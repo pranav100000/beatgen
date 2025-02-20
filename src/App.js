@@ -1,23 +1,78 @@
-import logo from './logo.svg';
 import './App.css';
+import { Button } from '@mui/material';
+import { MusicNote, Edit } from '@mui/icons-material';
+import NiceModal from '@ebay/nice-modal-react';
+import LoginModal from './components/LoginModal';
+import { useNavigate } from 'react-router-dom';
 
 function App() {
+  const navigate = useNavigate();
+  const showLoginModal = () => {
+    NiceModal.show(LoginModal);
+  };
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      <nav className="nav-header">
+        <div className="logo">beatgen</div>
+        <div className="nav-links">
+          <Button 
+            variant="text" 
+            href="/saved"
+            sx={{ color: '#1a237e', marginLeft: 2 }}
+          >
+            SAVED
+          </Button>
+          <Button 
+            variant="text" 
+            onClick={showLoginModal}
+            sx={{ color: '#1a237e', marginLeft: 2 }}
+          >
+            LOGIN
+          </Button>
+        </div>
+      </nav>
+      
+      <main className="main-content">
+        <h1>How would you like to create today?</h1>
+        <div className="action-links">
+          <Button
+            variant="outlined"
+            startIcon={<MusicNote />}
+            onClick={() => navigate('/new-project')}
+            sx={{
+              color: '#1a237e',
+              borderColor: '#1a237e',
+              padding: '10px 30px',
+              marginBottom: 2,
+              textTransform: 'none',
+              '&:hover': {
+                borderColor: '#1a237e',
+                backgroundColor: 'rgba(26, 35, 126, 0.04)'
+              }
+            }}
+          >
+            Begin with a template
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Edit />}
+            href="/customize"
+            sx={{
+              color: '#1a237e',
+              borderColor: '#1a237e',
+              padding: '10px 30px',
+              textTransform: 'none',
+              '&:hover': {
+                borderColor: '#1a237e',
+                backgroundColor: 'rgba(26, 35, 126, 0.04)'
+              }
+            }}
+          >
+            Customize your beats
+          </Button>
+        </div>
+      </main>
     </div>
   );
 }
