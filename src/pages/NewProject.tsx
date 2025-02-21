@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Box, IconButton, Button } from '@mui/material';
+import { Box, IconButton, Button, TextField } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
 import PauseIcon from '@mui/icons-material/Pause';
@@ -36,6 +36,7 @@ function NewProject() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [bpm, setBpm] = useState<number>(120);
 
   const storeRef = useRef<Store | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -44,6 +45,7 @@ function NewProject() {
   useEffect(() => {
     storeRef.current = new Store();
     storeRef.current.projectManager.createProject('New Project');
+    Tone.Transport.bpm.value = bpm;
   }, []);
 
   const handleAddTrack = async (trackTypeOrFile: string | File) => {
@@ -212,6 +214,16 @@ function NewProject() {
     );
   }, []);
 
+  const handleBpmChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newBpm = parseInt(event.target.value, 10);
+    if (!isNaN(newBpm) && newBpm > 0 && newBpm <= 999) {
+      setBpm(newBpm);
+      if (storeRef.current) {
+        Tone.getTransport().bpm.value = newBpm;
+      }
+    }
+  };
+
   return (
     <Box sx={{ 
       height: '100vh', 
@@ -226,24 +238,10 @@ function NewProject() {
         alignItems: 'center', 
         p: 1, 
         borderBottom: '1px solid #333',
-        gap: 2
-      }}>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size="small" sx={{ color: 'white' }}>
-            <ArrowBackIcon />
-          </IconButton>
-          <IconButton size="small" sx={{ color: 'white' }}>
-            <ArrowForwardIcon />
-          </IconButton>
-        </Box>
+        gap: 2,
+        paddingLeft: 2,
 
-        <IconButton 
-          size="small" 
-          sx={{ color: 'white' }}
-          onClick={handlePlayPause}
-        >
-          {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-        </IconButton>
+      }}>
 
         <Box sx={{ 
           display: 'flex', 
@@ -254,7 +252,51 @@ function NewProject() {
           py: 0.5,
           gap: 1
         }}>
-          <Box>120</Box>
+          <TextField
+            value={bpm}
+            onChange={handleBpmChange}
+            type="number"
+            onFocus={(e) => e.target.select()}
+            inputProps={{
+              min: 1,
+              max: 999,
+              style: { 
+                padding: '0px',
+                width: '28px',
+                color: 'white',
+                backgroundColor: 'transparent',
+                border: 'none',
+                textAlign: 'right',
+                cursor: 'pointer',
+              }
+            }}
+            sx={{
+              '& input::selection': {
+                backgroundColor: 'transparent',
+              },
+              '@keyframes gentleFlash': {
+                '0%': { backgroundColor: '#333' },
+                '50%': { backgroundColor: '#444' },
+                '100%': { backgroundColor: '#333' },
+              },
+              '& .MuiInput-root': {
+                fontSize: '1rem',
+              },
+              '& .MuiInput-root:before, & .MuiInput-root:after': {
+                display: 'none'
+              },
+              '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
+                display: 'none'
+              },
+              '& input:focus': {
+                backgroundColor: '#333',
+                outline: 'none',
+                borderRadius: '2px',
+                animation: 'gentleFlash 2s ease-in-out infinite',
+              }
+            }}
+            variant="standard"
+          />
           <Box sx={{ opacity: 0.7 }}>bpm</Box>
         </Box>
 
@@ -270,8 +312,12 @@ function NewProject() {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size="small" sx={{ color: 'white' }}>
-            <PlayArrowIcon />
+          <IconButton 
+            size="small" 
+            sx={{ color: 'white' }}
+            onClick={handlePlayPause}
+          >
+            {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
           </IconButton>
           <IconButton size="small" sx={{ color: 'white' }}>
             <SkipPreviousIcon />
