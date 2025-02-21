@@ -1,0 +1,56 @@
+.track-controls-sidebar {
+  padding: 8px;
+  background: #2a2a2a;
+  border-top: 1px solid #3a3a3a;
+}
+
+.track-control-item {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: #333;
+  border-radius: 4px;
+}
+
+.track-header {
+  margin-bottom: 8px;
+}
+
+.track-name-input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #fff;
+  padding: 4px;
+  width: 100%;
+}
+
+.track-name-input:hover,
+.track-name-input:focus {
+  border-color: #555;
+}
+
+.track-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.track-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.mute-button,
+.solo-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: #444;
+  color: #fff;
+  cursor: pointer;
+}
+
+.mute-button.active,
+.solo-button.active {
+  background: #666;
+} 

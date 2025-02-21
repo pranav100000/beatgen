@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Box, IconButton, Button } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
@@ -14,67 +14,91 @@ import Track from '../components/Track';
 import AddTrackMenu from '../components/AddTrackMenu';
 import { GRID_CONSTANTS } from '../constants/gridConstants';
 import PlaybackCursor from '../components/PlaybackCursor';
+import { Store } from '../core/state/store';
+import { Track as TrackType } from '../core/state/project';
+import { TrackControlsSidebar } from '../components/Sidebar/TrackControlsSidebar';
+import { AudioTrack } from '../core/audio-engine/audioEngine';
+import * as Tone from 'tone';
+
+interface TrackState extends TrackType, Omit<AudioTrack, 'id'> {
+  audioFile?: File;
+  channel: Tone.Channel;
+  volume: number;
+  pan: number;
+  muted: boolean;
+  soloed: boolean;
+}
 
 function NewProject() {
-  const [tracks, setTracks] = useState([]);
+  const [tracks, setTracks] = useState<TrackState[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  const animationFrameRef = useRef(null);
+  const storeRef = useRef<Store | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
+  // Initialize store only (not audio) on mount
   useEffect(() => {
-    let lastTimestamp = null;
+    storeRef.current = new Store();
+    storeRef.current.projectManager.createProject('New Project');
+  }, []);
 
-    const updatePlayback = (timestamp) => {
-      if (lastTimestamp === null) {
-        lastTimestamp = timestamp;
-      }
-      
-      const deltaTime = (timestamp - lastTimestamp) / 1000; // Convert to seconds
-      lastTimestamp = timestamp;
-
-      if (isPlaying) {
-        setCurrentTime(prevTime => prevTime + deltaTime);
-        animationFrameRef.current = requestAnimationFrame(updatePlayback);
-      }
-    };
-
-    if (isPlaying) {
-      animationFrameRef.current = requestAnimationFrame(updatePlayback);
+  const handleAddTrack = async (trackTypeOrFile: string | File) => {
+    if (!storeRef.current || !isInitialized) {
+      console.warn('Store not initialized');
+      return;
     }
 
-    // Cleanup function
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [isPlaying]);
+    try {
+      if (trackTypeOrFile instanceof File) {
+        // Handle audio file
+        const newTrack = storeRef.current.createTrack('Audio Track', 'audio');
+        const audioTrack = await storeRef.current.getAudioEngine().createTrack(newTrack.id, trackTypeOrFile);
+        
+        // Merge track properties
+        setTracks(prev => [...prev, { 
+          ...newTrack,
+          ...audioTrack,
+          audioFile: trackTypeOrFile
+        }]);
 
-  const handleAddTrack = (trackTypeOrFile) => {
-    if (trackTypeOrFile instanceof File) {
-      // Handle audio file
-      setTracks(prev => [...prev, { 
-        id: Date.now(), 
-        type: 'audio',
-        audioFile: trackTypeOrFile
-      }]);
-    } else {
-      // Handle other track types
-      setTracks(prev => [...prev, { 
-        id: Date.now(), 
-        type: trackTypeOrFile 
-      }]);
+      } else {
+        // Handle other track types
+        const newTrack = storeRef.current.createTrack(trackTypeOrFile, trackTypeOrFile as TrackType['type']);
+        const audioTrack = await storeRef.current.getAudioEngine().createTrack(newTrack.id);
+        
+        setTracks(prev => [...prev, {
+          ...newTrack,
+          ...audioTrack
+        }]);
+      }
+    } catch (error) {
+      console.error('Failed to create track:', error);
     }
   };
 
-  const handleDeleteTrack = (indexToDelete) => {
-    setTracks(prev => prev.filter((_, index) => index !== indexToDelete));
+  const handleDeleteTrack = (indexToDelete: number) => {
+    const trackToDelete = tracks[indexToDelete];
+    if (trackToDelete && storeRef.current) {
+      console.log('Deleting track:', trackToDelete.id);
+      storeRef.current.removeTrack(trackToDelete.id);
+      setTracks(prev => prev.filter((_, index) => index !== indexToDelete));
+    }
   };
 
-  const handleOpenMenu = (event) => {
+  const handleOpenMenu = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    // Initialize audio on first click if needed
+    if (!isInitialized && storeRef.current) {
+      try {
+        await storeRef.current.initialize();
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize audio:', error);
+      }
+    }
     setAnchorEl(event.currentTarget);
     setMenuOpen(true);
   };
@@ -84,11 +108,50 @@ function NewProject() {
     setAnchorEl(null);
   };
 
-  const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
+  const handlePlayPause = async () => {
+    if (!storeRef.current) return;
+
+    const transport = storeRef.current.getTransport();
+    try {
+      if (!isPlaying) {
+        console.log('🎮 UI: Triggering play');
+        await transport.play();
+        setIsPlaying(true);
+      } else {
+        console.log('🎮 UI: Triggering pause');
+        transport.pause();
+        setIsPlaying(false);
+      }
+    } catch (error) {
+      console.error('Playback control failed:', error);
+    }
   };
 
-  const formatTime = (timeInSeconds) => {
+  // Update UI time display based on transport position
+  useEffect(() => {
+    if (!isPlaying || !storeRef.current) return;
+
+    const updateTime = () => {
+      const transport = storeRef.current?.getTransport();
+      if (transport) {
+        // Get the current position from transport
+        setCurrentTime(transport.position);
+        animationFrameRef.current = requestAnimationFrame(updateTime);
+      }
+    };
+
+    // Start the animation frame loop
+    animationFrameRef.current = requestAnimationFrame(updateTime);
+
+    // Cleanup
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isPlaying]);
+
+  const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60);
     const seconds = Math.floor(timeInSeconds % 60);
     const tenths = Math.floor((timeInSeconds * 10) % 10);
@@ -98,6 +161,56 @@ function NewProject() {
   const gridLineStyle = {
     borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`,
   };
+
+  // Add these handlers
+  const handleVolumeChange = useCallback((trackId: string, volume: number) => {
+    if (!storeRef.current) return;
+    storeRef.current.getAudioEngine().setTrackVolume(trackId, volume);
+    setTracks(currentTracks => 
+      currentTracks.map(track => 
+        track.id === trackId ? { ...track, volume } : track
+      )
+    );
+  }, []);
+
+  const handlePanChange = useCallback((trackId: string, pan: number) => {
+    if (!storeRef.current) return;
+    storeRef.current.getAudioEngine().setTrackPan(trackId, pan);
+    setTracks(currentTracks => 
+      currentTracks.map(track => 
+        track.id === trackId ? { ...track, pan } : track
+      )
+    );
+  }, []);
+
+  const handleMute = useCallback((trackId: string, muted: boolean) => {
+    if (!storeRef.current) return;
+    storeRef.current.getAudioEngine().setTrackMute(trackId, muted);
+    setTracks(currentTracks => 
+      currentTracks.map(track => 
+        track.id === trackId ? { ...track, muted } : track
+      )
+    );
+  }, []);
+
+  const handleSolo = useCallback((trackId: string, soloed: boolean) => {
+    if (!storeRef.current) return;
+    setTracks(currentTracks => 
+      currentTracks.map(track => 
+        track.id === trackId ? { ...track, soloed } : track
+      )
+    );
+  }, []);
+
+  const handleTrackNameChange = useCallback((trackId: string, name: string) => {
+    if (!storeRef.current) return;
+    storeRef.current.getAudioEngine().setTrackName(trackId, name);
+    setTracks(currentTracks => 
+      currentTracks.map(track => 
+        track.id === trackId ? { ...track, name } : track
+      )
+    );
+  }, []);
 
   return (
     <Box sx={{ 
@@ -184,23 +297,52 @@ function NewProject() {
         <Box sx={{ 
           width: GRID_CONSTANTS.sidebarWidth,
           borderRight: gridLineStyle.borderRight,
-          p: 2,
-          bgcolor: '#1A1A1A'
+          bgcolor: '#1A1A1A',
+          display: 'flex',
+          flexDirection: 'column'
         }}>
-          <Button
-            startIcon={<AddIcon />}
-            variant="contained"
-            onClick={handleOpenMenu}
-            sx={{
-              bgcolor: '#333',
-              color: 'white',
-              '&:hover': {
-                bgcolor: '#444'
-              }
-            }}
-          >
-            Add Track
-          </Button>
+          {/* Header section with Add Track button */}
+          <Box sx={{
+            height: GRID_CONSTANTS.headerHeight,
+            borderBottom: gridLineStyle.borderRight,
+            display: 'flex',
+            alignItems: 'center',
+            p: 1.5,
+            boxSizing: 'border-box'
+          }}>
+            <Button
+              startIcon={<AddIcon />}
+              variant="contained"
+              onClick={handleOpenMenu}
+              sx={{
+                bgcolor: '#333',
+                color: 'white',
+                '&:hover': { bgcolor: '#444' },
+                height: 36,
+                textTransform: 'none'
+              }}
+            >
+              Add Track
+            </Button>
+          </Box>
+
+          {/* Track controls section */}
+          <Box sx={{ 
+            flex: 1, 
+            overflow: 'auto',
+            px: 1.5,
+            py: 0
+          }}>
+            <TrackControlsSidebar
+              tracks={tracks}
+              onVolumeChange={handleVolumeChange}
+              onPanChange={handlePanChange}
+              onMute={handleMute}
+              onSolo={handleSolo}
+              onTrackNameChange={handleTrackNameChange}
+              onDeleteTrack={handleDeleteTrack}
+            />
+          </Box>
         </Box>
 
         {/* Timeline Area */}
@@ -211,18 +353,10 @@ function NewProject() {
             position: 'sticky',
             top: 0,
             bgcolor: '#000',
-            zIndex: 2
+            zIndex: 2,
+            height: GRID_CONSTANTS.headerHeight,
+            boxSizing: 'border-box'
           }}>
-            {/* Empty space for track controls alignment */}
-            <Box sx={{ 
-              width: GRID_CONSTANTS.controlsWidth,
-              height: GRID_CONSTANTS.headerHeight,
-              borderRight: gridLineStyle.borderRight,
-              borderBottom: gridLineStyle.borderRight,
-              bgcolor: '#1A1A1A',
-              flexShrink: 0
-            }} />
-
             {/* Measure numbers container */}
             <Box sx={{ 
               display: 'flex',
@@ -283,7 +417,6 @@ function NewProject() {
                 <Track 
                   key={track.id}
                   index={index}
-                  onDelete={handleDeleteTrack}
                   type={track.type}
                   audioFile={track.audioFile}
                   isPlaying={isPlaying}

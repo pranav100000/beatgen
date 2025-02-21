@@ -1,0 +1,79 @@
+export interface Track {
+  id: string;
+  name: string;
+  type: 'audio' | 'midi' | 'video';
+  volume: number;
+  pan: number;
+  muted: boolean;
+  soloed: boolean;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  tempo: number;
+  timeSignature: [number, number];
+  tracks: Track[];
+}
+
+export class ProjectManager {
+  private currentProject?: Project;
+
+  public createProject(name: string): Project {
+    this.currentProject = {
+      id: crypto.randomUUID(),
+      name,
+      tempo: 120,
+      timeSignature: [4, 4],
+      tracks: []
+    };
+    return this.currentProject;
+  }
+
+  public getCurrentProject(): Project | undefined {
+    return this.currentProject;
+  }
+
+  public addTrack(name: string, type: Track['type'] = 'audio'): Track {
+    if (!this.currentProject) {
+      throw new Error('No project loaded');
+    }
+
+    const track: Track = {
+      id: crypto.randomUUID(),
+      name,
+      type,
+      volume: 1,
+      pan: 0,
+      muted: false,
+      soloed: false
+    };
+
+    this.currentProject.tracks.push(track);
+    return track;
+  }
+
+  public getTrackById(id: string): Track | undefined {
+    return this.currentProject?.tracks.find(track => track.id === id);
+  }
+
+  public removeTrack(id: string): void {
+    if (!this.currentProject) return;
+    
+    this.currentProject.tracks = this.currentProject.tracks.filter(
+      track => track.id !== id
+    );
+  }
+
+  public setTempo(tempo: number): void {
+    if (this.currentProject) {
+      this.currentProject.tempo = tempo;
+    }
+  }
+
+  public setTimeSignature(numerator: number, denominator: number): void {
+    if (this.currentProject) {
+      this.currentProject.timeSignature = [numerator, denominator];
+    }
+  }
+}

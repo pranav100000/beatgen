@@ -5,6 +5,25 @@ import PianoIcon from '@mui/icons-material/Piano';
 import GridOnIcon from '@mui/icons-material/GridOn';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { SvgIconComponent } from '@mui/icons-material';
+
+interface TrackType {
+  id: string;
+  title: string;
+  description: string;
+  icon: SvgIconComponent;
+  color: string;
+  isUpload?: boolean;
+}
+
+interface TrackOptionProps {
+  title: string;
+  description: string;
+  icon: SvgIconComponent;
+  color: string;
+  onClick: (file?: File) => void;
+  isUpload?: boolean;
+}
 
 const trackTypes = [
   {
@@ -45,15 +64,15 @@ const trackTypes = [
   }
 ];
 
-const TrackOption = ({ title, description, icon: Icon, color, onClick, isUpload }) => {
+const TrackOption: React.FC<TrackOptionProps> = ({ title, description, icon: Icon, color, onClick, isUpload }) => {
   const handleClick = (e) => {
     if (isUpload) {
       // Create a hidden file input
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'audio/*';
-      input.onchange = (e) => {
-        const file = e.target.files[0];
+      input.onchange = (e: Event) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
           onClick(file);
         }
