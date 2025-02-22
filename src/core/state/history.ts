@@ -88,6 +88,56 @@ export class DeleteTrackAction implements Action {
     }
 }
 
+// Action for moving a track
+export class MoveTrackAction implements Action {
+    type = 'MOVE_TRACK';
+    private store: Store;
+    private setTracks: React.Dispatch<React.SetStateAction<TrackState[]>>;
+    private trackId: string;
+    private oldPosition: { x: number; y: number };
+    private newPosition: { x: number; y: number };
+
+    constructor(
+        store: Store,
+        setTracks: React.Dispatch<React.SetStateAction<TrackState[]>>,
+        trackId: string,
+        oldPosition: { x: number; y: number },
+        newPosition: { x: number; y: number }
+    ) {
+        this.store = store;
+        this.setTracks = setTracks;
+        this.trackId = trackId;
+        this.oldPosition = oldPosition;
+        this.newPosition = newPosition;
+    }
+
+    async execute(): Promise<void> {
+        this.setTracks(prev => prev.map(track => 
+            track.id === this.trackId 
+                ? { ...track, position: this.newPosition }
+                : track
+        ));
+        console.log('🔄 Execute MoveTrackAction:', { 
+            trackId: this.trackId, 
+            from: this.oldPosition, 
+            to: this.newPosition 
+        });
+    }
+
+    async undo(): Promise<void> {
+        this.setTracks(prev => prev.map(track => 
+            track.id === this.trackId 
+                ? { ...track, position: this.oldPosition }
+                : track
+        ));
+        console.log('↩️ Undo MoveTrackAction:', { 
+            trackId: this.trackId, 
+            from: this.newPosition, 
+            to: this.oldPosition 
+        });
+    }
+}
+
 // History manager class
 export class HistoryManager {
     private undoStack: Action[] = [];

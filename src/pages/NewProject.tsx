@@ -24,8 +24,8 @@ import * as Tone from 'tone';
 import BPMControl from '../components/BPMControl';
 import TimeSignatureDisplay from '../components/TimeSignatureDisplay';
 import { db } from '../core/db/dexie-client';
-import { historyManager, AddTrackAction, DeleteTrackAction } from '../core/state/history';
-import { TrackState } from '../core/types/track';
+import { historyManager, AddTrackAction, DeleteTrackAction, MoveTrackAction } from '../core/state/history';
+import { TrackState, Position } from '../core/types/track';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -106,12 +106,16 @@ function NewProject() {
           throw new Error('Unsupported file type');
         }
 
-        // Create track data
+        // Create track data with initial position
         const trackData: TrackState = {
           ...newTrack,
           ...audioTrack,
           audioFile: trackTypeOrFile,
-          dbId
+          dbId,
+          position: {
+            x: 0,
+            y: tracks.length * GRID_CONSTANTS.trackHeight
+          }
         };
 
         // Create and execute the add track action
@@ -125,7 +129,11 @@ function NewProject() {
         
         const trackData: TrackState = {
           ...newTrack,
-          ...audioTrack
+          ...audioTrack,
+          position: {
+            x: 0,
+            y: tracks.length * GRID_CONSTANTS.trackHeight
+          }
         };
 
         // Create and execute the add track action
@@ -306,6 +314,35 @@ function NewProject() {
       );
       // Update Tone.js time signature if needed
       Tone.getTransport().timeSignature = [newTimeSignature[0], newTimeSignature[1]];
+    }
+  };
+
+  const positionsAreEqual = (p1: Position, p2: Position): boolean => {
+    return p1.x === p2.x && p1.y === p2.y;
+  };
+
+  const handleTrackPositionChange = async (trackId: string, newPosition: Position, isDragEnd: boolean) => {
+    const track = tracks.find(t => t.id === trackId);
+    if (!track || !storeRef.current) return;
+
+    if (isDragEnd && !positionsAreEqual(track.position, newPosition)) {
+      // Only create a history event when the drag ends
+      const oldPosition = track.position;
+      const action = new MoveTrackAction(
+        storeRef.current,
+        setTracks,
+        trackId,
+        oldPosition,
+        newPosition
+      );
+      await historyManager.executeAction(action);
+    } else {
+      // During drag, just update the state directly
+      setTracks(prev => prev.map(t => 
+        t.id === trackId 
+          ? { ...t, position: newPosition }
+          : t
+      ));
     }
   };
 
@@ -509,13 +546,15 @@ function NewProject() {
           {tracks.length > 0 ? (
             <Box sx={{ 
               minHeight: '100%',
-              position: 'relative'
+              position: 'relative',
+              overflow: 'hidden'
             }}>
               <PlaybackCursor currentTime={currentTime} />
 
               {tracks.map((track, index) => (
                 <Track 
                   key={track.id}
+                  id={track.id}
                   index={index}
                   type={track.type}
                   audioFile={track.audioFile}
@@ -523,6 +562,8 @@ function NewProject() {
                   currentTime={currentTime}
                   gridLineStyle={gridLineStyle}
                   measureCount={GRID_CONSTANTS.measureCount}
+                  position={track.position}
+                  onPositionChange={(newPosition, isDragEnd) => handleTrackPositionChange(track.id, newPosition, isDragEnd)}
                 />
               ))}
             </Box>
