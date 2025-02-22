@@ -4,7 +4,7 @@ export const GRID_CONSTANTS = {
   measureWidth: 200,
   borderWidth: 1,
   borderColor: '#333',
-  sidebarWidth: 224,
+  sidebarWidth: 200,
   measureCount: 6,
   pixelsPerSecond: 100,
   controlsWidth: 0,

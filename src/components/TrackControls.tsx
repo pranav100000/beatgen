@@ -45,7 +45,7 @@ function TrackControls({
         flexDirection: 'column',
         height: GRID_CONSTANTS.trackHeight,
         bgcolor: '#1A1A1A',
-        p: 1.5,
+        p: 0.5,
         alignItems: 'center',
         boxSizing: 'border-box'
       }}>
@@ -53,7 +53,7 @@ function TrackControls({
           display: 'flex',
           flexDirection: 'column',
           width: '100%',
-          gap: 0.5
+          gap: 1
         }}>
           <Box sx={{ 
             display: 'flex', 
@@ -72,22 +72,6 @@ function TrackControls({
                 fontSize: '0.85rem'
               }}
             />
-            <IconButton 
-              size="small" 
-              sx={{ 
-                color: '#666',
-                padding: 0.5
-              }}
-              onClick={() => onDelete(index)}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </Box>
-          <Box sx={{ 
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1
-          }}>
             <Box sx={{ display: 'flex', gap: 0.5 }}>
               <IconButton 
                 size="small" 
@@ -98,7 +82,7 @@ function TrackControls({
                 }}
                 onClick={() => onMute(!muted)}
               >
-                <VolumeUpIcon sx={{ fontSize: '1rem' }} />
+                <VolumeUpIcon sx={{ fontSize: 'small' }} />
               </IconButton>
               <IconButton 
                 size="small" 
@@ -109,10 +93,27 @@ function TrackControls({
                 }}
                 onClick={() => onSolo(!soloed)}
               >
-                <MicIcon sx={{ fontSize: '1rem' }} />
+                <MicIcon sx={{ fontSize: 'small' }} />
               </IconButton>
+            <IconButton 
+              size="small" 
+              sx={{ 
+                color: '#666',
+                padding: 0.5,
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+              }}
+              onClick={() => onDelete(index)}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
             </Box>
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          </Box>
+          <Box sx={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3
+          }}>
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
               <Slider
                 size="small"
                 value={volume}
