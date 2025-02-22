@@ -510,9 +510,10 @@ function NewProject() {
                     left: `${(i * GRID_CONSTANTS.measureWidth)}px`,
                     top: 0,
                     bottom: 0,
-                    width: GRID_CONSTANTS.borderWidth,
+                    width: 2,
+                    height: '1',
                     bgcolor: GRID_CONSTANTS.borderColor,
-                    zIndex: 1
+                    zIndex: 10
                   }}
                 />
               ))}
@@ -549,6 +550,58 @@ function NewProject() {
               position: 'relative',
               overflow: 'hidden'
             }}>
+              {/* Grid Overlay */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  pointerEvents: 'none',
+                  zIndex: 1000
+                }}
+              >
+                {/* Major grid lines (measures) */}
+                {Array.from({ length: GRID_CONSTANTS.measureCount + 1 }).map((_, i) => (
+                  <Box
+                    key={`major-${i}`}
+                    sx={{
+                      position: 'absolute',
+                      left: `${i * GRID_CONSTANTS.measureWidth}px`,
+                      top: 0,
+                      bottom: 0,
+                      width: '1px',
+                      bgcolor: GRID_CONSTANTS.borderColor,
+                      opacity: 1,
+                      zIndex: 1000
+                    }}
+                  />
+                ))}
+
+                {/* Minor grid lines (beats) */}
+                {Array.from({ length: GRID_CONSTANTS.measureCount * GRID_CONSTANTS.gridSubdivisions }).map((_, i) => {
+                  if (i % GRID_CONSTANTS.gridSubdivisions !== 0) { // Skip positions where major lines exist
+                    return (
+                      <Box
+                        key={`minor-${i}`}
+                        sx={{
+                          position: 'absolute',
+                          left: `${i * (GRID_CONSTANTS.measureWidth / GRID_CONSTANTS.gridSubdivisions)}px`,
+                          top: 0,
+                          bottom: 0,
+                          width: '1px',
+                          bgcolor: GRID_CONSTANTS.borderColor,
+                          opacity: 0.3,
+                          zIndex: 1000
+                        }}
+                      />
+                    );
+                  }
+                  return null;
+                })}
+              </Box>
+
               <PlaybackCursor currentTime={currentTime} />
 
               {tracks.map((track, index) => (

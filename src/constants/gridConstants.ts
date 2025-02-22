@@ -5,8 +5,10 @@ export const GRID_CONSTANTS = {
   borderWidth: 1,
   borderColor: '#333',
   sidebarWidth: 200,
-  measureCount: 6,
+  measureCount: 8,
   pixelsPerSecond: 100,
   controlsWidth: 0,
   gridSubdivisions: 4,
+  minorGridOpacity: 0.3,
+  majorGridOpacity: 1,
 } as const; 
