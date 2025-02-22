@@ -8,8 +8,8 @@ import AddIcon from '@mui/icons-material/Add';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import Track from '../components/Track';
 import AddTrackMenu from '../components/AddTrackMenu';
 import { GRID_CONSTANTS } from '../constants/gridConstants';
@@ -19,6 +19,8 @@ import { Track as TrackType } from '../core/state/project';
 import { TrackControlsSidebar } from '../components/Sidebar/TrackControlsSidebar';
 import { AudioTrack } from '../core/audio-engine/audioEngine';
 import * as Tone from 'tone';
+import BPMControl from '../components/BPMControl';
+import TimeSignatureDisplay from '../components/TimeSignatureDisplay';
 
 interface TrackState extends TrackType, Omit<AudioTrack, 'id'> {
   audioFile?: File;
@@ -240,9 +242,7 @@ function NewProject() {
         borderBottom: '1px solid #333',
         gap: 2,
         paddingLeft: 2,
-
       }}>
-
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
@@ -252,64 +252,11 @@ function NewProject() {
           py: 0.5,
           gap: 1
         }}>
-          <TextField
-            value={bpm}
-            onChange={handleBpmChange}
-            type="number"
-            onFocus={(e) => e.target.select()}
-            inputProps={{
-              min: 1,
-              max: 999,
-              style: { 
-                padding: '0px',
-                width: '28px',
-                color: 'white',
-                backgroundColor: 'transparent',
-                border: 'none',
-                textAlign: 'right',
-                cursor: 'pointer',
-              }
-            }}
-            sx={{
-              '& input::selection': {
-                backgroundColor: 'transparent',
-              },
-              '@keyframes gentleFlash': {
-                '0%': { backgroundColor: '#333' },
-                '50%': { backgroundColor: '#444' },
-                '100%': { backgroundColor: '#333' },
-              },
-              '& .MuiInput-root': {
-                fontSize: '1rem',
-              },
-              '& .MuiInput-root:before, & .MuiInput-root:after': {
-                display: 'none'
-              },
-              '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
-                display: 'none'
-              },
-              '& input:focus': {
-                backgroundColor: '#333',
-                outline: 'none',
-                borderRadius: '2px',
-                animation: 'gentleFlash 2s ease-in-out infinite',
-              }
-            }}
-            variant="standard"
-          />
+          <BPMControl bpm={bpm} onBpmChange={handleBpmChange} />
           <Box sx={{ opacity: 0.7 }}>bpm</Box>
         </Box>
 
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center',
-          bgcolor: '#1E1E1E',
-          borderRadius: 1,
-          px: 2,
-          py: 0.5
-        }}>
-          4 / 4
-        </Box>
+        <TimeSignatureDisplay topNumber={4} bottomNumber={4} />
 
         <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton 
