@@ -10,6 +10,8 @@ import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import UndoIcon from '@mui/icons-material/Undo';
+import RedoIcon from '@mui/icons-material/Redo';
 import Track from '../components/Track';
 import AddTrackMenu from '../components/AddTrackMenu';
 import { GRID_CONSTANTS } from '../constants/gridConstants';
@@ -262,6 +264,15 @@ function NewProject() {
         gap: 2,
         paddingLeft: 2,
       }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <IconButton size="small" sx={{ color: 'white' }}>
+            <UndoIcon />
+          </IconButton>
+          <IconButton size="small" sx={{ color: 'white' }}>
+            <RedoIcon />
+          </IconButton>
+        </Box>
+
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
