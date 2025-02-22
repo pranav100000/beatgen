@@ -39,6 +39,7 @@ function NewProject() {
   const [currentTime, setCurrentTime] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
   const [bpm, setBpm] = useState<number>(120);
+  const [timeSignature, setTimeSignature] = useState<[number, number]>([4, 4]);
 
   const storeRef = useRef<Store | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -226,6 +227,24 @@ function NewProject() {
     }
   };
 
+  const handleTimeSignatureChange = (numerator?: number, denominator?: number) => {
+    const [currentNumerator, currentDenominator] = timeSignature;
+    const newTimeSignature: [number, number] = [
+      numerator ?? currentNumerator,
+      denominator ?? currentDenominator
+    ];
+    
+    setTimeSignature(newTimeSignature);
+    if (storeRef.current) {
+      storeRef.current.projectManager.setTimeSignature(
+        newTimeSignature[0],
+        newTimeSignature[1]
+      );
+      // Update Tone.js time signature if needed
+      Tone.getTransport().timeSignature = [newTimeSignature[0], newTimeSignature[1]];
+    }
+  };
+
   return (
     <Box sx={{ 
       height: '100vh', 
@@ -256,7 +275,12 @@ function NewProject() {
           <Box sx={{ opacity: 0.7 }}>bpm</Box>
         </Box>
 
-        <TimeSignatureDisplay topNumber={4} bottomNumber={4} />
+        <TimeSignatureDisplay 
+          topNumber={timeSignature[0]} 
+          bottomNumber={timeSignature[1]}
+          onTopNumberChange={(value) => handleTimeSignatureChange(value, undefined)}
+          onBottomNumberChange={(value) => handleTimeSignatureChange(undefined, value)}
+        />
 
         <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton 
