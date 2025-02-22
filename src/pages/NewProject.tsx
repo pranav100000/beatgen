@@ -23,15 +23,9 @@ import { AudioTrack } from '../core/audio-engine/audioEngine';
 import * as Tone from 'tone';
 import BPMControl from '../components/BPMControl';
 import TimeSignatureDisplay from '../components/TimeSignatureDisplay';
-
-interface TrackState extends TrackType, Omit<AudioTrack, 'id'> {
-  audioFile?: File;
-  channel: Tone.Channel;
-  volume: number;
-  pan: number;
-  muted: boolean;
-  soloed: boolean;
-}
+import { db } from '../core/db/dexie-client';
+import { historyManager, AddTrackAction, DeleteTrackAction } from '../core/state/history';
+import { TrackState } from '../core/types/track';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -42,15 +36,50 @@ function NewProject() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [bpm, setBpm] = useState<number>(120);
   const [timeSignature, setTimeSignature] = useState<[number, number]>([4, 4]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   const storeRef = useRef<Store | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+
+  // Update undo/redo state whenever history changes
+  useEffect(() => {
+    const updateHistoryState = () => {
+      setCanUndo(historyManager.canUndo());
+      setCanRedo(historyManager.canRedo());
+    };
+
+    // Initial state
+    updateHistoryState();
+
+    // Subscribe to history changes
+    historyManager.subscribe(updateHistoryState);
+
+    return () => {
+      historyManager.unsubscribe(updateHistoryState);
+    };
+  }, []);
 
   // Initialize store only (not audio) on mount
   useEffect(() => {
     storeRef.current = new Store();
     storeRef.current.projectManager.createProject('New Project');
     Tone.Transport.bpm.value = bpm;
+
+    // Clear database on window unload/refresh
+    const handleUnload = async () => {
+      console.log('🧹 Cleaning up database...');
+      try {
+        await db.clearAllFiles();
+      } catch (error) {
+        console.error('Failed to clear database:', error);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+    };
   }, []);
 
   const handleAddTrack = async (trackTypeOrFile: string | File) => {
@@ -65,34 +94,67 @@ function NewProject() {
         const newTrack = storeRef.current.createTrack('Audio Track', 'audio');
         const audioTrack = await storeRef.current.getAudioEngine().createTrack(newTrack.id, trackTypeOrFile);
         
-        // Merge track properties
-        setTracks(prev => [...prev, { 
+        // Save to database
+        let dbId: number;
+        if (trackTypeOrFile.type.includes('audio')) {
+          const duration = await db.getAudioDuration(trackTypeOrFile);
+          dbId = await db.addAudioFile(trackTypeOrFile, duration);
+        } else if (trackTypeOrFile.type.includes('midi')) {
+          // For MIDI files, we could potentially extract tempo and time signature here
+          dbId = await db.addMidiFile(trackTypeOrFile);
+        } else {
+          throw new Error('Unsupported file type');
+        }
+
+        // Create track data
+        const trackData: TrackState = {
           ...newTrack,
           ...audioTrack,
-          audioFile: trackTypeOrFile
-        }]);
+          audioFile: trackTypeOrFile,
+          dbId
+        };
+
+        // Create and execute the add track action
+        const action = new AddTrackAction(storeRef.current, trackData, setTracks);
+        await historyManager.executeAction(action);
 
       } else {
         // Handle other track types
         const newTrack = storeRef.current.createTrack(trackTypeOrFile, trackTypeOrFile as TrackType['type']);
         const audioTrack = await storeRef.current.getAudioEngine().createTrack(newTrack.id);
         
-        setTracks(prev => [...prev, {
+        const trackData: TrackState = {
           ...newTrack,
           ...audioTrack
-        }]);
+        };
+
+        // Create and execute the add track action
+        const action = new AddTrackAction(storeRef.current, trackData, setTracks);
+        await historyManager.executeAction(action);
       }
     } catch (error) {
       console.error('Failed to create track:', error);
     }
   };
 
-  const handleDeleteTrack = (indexToDelete: number) => {
+  const handleDeleteTrack = async (indexToDelete: number) => {
     const trackToDelete = tracks[indexToDelete];
     if (trackToDelete && storeRef.current) {
-      console.log('Deleting track:', trackToDelete.id);
-      storeRef.current.removeTrack(trackToDelete.id);
-      setTracks(prev => prev.filter((_, index) => index !== indexToDelete));
+      // Create and execute the delete track action
+      const action = new DeleteTrackAction(storeRef.current, trackToDelete, setTracks);
+      await historyManager.executeAction(action);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (historyManager.canUndo()) {
+      await historyManager.undo();
+    }
+  };
+
+  const handleRedo = async () => {
+    if (historyManager.canRedo()) {
+      await historyManager.redo();
     }
   };
 
@@ -265,10 +327,20 @@ function NewProject() {
         paddingLeft: 2,
       }}>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size="small" sx={{ color: 'white' }}>
+          <IconButton 
+            size="small" 
+            sx={{ color: canUndo ? 'white' : '#666' }}
+            onClick={handleUndo}
+            disabled={!canUndo}
+          >
             <UndoIcon />
           </IconButton>
-          <IconButton size="small" sx={{ color: 'white' }}>
+          <IconButton 
+            size="small" 
+            sx={{ color: canRedo ? 'white' : '#666' }}
+            onClick={handleRedo}
+            disabled={!canRedo}
+          >
             <RedoIcon />
           </IconButton>
         </Box>
