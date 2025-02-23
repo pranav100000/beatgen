@@ -123,7 +123,14 @@ const TrackOption: React.FC<TrackOptionProps> = ({ title, description, icon: Ico
   );
 };
 
-function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }) {
+interface AddTrackMenuProps {
+  open: boolean;
+  onClose: () => void;
+  onSelectTrack: (trackIdOrFile: string | File) => void;
+  anchorEl: HTMLElement | null;
+}
+
+function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuProps) {
   const handleTrackSelect = (trackIdOrFile) => {
     onSelectTrack(trackIdOrFile);
     onClose();

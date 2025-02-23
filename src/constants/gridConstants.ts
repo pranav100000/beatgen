@@ -12,7 +12,6 @@ export const GRID_CONSTANTS = {
   minorGridOpacity: 0.3,
   majorGridOpacity: 1,
   beatsPerMeasure: 4,
-  minTrackWidth: 20, // Minimum width for a track in pixels
 } as const;
 
 /**
@@ -41,10 +40,7 @@ export const calculateTrackWidth = (durationInSeconds: number, bpm: number): num
   const measuresCount = totalBeats / GRID_CONSTANTS.beatsPerMeasure;
   
   // Convert measures to pixels
-  const width = Math.max(
-    measuresCount * GRID_CONSTANTS.measureWidth,
-    GRID_CONSTANTS.minTrackWidth // Use new minimum width
-  );
+  const width = measuresCount * GRID_CONSTANTS.measureWidth;
 
   console.log('Track width calculation results:', {
     beatsPerSecond,
