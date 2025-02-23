@@ -163,6 +163,7 @@ export const TimeSignatureDisplay: React.FC<TimeSignatureDisplayProps> = ({
         borderRadius: 1,
         px: 2,
         py: 0.5,
+        height: '24px',
       }}
     >
       <TimeSignatureNumber value={topNumber} onClick={handleTopClick} />

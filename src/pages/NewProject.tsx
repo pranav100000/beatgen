@@ -417,7 +417,6 @@ function NewProject() {
           gap: 1
         }}>
           <BPMControl bpm={bpm} onBpmChange={handleBpmChange} />
-          <Box sx={{ opacity: 0.7 }}>bpm</Box>
         </Box>
 
         <TimeSignatureDisplay 
