@@ -29,56 +29,58 @@ const BPMControl: React.FC<BPMControlProps> = ({ bpm, onBpmChange }) => {
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-      <TextField
-        value={bpm}
-        onChange={onBpmChange}
-        onKeyDown={handleKeyDown}
-        type="number"
-        onFocus={handleSelect}
-        onClick={handleSelect}
-        inputRef={inputRef}
-        inputProps={{
-          min: 1,
-          max: 999,
-          style: {
-            padding: '0px 2px',
-            width: getInputWidth(bpm),
-            color: 'white',
-            backgroundColor: 'transparent',
-            border: 'none',
-            textAlign: 'center',
-            cursor: 'pointer',
-            caretColor: 'transparent',
-          },
-        }}
-        sx={{
-          '& input::selection': {
-            backgroundColor: 'transparent',
-          },
-          '@keyframes gentleFlash': {
-            '0%': { backgroundColor: '#333' },
-            '50%': { backgroundColor: '#444' },
-            '100%': { backgroundColor: '#333' },
-          },
-          '& .MuiInput-root': {
-            fontSize: '1rem',
-            width: 'auto',
-          },
-          '& .MuiInput-root:before, & .MuiInput-root:after': {
-            display: 'none',
-          },
-          '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
-            display: 'none',
-          },
-          '& input:focus': {
-            backgroundColor: '#333',
-            outline: 'none',
-            borderRadius: '2px',
-            animation: 'gentleFlash 2s ease-in-out infinite',
-          },
-        }}
-        variant="standard"
-      />
+      <Box sx={{ width: '40px' }}>
+        <TextField
+          value={bpm}
+          onChange={onBpmChange}
+          onKeyDown={handleKeyDown}
+          type="number"
+          onFocus={handleSelect}
+          onClick={handleSelect}
+          inputRef={inputRef}
+          inputProps={{
+            min: 1,
+            max: 999,
+            style: {
+              padding: '0px 2px',
+              width: getInputWidth(bpm),
+              color: 'white',
+              backgroundColor: 'transparent',
+              border: 'none',
+              textAlign: 'center',
+              cursor: 'pointer',
+              caretColor: 'transparent',
+            },
+          }}
+          sx={{
+            '& input::selection': {
+              backgroundColor: 'transparent',
+            },
+            '@keyframes gentleFlash': {
+              '0%': { backgroundColor: '#333' },
+              '50%': { backgroundColor: '#444' },
+              '100%': { backgroundColor: '#333' },
+            },
+            '& .MuiInput-root': {
+              fontSize: '1rem',
+              width: 'auto',
+            },
+            '& .MuiInput-root:before, & .MuiInput-root:after': {
+              display: 'none',
+            },
+            '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
+              display: 'none',
+            },
+            '& input:focus': {
+              backgroundColor: '#333',
+              outline: 'none',
+              borderRadius: '2px',
+              animation: 'gentleFlash 2s ease-in-out infinite',
+            },
+          }}
+          variant="standard"
+        />
+      </Box>
       <Box sx={{ opacity: 0.7, ml: 1 }}>bpm</Box>
     </Box>
   );
