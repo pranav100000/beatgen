@@ -11,4 +11,47 @@ export const GRID_CONSTANTS = {
   gridSubdivisions: 4,
   minorGridOpacity: 0.3,
   majorGridOpacity: 1,
-} as const; 
+  beatsPerMeasure: 4,
+  minTrackWidth: 20, // Minimum width for a track in pixels
+} as const;
+
+/**
+ * Calculate track width based on duration and BPM
+ * Example: At 120 BPM, a 30-second track = 60 beats = 15 bars (measures)
+ *          At 60 BPM, a 30-second track = 30 beats = 7.5 bars (measures)
+ * 
+ * Formula: 
+ * 1. Beats = Duration * (BPM / 60)
+ * 2. Measures = Beats / BeatsPerMeasure
+ * 3. Width = Measures * MeasureWidth
+ */
+export const calculateTrackWidth = (durationInSeconds: number, bpm: number): number => {
+  console.log('Calculating track width:', {
+    durationInSeconds,
+    bpm,
+    beatsPerMeasure: GRID_CONSTANTS.beatsPerMeasure,
+    measureWidth: GRID_CONSTANTS.measureWidth
+  });
+
+  // Calculate total beats in the duration
+  const beatsPerSecond = bpm / 60;
+  const totalBeats = durationInSeconds * beatsPerSecond;
+  
+  // Convert beats to measures
+  const measuresCount = totalBeats / GRID_CONSTANTS.beatsPerMeasure;
+  
+  // Convert measures to pixels
+  const width = Math.max(
+    measuresCount * GRID_CONSTANTS.measureWidth,
+    GRID_CONSTANTS.minTrackWidth // Use new minimum width
+  );
+
+  console.log('Track width calculation results:', {
+    beatsPerSecond,
+    totalBeats,
+    measuresCount,
+    finalWidth: width
+  });
+
+  return width;
+}; 

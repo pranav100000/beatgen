@@ -16,4 +16,6 @@ export interface TrackState extends TrackType, Omit<AudioTrack, 'id'> {
     soloed: boolean;
     dbId?: number;
     position: Position; // Track's position in the grid
+    duration?: number; // Duration in seconds
+    _calculatedWidth?: number; // Width in pixels based on duration and BPM
 } 
