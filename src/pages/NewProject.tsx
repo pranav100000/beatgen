@@ -14,7 +14,7 @@ import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
 import Track from '../components/Track';
 import AddTrackMenu from '../components/AddTrackMenu';
-import { GRID_CONSTANTS } from '../constants/gridConstants';
+import { GRID_CONSTANTS, calculateTrackWidth } from '../constants/gridConstants';
 import PlaybackCursor from '../components/PlaybackCursor';
 import { Store } from '../core/state/store';
 import { Track as TrackType } from '../core/state/project';
@@ -96,9 +96,17 @@ function NewProject() {
         
         // Save to database
         let dbId: number;
+        let duration: number | undefined;
+        
         if (trackTypeOrFile.type.includes('audio')) {
-          const duration = await db.getAudioDuration(trackTypeOrFile);
+          duration = await db.getAudioDuration(trackTypeOrFile);
           dbId = await db.addAudioFile(trackTypeOrFile, duration);
+          
+          console.log('Adding audio track with duration:', {
+            duration,
+            bpm,
+            expectedWidth: duration ? calculateTrackWidth(duration, bpm) : undefined
+          });
         } else if (trackTypeOrFile.type.includes('midi')) {
           // For MIDI files, we could potentially extract tempo and time signature here
           dbId = await db.addMidiFile(trackTypeOrFile);
@@ -112,10 +120,13 @@ function NewProject() {
           ...audioTrack,
           audioFile: trackTypeOrFile,
           dbId,
+          duration,
           position: {
             x: 0,
             y: tracks.length * GRID_CONSTANTS.trackHeight
-          }
+          },
+          // Calculate initial width based on duration and current BPM
+          _calculatedWidth: duration ? calculateTrackWidth(duration, bpm) : undefined
         };
 
         // Create and execute the add track action
@@ -292,9 +303,39 @@ function NewProject() {
   const handleBpmChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newBpm = parseInt(event.target.value, 10);
     if (!isNaN(newBpm) && newBpm > 0 && newBpm <= 999) {
-      setBpm(newBpm);
+      console.log('BPM changing to:', newBpm);
       if (storeRef.current) {
+        // Update Tone.js transport BPM
         Tone.getTransport().bpm.value = newBpm;
+        
+        // Update tracks first to ensure they have the latest BPM value
+        setTracks(currentTracks => {
+          console.log('Updating tracks with new BPM:', newBpm);
+          return currentTracks.map(track => {
+            if (!track.duration) return track;
+            
+            // Calculate new width based on duration and new BPM
+            const expectedWidth = calculateTrackWidth(track.duration, newBpm);
+            console.log(`Track ${track.id} width calculation for BPM change:`, {
+              duration: track.duration,
+              oldBpm: bpm,
+              newBpm,
+              expectedWidth,
+              oldWidth: track._calculatedWidth
+            });
+            
+            // Create a completely new track object to force React to see it as a change
+            return {
+              ...track,
+              position: { ...track.position },
+              _calculatedWidth: expectedWidth,
+              _bpmUpdateId: Date.now() // Force React to see this as a new object
+            };
+          });
+        });
+        
+        // Then update the BPM state
+        setBpm(newBpm);
       }
     }
   };
@@ -617,6 +658,9 @@ function NewProject() {
                   measureCount={GRID_CONSTANTS.measureCount}
                   position={track.position}
                   onPositionChange={(newPosition, isDragEnd) => handleTrackPositionChange(track.id, newPosition, isDragEnd)}
+                  bpm={bpm}
+                  duration={track.duration}
+                  _calculatedWidth={track._calculatedWidth}
                 />
               ))}
             </Box>

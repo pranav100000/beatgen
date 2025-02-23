@@ -1,7 +1,7 @@
 import { Box } from '@mui/material';
-import { GRID_CONSTANTS } from '../constants/gridConstants';
+import { GRID_CONSTANTS, calculateTrackWidth } from '../constants/gridConstants';
 import WaveformDisplay from './WaveformDisplay';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { Position } from '../core/types/track';
 
 interface TrackProps {
@@ -15,6 +15,9 @@ interface TrackProps {
   position: Position;
   onPositionChange: (newPosition: Position, isDragEnd: boolean) => void;
   id: string;
+  bpm: number;
+  duration?: number;
+  _calculatedWidth?: number;
 }
 
 function Track({ 
@@ -27,13 +30,92 @@ function Track({
   gridLineStyle,
   position,
   onPositionChange,
-  id 
+  id,
+  bpm,
+  duration,
+  _calculatedWidth
 }: TrackProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startDragMousePosition, setStartDragMousePosition] = useState({ x: 0, y: 0 });
   const [startDragTrackPosition, setStartDragTrackPosition] = useState({ x: 0, y: 0 });
   const lastMovedPositionRef = useRef<Position>(position);
+
+  // Calculate track width based on duration and BPM or use pre-calculated width
+  const trackWidth = useMemo(() => {
+    // If we have a pre-calculated width from parent, use that
+    if (_calculatedWidth !== undefined) {
+      console.log(`Track ${id} using pre-calculated width:`, {
+        _calculatedWidth,
+        duration,
+        bpm,
+        isPreCalculated: true
+      });
+      return _calculatedWidth;
+    }
+    
+    // Otherwise calculate it
+    if (!duration) {
+      console.log(`Track ${id} using default width - no duration`);
+      return '100%';
+    }
+    
+    const width = calculateTrackWidth(duration, bpm);
+    console.log(`Track ${id} calculating width:`, { 
+      duration, 
+      bpm, 
+      calculatedWidth: width,
+      isPreCalculated: false
+    });
+    return width;
+  }, [duration, bpm, id, _calculatedWidth]);
+
+  // Log whenever width changes
+  useEffect(() => {
+    console.log(`Track ${id} width update:`, { 
+      trackWidth,
+      _calculatedWidth,
+      duration,
+      bpm,
+      isNumber: typeof trackWidth === 'number',
+      timestamp: Date.now()
+    });
+  }, [trackWidth, duration, bpm, id, _calculatedWidth]);
+
+  // Create style object for track width
+  const trackStyle = useMemo(() => {
+    const baseStyle = {
+      display: 'flex',
+      height: GRID_CONSTANTS.trackHeight,
+      position: 'absolute',
+      boxSizing: 'border-box' as const,
+      borderBottom: `1px solid ${GRID_CONSTANTS.borderColor}`,
+      left: `${position.x}px`,
+      top: `${position.y}px`,
+      cursor: isDragging ? 'grabbing' : 'grab',
+      zIndex: isDragging ? 2 : 1,
+      transition: isDragging ? 'none' : 'width 0.2s ease',
+      '&:hover': {
+        boxShadow: '0 0 10px rgba(0,0,0,0.3)'
+      },
+      bgcolor: 'rgba(26, 26, 26, 0.8)'
+    };
+
+    // Add width-specific styles
+    if (typeof trackWidth === 'number') {
+      return {
+        ...baseStyle,
+        width: `${trackWidth}px`,
+        minWidth: `${trackWidth}px`
+      };
+    }
+
+    return {
+      ...baseStyle,
+      width: trackWidth,
+      minWidth: GRID_CONSTANTS.measureWidth
+    };
+  }, [trackWidth, position.x, position.y, isDragging]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!trackRef.current) return;
@@ -122,30 +204,17 @@ function Track({
     <Box
       ref={trackRef}
       onMouseDown={handleMouseDown}
-      sx={{ 
-        display: 'flex',
-        height: GRID_CONSTANTS.trackHeight,
-        position: 'absolute',
-        boxSizing: 'border-box',
-        borderBottom: `1px solid ${GRID_CONSTANTS.borderColor}`,
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        width: '100%',
-        cursor: isDragging ? 'grabbing' : 'grab',
-        zIndex: isDragging ? 2 : 1,
-        transition: isDragging ? 'none' : 'all 0.1s ease',
-        '&:hover': {
-          boxShadow: '0 0 10px rgba(0,0,0,0.3)'
-        }
-      }}>
+      sx={trackStyle}
+    >
       {/* Track Timeline */}
       <Box sx={{ 
         display: 'flex',
         flex: 1,
-        bgcolor: '#1A1A1A',
         position: 'relative',
         overflow: 'hidden',
-        height: '100%'
+        height: '100%',
+        width: typeof trackWidth === 'number' ? `${trackWidth}px` : '100%',
+        minWidth: typeof trackWidth === 'number' ? `${trackWidth}px` : 1
       }}>
         {/* Background Grid */}
         <Box sx={{
@@ -154,7 +223,9 @@ function Track({
           left: 0,
           right: 0,
           bottom: 0,
-          zIndex: 1
+          zIndex: 1,
+          width: '100%',
+          minWidth: typeof trackWidth === 'number' ? `${trackWidth}px` : 1
         }}>
           {/* Major grid lines (measures) */}
           {Array.from({ length: measureCount + 1 }).map((_, i) => (
@@ -166,7 +237,8 @@ function Track({
                 top: 0,
                 bottom: 0,
                 width: 1,
-                bgcolor: GRID_CONSTANTS.borderColor
+                bgcolor: GRID_CONSTANTS.borderColor,
+                opacity: 0.8
               }}
             />
           ))}
@@ -218,12 +290,16 @@ function Track({
             zIndex: 2,
             padding: '2px 0',
             height: '100%',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            width: typeof trackWidth === 'number' ? `${trackWidth}px` : '100%',
+            minWidth: typeof trackWidth === 'number' ? `${trackWidth}px` : GRID_CONSTANTS.measureWidth
           }}>
             <WaveformDisplay 
               audioFile={audioFile}
               isPlaying={isPlaying}
               color="#4CAF50"
+              width={typeof trackWidth === 'number' ? trackWidth : undefined}
+              bpm={bpm}
             />
           </Box>
         )}

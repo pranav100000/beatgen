@@ -1,0 +1,88 @@
+## Project Overview
+
+*   **Type:** cursor_project_rules
+*   **Description:** I want to build an online DAW web application in React with some AI features on top. The DAW web app should have the ability to upload audio files and create MIDI tracks. It already has undo and redo functionality implemented with a history manager which stores actions, not state. The audio engine still needs some work (playing audio files and midi files at the right time).
+*   **Primary Goal:** Build a working online Digital Audio Workstation (DAW) for hobbyists that integrates audio file uploads, AI-assisted MIDI generation, and a synchronized playback engine using Tone.js. The app must address current audio engine issues (e.g., playback cursor precision, correct timing, and synchronization between audio and MIDI) while supporting user registration, project saving, and basic collaboration.
+
+## Project Structure
+
+### Framework-Specific Routing
+
+*   **Directory Rules:**
+
+    *   **React Router 6:** Uses a conventional routing structure typically located in `src/routes/` with component-based route definitions. For example, routes are defined using the `createBrowserRouter` or `BrowserRouter` along with nested routes as required.
+    *   Example: "React Router 6" → `src/routes/` directory where each route maps to a corresponding component file.
+
+### Core Directories
+
+*   **Versioned Structure:**
+
+    *   **src/components:** Contains versioned and modular React components (functional components with hooks) to build UI elements including DAW elements like timeline, track, and playback cursor.
+    *   **src/api:** Holds Node.js backend integrations, including API endpoints for user registration, project management, and AI-driven MIDI generation.
+    *   **src/utils:** Contains utility functions and state management tools (e.g., history manager for undo/redo actions) that support core functionality.
+
+### Key Files
+
+*   **Stack-Versioned Patterns:**
+
+    *   **src/index.tsx:** Entry point which bootstraps the React application.
+    *   **src/routes/AppRouter.tsx:** Main routing file if using React Router 6 to manage the app's route hierarchy.
+    *   **src/components/PlaybackCursor.tsx:** Specific component defining the playback cursor mechanism in the DAW.
+    *   **src/api/audioEngine.ts:** Implements integration with Tone.js for handling audio playback and MIDI synchronization.
+
+## Tech Stack Rules
+
+*   **Version Enforcement:**
+
+    *   **react@latest:** Must use modern React patterns such as functional components and hooks. Ensure clear separation of component logic and UI.
+    *   **tone.js@latest:** Enforce precise timing and synchronization logic; ensure that Tone.js is used exclusively for audio and MIDI playback to minimize latency.
+    *   **node.js@latest:** Build RESTful API services with Node.js ensuring scalability and maintainability.
+
+## PRD Compliance
+
+*   **Non-Negotiable:**
+
+    *   "Implement a working playback cursor that can be moved and ensure that audio and MIDI tracks are synchronized without restarting unexpectedly."
+    *   "Enable audio file uploads that auto-add new tracks, integrate AI-assisted MIDI generation via backend requests, and minimize latency during audio playback."
+
+## App Flow Integration
+
+*   **Stack-Aligned Flow:**
+
+    *   The project dashboard initiates in React, directing users through authentication, project selection, and DAW workspace creation.
+    *   Example: User logs in → `src/routes/Dashboard.tsx` loads project options → Selecting a project routes to `src/components/DAWWorkspace.tsx` where audio uploads trigger new track components (`src/components/Track.tsx`).
+    *   Tone.js integration is mapped in `src/core/audioEngine.ts` to handle playback actions and synchronize with UI components such as the playback cursor (`src/components/PlaybackCursor.tsx`).
+
+## Best Practices
+
+*   **react**
+
+    *   Utilize functional components and hooks to manage state and side effects.
+    *   Keep components modular and reusable; separate UI logic from business logic.
+    *   Ensure code readability and maintainability by following standard linting and formatting practices.
+
+*   **tone.js**
+
+    *   Adhere to best practices for real-time audio processing; ensure precise timing and callback management.
+    *   Optimize event handling to minimize playback latency.
+    *   Encapsulate audio engine integration into dedicated modules to isolate concerns.
+
+*   **node.js**
+
+    *   Follow RESTful API design principles; ensure clear endpoint definitions and proper error handling.
+    *   Use asynchronous patterns (async/await) to enhance performance.
+    *   Secure API endpoints with JWT and validate user inputs to prevent vulnerabilities.
+
+*   **jwt**
+
+    *   Implement strong secret management and token expiry configurations.
+    *   Avoid storing sensitive information in tokens.
+    *   Validate tokens on every request to ensure secure access control.
+
+## Rules
+
+*   Derive folder/file patterns directly from tech stack documented practices and versions.
+*   If using React Router 6, enforce a `src/routes/` directory with nested route folders and avoid mixing with deprecated flat routing structures.
+*   The backend should maintain a clear separation between API routes (`src/api/`) and frontend assets.
+*   All components, utilities, and API endpoints should follow clear naming conventions and version-specific patterns to ensure maintainability and scalability.
+*   Never mix version patterns across different tech stack elements (e.g., avoid using legacy patterns when modern ones are specified).

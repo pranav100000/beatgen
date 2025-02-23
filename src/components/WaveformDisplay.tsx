@@ -6,9 +6,11 @@ interface WaveformDisplayProps {
   audioFile: File;
   color?: string;
   isPlaying: boolean;
+  width?: number;
+  bpm: number;
 }
 
-function WaveformDisplay({ audioFile, color = '#4CAF50', isPlaying }: WaveformDisplayProps) {
+function WaveformDisplay({ audioFile, color = '#4CAF50', isPlaying, width, bpm }: WaveformDisplayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -23,13 +25,15 @@ function WaveformDisplay({ audioFile, color = '#4CAF50', isPlaying }: WaveformDi
 
         const container = containerRef.current!;
         
+        // Use provided width or container width
+        const displayWidth = width || container.clientWidth;
+        
         // Increase resolution for sharper rendering
         const dpr = window.devicePixelRatio || 1;
-        canvas.width = container.clientWidth * dpr;
+        canvas.width = displayWidth * dpr;
         canvas.height = container.clientHeight * dpr;
         context.scale(dpr, dpr);
 
-        const width = container.clientWidth;
         const height = container.clientHeight;
 
         // Load and decode audio
@@ -39,19 +43,19 @@ function WaveformDisplay({ audioFile, color = '#4CAF50', isPlaying }: WaveformDi
 
         // Clear with semi-transparent background
         context.fillStyle = 'rgba(0, 0, 0, 0.2)';
-        context.fillRect(0, 0, width, height);
+        context.fillRect(0, 0, displayWidth, height);
 
         // Draw center line
         context.beginPath();
         context.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         context.moveTo(0, height / 2);
-        context.lineTo(width, height / 2);
+        context.lineTo(displayWidth, height / 2);
         context.stroke();
 
         // Draw waveform
         const padding = 4;
         const drawHeight = height - (padding * 2);
-        const step = Math.ceil(channelData.length / width);
+        const step = Math.ceil(channelData.length / displayWidth);
         const amp = (drawHeight / 2) * 0.9;
 
         // Main waveform
@@ -63,7 +67,7 @@ function WaveformDisplay({ audioFile, color = '#4CAF50', isPlaying }: WaveformDi
         let prevYMin = height / 2;
         let prevYMax = height / 2;
 
-        for (let i = 0; i < width; i++) {
+        for (let i = 0; i < displayWidth; i++) {
           const startIdx = i * step;
           const endIdx = startIdx + step;
           const slice = channelData.slice(startIdx, endIdx);
@@ -109,7 +113,7 @@ function WaveformDisplay({ audioFile, color = '#4CAF50', isPlaying }: WaveformDi
     };
 
     drawWaveform();
-  }, [audioFile, color]);
+  }, [audioFile, color, width, bpm]);
 
   return (
     <Box 
