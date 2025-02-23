@@ -1,5 +1,6 @@
 import { Store } from './store';
 import { TrackState } from '../types/track';
+import * as Tone from 'tone';
 
 // Base interface for all actions
 export interface Action {
@@ -135,6 +136,33 @@ export class MoveTrackAction implements Action {
             from: this.newPosition, 
             to: this.oldPosition 
         });
+    }
+}
+
+// Action for changing BPM
+export class BPMChangeAction implements Action {
+    readonly type = 'BPM_CHANGE';
+
+    constructor(
+        private store: Store,
+        private setBpm: (bpm: number) => void,
+        private oldBpm: number,
+        private newBpm: number
+    ) {}
+
+    private updateBPM(bpm: number) {
+        // Update Tone.js transport BPM
+        Tone.getTransport().bpm.value = bpm;
+        // Update React state
+        this.setBpm(bpm);
+    }
+
+    async execute(): Promise<void> {
+        this.updateBPM(this.newBpm);
+    }
+
+    async undo(): Promise<void> {
+        this.updateBPM(this.oldBpm);
     }
 }
 

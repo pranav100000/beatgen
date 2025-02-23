@@ -41,20 +41,8 @@ function Track({
   const [startDragTrackPosition, setStartDragTrackPosition] = useState({ x: 0, y: 0 });
   const lastMovedPositionRef = useRef<Position>(position);
 
-  // Calculate track width based on duration and BPM or use pre-calculated width
+  // Calculate track width based on duration and BPM
   const trackWidth = useMemo(() => {
-    // If we have a pre-calculated width from parent, use that
-    if (_calculatedWidth !== undefined) {
-      console.log(`Track ${id} using pre-calculated width:`, {
-        _calculatedWidth,
-        duration,
-        bpm,
-        isPreCalculated: true
-      });
-      return _calculatedWidth;
-    }
-    
-    // Otherwise calculate it
     if (!duration) {
       console.log(`Track ${id} using default width - no duration`);
       return '100%';
@@ -64,11 +52,10 @@ function Track({
     console.log(`Track ${id} calculating width:`, { 
       duration, 
       bpm, 
-      calculatedWidth: width,
-      isPreCalculated: false
+      calculatedWidth: width
     });
     return width;
-  }, [duration, bpm, id, _calculatedWidth]);
+  }, [duration, bpm, id]);
 
   // Log whenever width changes
   useEffect(() => {
@@ -105,15 +92,13 @@ function Track({
     if (typeof trackWidth === 'number') {
       return {
         ...baseStyle,
-        width: `${trackWidth}px`,
-        minWidth: `${trackWidth}px`
+        width: `${trackWidth}px`
       };
     }
 
     return {
       ...baseStyle,
-      width: trackWidth,
-      minWidth: GRID_CONSTANTS.measureWidth
+      width: '100%'
     };
   }, [trackWidth, position.x, position.y, isDragging]);
 
@@ -213,8 +198,7 @@ function Track({
         position: 'relative',
         overflow: 'hidden',
         height: '100%',
-        width: typeof trackWidth === 'number' ? `${trackWidth}px` : '100%',
-        minWidth: typeof trackWidth === 'number' ? `${trackWidth}px` : 1
+        width: typeof trackWidth === 'number' ? `${trackWidth}px` : '100%'
       }}>
         {/* Background Grid */}
         <Box sx={{
@@ -224,8 +208,7 @@ function Track({
           right: 0,
           bottom: 0,
           zIndex: 1,
-          width: '100%',
-          minWidth: typeof trackWidth === 'number' ? `${trackWidth}px` : 1
+          width: '100%'
         }}>
           {/* Major grid lines (measures) */}
           {Array.from({ length: measureCount + 1 }).map((_, i) => (
@@ -291,8 +274,7 @@ function Track({
             padding: '2px 0',
             height: '100%',
             pointerEvents: 'none',
-            width: typeof trackWidth === 'number' ? `${trackWidth}px` : '100%',
-            minWidth: typeof trackWidth === 'number' ? `${trackWidth}px` : GRID_CONSTANTS.measureWidth
+            width: typeof trackWidth === 'number' ? `${trackWidth}px` : '100%'
           }}>
             <WaveformDisplay 
               audioFile={audioFile}

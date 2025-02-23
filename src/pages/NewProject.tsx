@@ -24,7 +24,7 @@ import * as Tone from 'tone';
 import BPMControl from '../components/BPMControl';
 import TimeSignatureDisplay from '../components/TimeSignatureDisplay';
 import { db } from '../core/db/dexie-client';
-import { historyManager, AddTrackAction, DeleteTrackAction, MoveTrackAction } from '../core/state/history';
+import { historyManager, AddTrackAction, DeleteTrackAction, MoveTrackAction, BPMChangeAction } from '../core/state/history';
 import { TrackState, Position } from '../core/types/track';
 
 function NewProject() {
@@ -62,9 +62,21 @@ function NewProject() {
 
   // Initialize store only (not audio) on mount
   useEffect(() => {
-    storeRef.current = new Store();
-    storeRef.current.projectManager.createProject('New Project');
-    Tone.Transport.bpm.value = bpm;
+    const initializeStore = async () => {
+      try {
+        storeRef.current = new Store();
+        storeRef.current.projectManager.createProject('New Project');
+        Tone.Transport.bpm.value = bpm;
+        
+        // Initialize audio immediately
+        await storeRef.current.initialize();
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize store:', error);
+      }
+    };
+
+    initializeStore();
 
     // Clear database on window unload/refresh
     const handleUnload = async () => {
@@ -177,15 +189,10 @@ function NewProject() {
     }
   };
 
-  const handleOpenMenu = async (event: React.MouseEvent<HTMLButtonElement>) => {
-    // Initialize audio on first click if needed
-    if (!isInitialized && storeRef.current) {
-      try {
-        await storeRef.current.initialize();
-        setIsInitialized(true);
-      } catch (error) {
-        console.error('Failed to initialize audio:', error);
-      }
+  const handleOpenMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!isInitialized) {
+      console.warn('Store not initialized yet');
+      return;
     }
     setAnchorEl(event.currentTarget);
     setMenuOpen(true);
@@ -300,42 +307,19 @@ function NewProject() {
     );
   }, []);
 
-  const handleBpmChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBpmChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const newBpm = parseInt(event.target.value, 10);
     if (!isNaN(newBpm) && newBpm > 0 && newBpm <= 999) {
       console.log('BPM changing to:', newBpm);
       if (storeRef.current) {
-        // Update Tone.js transport BPM
-        Tone.getTransport().bpm.value = newBpm;
-        
-        // Update tracks first to ensure they have the latest BPM value
-        setTracks(currentTracks => {
-          console.log('Updating tracks with new BPM:', newBpm);
-          return currentTracks.map(track => {
-            if (!track.duration) return track;
-            
-            // Calculate new width based on duration and new BPM
-            const expectedWidth = calculateTrackWidth(track.duration, newBpm);
-            console.log(`Track ${track.id} width calculation for BPM change:`, {
-              duration: track.duration,
-              oldBpm: bpm,
-              newBpm,
-              expectedWidth,
-              oldWidth: track._calculatedWidth
-            });
-            
-            // Create a completely new track object to force React to see it as a change
-            return {
-              ...track,
-              position: { ...track.position },
-              _calculatedWidth: expectedWidth,
-              _bpmUpdateId: Date.now() // Force React to see this as a new object
-            };
-          });
-        });
-        
-        // Then update the BPM state
-        setBpm(newBpm);
+        // Create and execute the BPM change action
+        const action = new BPMChangeAction(
+          storeRef.current,
+          setBpm,
+          bpm, // old BPM
+          newBpm // new BPM
+        );
+        await historyManager.executeAction(action);
       }
     }
   };
