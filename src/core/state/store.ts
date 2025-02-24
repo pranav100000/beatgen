@@ -9,7 +9,7 @@ export interface StoreInterface {
   getTransport(): TransportController;
   projectManager: ProjectManager;
   initialize(): Promise<void>;
-  createTrack(name: string, type: string): Track;
+  createTrack(name: string, type: 'audio' | 'midi' | 'video'): Track;
   getInstrumentManager(): InstrumentManager;
   getMidiManager(): MidiManager;
 }
@@ -42,7 +42,7 @@ export class Store implements StoreInterface {
     return this.transportController;
   }
 
-  public createTrack(name: string, type: Track['type'] = 'audio'): Track {
+  public createTrack(name: string, type: 'audio' | 'midi' | 'video'): Track {
     if (!this.initialized) {
       throw new Error('Store must be initialized before creating tracks');
     }
