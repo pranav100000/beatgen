@@ -6,6 +6,8 @@ import GridOnIcon from '@mui/icons-material/GridOn';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { SvgIconComponent } from '@mui/icons-material';
+import NiceModal from '@ebay/nice-modal-react';
+import { MODAL_IDS } from '../modals';
 
 interface TrackType {
   id: string;
@@ -17,11 +19,12 @@ interface TrackType {
 }
 
 interface TrackOptionProps {
+  id: string;
   title: string;
   description: string;
   icon: SvgIconComponent;
   color: string;
-  onClick: (file?: File) => void;
+  onClick: (trackIdOrFile: string | File) => void;
   isUpload?: boolean;
 }
 
@@ -64,7 +67,7 @@ const trackTypes = [
   }
 ];
 
-const TrackOption: React.FC<TrackOptionProps> = ({ title, description, icon: Icon, color, onClick, isUpload }) => {
+const TrackOption: React.FC<TrackOptionProps> = ({ id, title, description, icon: Icon, color, onClick, isUpload }) => {
   const handleClick = (e) => {
     if (isUpload) {
       // Create a hidden file input
@@ -79,7 +82,7 @@ const TrackOption: React.FC<TrackOptionProps> = ({ title, description, icon: Ico
       };
       input.click();
     } else {
-      onClick();
+      onClick(id);
     }
   };
 
@@ -131,9 +134,19 @@ interface AddTrackMenuProps {
 }
 
 function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuProps) {
-  const handleTrackSelect = (trackIdOrFile) => {
-    onSelectTrack(trackIdOrFile);
-    onClose();
+  const handleTrackSelect = (trackIdOrFile: string | File) => {
+    if (trackIdOrFile === 'virtual') {
+      // Show virtual instruments modal using the constant ID
+      NiceModal.show(MODAL_IDS.VIRTUAL_INSTRUMENTS, {
+        onSelect: (instrumentId: string) => {
+          onSelectTrack(`virtual-${instrumentId}`);
+          onClose();
+        }
+      });
+    } else {
+      onSelectTrack(trackIdOrFile);
+      onClose();
+    }
   };
 
   return (
@@ -179,7 +192,12 @@ function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuPr
         {trackTypes.map((track) => (
           <TrackOption
             key={track.id}
-            {...track}
+            id={track.id}
+            title={track.title}
+            description={track.description}
+            icon={track.icon}
+            color={track.color}
+            isUpload={track.isUpload}
             onClick={handleTrackSelect}
           />
         ))}

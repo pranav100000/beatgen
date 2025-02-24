@@ -6,6 +6,10 @@ import NewProject from './pages/NewProject';
 import reportWebVitals from './reportWebVitals';
 import NiceModal from '@ebay/nice-modal-react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { registerModals } from './modals';
+
+// Register all modals
+registerModals();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
