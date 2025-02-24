@@ -27,7 +27,7 @@ import { db } from '../core/db/dexie-client';
 import { historyManager, AddTrackAction, DeleteTrackAction, MoveTrackAction, BPMChangeAction } from '../core/state/history';
 import { TrackState, Position } from '../core/types/track';
 import KeySelector from '../components/KeySelector';
-import { PianoRollButton, PianoRollProvider } from '../components/piano-roll/PianoRollWindow';
+import { PianoRollProvider } from '../components/piano-roll/PianoRollWindow';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -711,7 +711,6 @@ export default function NewProjectWithProvider() {
     <PianoRollProvider>
       <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
         <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}>
-          <PianoRollButton />
         </Box>
         <NewProject />
       </Box>

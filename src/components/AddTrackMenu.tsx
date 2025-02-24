@@ -8,6 +8,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { SvgIconComponent } from '@mui/icons-material';
 import { VirtualInstrumentsModal } from '../modals';
 import { useState } from 'react';
+import { usePianoRoll } from './piano-roll/PianoRollWindow';
 
 interface TrackType {
   id: string;
@@ -135,6 +136,8 @@ interface AddTrackMenuProps {
 
 function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuProps) {
   const [isVirtualInstrumentsOpen, setIsVirtualInstrumentsOpen] = useState(false);
+  const { openPianoRoll } = usePianoRoll();
+
 
   const handleTrackSelect = (trackIdOrFile: string | File) => {
     if (trackIdOrFile === 'virtual') {
@@ -146,8 +149,8 @@ function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuPr
   };
 
   const handleInstrumentSelect = (instrumentId: string) => {
-    onSelectTrack(`virtual-${instrumentId}`);
     onClose();
+    openPianoRoll();
   };
 
   return (

@@ -81,7 +81,7 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 };
 
 // Hook to access the piano roll context
-const usePianoRoll = (): PianoRollContextType => {
+export const usePianoRoll = (): PianoRollContextType => {
   const context = useContext(PianoRollContext);
   if (!context) {
     throw new Error('usePianoRoll must be used within a PianoRollProvider');
@@ -625,14 +625,3 @@ const DraggableModal: React.FC<DraggableModalProps> = ({ children, title, onClos
     </Modal>
   );
 };
-
-// Main App Component
-const App: React.FC = () => {
-  return (
-    <PianoRollProvider>
-      <PianoRollButton />
-    </PianoRollProvider>
-  );
-};
-
-export default App;
