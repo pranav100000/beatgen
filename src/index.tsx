@@ -4,23 +4,16 @@ import './index.css';
 import App from './App';
 import NewProject from './pages/NewProject';
 import reportWebVitals from './reportWebVitals';
-import NiceModal from '@ebay/nice-modal-react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { registerModals } from './modals';
-
-// Register all modals
-registerModals();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <BrowserRouter>
-      <NiceModal.Provider>
-        <Routes>
-          <Route path="/" element={<App />} />
-          <Route path="/new-project" element={<NewProject />} />
-        </Routes>
-      </NiceModal.Provider>
+      <Routes>
+        <Route path="/" element={<App />} />
+        <Route path="/new-project" element={<NewProject />} />
+      </Routes>
     </BrowserRouter>
   </React.StrictMode>
 );

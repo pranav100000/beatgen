@@ -1,6 +1,5 @@
-import { Box, Dialog, DialogContent, DialogTitle, IconButton, Typography, Grid } from '@mui/material';
+import { Box, Modal, IconButton, Typography, Grid } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import PianoIcon from '@mui/icons-material/Piano';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import { SvgIconComponent } from '@mui/icons-material';
@@ -52,41 +51,49 @@ const instruments: Instrument[] = [
 ];
 
 export interface VirtualInstrumentsModalProps {
+  open: boolean;
+  onClose: () => void;
   onSelect: (instrumentId: string) => void;
 }
 
-export default NiceModal.create(({ onSelect }: VirtualInstrumentsModalProps) => {
-  const modal = useModal();
-
+export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInstrumentsModalProps) => {
   const handleSelect = (instrumentId: string) => {
     onSelect(instrumentId);
-    modal.hide();
+    onClose();
   };
 
   return (
-    <Dialog
-      open={modal.visible}
-      onClose={() => modal.hide()}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: {
-          bgcolor: '#1A1A1A',
-          color: 'white'
-        }
+    <Modal
+      open={open}
+      onClose={onClose}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
       }}
     >
-      <DialogTitle sx={{ m: 0, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography variant="h6">Choose Virtual Instrument</Typography>
-        <IconButton
-          onClick={() => modal.hide()}
-          sx={{ color: 'white' }}
-        >
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
+      <Box
+        sx={{
+          bgcolor: '#1A1A1A',
+          color: 'white',
+          borderRadius: 2,
+          p: 3,
+          maxWidth: '900px',
+          width: '90%',
+          maxHeight: '90vh',
+          overflow: 'auto'
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Typography variant="h6">Choose Virtual Instrument</Typography>
+          <IconButton
+            onClick={onClose}
+            sx={{ color: 'white' }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        <Grid container spacing={2}>
           {instruments.map((instrument) => (
             <Grid item xs={12} sm={6} md={4} key={instrument.id}>
               <Box
@@ -128,7 +135,7 @@ export default NiceModal.create(({ onSelect }: VirtualInstrumentsModalProps) => 
             </Grid>
           ))}
         </Grid>
-      </DialogContent>
-    </Dialog>
+      </Box>
+    </Modal>
   );
-}); 
+}; 

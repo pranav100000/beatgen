@@ -7,7 +7,6 @@ import {
   IconButton
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import NiceModal, { useModal } from '@ebay/nice-modal-react';
 
 const style = {
   position: 'absolute',
@@ -21,19 +20,23 @@ const style = {
   p: 4,
 };
 
-export default NiceModal.create(() => {
-  const modal = useModal();
+interface LoginModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSignupClick?: () => void;
+}
 
+export default function LoginModal({ open, onClose, onSignupClick }: LoginModalProps) {
   return (
     <Modal
-      open={modal.visible}
-      onClose={() => modal.hide()}
+      open={open}
+      onClose={onClose}
       aria-labelledby="login-modal-title"
     >
       <Box sx={style}>
         <IconButton
           aria-label="close"
-          onClick={() => modal.hide()}
+          onClick={onClose}
           sx={{
             position: 'absolute',
             right: 8,
@@ -89,9 +92,10 @@ export default NiceModal.create(() => {
                 color: '#1a237e'
               }}
               onClick={() => {
-                modal.hide();
-                // You can show signup modal here if needed
-                // NiceModal.show(SignupModal);
+                onClose();
+                if (onSignupClick) {
+                  onSignupClick();
+                }
               }}
             >
               Sign up
@@ -101,4 +105,4 @@ export default NiceModal.create(() => {
       </Box>
     </Modal>
   );
-}); 
+} 

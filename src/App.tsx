@@ -1,15 +1,13 @@
 import './App.css';
 import { Button } from '@mui/material';
 import { MusicNote, Edit } from '@mui/icons-material';
-import NiceModal from '@ebay/nice-modal-react';
 import LoginModal from './components/LoginModal';
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 
 function App() {
   const navigate = useNavigate();
-  const showLoginModal = () => {
-    NiceModal.show(LoginModal);
-  };
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   return (
     <div className="App">
@@ -25,7 +23,7 @@ function App() {
           </Button>
           <Button 
             variant="text" 
-            onClick={showLoginModal}
+            onClick={() => setIsLoginModalOpen(true)}
             sx={{ color: '#1a237e', marginLeft: 2 }}
           >
             LOGIN
@@ -73,6 +71,11 @@ function App() {
           </Button>
         </div>
       </main>
+
+      <LoginModal 
+        open={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
     </div>
   );
 }
