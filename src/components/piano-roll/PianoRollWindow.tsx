@@ -1,14 +1,11 @@
 import React, { useState, useRef, useEffect, createContext, useContext } from 'react';
 import { Button, Modal, Box } from '@mui/material';
+import { Note } from '../../core/types/note';
+import { NoteCreateAction, NoteMoveAction, NoteResizeAction } from '../../core/state/history/actions/NoteActions';
+import { historyManager } from '../../core/state/history/HistoryManager';
+import { useStore } from '../../core/state/StoreContext';
 
 // Types and interfaces remain the same as before
-interface Note {
-  id: number;
-  row: number;
-  column: number;
-  length: number;
-}
-
 interface Position {
   x: number;
   y: number;
@@ -81,7 +78,7 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 };
 
 // Hook to access the piano roll context
-const usePianoRoll = (): PianoRollContextType => {
+export const usePianoRoll = (): PianoRollContextType => {
   const context = useContext(PianoRollContext);
   if (!context) {
     throw new Error('usePianoRoll must be used within a PianoRollProvider');
@@ -93,12 +90,16 @@ const usePianoRoll = (): PianoRollContextType => {
 const PianoRoll: React.FC = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [draggedNote, setDraggedNote] = useState<number | null>(null);
+  const [dragStartPosition, setDragStartPosition] = useState<{ row: number; column: number } | null>(null);
   const [dragOffset, setDragOffset] = useState<DragOffset>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [resizingNote, setResizingNote] = useState<number | null>(null);
+  const [resizeStartLength, setResizeStartLength] = useState<number | null>(null);
+  const [resizeStartColumn, setResizeStartColumn] = useState<number | null>(null);
   const [resizeSide, setResizeSide] = useState<'left' | 'right' | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const store = useStore();
 
   const octaves = 10;
   const notesPerOctave = 12;
@@ -155,7 +156,7 @@ const PianoRoll: React.FC = () => {
     return [1, 3, 6, 8, 10].includes(noteInOctave);
   };
 
-  const handleGridClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleGridClick = async (e: React.MouseEvent<HTMLDivElement>) => {
     if (!gridRef.current || isDragging) return;
     
     const rect = gridRef.current.getBoundingClientRect();
@@ -167,15 +168,21 @@ const PianoRoll: React.FC = () => {
     const actualRow = displayRowToActualRow(displayRow);
     
     const noteExists = notes.some(note => note.row === actualRow && note.column === column);
-    if (noteExists) {
-      setNotes(notes.filter(note => !(note.row === actualRow && note.column === column)));
-    } else {
-      setNotes([...notes, { 
-        row: actualRow, 
-        column, 
+    if (!noteExists) {
+      const newNote: Note = {
+        row: actualRow,
+        column,
         id: Date.now(),
         length: 1
-      }]);
+      };
+
+      const action = new NoteCreateAction(
+        store,
+        setNotes,
+        newNote,
+        notes
+      );
+      await historyManager.executeAction(action);
     }
   };
 
@@ -185,19 +192,26 @@ const PianoRoll: React.FC = () => {
     if (!note) return;
 
     setIsDragging(true);
+    setDraggedNote(noteId);
+    setDragStartPosition({ row: note.row, column: note.column });
+    
     const noteElement = e.currentTarget as HTMLElement;
     const rect = noteElement.getBoundingClientRect();
     setDragOffset({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
     });
-    setDraggedNote(noteId);
   };
 
   const handleResizeStart = (e: React.MouseEvent, noteId: number, side: 'left' | 'right') => {
     e.stopPropagation();
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+
     setResizingNote(noteId);
     setResizeSide(side);
+    setResizeStartLength(note.length);
+    setResizeStartColumn(note.column);
     setIsDragging(true);
   };
 
@@ -253,9 +267,44 @@ const PianoRoll: React.FC = () => {
     }
   };
 
-  const handleGridMouseUp = () => {
+  const handleGridMouseUp = async () => {
+    if (draggedNote !== null && dragStartPosition) {
+      const note = notes.find(n => n.id === draggedNote);
+      if (note) {
+        const action = new NoteMoveAction(
+          store,
+          setNotes,
+          draggedNote,
+          { x: dragStartPosition.column, y: dragStartPosition.row },
+          { x: note.column, y: note.row },
+          notes
+        );
+        await historyManager.executeAction(action);
+      }
+    }
+
+    if (resizingNote !== null && resizeStartLength !== null) {
+      const note = notes.find(n => n.id === resizingNote);
+      if (note) {
+        const action = new NoteResizeAction(
+          store,
+          setNotes,
+          resizingNote,
+          resizeStartLength,
+          note.length,
+          notes,
+          resizeSide === 'left' ? resizeStartColumn : undefined,
+          resizeSide === 'left' ? note.column : undefined
+        );
+        await historyManager.executeAction(action);
+      }
+    }
+
     setDraggedNote(null);
+    setDragStartPosition(null);
     setResizingNote(null);
+    setResizeStartLength(null);
+    setResizeStartColumn(null);
     setResizeSide(null);
     setTimeout(() => {
       setIsDragging(false);
@@ -545,9 +594,17 @@ const DraggableModal: React.FC<DraggableModalProps> = ({ children, title, onClos
   return (
     <Modal
       open={true}
-      onClose={onClose}
-      aria-labelledby="piano-roll-modal"
       disableAutoFocus
+      disableEscapeKeyDown
+      onClose={() => {}}
+      sx={{
+        pointerEvents: 'none',  // Make the modal container non-blocking
+        '& .MuiBackdrop-root': {
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          pointerEvents: 'none'
+        }
+      }}
+      keepMounted
     >
       <Box
         ref={modalRef}
@@ -557,13 +614,14 @@ const DraggableModal: React.FC<DraggableModalProps> = ({ children, title, onClos
           top: `${position.y}px`,
           width: `${size.width}px`,
           height: `${size.height}px`,
-          bgcolor: '#333333', // Match header color
+          bgcolor: '#333333',
           boxShadow: 24,
           borderRadius: 1,
           display: 'flex',
           flexDirection: 'column',
           outline: 'none',
-          overflow: 'hidden' // Prevent content from overflowing rounded corners
+          overflow: 'hidden',
+          pointerEvents: 'auto'  // Re-enable pointer events for the modal content
         }}
         onMouseDown={handleHeaderMouseDown}
       >
@@ -625,14 +683,3 @@ const DraggableModal: React.FC<DraggableModalProps> = ({ children, title, onClos
     </Modal>
   );
 };
-
-// Main App Component
-const App: React.FC = () => {
-  return (
-    <PianoRollProvider>
-      <PianoRollButton />
-    </PianoRollProvider>
-  );
-};
-
-export default App;

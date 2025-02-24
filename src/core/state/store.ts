@@ -1,8 +1,20 @@
-import AudioEngine from '../audio-engine/audioEngine';
 import { ProjectManager, Track } from './project';
 import { TransportController } from './transport';
+import { MidiManager } from '../midi/MidiManager';
+import { InstrumentManager } from '../instruments/InstrumentManager';
+import AudioEngine from '../audio-engine/audioEngine';
 
-export class Store {
+export interface StoreInterface {
+  getAudioEngine(): AudioEngine;
+  getTransport(): TransportController;
+  projectManager: ProjectManager;
+  initialize(): Promise<void>;
+  createTrack(name: string, type: string): Track;
+  getInstrumentManager(): InstrumentManager;
+  getMidiManager(): MidiManager;
+}
+
+export class Store implements StoreInterface {
   private audioEngine: AudioEngine;
   public projectManager: ProjectManager;
   private transportController: TransportController;
@@ -48,5 +60,15 @@ export class Store {
 
   public getAudioEngine(): AudioEngine {
     return this.audioEngine;
+  }
+
+  public getInstrumentManager(): InstrumentManager {
+    // Implementation needed
+    throw new Error('Method not implemented');
+  }
+
+  public getMidiManager(): MidiManager {
+    // Implementation needed
+    throw new Error('Method not implemented');
   }
 }

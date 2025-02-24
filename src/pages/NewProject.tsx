@@ -24,10 +24,13 @@ import * as Tone from 'tone';
 import BPMControl from '../components/BPMControl';
 import TimeSignatureDisplay from '../components/TimeSignatureDisplay';
 import { db } from '../core/db/dexie-client';
-import { historyManager, AddTrackAction, DeleteTrackAction, MoveTrackAction, BPMChangeAction } from '../core/state/history';
+import { historyManager } from '../core/state/history/HistoryManager';
+import { AddTrackAction, DeleteTrackAction, MoveTrackAction } from '../core/state/history/actions/TrackActions';
+import { BPMChangeAction } from '../core/state/history/actions/BPMActions';
 import { TrackState, Position } from '../core/types/track';
 import KeySelector from '../components/KeySelector';
-import { PianoRollButton, PianoRollProvider } from '../components/piano-roll/PianoRollWindow';
+import { PianoRollProvider } from '../components/piano-roll/PianoRollWindow';
+import { StoreProvider } from '../core/state/StoreContext';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -707,14 +710,17 @@ function NewProject() {
 }
 
 export default function NewProjectWithProvider() {
+  const store = useRef(new Store()).current;
+
   return (
-    <PianoRollProvider>
-      <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-        <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}>
-          <PianoRollButton />
+    <StoreProvider store={store}>
+      <PianoRollProvider>
+        <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+          <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}>
+          </Box>
+          <NewProject />
         </Box>
-        <NewProject />
-      </Box>
-    </PianoRollProvider>
+      </PianoRollProvider>
+    </StoreProvider>
   );
 } 
