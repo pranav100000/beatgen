@@ -69,7 +69,7 @@ const trackTypes = [
 ];
 
 const TrackOption: React.FC<TrackOptionProps> = ({ id, title, description, icon: Icon, color, onClick, isUpload }) => {
-  const handleClick = (e) => {
+  const handleClick = (e: React.MouseEvent) => {
     if (isUpload) {
       // Create a hidden file input
       const input = document.createElement('input');

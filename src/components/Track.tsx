@@ -107,8 +107,8 @@ function Track({
 
     // Store the initial mouse position
     setStartDragMousePosition({
-      x: e.clientX + trackRef.current.closest('.MuiBox-root')?.scrollLeft || 0,
-      y: e.clientY + trackRef.current.closest('.MuiBox-root')?.scrollTop || 0
+      x: e.clientX + (trackRef.current?.closest('.MuiBox-root')?.scrollLeft ?? 0),
+      y: e.clientY + (trackRef.current?.closest('.MuiBox-root')?.scrollTop ?? 0)
     });
 
     // Store the initial track position

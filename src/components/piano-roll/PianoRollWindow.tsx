@@ -293,7 +293,7 @@ const PianoRoll: React.FC = () => {
           resizeStartLength,
           note.length,
           notes,
-          resizeSide === 'left' ? resizeStartColumn : undefined,
+          resizeSide === 'left' ? (resizeStartColumn ?? undefined) : undefined,
           resizeSide === 'left' ? note.column : undefined
         );
         await historyManager.executeAction(action);
