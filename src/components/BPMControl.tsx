@@ -8,7 +8,7 @@ interface BPMControlProps {
 }
 
 const BPMControl: React.FC<BPMControlProps> = ({ bpm, onBpmChange }) => {
-  const inputRef = useRef<HTMLInputElement>();
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter') {
