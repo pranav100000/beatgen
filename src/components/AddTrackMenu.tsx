@@ -6,8 +6,8 @@ import GridOnIcon from '@mui/icons-material/GridOn';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { SvgIconComponent } from '@mui/icons-material';
-import NiceModal from '@ebay/nice-modal-react';
-import { MODAL_IDS } from '../modals';
+import { VirtualInstrumentsModal } from '../modals';
+import { useState } from 'react';
 
 interface TrackType {
   id: string;
@@ -134,75 +134,84 @@ interface AddTrackMenuProps {
 }
 
 function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuProps) {
+  const [isVirtualInstrumentsOpen, setIsVirtualInstrumentsOpen] = useState(false);
+
   const handleTrackSelect = (trackIdOrFile: string | File) => {
     if (trackIdOrFile === 'virtual') {
-      // Show virtual instruments modal using the constant ID
-      NiceModal.show(MODAL_IDS.VIRTUAL_INSTRUMENTS, {
-        onSelect: (instrumentId: string) => {
-          onSelectTrack(`virtual-${instrumentId}`);
-          onClose();
-        }
-      });
+      setIsVirtualInstrumentsOpen(true);
     } else {
       onSelectTrack(trackIdOrFile);
       onClose();
     }
   };
 
-  return (
-    <Popover
-      open={open}
-      onClose={onClose}
-      anchorEl={anchorEl}
-      anchorOrigin={{
-        vertical: 'top',
-        horizontal: 'left',
-      }}
-      transformOrigin={{
-        vertical: 'top',
-        horizontal: 'left',
-      }}
-      PaperProps={{
-        sx: {
-          bgcolor: '#1A1A1A',
-          borderRadius: 2,
-          width: 400,
-          mt: 1
-        }
-      }}
-    >
-      <Box sx={{ position: 'relative', p: 2, pb: 0 }}>
-        <Typography variant="h5" sx={{ color: 'white', mb: 2 }}>
-          New Track
-        </Typography>
-        <IconButton
-          onClick={onClose}
-          sx={{
-            position: 'absolute',
-            right: 8,
-            top: 8,
-            color: 'white'
-          }}
-        >
-          <CloseIcon />
-        </IconButton>
-      </Box>
+  const handleInstrumentSelect = (instrumentId: string) => {
+    onSelectTrack(`virtual-${instrumentId}`);
+    onClose();
+  };
 
-      <Box sx={{ maxHeight: '70vh', overflow: 'auto' }}>
-        {trackTypes.map((track) => (
-          <TrackOption
-            key={track.id}
-            id={track.id}
-            title={track.title}
-            description={track.description}
-            icon={track.icon}
-            color={track.color}
-            isUpload={track.isUpload}
-            onClick={handleTrackSelect}
-          />
-        ))}
-      </Box>
-    </Popover>
+  return (
+    <>
+      <Popover
+        open={open}
+        onClose={onClose}
+        anchorEl={anchorEl}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        PaperProps={{
+          sx: {
+            bgcolor: '#1A1A1A',
+            borderRadius: 2,
+            width: 400,
+            mt: 1
+          }
+        }}
+      >
+        <Box sx={{ position: 'relative', p: 2, pb: 0 }}>
+          <Typography variant="h5" sx={{ color: 'white', mb: 2 }}>
+            New Track
+          </Typography>
+          <IconButton
+            onClick={onClose}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              color: 'white'
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+
+        <Box sx={{ maxHeight: '70vh', overflow: 'auto' }}>
+          {trackTypes.map((track) => (
+            <TrackOption
+              key={track.id}
+              id={track.id}
+              title={track.title}
+              description={track.description}
+              icon={track.icon}
+              color={track.color}
+              isUpload={track.isUpload}
+              onClick={handleTrackSelect}
+            />
+          ))}
+        </Box>
+      </Popover>
+
+      <VirtualInstrumentsModal
+        open={isVirtualInstrumentsOpen}
+        onClose={() => setIsVirtualInstrumentsOpen(false)}
+        onSelect={handleInstrumentSelect}
+      />
+    </>
   );
 }
 
