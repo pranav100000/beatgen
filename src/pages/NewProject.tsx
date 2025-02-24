@@ -26,6 +26,7 @@ import TimeSignatureDisplay from '../components/TimeSignatureDisplay';
 import { db } from '../core/db/dexie-client';
 import { historyManager, AddTrackAction, DeleteTrackAction, MoveTrackAction, BPMChangeAction } from '../core/state/history';
 import { TrackState, Position } from '../core/types/track';
+import KeySelector from '../components/KeySelector';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -38,6 +39,7 @@ function NewProject() {
   const [timeSignature, setTimeSignature] = useState<[number, number]>([4, 4]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [key, setKey] = useState<string>('C');
 
   const storeRef = useRef<Store | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -371,6 +373,13 @@ function NewProject() {
     }
   };
 
+  const handleKeyChange = (newKey: string) => {
+    setKey(newKey);
+    if (storeRef.current) {
+      storeRef.current.projectManager.setKey(newKey);
+    }
+  };
+
   return (
     <Box sx={{ 
       height: '100vh', 
@@ -426,6 +435,8 @@ function NewProject() {
           onBottomNumberChange={(value) => handleTimeSignatureChange(undefined, value)}
         />
 
+        <KeySelector selectedKey={key} onKeyChange={handleKeyChange} />
+
         <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton 
             size="small" 
@@ -436,9 +447,6 @@ function NewProject() {
           </IconButton>
           <IconButton size="small" sx={{ color: 'white' }}>
             <SkipPreviousIcon />
-          </IconButton>
-          <IconButton size="small" sx={{ color: 'white', bgcolor: '#3E3E3E' }}>
-            <LoopIcon />
           </IconButton>
         </Box>
 

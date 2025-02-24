@@ -13,6 +13,7 @@ export interface Project {
   name: string;
   tempo: number;
   timeSignature: [number, number];
+  key: string;
   tracks: Track[];
 }
 
@@ -25,6 +26,7 @@ export class ProjectManager {
       name,
       tempo: 120,
       timeSignature: [4, 4],
+      key: 'C',
       tracks: []
     };
     return this.currentProject;
@@ -74,6 +76,12 @@ export class ProjectManager {
   public setTimeSignature(numerator: number, denominator: number): void {
     if (this.currentProject) {
       this.currentProject.timeSignature = [numerator, denominator];
+    }
+  }
+
+  public setKey(key: string): void {
+    if (this.currentProject) {
+      this.currentProject.key = key;
     }
   }
 }
