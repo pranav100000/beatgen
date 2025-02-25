@@ -149,8 +149,15 @@ function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuPr
   };
 
   const handleInstrumentSelect = (instrumentId: string) => {
+    // Create a MIDI track first - this will then be handled by the track creation system
+    // which will set up the proper subscriptions and activations
+    onSelectTrack('midi');
+    
+    // Close the menu
     onClose();
-    openPianoRoll();
+    
+    // We no longer need to open the piano roll here - that will be handled by the track click handler
+    // The track will be automatically activated for notes to appear in the preview
   };
 
   return (

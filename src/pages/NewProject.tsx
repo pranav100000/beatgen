@@ -156,13 +156,34 @@ function NewProject() {
         const newTrack = storeRef.current.createTrack(trackTypeOrFile, trackTypeOrFile as TrackType['type']);
         const audioTrack = await storeRef.current.getAudioEngine().createTrack(newTrack.id);
         
+        // Default duration for MIDI tracks (4 bars at 4/4 time signature = 16 beats)
+        let defaultDuration;
+        if (trackTypeOrFile === 'midi') {
+          // Convert beats to seconds based on current BPM
+          // Duration = (beats * 60) / BPM
+          const beatsPerBar = 4; // Assuming 4/4 time signature
+          const defaultBars = 4;
+          const totalBeats = defaultBars * beatsPerBar;
+          defaultDuration = (totalBeats * 60) / bpm;
+          
+          console.log('Creating MIDI track with default duration:', {
+            defaultBars,
+            totalBeats,
+            bpm,
+            defaultDuration,
+            expectedWidth: calculateTrackWidth(defaultDuration, bpm)
+          });
+        }
+        
         const trackData: TrackState = {
           ...newTrack,
           ...audioTrack,
           position: {
             x: 0,
             y: tracks.length * GRID_CONSTANTS.trackHeight
-          }
+          },
+          duration: defaultDuration,
+          _calculatedWidth: defaultDuration ? calculateTrackWidth(defaultDuration, bpm) : undefined
         };
 
         // Create and execute the add track action
@@ -322,10 +343,12 @@ function NewProject() {
         const action = new BPMChangeAction(
           storeRef.current,
           setBpm,
+          setTracks,
           bpm, // old BPM
           newBpm // new BPM
         );
         await historyManager.executeAction(action);
+        // Track widths are now recalculated inside the BPMChangeAction
       }
     }
   };
