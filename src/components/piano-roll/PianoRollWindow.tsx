@@ -21,10 +21,23 @@ interface DragOffset {
   y: number;
 }
 
+// Type for note change subscriber callbacks
+type NoteChangeSubscriber = (trackId: string, notes: Note[]) => void;
+
 interface PianoRollContextType {
   isOpen: boolean;
-  openPianoRoll: () => void;
-  closePianoRoll: () => void;
+  activeInstrumentId: string | null;
+  activeTrackId: string | null;
+  notes: Note[];
+  openPianoRoll: (trackId?: string, instrumentId?: string, initialNotes?: Note[]) => void;
+  closePianoRoll: (maintainActiveTrack?: boolean) => void;
+  updateNotes: (newNotes: Note[]) => void;
+  playNote?: (note: number) => void;
+  stopNote?: (note: number) => void;
+  importMidi?: (file: File) => Promise<void>;
+  exportMidi?: (bpm: number) => Blob;
+  // Add subscription method
+  subscribeToNoteChanges: (callback: NoteChangeSubscriber) => () => void;
 }
 
 interface DraggableModalProps {
@@ -43,7 +56,7 @@ export const PianoRollButton: React.FC = () => {
   
   return (
     <Button 
-      onClick={openPianoRoll}
+      onClick={() => openPianoRoll()}
       variant="contained"
       sx={{
         bgcolor: '#2196f3',
@@ -61,15 +74,66 @@ export const PianoRollButton: React.FC = () => {
 // Provider component that manages the piano roll state
 export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeInstrumentId, setActiveInstrumentId] = useState<string | null>(null);
+  const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
+  
+  // Collection of subscribers to note changes
+  const noteChangeSubscribers = useRef<NoteChangeSubscriber[]>([]);
 
-  const openPianoRoll = () => setIsOpen(true);
-  const closePianoRoll = () => setIsOpen(false);
+  const openPianoRoll = (trackId?: string, instrumentId?: string, initialNotes?: Note[]) => {
+    setActiveTrackId(trackId || null);
+    setActiveInstrumentId(instrumentId || null);
+    if (initialNotes && initialNotes.length > 0) {
+      setNotes(initialNotes);
+    }
+    setIsOpen(true);
+  };
+
+  const closePianoRoll = (maintainActiveTrack?: boolean) => {
+    setIsOpen(false);
+    if (maintainActiveTrack) {
+      setActiveTrackId(activeTrackId);
+    } else {
+      setActiveTrackId(null);
+    }
+  };
+
+  const updateNotes = (newNotes: Note[]) => {
+    setNotes(newNotes);
+    
+    // If we have an active track, notify subscribers
+    if (activeTrackId) {
+      noteChangeSubscribers.current.forEach(subscriber => {
+        subscriber(activeTrackId, newNotes);
+      });
+    }
+  };
+  
+  // Add subscription method
+  const subscribeToNoteChanges = (callback: NoteChangeSubscriber): (() => void) => {
+    noteChangeSubscribers.current.push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      noteChangeSubscribers.current = noteChangeSubscribers.current.filter(cb => cb !== callback);
+    };
+  };
 
   return (
-    <PianoRollContext.Provider value={{ isOpen, openPianoRoll, closePianoRoll }}>
+    <PianoRollContext.Provider value={{ 
+      isOpen, 
+      activeInstrumentId,
+      activeTrackId,
+      notes,
+      openPianoRoll, 
+      closePianoRoll,
+      updateNotes,
+      subscribeToNoteChanges
+    }}>
       {children}
       {isOpen && (
-        <DraggableModal title="Piano Roll" onClose={closePianoRoll}>
+        <DraggableModal title="Piano Roll" onClose={() => closePianoRoll(false)}>
           <PianoRoll />
         </DraggableModal>
       )}
@@ -88,6 +152,7 @@ export const usePianoRoll = (): PianoRollContextType => {
 
 // The main PianoRoll component
 const PianoRoll: React.FC = () => {
+  const { activeTrackId, notes: contextNotes, updateNotes: updateContextNotes } = usePianoRoll();
   const [notes, setNotes] = useState<Note[]>([]);
   const [draggedNote, setDraggedNote] = useState<number | null>(null);
   const [dragStartPosition, setDragStartPosition] = useState<{ row: number; column: number } | null>(null);
@@ -156,6 +221,21 @@ const PianoRoll: React.FC = () => {
     return [1, 3, 6, 8, 10].includes(noteInOctave);
   };
 
+  // Sync notes with context
+  useEffect(() => {
+    if (contextNotes && contextNotes.length > 0) {
+      setNotes(contextNotes);
+    }
+  }, [contextNotes]);
+  
+  // Update context when notes change in the component
+  const updateNotes = (newNotes: Note[]) => {
+    setNotes(newNotes);
+    if (typeof updateContextNotes === 'function') {
+      updateContextNotes(newNotes);
+    }
+  };
+
   const handleGridClick = async (e: React.MouseEvent<HTMLDivElement>) => {
     if (!gridRef.current || isDragging) return;
     
@@ -178,7 +258,7 @@ const PianoRoll: React.FC = () => {
 
       const action = new NoteCreateAction(
         store,
-        setNotes,
+        updateNotes,
         newNote,
         notes
       );
@@ -232,7 +312,7 @@ const PianoRoll: React.FC = () => {
         const maxLength = gridColumns - note.column;
         const clampedLength = Math.min(newLength, maxLength);
         
-        setNotes(notes.map(n => 
+        updateNotes(notes.map(n => 
           n.id === resizingNote 
             ? { ...n, length: clampedLength }
             : n
@@ -242,7 +322,7 @@ const PianoRoll: React.FC = () => {
         const newStart = Math.max(0, Math.min(mouseGridPosition, originalEnd));
         const newLength = originalEnd - newStart + 1;
         
-        setNotes(notes.map(n => 
+        updateNotes(notes.map(n => 
           n.id === resizingNote 
             ? { ...n, column: newStart, length: newLength }
             : n
@@ -256,7 +336,7 @@ const PianoRoll: React.FC = () => {
       const displayRow = Math.floor(y / cellHeight);
       const actualRow = displayRowToActualRow(displayRow);
 
-      setNotes(notes.map(note => {
+      updateNotes(notes.map(note => {
         if (note.id === draggedNote) {
           const maxColumn = gridColumns - note.length;
           const clampedColumn = Math.min(column, maxColumn);
@@ -273,7 +353,7 @@ const PianoRoll: React.FC = () => {
       if (note) {
         const action = new NoteMoveAction(
           store,
-          setNotes,
+          updateNotes,
           draggedNote,
           { x: dragStartPosition.column, y: dragStartPosition.row },
           { x: note.column, y: note.row },
@@ -288,7 +368,7 @@ const PianoRoll: React.FC = () => {
       if (note) {
         const action = new NoteResizeAction(
           store,
-          setNotes,
+          updateNotes,
           resizingNote,
           resizeStartLength,
           note.length,

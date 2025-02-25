@@ -19,11 +19,15 @@ export class Store implements StoreInterface {
   public projectManager: ProjectManager;
   private transportController: TransportController;
   private initialized: boolean = false;
+  private midiManager: MidiManager;
+  private instrumentManager: InstrumentManager;
 
   constructor() {
     this.audioEngine = AudioEngine.getInstance();
     this.projectManager = new ProjectManager();
     this.transportController = new TransportController();
+    this.midiManager = new MidiManager();
+    this.instrumentManager = new InstrumentManager();
   }
 
   public async initialize(): Promise<void> {
@@ -63,12 +67,10 @@ export class Store implements StoreInterface {
   }
 
   public getInstrumentManager(): InstrumentManager {
-    // Implementation needed
-    throw new Error('Method not implemented');
+    return this.instrumentManager;
   }
 
   public getMidiManager(): MidiManager {
-    // Implementation needed
-    throw new Error('Method not implemented');
+    return this.midiManager;
   }
 }

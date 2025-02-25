@@ -12,6 +12,7 @@ export const GRID_CONSTANTS = {
   minorGridOpacity: 0.3,
   majorGridOpacity: 1,
   beatsPerMeasure: 4,
+  midiNoteHeight: 4, // Height of MIDI notes in the track preview
 } as const;
 
 /**

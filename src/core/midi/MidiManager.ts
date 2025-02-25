@@ -6,6 +6,8 @@ import { MidiManagerInterface, MidiData, MidiTrack, MidiNote } from './types';
 
 export class MidiManager implements MidiManagerInterface {
   private activePlayback: Map<string, Tone.Part> = new Map();
+  private tracks: Map<string, Note[]> = new Map();
+  private subscribers: Map<string, ((trackId: string, notes: Note[]) => void)[]> = new Map();
 
   async loadMidiFile(file: File): Promise<MidiData> {
     const arrayBuffer = await file.arrayBuffer();
@@ -91,8 +93,12 @@ export class MidiManager implements MidiManagerInterface {
   }
 
   createTrack(instrumentId: string): MidiTrack {
+    const trackId = uuidv4();
+    // Initialize with empty notes array
+    this.tracks.set(trackId, []);
+    
     return {
-      id: uuidv4(),
+      id: trackId,
       instrumentId,
       notes: [],
       name: `Track ${instrumentId}`
@@ -100,8 +106,41 @@ export class MidiManager implements MidiManagerInterface {
   }
 
   updateTrack(trackId: string, notes: Note[]): void {
-    // This would typically update the track in your project state
-    // Implementation depends on your state management solution
+    console.log(`MidiManager.updateTrack: Updating track ${trackId} with ${notes.length} notes`);
+    
+    // Store the notes in our internal map
+    this.tracks.set(trackId, [...notes]);
+    
+    // Notify subscribers
+    if (this.subscribers.has(trackId)) {
+      const trackSubscribers = this.subscribers.get(trackId) || [];
+      trackSubscribers.forEach(callback => callback(trackId, notes));
+    }
+  }
+
+  // Subscribe to track updates
+  subscribeToTrack(trackId: string, callback: (trackId: string, notes: Note[]) => void): () => void {
+    if (!this.subscribers.has(trackId)) {
+      this.subscribers.set(trackId, []);
+    }
+    
+    const trackSubscribers = this.subscribers.get(trackId) || [];
+    trackSubscribers.push(callback);
+    this.subscribers.set(trackId, trackSubscribers);
+    
+    // Return unsubscribe function
+    return () => {
+      const currentSubscribers = this.subscribers.get(trackId) || [];
+      this.subscribers.set(
+        trackId, 
+        currentSubscribers.filter(cb => cb !== callback)
+      );
+    };
+  }
+
+  // Get notes for a track
+  getNotesForTrack(trackId: string): Note[] {
+    return this.tracks.get(trackId) || [];
   }
 
   schedulePlayback(track: MidiTrack): void {
