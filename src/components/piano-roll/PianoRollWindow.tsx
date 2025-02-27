@@ -312,7 +312,8 @@ const PianoRoll: React.FC = () => {
         const maxLength = gridColumns - note.column;
         const clampedLength = Math.min(newLength, maxLength);
         
-        updateNotes(notes.map(n => 
+        // Only update local state during dragging
+        setNotes(notes.map(n => 
           n.id === resizingNote 
             ? { ...n, length: clampedLength }
             : n
@@ -322,7 +323,8 @@ const PianoRoll: React.FC = () => {
         const newStart = Math.max(0, Math.min(mouseGridPosition, originalEnd));
         const newLength = originalEnd - newStart + 1;
         
-        updateNotes(notes.map(n => 
+        // Only update local state during dragging
+        setNotes(notes.map(n => 
           n.id === resizingNote 
             ? { ...n, column: newStart, length: newLength }
             : n
@@ -336,7 +338,8 @@ const PianoRoll: React.FC = () => {
       const displayRow = Math.floor(y / cellHeight);
       const actualRow = displayRowToActualRow(displayRow);
 
-      updateNotes(notes.map(note => {
+      // Only update local state during dragging
+      setNotes(notes.map(note => {
         if (note.id === draggedNote) {
           const maxColumn = gridColumns - note.length;
           const clampedColumn = Math.min(column, maxColumn);
@@ -348,9 +351,21 @@ const PianoRoll: React.FC = () => {
   };
 
   const handleGridMouseUp = async () => {
+    console.log('GridMouseUp - state before action:', {
+      draggedNote,
+      resizingNote,
+      notes: notes.length
+    });
+  
     if (draggedNote !== null && dragStartPosition) {
       const note = notes.find(n => n.id === draggedNote);
       if (note) {
+        // First update the context to match our local state
+        if (typeof updateContextNotes === 'function') {
+          updateContextNotes(notes);
+        }
+        
+        // Then create the history action
         const action = new NoteMoveAction(
           store,
           updateNotes,
@@ -366,6 +381,12 @@ const PianoRoll: React.FC = () => {
     if (resizingNote !== null && resizeStartLength !== null) {
       const note = notes.find(n => n.id === resizingNote);
       if (note) {
+        // First update the context to match our local state
+        if (typeof updateContextNotes === 'function') {
+          updateContextNotes(notes);
+        }
+        
+        // Then create the history action
         const action = new NoteResizeAction(
           store,
           updateNotes,
