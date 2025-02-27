@@ -142,6 +142,10 @@ function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuPr
   const handleTrackSelect = (trackIdOrFile: string | File) => {
     if (trackIdOrFile === 'virtual') {
       setIsVirtualInstrumentsOpen(true);
+    } else if (trackIdOrFile === 'drum') {
+      // Handle drum machine creation directly
+      onSelectTrack('drum');
+      onClose();
     } else {
       onSelectTrack(trackIdOrFile);
       onClose();

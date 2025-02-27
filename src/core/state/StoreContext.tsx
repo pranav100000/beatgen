@@ -1,9 +1,9 @@
 import React, { createContext, useContext } from 'react';
-import { StoreInterface } from './store';
+import { Store } from './store';
 
-const StoreContext = createContext<StoreInterface | null>(null);
+const StoreContext = createContext<Store | null>(null);
 
-export const StoreProvider: React.FC<{ store: StoreInterface; children: React.ReactNode }> = ({ 
+export const StoreProvider: React.FC<{ store: Store; children: React.ReactNode }> = ({ 
   store, 
   children 
 }) => {
@@ -14,7 +14,7 @@ export const StoreProvider: React.FC<{ store: StoreInterface; children: React.Re
   );
 };
 
-export const useStore = (): StoreInterface => {
+export const useStore = (): Store => {
   const context = useContext(StoreContext);
   if (!context) {
     throw new Error('useStore must be used within a StoreProvider');

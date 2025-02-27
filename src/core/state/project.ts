@@ -1,7 +1,7 @@
 export interface Track {
   id: string;
   name: string;
-  type: 'audio' | 'midi' | 'video';
+  type: 'audio' | 'midi' | 'video' | 'drum';
   volume: number;
   pan: number;
   muted: boolean;
