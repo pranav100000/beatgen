@@ -27,17 +27,31 @@ export interface MidiFile {
     tags?: string[];
 }
 
+// Interface for Drum Machine entries
+export interface DrumMachineFile {
+    id?: number;
+    name: string;
+    trackId: string;
+    beatsPerMeasure: number;
+    stepsPerBeat: number;
+    createdAt: Date;
+    updatedAt: Date;
+    tags?: string[];
+}
+
 // Database class
 export class BeatGenDB extends Dexie {
     audioFiles!: Table<AudioFile, number>;
     midiFiles!: Table<MidiFile, number>;
+    drumMachineFiles!: Table<DrumMachineFile, number>;
 
     constructor() {
         super('BeatGenDB');
 
         this.version(1).stores({
             audioFiles: '++id, name, type, createdAt, updatedAt, *tags',
-            midiFiles: '++id, name, type, createdAt, updatedAt, *tags'
+            midiFiles: '++id, name, type, createdAt, updatedAt, *tags',
+            drumMachineFiles: '++id, name, trackId, createdAt, updatedAt, *tags'
         });
 
         // Log database open
@@ -257,6 +271,63 @@ export class BeatGenDB extends Dexie {
             this.logOperation('Failed to clear files', { error });
             throw error;
         }
+    }
+
+    // Drum Machine Operations
+    async addDrumMachineTrack(trackId: string, name: string = 'Drum Machine'): Promise<number> {
+        this.logOperation('Adding drum machine track', {
+            name,
+            trackId
+        });
+        
+        const metadata: DrumMachineFile = {
+            name,
+            trackId,
+            beatsPerMeasure: 4,  // Default to 4/4 time
+            stepsPerBeat: 4,     // Default to 16th notes
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+        
+        const id = await this.drumMachineFiles.add(metadata);
+        await this.logDbState();
+        return id;
+    }
+
+    async getDrumMachineTrack(id: number): Promise<DrumMachineFile | undefined> {
+        this.logOperation('Getting drum machine track', { id });
+        const track = await this.drumMachineFiles.get(id);
+        this.logOperation('Retrieved drum machine track', {
+            id,
+            found: !!track,
+            name: track?.name
+        });
+        return track;
+    }
+
+    async getAllDrumMachineTracks(): Promise<DrumMachineFile[]> {
+        this.logOperation('Getting all drum machine tracks', {});
+        const tracks = await this.drumMachineFiles.toArray();
+        this.logOperation('Retrieved all drum machine tracks', {
+            count: tracks.length,
+            names: tracks.map(t => t.name)
+        });
+        return tracks;
+    }
+
+    async updateDrumMachineTrack(id: number, updates: Partial<DrumMachineFile>): Promise<number> {
+        this.logOperation('Updating drum machine track', { id, updates });
+        updates.updatedAt = new Date();
+        const count = await this.drumMachineFiles.update(id, updates);
+        this.logOperation('Updated drum machine track', { id, success: count > 0 });
+        await this.logDbState();
+        return count;
+    }
+
+    async deleteDrumMachineTrack(id: number): Promise<void> {
+        this.logOperation('Deleting drum machine track', { id });
+        await this.drumMachineFiles.delete(id);
+        await this.logDbState();
     }
 }
 

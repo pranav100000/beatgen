@@ -31,6 +31,7 @@ import { TrackState, Position } from '../core/types/track';
 import KeySelector from '../components/KeySelector';
 import { PianoRollProvider } from '../components/piano-roll/PianoRollWindow';
 import { StoreProvider } from '../core/state/StoreContext';
+import { useStore } from '../core/state/StoreContext';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -45,7 +46,7 @@ function NewProject() {
   const [canRedo, setCanRedo] = useState(false);
   const [key, setKey] = useState<string>('C');
 
-  const storeRef = useRef<Store | null>(null);
+  const store = useStore();
   const animationFrameRef = useRef<number | null>(null);
 
   // Update undo/redo state whenever history changes
@@ -70,12 +71,13 @@ function NewProject() {
   useEffect(() => {
     const initializeStore = async () => {
       try {
-        storeRef.current = new Store();
-        storeRef.current.projectManager.createProject('New Project');
+        if (!store.projectManager.getCurrentProject()) {
+          store.projectManager.createProject('New Project');
+        }
         Tone.Transport.bpm.value = bpm;
         
         // Initialize audio immediately
-        await storeRef.current.initialize();
+        await store.initialize();
         setIsInitialized(true);
       } catch (error) {
         console.error('Failed to initialize store:', error);
@@ -101,7 +103,7 @@ function NewProject() {
   }, []);
 
   const handleAddTrack = async (trackTypeOrFile: string | File) => {
-    if (!storeRef.current || !isInitialized) {
+    if (!store || !isInitialized) {
       console.warn('Store not initialized');
       return;
     }
@@ -109,8 +111,8 @@ function NewProject() {
     try {
       if (trackTypeOrFile instanceof File) {
         // Handle audio file
-        const newTrack = storeRef.current.createTrack('Audio Track', 'audio');
-        const audioTrack = await storeRef.current.getAudioEngine().createTrack(newTrack.id, trackTypeOrFile);
+        const newTrack = store.createTrack('Audio Track', 'audio');
+        const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, trackTypeOrFile);
         
         // Save to database
         let dbId: number;
@@ -148,17 +150,19 @@ function NewProject() {
         };
 
         // Create and execute the add track action
-        const action = new AddTrackAction(storeRef.current, trackData, setTracks);
+        const action = new AddTrackAction(store, trackData, setTracks);
         await historyManager.executeAction(action);
 
       } else {
         // Handle other track types
-        const newTrack = storeRef.current.createTrack(trackTypeOrFile, trackTypeOrFile as TrackType['type']);
-        const audioTrack = await storeRef.current.getAudioEngine().createTrack(newTrack.id);
+        const newTrack = store.createTrack(trackTypeOrFile, trackTypeOrFile as TrackType['type']);
+        const audioTrack = await store.getAudioEngine().createTrack(newTrack.id);
         
         // Default duration for MIDI tracks (4 bars at 4/4 time signature = 16 beats)
         let defaultDuration;
-        if (trackTypeOrFile === 'midi') {
+        let dbId: number | undefined;
+        
+        if (trackTypeOrFile === 'midi' || trackTypeOrFile === 'drum') {
           // Convert beats to seconds based on current BPM
           // Duration = (beats * 60) / BPM
           const beatsPerBar = 4; // Assuming 4/4 time signature
@@ -166,13 +170,19 @@ function NewProject() {
           const totalBeats = defaultBars * beatsPerBar;
           defaultDuration = (totalBeats * 60) / bpm;
           
-          console.log('Creating MIDI track with default duration:', {
+          const trackTypeLabel = trackTypeOrFile === 'midi' ? 'MIDI' : 'Drum Machine';
+          console.log(`Creating ${trackTypeLabel} track with default duration:`, {
             defaultBars,
             totalBeats,
             bpm,
             defaultDuration,
             expectedWidth: calculateTrackWidth(defaultDuration, bpm)
           });
+          
+          // Add record to database based on track type
+          if (trackTypeOrFile === 'drum') {
+            dbId = await db.addDrumMachineTrack(newTrack.id, `Drum Machine ${tracks.length + 1}`);
+          }
         }
         
         const trackData: TrackState = {
@@ -183,11 +193,12 @@ function NewProject() {
             y: tracks.length * GRID_CONSTANTS.trackHeight
           },
           duration: defaultDuration,
-          _calculatedWidth: defaultDuration ? calculateTrackWidth(defaultDuration, bpm) : undefined
+          _calculatedWidth: defaultDuration ? calculateTrackWidth(defaultDuration, bpm) : undefined,
+          dbId
         };
 
         // Create and execute the add track action
-        const action = new AddTrackAction(storeRef.current, trackData, setTracks);
+        const action = new AddTrackAction(store, trackData, setTracks);
         await historyManager.executeAction(action);
       }
     } catch (error) {
@@ -197,9 +208,9 @@ function NewProject() {
 
   const handleDeleteTrack = async (indexToDelete: number) => {
     const trackToDelete = tracks[indexToDelete];
-    if (trackToDelete && storeRef.current) {
+    if (trackToDelete && store) {
       // Create and execute the delete track action
-      const action = new DeleteTrackAction(storeRef.current, trackToDelete, setTracks);
+      const action = new DeleteTrackAction(store, trackToDelete, setTracks);
       await historyManager.executeAction(action);
     }
   };
@@ -231,9 +242,9 @@ function NewProject() {
   };
 
   const handlePlayPause = async () => {
-    if (!storeRef.current) return;
+    if (!store) return;
 
-    const transport = storeRef.current.getTransport();
+    const transport = store.getTransport();
     try {
       if (!isPlaying) {
         console.log('🎮 UI: Triggering play');
@@ -251,10 +262,10 @@ function NewProject() {
 
   // Update UI time display based on transport position
   useEffect(() => {
-    if (!isPlaying || !storeRef.current) return;
+    if (!isPlaying || !store) return;
 
     const updateTime = () => {
-      const transport = storeRef.current?.getTransport();
+      const transport = store?.getTransport();
       if (transport) {
         // Get the current position from transport
         setCurrentTime(transport.position);
@@ -286,8 +297,8 @@ function NewProject() {
 
   // Add these handlers
   const handleVolumeChange = useCallback((trackId: string, volume: number) => {
-    if (!storeRef.current) return;
-    storeRef.current.getAudioEngine().setTrackVolume(trackId, volume);
+    if (!store) return;
+    store.getAudioEngine().setTrackVolume(trackId, volume);
     setTracks(currentTracks => 
       currentTracks.map(track => 
         track.id === trackId ? { ...track, volume } : track
@@ -296,8 +307,8 @@ function NewProject() {
   }, []);
 
   const handlePanChange = useCallback((trackId: string, pan: number) => {
-    if (!storeRef.current) return;
-    storeRef.current.getAudioEngine().setTrackPan(trackId, pan);
+    if (!store) return;
+    store.getAudioEngine().setTrackPan(trackId, pan);
     setTracks(currentTracks => 
       currentTracks.map(track => 
         track.id === trackId ? { ...track, pan } : track
@@ -306,8 +317,8 @@ function NewProject() {
   }, []);
 
   const handleMute = useCallback((trackId: string, muted: boolean) => {
-    if (!storeRef.current) return;
-    storeRef.current.getAudioEngine().setTrackMute(trackId, muted);
+    if (!store) return;
+    store.getAudioEngine().setTrackMute(trackId, muted);
     setTracks(currentTracks => 
       currentTracks.map(track => 
         track.id === trackId ? { ...track, muted } : track
@@ -316,7 +327,7 @@ function NewProject() {
   }, []);
 
   const handleSolo = useCallback((trackId: string, soloed: boolean) => {
-    if (!storeRef.current) return;
+    if (!store) return;
     setTracks(currentTracks => 
       currentTracks.map(track => 
         track.id === trackId ? { ...track, soloed } : track
@@ -325,8 +336,8 @@ function NewProject() {
   }, []);
 
   const handleTrackNameChange = useCallback((trackId: string, name: string) => {
-    if (!storeRef.current) return;
-    storeRef.current.getAudioEngine().setTrackName(trackId, name);
+    if (!store) return;
+    store.getAudioEngine().setTrackName(trackId, name);
     setTracks(currentTracks => 
       currentTracks.map(track => 
         track.id === trackId ? { ...track, name } : track
@@ -338,10 +349,10 @@ function NewProject() {
     const newBpm = parseInt(event.target.value, 10);
     if (!isNaN(newBpm) && newBpm > 0 && newBpm <= 999) {
       console.log('BPM changing to:', newBpm);
-      if (storeRef.current) {
+      if (store) {
         // Create and execute the BPM change action
         const action = new BPMChangeAction(
-          storeRef.current,
+          store,
           setBpm,
           setTracks,
           bpm, // old BPM
@@ -361,8 +372,8 @@ function NewProject() {
     ];
     
     setTimeSignature(newTimeSignature);
-    if (storeRef.current) {
-      storeRef.current.projectManager.setTimeSignature(
+    if (store) {
+      store.projectManager.setTimeSignature(
         newTimeSignature[0],
         newTimeSignature[1]
       );
@@ -377,13 +388,13 @@ function NewProject() {
 
   const handleTrackPositionChange = async (trackId: string, newPosition: Position, isDragEnd: boolean) => {
     const track = tracks.find(t => t.id === trackId);
-    if (!track || !storeRef.current) return;
+    if (!track || !store) return;
 
     if (isDragEnd && !positionsAreEqual(track.position, newPosition)) {
       // Only create a history event when the drag ends
       const oldPosition = track.position;
       const action = new MoveTrackAction(
-        storeRef.current,
+        store,
         setTracks,
         trackId,
         oldPosition,
@@ -402,8 +413,8 @@ function NewProject() {
 
   const handleKeyChange = (newKey: string) => {
     setKey(newKey);
-    if (storeRef.current) {
-      storeRef.current.projectManager.setKey(newKey);
+    if (store) {
+      store.projectManager.setKey(newKey);
     }
   };
 
@@ -733,8 +744,12 @@ function NewProject() {
 }
 
 export default function NewProjectWithProvider() {
+  // Create a single store instance for the entire application
   const store = useRef(new Store()).current;
-
+  
+  // Log the store instance for debugging
+  console.log('Store instance in NewProjectWithProvider:', store);
+  
   return (
     <StoreProvider store={store}>
       <PianoRollProvider>

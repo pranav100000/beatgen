@@ -53,7 +53,9 @@ const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       '&:hover': {
         boxShadow: '0 0 10px rgba(0,0,0,0.3)'
       },
-      bgcolor: 'rgba(26, 26, 26, 0.8)'
+      bgcolor: 'rgba(26, 26, 26, 0.8)',
+      margin: 0,
+      padding: 0
     };
 
     // Add width-specific styles
@@ -184,7 +186,18 @@ const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
         position: 'relative',
         overflow: 'hidden',
         height: '100%',
-        width: typeof trackWidth === 'number' ? `${trackWidth}px` : '100%'
+        width: typeof trackWidth === 'number' ? `${trackWidth}px` : '100%',
+        margin: 0,
+        padding: 0,
+        boxSizing: 'border-box',
+        borderLeft: 'none',
+        borderRight: 'none',
+        '& > *': {
+          margin: 0,
+          padding: 0,
+          borderLeft: 'none',
+          borderRight: 'none'
+        }
       }}>
         {renderContent(contentProps)}
       </Box>

@@ -1,6 +1,7 @@
 import * as Tone from 'tone';
 import { Track as TrackType } from '../state/project';
 import { AudioTrack } from '../audio-engine/audioEngine';
+import { DrumPad } from '../state/store';
 
 export interface Position {
     x: number; // Position in pixels from left (time)
@@ -18,4 +19,5 @@ export interface TrackState extends TrackType, Omit<AudioTrack, 'id'> {
     position: Position; // Track's position in the grid
     duration?: number; // Duration in seconds
     _calculatedWidth?: number; // Width in pixels based on duration and BPM
+    drumPads?: DrumPad[]; // For drum machine tracks
 } 

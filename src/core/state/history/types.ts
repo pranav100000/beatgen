@@ -150,4 +150,80 @@ export class BPMChangeAction implements Action {
     async undo(): Promise<void> {
         this.updateBPM(this.oldBpm);
     }
+}
+
+// Action for toggling a drum pad (on/off)
+export class ToggleDrumPadAction implements Action {
+    readonly type = 'TOGGLE_DRUM_PAD';
+
+    constructor(
+        private store: Store,
+        private trackId: string,
+        private column: number,
+        private row: number
+    ) {}
+
+    async execute(): Promise<void> {
+        console.log('🔄 Executing ToggleDrumPadAction:', { 
+            trackId: this.trackId, 
+            column: this.column, 
+            row: this.row 
+        });
+        
+        // Get current state for logging
+        const trackBefore = this.store.getTrackById(this.trackId);
+        const padsBefore = trackBefore?.drumPads || [];
+        const padExistsBefore = padsBefore.some(
+            pad => pad.column === this.column && pad.row === this.row
+        );
+        
+        // Toggle the pad
+        this.store.toggleDrumPad(this.trackId, this.column, this.row);
+        
+        // Get new state for logging
+        const trackAfter = this.store.getTrackById(this.trackId);
+        const padsAfter = trackAfter?.drumPads || [];
+        const padExistsAfter = padsAfter.some(
+            pad => pad.column === this.column && pad.row === this.row
+        );
+        
+        console.log('🔄 ToggleDrumPadAction result:', { 
+            action: padExistsBefore ? 'removed' : 'added',
+            result: padExistsAfter ? 'pad exists' : 'pad removed',
+            padsBefore: padsBefore.length,
+            padsAfter: padsAfter.length
+        });
+    }
+
+    async undo(): Promise<void> {
+        console.log('↩️ Undoing ToggleDrumPadAction:', { 
+            trackId: this.trackId, 
+            column: this.column, 
+            row: this.row 
+        });
+        
+        // Get current state for logging
+        const trackBefore = this.store.getTrackById(this.trackId);
+        const padsBefore = trackBefore?.drumPads || [];
+        const padExistsBefore = padsBefore.some(
+            pad => pad.column === this.column && pad.row === this.row
+        );
+        
+        // Toggle again to revert the state
+        this.store.toggleDrumPad(this.trackId, this.column, this.row);
+        
+        // Get new state for logging
+        const trackAfter = this.store.getTrackById(this.trackId);
+        const padsAfter = trackAfter?.drumPads || [];
+        const padExistsAfter = padsAfter.some(
+            pad => pad.column === this.column && pad.row === this.row
+        );
+        
+        console.log('↩️ ToggleDrumPadAction undo result:', { 
+            action: padExistsBefore ? 'removed' : 'added',
+            result: padExistsAfter ? 'pad exists' : 'pad removed',
+            padsBefore: padsBefore.length,
+            padsAfter: padsAfter.length
+        });
+    }
 } 

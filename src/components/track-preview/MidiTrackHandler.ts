@@ -9,7 +9,7 @@ import { Note } from '../../core/types/note';
 
 export class MidiTrackHandler implements TrackTypeHandler {
   private pianoRollHook?: ReturnType<typeof usePianoRoll>;
-  private storeHook?: ReturnType<typeof useStore>;
+  private storeHook?: () => ReturnType<typeof useStore>;
   private midiTrackCache: Map<string, MidiTrack> = new Map();
   private trackSubscriptions: Map<string, () => void> = new Map(); // Track-specific unsubscribe functions
   private forceRerenderCallbacks: Map<string, () => void> = new Map();
@@ -39,8 +39,8 @@ export class MidiTrackHandler implements TrackTypeHandler {
   }
   
   // Method to set the store hook from the component
-  setStoreHook(hook: ReturnType<typeof useStore>) {
-    this.storeHook = hook;
+  setStoreHook(store: ReturnType<typeof useStore>) {
+    this.storeHook = () => store;
   }
   
   // Refresh all track subscriptions
@@ -136,13 +136,16 @@ export class MidiTrackHandler implements TrackTypeHandler {
       // Also check if there are notes in the MidiManager for initial display
       if (this.storeHook) {
         try {
-          const midiManager = this.storeHook.getMidiManager();
-          if (midiManager) {
-            const managerNotes = midiManager.getNotesForTrack(trackId);
-            
-            if (managerNotes.length > 0) {
-              console.log(`MidiTrackHandler: Found ${managerNotes.length} notes in MidiManager for track ${trackId} during subscription`);
-              this.handleNoteChanges(trackId, managerNotes);
+          const store = this.storeHook();
+          if (store) {
+            const midiManager = store.getMidiManager();
+            if (midiManager) {
+              const managerNotes = midiManager.getNotesForTrack(trackId);
+              
+              if (managerNotes.length > 0) {
+                console.log(`MidiTrackHandler: Found ${managerNotes.length} notes in MidiManager for track ${trackId} during subscription`);
+                this.handleNoteChanges(trackId, managerNotes);
+              }
             }
           }
         } catch (error) {
@@ -180,7 +183,9 @@ export class MidiTrackHandler implements TrackTypeHandler {
       // Try to get the MidiManager, but handle errors carefully
       let midiManager;
       try {
-        midiManager = this.storeHook.getMidiManager();
+        const store = this.storeHook();
+        if (!store) return;
+        midiManager = store.getMidiManager();
       } catch (error) {
         console.warn(`MidiTrackHandler: Store not initialized yet - cannot activate track ${trackId}`, error);
         return; // Exit early if store is not ready
@@ -267,7 +272,11 @@ export class MidiTrackHandler implements TrackTypeHandler {
         return null;
       }
       
-      const store = this.storeHook;
+      const store = this.storeHook();
+      if (!store) {
+        console.warn('MidiTrackHandler: Cannot create MidiTrack - store not available');
+        return null;
+      }
       
       try {
         // This might throw if store isn't initialized yet
@@ -317,8 +326,11 @@ export class MidiTrackHandler implements TrackTypeHandler {
       
       // If we have a MidiManager, update it as well to ensure consistency
       if (this.storeHook) {
-        const midiManager = this.storeHook.getMidiManager();
-        midiManager.updateTrack(trackId, notes);
+        const store = this.storeHook();
+        if (store) {
+          const midiManager = store.getMidiManager();
+          midiManager.updateTrack(trackId, notes);
+        }
       }
       
       console.log(`MidiTrackHandler: Updated notes for track ${trackId}`, {
@@ -340,7 +352,9 @@ export class MidiTrackHandler implements TrackTypeHandler {
         // Try to get the MidiManager - might throw if store is not initialized
         let midiManager;
         try {
-          midiManager = this.storeHook.getMidiManager();
+          const store = this.storeHook();
+          if (!store) throw new Error("Store not available");
+          midiManager = store.getMidiManager();
         } catch (error) {
           console.log(`MidiTrackHandler: Store not ready for track ${props.track.id} rendering - will retry later`);
           
