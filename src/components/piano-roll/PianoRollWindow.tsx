@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, createContext, useContext } from 'react';
-import { Button, Modal, Box } from '@mui/material';
+import { Button, Box, Modal } from '@mui/material';
 import { Note } from '../../core/types/note';
 import { NoteCreateAction, NoteMoveAction, NoteResizeAction } from '../../core/state/history/actions/NoteActions';
 import { historyManager } from '../../core/state/history/HistoryManager';
 import { useStore } from '../../core/state/StoreContext';
+import { DraggableModal } from '../common';
 
 // Types and interfaces remain the same as before
 interface Position {
@@ -40,11 +41,7 @@ interface PianoRollContextType {
   subscribeToNoteChanges: (callback: NoteChangeSubscriber) => () => void;
 }
 
-interface DraggableModalProps {
-  children: React.ReactNode;
-  title: string;
-  onClose: () => void;
-}
+// DraggableModalProps is now imported from DraggableModal
 
 // Create context
 const PianoRollContext = createContext<PianoRollContextType | null>(null);
@@ -133,7 +130,11 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }}>
       {children}
       {isOpen && (
-        <DraggableModal title="Piano Roll" onClose={() => closePianoRoll(false)}>
+        <DraggableModal 
+          title="Piano Roll" 
+          open={isOpen} 
+          onClose={() => closePianoRoll(false)}
+        >
           <PianoRoll />
         </DraggableModal>
       )}
@@ -630,157 +631,4 @@ const PianoRoll: React.FC = () => {
   );
 };
 
-// DraggableModal component
-const DraggableModal: React.FC<DraggableModalProps> = ({ children, title, onClose }) => {
-  const [position, setPosition] = useState<Position>({ x: 100, y: 100 });
-  const [size, setSize] = useState<Size>({ width: 800, height: 500 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
-  const modalRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
-        const newX = e.clientX - dragStart.x;
-        const newY = e.clientY - dragStart.y;
-        setPosition({ x: newX, y: newY });
-      } else if (isResizing) {
-        const deltaX = e.clientX - dragStart.x;
-        const deltaY = e.clientY - dragStart.y;
-        setSize(prev => ({
-          width: Math.max(400, prev.width + deltaX),
-          height: Math.max(300, prev.height + deltaY)
-        }));
-        setDragStart({ x: e.clientX, y: e.clientY });
-      }
-    };
-
-    const handleGlobalMouseUp = () => {
-      setIsDragging(false);
-      setIsResizing(false);
-    };
-
-    if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleGlobalMouseMove);
-      document.addEventListener('mouseup', handleGlobalMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleGlobalMouseMove);
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [isDragging, isResizing, dragStart]);
-
-  const handleHeaderMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if ((e.target as HTMLElement).closest('.close-button')) return;
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    });
-  };
-
-  const handleResizeMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizing(true);
-    setDragStart({
-      x: e.clientX,
-      y: e.clientY
-    });
-  };
-
-  return (
-    <Modal
-      open={true}
-      disableAutoFocus
-      disableEscapeKeyDown
-      onClose={() => {}}
-      sx={{
-        pointerEvents: 'none',  // Make the modal container non-blocking
-        '& .MuiBackdrop-root': {
-          backgroundColor: 'rgba(0, 0, 0, 0.2)',
-          pointerEvents: 'none'
-        }
-      }}
-      keepMounted
-    >
-      <Box
-        ref={modalRef}
-        sx={{
-          position: 'absolute',
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          width: `${size.width}px`,
-          height: `${size.height}px`,
-          bgcolor: '#333333',
-          boxShadow: 24,
-          borderRadius: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          outline: 'none',
-          overflow: 'hidden',
-          pointerEvents: 'auto'  // Re-enable pointer events for the modal content
-        }}
-        onMouseDown={handleHeaderMouseDown}
-      >
-        <Box sx={{ 
-          height: '8px',
-          cursor: 'move',
-          borderTopLeftRadius: 'inherit',
-          borderTopRightRadius: 'inherit'
-        }} />
-        
-        <Button 
-          onClick={onClose} 
-          className="close-button"
-          sx={{
-            position: 'absolute',
-            right: 2,
-            top: 8,
-            minWidth: 'auto',
-            width: 16,
-            height: 16,
-            p: 0,
-            color: '#999999',
-            zIndex: 10,
-            fontSize: '14px',
-            lineHeight: 1,
-            '&:hover': {
-              color: '#ffffff',
-              bgcolor: 'rgba(255, 255, 255, 0.1)'
-            }
-          }}
-        >
-          ×
-        </Button>
-
-        <Box sx={{ 
-          flex: 1, 
-          overflow: 'hidden',
-          bgcolor: 'background.paper',
-          borderBottomLeftRadius: 'inherit',
-          borderBottomRightRadius: 'inherit'
-        }}>
-          {children}
-        </Box>
-
-        <Box
-          sx={{
-            position: 'absolute',
-            bottom: 0,
-            right: 0,
-            width: 20,
-            height: 20,
-            cursor: 'se-resize',
-            bgcolor: 'grey.300',
-            clipPath: 'polygon(100% 0, 100% 100%, 0 100%)'
-          }}
-          onMouseDown={handleResizeMouseDown}
-        />
-      </Box>
-    </Modal>
-  );
-};
+// The DraggableModal component is now imported from '../common/DraggableModal'
