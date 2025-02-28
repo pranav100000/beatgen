@@ -84,7 +84,7 @@ const MidiTrackContent: React.FC<ExtendedTrackContentProps> = ({
   const sixteenthNotesPerBeat = 4; // Standard division: 4 sixteenth notes = 1 quarter note
   
   // Calculate display constants
-  const measureWidthAdjusted = GRID_CONSTANTS.measureWidth / 4; // Adjusted for the new scale (beats instead of bars)
+  const measureWidthAdjusted = GRID_CONSTANTS.measureWidth;
   const pixelsPerSixteenthNote = measureWidthAdjusted / (beatsPerMeasure * sixteenthNotesPerBeat);
   const trackHeight = GRID_CONSTANTS.trackHeight;
   
