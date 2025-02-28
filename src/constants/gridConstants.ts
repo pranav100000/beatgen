@@ -1,6 +1,7 @@
 export const GRID_CONSTANTS = {
   headerHeight: 48,
   trackHeight: 80,
+  drumPadHeight: 20,
   measureWidth: 200,
   borderWidth: 1,
   borderColor: '#333',
