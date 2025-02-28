@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { GRID_CONSTANTS } from '../core/constants/grid-constants';
 
 interface GridContextProps {
   gridColumns: number;
