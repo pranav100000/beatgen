@@ -161,7 +161,7 @@ const DrumMachineTrackContent: React.FC<DrumMachineTrackContentProps> = ({
   
   // Calculate grid dimensions
   const gridBlockWidth = GRID_CONSTANTS.measureWidth / COLUMNS_PER_MEASURE; 
-  const rowHeight = height / DRUM_SOUNDS.length;
+  const rowHeight = height / DRUM_SOUNDS.length - 1;
   
   // Helper function: check if a pad exists at a specific position
   const isPadActive = useCallback((row: number, column: number): boolean => {

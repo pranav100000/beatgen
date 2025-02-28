@@ -526,7 +526,8 @@ function NewProject() {
                 color: 'white',
                 '&:hover': { bgcolor: '#444' },
                 height: 36,
-                textTransform: 'none'
+                textTransform: 'none',
+                width: '100%'
               }}
             >
               Add Track
