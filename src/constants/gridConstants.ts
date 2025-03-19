@@ -6,7 +6,7 @@ export const GRID_CONSTANTS = {
   borderWidth: 1,
   borderColor: '#333',
   sidebarWidth: 200,
-  measureCount: 8,
+  measureCount: 100,
   pixelsPerSecond: 100,
   controlsWidth: 0,
   gridSubdivisions: 4,
@@ -14,6 +14,7 @@ export const GRID_CONSTANTS = {
   majorGridOpacity: 1,
   beatsPerMeasure: 4,
   midiNoteHeight: 4, // Height of MIDI notes in the track preview
+  scrollThreshold: 50
 } as const;
 
 /**
@@ -33,7 +34,7 @@ export const calculateTrackWidth = (durationInSeconds: number, bpm: number): num
     beatsPerMeasure: GRID_CONSTANTS.beatsPerMeasure,
     measureWidth: GRID_CONSTANTS.measureWidth
   });
-
+  
   // Calculate total beats in the duration
   const beatsPerSecond = bpm / 60;
   const totalBeats = durationInSeconds * beatsPerSecond;
@@ -50,6 +51,6 @@ export const calculateTrackWidth = (durationInSeconds: number, bpm: number): num
     measuresCount,
     finalWidth: width
   });
-
+  
   return width;
 }; 

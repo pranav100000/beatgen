@@ -27,7 +27,7 @@ export class BPMChangeAction implements Action {
         this.setTracks(currentTracks => 
             currentTracks.map(track => {
                 // Only recalculate for tracks with duration
-                if (track.duration) {
+                if (track.duration && track.type === 'audio') {
                     console.log(`Recalculating width for track ${track.id} with new BPM: ${bpm}`);
                     return {
                         ...track,
