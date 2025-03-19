@@ -1,7 +1,7 @@
-import React, { useMemo, useReducer, useEffect, useRef } from 'react';
+import React, { useMemo, useReducer, useEffect, useRef,useState } from 'react';
 import { Box } from '@mui/material';
 import { TrackContentProps } from './TrackPreviewTypes';
-import { GRID_CONSTANTS } from '../../constants/gridConstants';
+import { GRID_CONSTANTS,calculateTrackWidth } from '../../constants/gridConstants';
 import { Note } from '../../core/types/note';
 
 // Extended props for MidiTrackContent
@@ -183,7 +183,8 @@ const MidiTrackContent: React.FC<ExtendedTrackContentProps> = ({
               top: 0,
               bottom: 0,
               width: 1,
-              bgcolor: 'rgba(51, 51, 51, 0.5)'
+              // bgcolor: 'rgb(255, 248, 220)'
+              bgcolor: 'rgb(169,169,169)'
             }}
           />
         );
@@ -220,6 +221,7 @@ const MidiTrackContent: React.FC<ExtendedTrackContentProps> = ({
               right: 0,
               height: 1,
               bgcolor: isOctaveBoundary ? 'rgba(100, 100, 100, 0.7)' : 'rgba(80, 80, 80, 0.4)',
+              // bgcolor: isOctaveBoundary ? 'rgb(245, 245, 220)' : 'rgb(255, 248, 220)',
               zIndex: 0
             }}
           />

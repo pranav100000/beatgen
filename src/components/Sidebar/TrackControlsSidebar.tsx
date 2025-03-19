@@ -28,7 +28,7 @@ export const TrackControlsSidebar: React.FC<TrackControlsSidebarProps> = ({
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'auto',
+        // overflow: 'auto',
         maxHeight: 'calc(100vh - 200px)'
       }}
     >

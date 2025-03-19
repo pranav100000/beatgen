@@ -22,22 +22,27 @@ export interface DraggableModalProps {
   minHeight?: number;
 }
 
-const DraggableModal: React.FC<DraggableModalProps> = ({ 
-  children, 
-  title, 
-  open, 
+const DraggableModal: React.FC<DraggableModalProps> = ({
+  children,
+  title,
+  open,
   onClose,
   initialPosition = { x: 100, y: 100 },
   initialSize = { width: 800, height: 500 },
   minWidth = 400,
   minHeight = 300
 }) => {
-  const [position, setPosition] = useState<Position>(initialPosition);
+  // const [position, setPosition] = useState<Position>(initialPosition);
   const [size, setSize] = useState<Size>(initialSize);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
   const modalRef = useRef<HTMLDivElement>(null);
+  const centerPosition = typeof window !== "undefined"
+    ? { x: (window.innerWidth - initialSize.width) / 2, y: (window.innerHeight - initialSize.height) / 2 }
+    : { x: 100, y: 100 };
+
+  const [position, setPosition] = useState<Position>(centerPosition);
 
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
@@ -126,7 +131,7 @@ const DraggableModal: React.FC<DraggableModalProps> = ({
         }}
         onMouseDown={handleHeaderMouseDown}
       >
-        <Box sx={{ 
+        <Box sx={{
           height: '8px',
           cursor: 'move',
           borderTopLeftRadius: 'inherit',
@@ -149,9 +154,9 @@ const DraggableModal: React.FC<DraggableModalProps> = ({
             </Box>
           )}
         </Box>
-        
-        <Button 
-          onClick={onClose} 
+
+        <Button
+          onClick={onClose}
           className="close-button"
           sx={{
             position: 'absolute',
@@ -174,8 +179,8 @@ const DraggableModal: React.FC<DraggableModalProps> = ({
           ×
         </Button>
 
-        <Box sx={{ 
-          flex: 1, 
+        <Box sx={{
+          flex: 1,
           overflow: 'hidden',
           bgcolor: 'background.paper',
           borderBottomLeftRadius: 'inherit',

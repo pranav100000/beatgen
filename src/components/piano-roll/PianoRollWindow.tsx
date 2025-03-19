@@ -194,7 +194,7 @@ const PianoRoll: React.FC = () => {
 
     const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
     const scrollRatio = (scrollLeft + clientWidth) / scrollWidth;
-
+    
     // If we've scrolled past the threshold, add more columns
     if (scrollRatio > expandThreshold) {
       setGridColumns(prev => prev + minGridColumns);
@@ -239,11 +239,11 @@ const PianoRoll: React.FC = () => {
 
   const handleGridClick = async (e: React.MouseEvent<HTMLDivElement>) => {
     if (!gridRef.current || isDragging) return;
-    
+
     const rect = gridRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     const column = Math.floor(x / cellWidth);
     const displayRow = Math.floor(y / cellHeight);
     const actualRow = displayRowToActualRow(displayRow);
@@ -298,7 +298,7 @@ const PianoRoll: React.FC = () => {
 
   const handleGridMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!gridRef.current) return;
-    
+
     const rect = gridRef.current.getBoundingClientRect();
     
     if (resizingNote !== null) {
@@ -413,6 +413,15 @@ const PianoRoll: React.FC = () => {
     }, 10);
   };
 
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const middlePosition = container.scrollHeight / 2 - container.clientHeight / 2;
+      container.scrollTop = middlePosition;
+    }
+  }, []);
+  
   return (
     <Box sx={{ 
       display: 'flex', 
