@@ -17,7 +17,7 @@ export interface Transport {
 export class TransportController implements Transport {
     private audioEngine: AudioEngine;
     private isStarting: boolean = false;
-    private maxPosition: number = 0;  // Track the maximum position
+    private maxPosition: number = 3600;  // Default to 1 hour (3600 seconds) as safety
     private static FADE_TIME = 0.01; // 10ms fade
 
     constructor() {
@@ -303,7 +303,7 @@ export class TransportController implements Transport {
     }
     
     public setPosition(position: number): void {
-        // Just an alias for seek
+        // Just an alias for seek - make sure we pass the position value directly
         this.seek(position);
     }
 }
