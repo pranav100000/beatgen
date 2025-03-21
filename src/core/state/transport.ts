@@ -45,19 +45,32 @@ export class TransportController implements Transport {
             
             // Ensure all players are at the correct position
             const currentPosition = this.position;
+            console.log(`Starting playback at position: ${currentPosition}s`);
+            
             this.audioEngine.getAllTracks().forEach(track => {
                 if (track.player) {
+                    // Make sure player is synced to transport
                     track.player.sync();
+                    
+                    // Ensure it's at the right position
                     track.player.seek(currentPosition);
+                    
+                    // Set volume for fade-in
                     track.player.volume.value = -Infinity;
-                    track.player.volume.rampTo(0, TransportController.FADE_TIME);
+                    track.player.volume.rampTo(track.muted ? -Infinity : track.volume, TransportController.FADE_TIME);
+                    
+                    console.log(`Prepared player for track ${track.id}, state: ${track.player.state}`);
                 }
             });
 
+            // Start transport first
             Tone.getTransport().start();
+            console.log('Transport started');
 
+            // Check if players need to be started explicitly
             this.audioEngine.getAllTracks().forEach(track => {
-                if (track.player) {
+                if (track.player && track.player.state !== "started") {
+                    console.log(`Starting player for track ${track.id}`);
                     track.player.start();
                 }
             });
@@ -70,6 +83,8 @@ export class TransportController implements Transport {
     }
 
     public pause(): void {
+        console.log('Pausing playback at position:', this.position);
+        
         // Fade out before stopping
         this.audioEngine.getAllTracks().forEach(track => {
             if (track.player) {
@@ -77,15 +92,25 @@ export class TransportController implements Transport {
             }
         });
 
-        // Wait for fade before stopping
+        // Save current position for reference
+        const currentPosition = this.position;
+
+        // Wait for fade before pausing
         setTimeout(() => {
-            this.audioEngine.stopAllPlayback();
+            // Pause the transport first (doesn't reset position)
             Tone.getTransport().pause();
+            
+            // Use the special pause method that doesn't stop the players
+            this.audioEngine.pauseAllPlayback();
+            
+            console.log('Transport: Paused at position', currentPosition);
         }, TransportController.FADE_TIME * 1000);
     }
 
     public stop(): void {
+        console.log('Stopping transport and resetting position to 0');
         this.isStarting = false; // Reset starting state
+        
         // Stop players first with fade out
         this.audioEngine.getAllTracks().forEach(track => {
             if (track.player) {
@@ -94,9 +119,29 @@ export class TransportController implements Transport {
         });
 
         setTimeout(() => {
-            this.audioEngine.stopAllPlayback();
+            // First stop the Transport so no more scheduling happens
             Tone.getTransport().stop();
+            
+            // Then reset transport position to 0
             Tone.getTransport().seconds = 0;
+            
+            // Now stop all audio playback
+            this.audioEngine.stopAllPlayback();
+            
+            // Ensure all players are synced and reset to position 0
+            this.audioEngine.getAllTracks().forEach(track => {
+                if (track.player) {
+                    // Re-sync with transport to ensure proper future playback
+                    track.player.sync();
+                    
+                    // Reset position to 0
+                    track.player.seek(0);
+                    
+                    console.log(`Reset player for track ${track.id} to position 0`);
+                }
+            });
+            
+            console.log('Transport: Successfully reset to position 0');
         }, TransportController.FADE_TIME * 1000);
     }
 

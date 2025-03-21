@@ -6,11 +6,12 @@ interface PlaybackCursorProps {
   currentTime: number;
   isPlaying?: boolean;
   bpm?: number;
+  timeSignature?: [number, number];
 }
 
-function PlaybackCursor({ currentTime, isPlaying = false, bpm = 120 }: PlaybackCursorProps) {
+function PlaybackCursor({ currentTime, isPlaying = false, bpm = 120, timeSignature = [4, 4] }: PlaybackCursorProps) {
   // Use musical timing for accurate cursor positioning
-  const position = calculateTimePosition(currentTime, bpm);
+  const position = calculateTimePosition(currentTime, bpm, timeSignature);
   
   // Colors from constants
   const activeColor = GRID_CONSTANTS.cursorColor;
