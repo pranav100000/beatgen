@@ -93,12 +93,12 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } else {
           // Default to empty notes array if no notes are found
           console.log(`PianoRollContext: Opening piano roll with empty notes for track ${trackId}`);
-          setNotes([]);
+          // Notes already set to [] above, no need to set again
         }
       }
     } else {
       setActiveTrackId(null);
-      setNotes([]);
+      // Notes already set to [] above, no need to set again
     }
     
     setIsOpen(true);

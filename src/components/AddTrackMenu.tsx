@@ -159,9 +159,6 @@ function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuPr
     
     // Close the menu
     onClose();
-    
-    // We no longer need to open the piano roll here - that will be handled by the track click handler
-    // The track will be automatically activated for notes to appear in the preview
   };
 
   return (
