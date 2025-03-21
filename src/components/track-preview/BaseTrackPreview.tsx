@@ -177,6 +177,7 @@ const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       ref={trackRef}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
+      className="track"
       sx={trackStyle}
     >
       {/* Track Timeline */}

@@ -691,6 +691,24 @@ function NewProject() {
           zoomLevel={zoomLevel}
           bpm={bpm}
           onTrackPositionChange={handleTrackPositionChange}
+          onTimeChange={(newTime) => {
+            setCurrentTime(newTime);
+            
+            // Log detailed debug info
+            console.log(`Setting playback position to: ${newTime}s`, {
+              store: !!store,
+              transport: store ? !!store.getTransport() : false,
+              hasSetPosition: store && store.getTransport() ? typeof store.getTransport().setPosition === 'function' : false
+            });
+            
+            try {
+              if (store && store.getTransport()) {
+                store.getTransport().setPosition(newTime);
+              }
+            } catch (err) {
+              console.error('Error setting transport position:', err);
+            }
+          }}
           gridLineStyle={gridLineStyle}
           ref={scrollRef}
         />

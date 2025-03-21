@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react';
 import { Box } from '@mui/material';
-import { GRID_CONSTANTS } from '../../constants/gridConstants';
+import { GRID_CONSTANTS, calculatePositionTime } from '../../constants/gridConstants';
 import Track from '../Track';
 import PlaybackCursor from '../PlaybackCursor';
 import { TrackState, Position } from '../../core/types/track';
@@ -32,10 +32,17 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
     borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`
   }
 }, ref) => {
+  // Calculate the total width needed for the entire timeline
+  const totalTimelineWidth = measureCount * GRID_CONSTANTS.measureWidth;
+  
   return (
     <Box 
       ref={ref}
-      sx={{ flex: 1, position: 'relative', overflow: 'auto' }}
+      sx={{ 
+        flex: 1, 
+        position: 'relative', 
+        overflow: 'auto',
+      }}
     >
       {/* Time Markers */}
       <TimelineRuler 
@@ -44,6 +51,7 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
         gridLineStyle={gridLineStyle} 
         bpm={bpm}
         onTimeChange={onTimeChange}
+        totalWidth={totalTimelineWidth}
       />
 
       {/* Tracks or Drop Zone */}
@@ -58,6 +66,7 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
           gridLineStyle={gridLineStyle}
           onTrackPositionChange={onTrackPositionChange}
           onTimeChange={onTimeChange}
+          totalWidth={totalTimelineWidth}
         />
       ) : (
         <EmptyTimelineDropZone onTimeChange={onTimeChange} bpm={bpm} />
@@ -74,34 +83,68 @@ interface TimelineRulerProps {
   gridLineStyle: {
     borderRight: string;
   };
+  totalWidth?: number;
 }
 
-function TimelineRuler({ measureCount, zoomLevel, gridLineStyle }: TimelineRulerProps) {
+function TimelineRuler({ measureCount, zoomLevel, bpm = 120, onTimeChange = () => {}, gridLineStyle, totalWidth }: TimelineRulerProps) {
   // Number of beats per measure (from grid constants)
   const beatsPerMeasure = GRID_CONSTANTS.beatsPerMeasure;
   // Width of a single beat in pixels
   const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
   
+  // Handler for ruler clicks to set playback position
+  const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Get click position relative to the ruler
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    
+    // Adjust for zoom level
+    const adjustedX = clickX / zoomLevel;
+    
+    // Convert pixel position to time in seconds using our utility function
+    const newTime = calculatePositionTime(adjustedX, bpm);
+    
+    console.log('Timeline ruler clicked!', {
+      clickX,
+      adjustedX,
+      newTime,
+      zoomLevel,
+      bpm
+    });
+    
+    // Call the callback with the new time
+    onTimeChange(newTime);
+  };
+  
   return (
-    <Box sx={{ 
-      display: 'flex',
-      position: 'sticky',
-      top: 0,
-      bgcolor: '#111', // Slightly darker for better contrast
-      zIndex: 2,
-      height: GRID_CONSTANTS.headerHeight,
-      boxSizing: 'border-box',
-      transform: `scaleX(${zoomLevel})`,
-      willChange: "transform",
-      imageRendering: "crisp-edges",
-      transformOrigin: "top left",
-      borderBottom: '1px solid #444', // More subtle border
-    }}>
-      <Box sx={{ 
+    <Box 
+      sx={{ 
         display: 'flex',
-        position: 'relative',
-        flex: 1,
-      }}>
+        position: 'sticky',
+        top: 0,
+        bgcolor: '#111', // Slightly darker for better contrast
+        zIndex: 2,
+        height: GRID_CONSTANTS.headerHeight,
+        boxSizing: 'border-box',
+        transform: `scaleX(${zoomLevel})`,
+        willChange: "transform",
+        imageRendering: "crisp-edges",
+        transformOrigin: "top left",
+        borderBottom: '1px solid #444', // More subtle border
+      }}
+      style={{
+        width: totalWidth ? `${totalWidth}px` : '100%',
+      }}
+    >
+      <Box 
+        sx={{ 
+          display: 'flex',
+          position: 'relative',
+          width: '100%', // Ensure it fills the full width
+          cursor: 'pointer', // Show pointer cursor to indicate clickable
+        }}
+        onClick={handleRulerClick}
+      >
         {/* Measure divisions */}
         {Array.from({ length: measureCount }).map((_, measureIndex) => (
           <Box 
@@ -199,6 +242,8 @@ interface TimelineContentProps extends TimelineRulerProps {
   isPlaying: boolean;
   bpm: number;
   onTrackPositionChange: (trackId: string, newPosition: Position, isDragEnd: boolean) => void;
+  onTimeChange: (newTime: number) => void;
+  totalWidth?: number;
 }
 
 function TimelineContent({
@@ -209,17 +254,59 @@ function TimelineContent({
   isPlaying,
   bpm,
   gridLineStyle,
-  onTrackPositionChange
+  onTrackPositionChange,
+  onTimeChange,
+  totalWidth
 }: TimelineContentProps) {
+  
+  // Handler for timeline content clicks to set playback position
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only handle direct clicks on the background, not on tracks
+    if ((e.target as HTMLElement).closest('.track')) {
+      console.log('Click on track - ignoring for timeline click');
+      return;
+    }
+    
+    // Get click position relative to the content area
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    
+    // Adjust for zoom level
+    const adjustedX = clickX / zoomLevel;
+    
+    // Convert pixel position to time in seconds
+    const newTime = calculatePositionTime(adjustedX, bpm);
+    
+    console.log('Timeline content clicked!', {
+      clickX,
+      adjustedX,
+      newTime,
+      zoomLevel,
+      bpm,
+      target: e.target,
+      currentTarget: e.currentTarget
+    });
+    
+    // Call the callback with the new time
+    onTimeChange(newTime);
+  };
+  
   return (
-    <Box sx={{ 
-      minHeight: '100%',
-      position: 'relative',
-      transform: `scaleX(${zoomLevel})`,
-      willChange: "transform",
-      imageRendering: "crisp-edges",
-      transformOrigin: "top left",
-    }}>
+    <Box 
+      sx={{ 
+        minHeight: '100%',
+        position: 'relative',
+        transform: `scaleX(${zoomLevel})`,
+        willChange: "transform",
+        imageRendering: "crisp-edges",
+        transformOrigin: "top left",
+        cursor: 'pointer', // Show pointer cursor to indicate clickable
+      }}
+      style={{
+        width: totalWidth ? `${totalWidth}px` : '100%',
+      }}
+      onClick={handleTimelineClick}
+    >
       <GridOverlay measureCount={measureCount} />
       <PlaybackCursor currentTime={currentTime} isPlaying={isPlaying} bpm={bpm} />
 
@@ -256,10 +343,14 @@ function GridOverlay({ measureCount }: { measureCount: number }) {
         position: 'absolute',
         top: 0,
         left: 0,
-        right: 0,
         bottom: 0,
-        pointerEvents: 'none',
+        width: '100%', // Fill the full width of the parent container
+        pointerEvents: 'none', // Important: this makes the grid not catch any mouse events
         zIndex: 1000
+      }}
+      onClick={(e) => {
+        console.log('Grid overlay clicked - this should not happen with pointerEvents: none');
+        e.stopPropagation();
       }}
     >
       {/* Measure grid lines */}
@@ -328,7 +419,12 @@ function GridOverlay({ measureCount }: { measureCount: number }) {
   );
 }
 
-function EmptyTimelineDropZone() {
+interface EmptyTimelineDropZoneProps {
+  onTimeChange?: (newTime: number) => void;
+  bpm?: number;
+}
+
+function EmptyTimelineDropZone({ onTimeChange = () => {}, bpm = 120 }: EmptyTimelineDropZoneProps) {
   return (
     <Box sx={{ 
       flex: 1,
@@ -340,10 +436,14 @@ function EmptyTimelineDropZone() {
       height: '100%',
       border: '2px dashed #333',
       m: 2,
-      borderRadius: 2
+      borderRadius: 2,
+      position: 'relative', // For positioning the cursor inside
     }}>
       <Box sx={{ fontSize: 24, mb: 1 }}>♫</Box>
       <Box>Drop a loop or an audio/MIDI/Video file</Box>
+      
+      {/* We still include the cursor element even in empty state, just hidden until tracks exist */}
+      <PlaybackCursor currentTime={0} isPlaying={false} bpm={bpm} />
     </Box>
   );
 } 
