@@ -64,6 +64,9 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [notes, activeTrackId, store]);
 
   const openPianoRoll = (trackId?: string, instrumentId?: string, initialNotes?: Note[]) => {
+    // CRITICAL FIX: Always clear notes first to prevent inherited state
+    setNotes([]);
+    
     const selectedInstrumentId = instrumentId || 'default';
     setActiveInstrumentId(selectedInstrumentId);
     
