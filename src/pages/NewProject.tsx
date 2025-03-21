@@ -34,6 +34,17 @@ import { StoreProvider } from '../core/state/StoreContext';
 import { useStore } from '../core/state/StoreContext';
 import { ChatBubble, ChatBubbleRounded, ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
 
+/**
+ * Renders the primary interface for creating and managing a music project.
+ *
+ * This component initializes the project store and audio engine, manages state for tracks,
+ * playback, BPM, time signature, project title, and other UI elements, and handles user interactions
+ * including adding, deleting, renaming, and moving tracks. It also supports undo/redo operations via
+ * a history manager and ensures database cleanup on window unload.
+ *
+ * @example
+ * <NewProject />
+ */
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
