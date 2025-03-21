@@ -32,6 +32,7 @@ import KeySelector from '../components/KeySelector';
 import { PianoRollProvider } from '../components/piano-roll/PianoRollWindow';
 import { StoreProvider } from '../core/state/StoreContext';
 import { useStore } from '../core/state/StoreContext';
+import { ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -529,13 +530,47 @@ function NewProject() {
           </IconButton>
         </Box>
 
+        {/* Remove the separate boxes and combine them */}
         <Box sx={{ 
-          ml: 'auto', 
-          color: '#fff',
+          borderLeft: gridLineStyle.borderRight,
           display: 'flex',
-          alignItems: 'center'
+          alignItems: 'center',
+          gap: 2,
+          marginLeft: 'auto'  // This pushes everything to the right
         }}>
-          {formatTime(currentTime)}
+          <Box sx={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}>
+            <IconButton size="small" sx={{ color: 'white' }} onClick={handleZoomIn}>
+              <ZoomInIcon />
+            </IconButton>
+            <Box sx={{ color: "white", fontWeight: "bold", backgroundColor: "#333", minWidth: 40, textAlign: "center", border: "1px solid rgba(255, 255, 255, 0.2)", padding: "4px 4px", borderRadius: "6px" }}>
+              {zoomLevel.toFixed(1)}x
+            </Box>
+            <IconButton size="small" sx={{ color: 'white' }} onClick={handleZoomOut}>
+              <ZoomOutIcon />
+            </IconButton>
+          </Box>
+
+          <Box sx={{ 
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+          }}>
+            {formatTime(currentTime)}
+          </Box>
+          <Box sx={{ 
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            pr: 2  // Add some padding on the right
+          }}>
+            <IconButton size="small" sx={{ color: 'white' }} onClick={() => {}}>
+              <ViewSidebarRounded />
+            </IconButton>
+          </Box>
         </Box>
       </Box>
 
@@ -760,29 +795,6 @@ function NewProject() {
               <Box>Drop a loop or an audio/MIDI/Video file</Box>
             </Box>
           )}
-        </Box>
-
-        {/* Right Toolbar */}
-        <Box sx={{ 
-          width: 50,
-          borderLeft: gridLineStyle.borderRight,
-          display: 'flex',
-          flexDirection: 'column',
-          p: 1,
-          gap: 1
-        }}>
-          <IconButton size="small" sx={{ color: 'white' }}>
-            <ShuffleIcon />
-          </IconButton>
-          <IconButton size="small" sx={{ color: 'white' }} onClick={handleZoomIn}>
-            <ZoomInIcon />
-          </IconButton>
-          <Box sx={{ color: "white", fontWeight: "bold", backgroundColor: "#333", minWidth: 40, textAlign: "center", border: "1px solid rgba(255, 255, 255, 0.2)", padding: "4px 4px", borderRadius: "6px", marginRight: '2px' }}>
-            {zoomLevel.toFixed(1)}x
-          </Box>
-          <IconButton size="small" sx={{ color: 'white' }} onClick={handleZoomOut}>
-            <ZoomOutIcon />
-          </IconButton>
         </Box>
       </Box>
 
