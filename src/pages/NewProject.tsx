@@ -35,6 +35,7 @@ import { useStore } from '../core/state/StoreContext';
 import { ArrowBack, ChatBubble, ChatBubbleOutlineRounded, ChatBubbleRounded, ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
 import ChatWindow from '../components/chat/ChatWindow';
 import { Timeline } from '../components/Timeline/Timeline';
+import { useNavigate } from 'react-router-dom';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -55,6 +56,7 @@ function NewProject() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [projectTitle, setProjectTitle] = useState("Untitled Project");
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Update undo/redo state whenever history changes
   useEffect(() => {
@@ -514,9 +516,10 @@ function NewProject() {
           <Tooltip title="Go back to Projects" arrow>
             <IconButton 
               size="small" 
-              sx={{ color: canUndo ? 'white' : '#666' }}
-              onClick={handleUndo}
-              disabled={!canUndo}
+              sx={{ color: 'white' }}
+              onClick={() => {
+                navigate('/projects');
+              }}
             >
               <ArrowBack />
             </IconButton>
