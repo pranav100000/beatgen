@@ -187,7 +187,6 @@ const PianoRoll: React.FC = () => {
   const actualRowToDisplayRow = (actualRow: number): number => {
     return totalNotes - 1 - actualRow;
   };
-
   // Helper function to handle scroll and expand grid if needed
   const handleScroll = () => {
     if (!scrollContainerRef.current || !gridRef.current) return;
@@ -197,16 +196,37 @@ const PianoRoll: React.FC = () => {
 
     // If we've scrolled past the threshold, add more columns
     if (scrollRatio > expandThreshold) {
-      setGridColumns(prev => prev + minGridColumns);
+      setGridColumns(prev => prev + 1);
     }
   };
 
-  // Update grid width on container resize
+  const calculateMinimumGridColumns = (currentNotes: Note[]): number => {
+    if (currentNotes.length === 0) return minGridColumns;
+    
+    // Find the rightmost note's end position (column + length)
+    const farthestPosition = Math.max(
+      ...currentNotes.map(note => note.column + note.length)
+    );
+    
+    // Add some padding columns and ensure we're not smaller than minGridColumns
+    return Math.max(minGridColumns, farthestPosition + 4);
+  };
+
+  // Update grid columns whenever notes change
+  useEffect(() => {
+    setGridColumns(prev => Math.max(prev, calculateMinimumGridColumns(notes)));
+  }, [notes]);
+
+  // Modify the existing resize observer to maintain minimum width
   useEffect(() => {
     const updateGridColumns = () => {
       if (!gridRef.current) return;
       const containerWidth = gridRef.current.clientWidth;
-      setGridColumns(Math.max(minGridColumns, Math.floor(containerWidth / cellWidth)));
+      const minimumColumns = calculateMinimumGridColumns(notes);
+      setGridColumns(prev => Math.max(
+        prev,
+        Math.max(minimumColumns, Math.floor(containerWidth / cellWidth))
+      ));
     };
 
     const resizeObserver = new ResizeObserver(updateGridColumns);
@@ -215,7 +235,7 @@ const PianoRoll: React.FC = () => {
     }
 
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [notes]); // Add notes as dependency
 
   const isBlackKey = (noteIndex: number): boolean => {
     const noteInOctave = noteIndex % 12;
