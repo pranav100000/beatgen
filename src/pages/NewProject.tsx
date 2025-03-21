@@ -533,7 +533,18 @@ function NewProject() {
           >
             {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
           </IconButton>
-          <IconButton size="small" sx={{ color: 'white' }}>
+          <IconButton 
+            size="small" 
+            sx={{ color: 'white' }}
+            onClick={() => {
+              if (store) {
+                console.log('🎮 UI: Triggering stop');
+                store.getTransport().stop();
+                setIsPlaying(false);
+                setCurrentTime(0);
+              }
+            }}
+          >
             <SkipPreviousIcon />
           </IconButton>
         </Box>
@@ -694,6 +705,7 @@ function NewProject() {
           measureCount={measureCount}
           zoomLevel={zoomLevel}
           bpm={bpm}
+          timeSignature={timeSignature}
           onTrackPositionChange={handleTrackPositionChange}
           onTimeChange={(newTime) => {
             setCurrentTime(newTime);

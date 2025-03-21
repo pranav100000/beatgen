@@ -121,13 +121,33 @@ class AudioEngine {
     this.mainOutput.volume.value = volume;
   }
 
-  // Add method to stop all playback
+  // Stops all playback and should only be used for full stop, not pause
   public stopAllPlayback(): void {
-    console.log('Stopping all playback');
+    console.log('Stopping all playback (full stop)');
     this.tracks.forEach((track, id) => {
       if (track.player) {
         console.log(`Stopping player for track ${id}`);
-        track.player.stop();  // Don't unsync - keep synced with transport
+        // With Tone.js, we need to be careful with stop() as it completely stops the player
+        // Only stop if it's actually playing
+        if (track.player.state === "started") {
+          track.player.stop();  
+        }
+        
+        // Keep synced with transport
+        track.player.sync();
+      }
+    });
+  }
+  
+  // Add a method specifically for pausing (doesn't actually stop the players)
+  public pauseAllPlayback(): void {
+    console.log('Pausing all playback (maintain position)');
+    // For pause, we don't actually call stop() on the players
+    // We just let the transport pause and the players will pause with it
+    // since they are synced to the transport
+    this.tracks.forEach((track, id) => {
+      if (track.player && track.player.state === "started") {
+        console.log(`Track ${id} player synced with paused transport`);
       }
     });
   }

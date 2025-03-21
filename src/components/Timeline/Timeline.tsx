@@ -12,6 +12,7 @@ export interface TimelineProps {
   measureCount?: number;
   zoomLevel?: number;
   bpm?: number;
+  timeSignature?: [number, number];
   onTrackPositionChange?: (trackId: string, newPosition: Position, isDragEnd: boolean) => void;
   onTimeChange?: (newTime: number) => void;
   gridLineStyle?: {
@@ -26,6 +27,7 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
   measureCount = GRID_CONSTANTS.measureCount,
   zoomLevel = 1,
   bpm = 120,
+  timeSignature = [4, 4],
   onTrackPositionChange = () => {},
   onTimeChange = () => {},
   gridLineStyle = {
@@ -50,6 +52,7 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
         zoomLevel={zoomLevel} 
         gridLineStyle={gridLineStyle} 
         bpm={bpm}
+        timeSignature={timeSignature}
         onTimeChange={onTimeChange}
         totalWidth={totalTimelineWidth}
       />
@@ -63,13 +66,14 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
           currentTime={currentTime}
           isPlaying={isPlaying}
           bpm={bpm}
+          timeSignature={timeSignature}
           gridLineStyle={gridLineStyle}
           onTrackPositionChange={onTrackPositionChange}
           onTimeChange={onTimeChange}
           totalWidth={totalTimelineWidth}
         />
       ) : (
-        <EmptyTimelineDropZone onTimeChange={onTimeChange} bpm={bpm} />
+        <EmptyTimelineDropZone onTimeChange={onTimeChange} bpm={bpm} timeSignature={timeSignature} />
       )}
     </Box>
   );
@@ -79,6 +83,7 @@ interface TimelineRulerProps {
   measureCount: number;
   zoomLevel: number;
   bpm?: number;
+  timeSignature?: [number, number];
   onTimeChange?: (newTime: number) => void;
   gridLineStyle: {
     borderRight: string;
@@ -86,9 +91,9 @@ interface TimelineRulerProps {
   totalWidth?: number;
 }
 
-function TimelineRuler({ measureCount, zoomLevel, bpm = 120, onTimeChange = () => {}, gridLineStyle, totalWidth }: TimelineRulerProps) {
-  // Number of beats per measure (from grid constants)
-  const beatsPerMeasure = GRID_CONSTANTS.beatsPerMeasure;
+function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4, 4], onTimeChange = () => {}, gridLineStyle, totalWidth }: TimelineRulerProps) {
+  // Get beats per measure from time signature
+  const beatsPerMeasure = timeSignature[0];
   // Width of a single beat in pixels
   const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
   
@@ -102,14 +107,15 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, onTimeChange = () =
     const adjustedX = clickX / zoomLevel;
     
     // Convert pixel position to time in seconds using our utility function
-    const newTime = calculatePositionTime(adjustedX, bpm);
+    const newTime = calculatePositionTime(adjustedX, bpm, timeSignature);
     
     console.log('Timeline ruler clicked!', {
       clickX,
       adjustedX,
       newTime,
       zoomLevel,
-      bpm
+      bpm,
+      timeSignature
     });
     
     // Call the callback with the new time
@@ -201,21 +207,39 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, onTimeChange = () =
                   </Box>
                 )}
 
-                {/* Sub-beat markings (16ths) */}
-                {beatIndex !== beatsPerMeasure && Array.from({ length: 3 }).map((_, subBeatIndex) => (
-                  <Box 
-                    key={`sub-${measureIndex}-${beatIndex}-${subBeatIndex}`}
-                    sx={{
-                      position: 'absolute',
-                      top: '95%',
-                      left: `${((subBeatIndex + 1) * (beatWidth / 4))}px`,
-                      height: '4px',
-                      width: '1px',
-                      bgcolor: subBeatIndex === 1 ? '#444' : '#333', // Middle 8th note slightly more visible
-                      transform: 'translateY(-2px)',
-                    }}
-                  />
-                ))}
+                {/* Sub-beat markings based on time signature */}
+                {beatIndex !== beatsPerMeasure && (() => {
+                  const denominator = timeSignature[1];
+                  const numSubdivisions = denominator - 1;
+                  
+                  // Return early if no subdivisions are needed
+                  if (numSubdivisions <= 0) return null;
+                  
+                  // Create an array of subdivisions
+                  return Array.from({ length: numSubdivisions }).map((_, subBeatIndex) => {
+                    // Calculate the position of each subdivision
+                    const subBeatPosition = (subBeatIndex + 1) * (beatWidth / denominator);
+                    
+                    // Determine visibility - highlight middle subdivisions for better readability
+                    const isMiddle = subBeatIndex === Math.floor(numSubdivisions / 2) - 1;
+                    const subBeatColor = isMiddle ? '#444' : '#333';
+                    
+                    return (
+                      <Box 
+                        key={`sub-${measureIndex}-${beatIndex}-${subBeatIndex}`}
+                        sx={{
+                          position: 'absolute',
+                          top: '95%',
+                          left: `${subBeatPosition}px`,
+                          height: '4px',
+                          width: '1px',
+                          bgcolor: subBeatColor,
+                          transform: 'translateY(-2px)',
+                        }}
+                      />
+                    );
+                  });
+                })()}
               </Box>
             ))}
           </Box>
@@ -242,6 +266,7 @@ interface TimelineContentProps extends TimelineRulerProps {
   currentTime: number;
   isPlaying: boolean;
   bpm: number;
+  timeSignature: [number, number];
   onTrackPositionChange: (trackId: string, newPosition: Position, isDragEnd: boolean) => void;
   onTimeChange: (newTime: number) => void;
   totalWidth?: number;
@@ -254,6 +279,7 @@ function TimelineContent({
   currentTime,
   isPlaying,
   bpm,
+  timeSignature,
   gridLineStyle,
   onTrackPositionChange,
   onTimeChange,
@@ -276,7 +302,7 @@ function TimelineContent({
     const adjustedX = clickX / zoomLevel;
     
     // Convert pixel position to time in seconds
-    const newTime = calculatePositionTime(adjustedX, bpm);
+    const newTime = calculatePositionTime(adjustedX, bpm, timeSignature);
     
     console.log('Timeline content clicked!', {
       clickX,
@@ -284,6 +310,7 @@ function TimelineContent({
       newTime,
       zoomLevel,
       bpm,
+      timeSignature,
       target: e.target,
       currentTarget: e.currentTarget
     });
@@ -308,8 +335,8 @@ function TimelineContent({
       }}
       onClick={handleTimelineClick}
     >
-      <GridOverlay measureCount={measureCount} />
-      <PlaybackCursor currentTime={currentTime} isPlaying={isPlaying} bpm={bpm} />
+      <GridOverlay measureCount={measureCount} timeSignature={timeSignature} />
+      <PlaybackCursor currentTime={currentTime} isPlaying={isPlaying} bpm={bpm} timeSignature={timeSignature} />
 
       {tracks.map((track, index) => (
         <Track 
@@ -334,8 +361,8 @@ function TimelineContent({
   );
 }
 
-function GridOverlay({ measureCount }: { measureCount: number }) {
-  const beatsPerMeasure = GRID_CONSTANTS.beatsPerMeasure;
+function GridOverlay({ measureCount, timeSignature = [4, 4] }: { measureCount: number, timeSignature?: [number, number] }) {
+  const beatsPerMeasure = timeSignature[0];
   const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
   
   return (
@@ -394,28 +421,62 @@ function GridOverlay({ measureCount }: { measureCount: number }) {
         return null;
       })}
 
-      {/* Sixteenth note grid lines (for more detailed grid) */}
-      {Array.from({ length: measureCount * beatsPerMeasure * 4 }).map((_, i) => {
-        // Skip beat lines and measure lines (already drawn above)
-        if (i % 4 !== 0) {
-          return (
-            <Box
-              key={`sixteenth-${i}`}
-              sx={{
-                position: 'absolute',
-                left: `${i * (beatWidth / 4)}px`,
-                top: 0,
-                bottom: 0,
-                width: '1px',
-                bgcolor: '#222', // Subtle color for 16th note lines
-                opacity: i % 2 === 0 ? 0.5 : 0.3, // 8th notes slightly more visible
-                zIndex: 998
-              }}
-            />
-          );
-        }
-        return null;
-      })}
+      {/* Subdivision grid lines based on time signature */}
+      {(() => {
+        const denominator = timeSignature[1];
+        // Determine how many subdivisions we need per beat
+        const subdivisionsPerBeat = denominator;
+        // Total number of subdivisions for the entire timeline
+        const totalSubdivisions = measureCount * beatsPerMeasure * subdivisionsPerBeat;
+        
+        return Array.from({ length: totalSubdivisions }).map((_, i) => {
+          // Skip main beat lines (already drawn above)
+          if (i % subdivisionsPerBeat === 0) return null;
+          
+          // Calculate position
+          const position = i * (beatWidth / subdivisionsPerBeat);
+          
+          // Determine opacity based on position in the beat
+          let opacity = 0;
+          
+          // For eighth notes (denominator=8), show all subdivisions
+          // For quarter notes (denominator=4), show half and quarter subdivisions
+          // For half notes (denominator=2), just show the middle subdivision
+          
+          // Is this a half-beat subdivision?
+          const isHalfBeat = i % (subdivisionsPerBeat / 2) === 0;
+          // Is this a quarter-beat subdivision?
+          const isQuarterBeat = i % (subdivisionsPerBeat / 4) === 0;
+          
+          if (isHalfBeat) {
+            opacity = 0.6; // Highest visibility for half-beat marks
+          } else if (isQuarterBeat && denominator >= 4) {
+            opacity = 0.4; // Medium visibility for quarter-beat marks
+          } else if (denominator >= 8) {
+            opacity = 0.2; // Lowest visibility for other subdivisions
+          }
+          
+          // Only render if visible
+          if (opacity > 0) {
+            return (
+              <Box
+                key={`subdivision-${i}`}
+                sx={{
+                  position: 'absolute',
+                  left: `${position}px`,
+                  top: 0,
+                  bottom: 0,
+                  width: '1px',
+                  bgcolor: '#222', // Subtle color for subdivision lines
+                  opacity,
+                  zIndex: 998
+                }}
+              />
+            );
+          }
+          return null;
+        });
+      })()}
     </Box>
   );
 }
@@ -423,9 +484,10 @@ function GridOverlay({ measureCount }: { measureCount: number }) {
 interface EmptyTimelineDropZoneProps {
   onTimeChange?: (newTime: number) => void;
   bpm?: number;
+  timeSignature?: [number, number];
 }
 
-function EmptyTimelineDropZone({ onTimeChange = () => {}, bpm = 120 }: EmptyTimelineDropZoneProps) {
+function EmptyTimelineDropZone({ onTimeChange = () => {}, bpm = 120, timeSignature = [4, 4] }: EmptyTimelineDropZoneProps) {
   return (
     <Box sx={{ 
       flex: 1,
@@ -444,7 +506,7 @@ function EmptyTimelineDropZone({ onTimeChange = () => {}, bpm = 120 }: EmptyTime
       <Box>Drop a loop or an audio/MIDI/Video file</Box>
       
       {/* We still include the cursor element even in empty state, just hidden until tracks exist */}
-      <PlaybackCursor currentTime={0} isPlaying={false} bpm={bpm} />
+      <PlaybackCursor currentTime={0} isPlaying={false} bpm={bpm} timeSignature={timeSignature} />
     </Box>
   );
 } 
