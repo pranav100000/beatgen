@@ -13,6 +13,7 @@ export interface TimelineProps {
   zoomLevel?: number;
   bpm?: number;
   onTrackPositionChange?: (trackId: string, newPosition: Position, isDragEnd: boolean) => void;
+  onTimeChange?: (newTime: number) => void;
   gridLineStyle?: {
     borderRight: string;
   };
@@ -26,6 +27,7 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
   zoomLevel = 1,
   bpm = 120,
   onTrackPositionChange = () => {},
+  onTimeChange = () => {},
   gridLineStyle = {
     borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`
   }
@@ -36,7 +38,13 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
       sx={{ flex: 1, position: 'relative', overflow: 'auto' }}
     >
       {/* Time Markers */}
-      <TimelineRuler measureCount={measureCount} zoomLevel={zoomLevel} gridLineStyle={gridLineStyle} />
+      <TimelineRuler 
+        measureCount={measureCount} 
+        zoomLevel={zoomLevel} 
+        gridLineStyle={gridLineStyle} 
+        bpm={bpm}
+        onTimeChange={onTimeChange}
+      />
 
       {/* Tracks or Drop Zone */}
       {tracks.length > 0 ? (
@@ -49,9 +57,10 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
           bpm={bpm}
           gridLineStyle={gridLineStyle}
           onTrackPositionChange={onTrackPositionChange}
+          onTimeChange={onTimeChange}
         />
       ) : (
-        <EmptyTimelineDropZone />
+        <EmptyTimelineDropZone onTimeChange={onTimeChange} bpm={bpm} />
       )}
     </Box>
   );
@@ -60,18 +69,25 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
 interface TimelineRulerProps {
   measureCount: number;
   zoomLevel: number;
+  bpm?: number;
+  onTimeChange?: (newTime: number) => void;
   gridLineStyle: {
     borderRight: string;
   };
 }
 
 function TimelineRuler({ measureCount, zoomLevel, gridLineStyle }: TimelineRulerProps) {
+  // Number of beats per measure (from grid constants)
+  const beatsPerMeasure = GRID_CONSTANTS.beatsPerMeasure;
+  // Width of a single beat in pixels
+  const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
+  
   return (
     <Box sx={{ 
       display: 'flex',
       position: 'sticky',
       top: 0,
-      bgcolor: '#000',
+      bgcolor: '#111', // Slightly darker for better contrast
       zIndex: 2,
       height: GRID_CONSTANTS.headerHeight,
       boxSizing: 'border-box',
@@ -79,52 +95,99 @@ function TimelineRuler({ measureCount, zoomLevel, gridLineStyle }: TimelineRuler
       willChange: "transform",
       imageRendering: "crisp-edges",
       transformOrigin: "top left",
+      borderBottom: '1px solid #444', // More subtle border
     }}>
       <Box sx={{ 
         display: 'flex',
         position: 'relative',
         flex: 1,
-        borderBottom: gridLineStyle.borderRight
       }}>
-        {/* Vertical grid lines */}
-        {Array.from({ length: measureCount + 1 }).map((_, i) => (
-          <Box
-            key={`grid-${i}`}
-            sx={{
-              position: 'absolute',
-              left: `${(i * GRID_CONSTANTS.measureWidth)}px`,
-              top: 0,
-              bottom: 0,
-              width: 2,
-              height: '1',
-              bgcolor: GRID_CONSTANTS.borderColor,
-              zIndex: 10
-            }}
-          />
-        ))}
-
-        {/* Measure numbers */}
-        {Array.from({ length: measureCount }).map((_, i) => (
+        {/* Measure divisions */}
+        {Array.from({ length: measureCount }).map((_, measureIndex) => (
           <Box 
-            key={`number-${i}`}
+            key={`measure-${measureIndex}`}
             sx={{ 
-              width: GRID_CONSTANTS.measureWidth,
-              height: GRID_CONSTANTS.headerHeight,
-              display: 'flex',
-              alignItems: 'center',
-              color: '#666',
-              flexShrink: 0,
               position: 'relative',
-              zIndex: 2,
-              '& > span': {
-                position: 'absolute',
-                left: 20
-              }
+              width: GRID_CONSTANTS.measureWidth,
+              height: '100%',
+              display: 'flex',
             }}
           >
-            <span>{i + 1}</span>
+            {/* Measure number */}
+            <Box sx={{
+              position: 'absolute',
+              top: '6px',
+              left: '4px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              color: '#999',
+              userSelect: 'none',
+            }}>
+              {measureIndex + 1}
+            </Box>
+            
+            {/* Beat divisions */}
+            {Array.from({ length: beatsPerMeasure }).map((_, beatIndex) => (
+              <Box 
+                key={`beat-${measureIndex}-${beatIndex}`}
+                sx={{ 
+                  position: 'relative',
+                  width: beatWidth,
+                  height: '100%',
+                  borderLeft: beatIndex === 0 
+                    ? '1px solid #555' // Stronger line for measure start
+                    : '1px solid #333', // Lighter line for beats
+                  '&:first-of-type': {
+                    borderLeft: '1px solid #555', // Ensure first beat has stronger line
+                  }
+                }}
+              >
+                {/* Beat number under measure number */}
+                {measureIndex === 0 && (
+                  <Box sx={{
+                    position: 'absolute',
+                    bottom: '6px',
+                    width: '100%',
+                    textAlign: 'center',
+                    fontSize: '10px',
+                    color: '#777',
+                    userSelect: 'none',
+                  }}>
+                    {beatIndex + 1}
+                  </Box>
+                )}
+
+                {/* Sub-beat markings (16ths) */}
+                {beatIndex !== beatsPerMeasure - 1 && Array.from({ length: 3 }).map((_, subBeatIndex) => (
+                  <Box 
+                    key={`sub-${measureIndex}-${beatIndex}-${subBeatIndex}`}
+                    sx={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: `${((subBeatIndex + 1) * (beatWidth / 4))}px`,
+                      height: '4px',
+                      width: '1px',
+                      bgcolor: subBeatIndex === 1 ? '#444' : '#333', // Middle 8th note slightly more visible
+                      transform: 'translateY(-2px)',
+                    }}
+                  />
+                ))}
+              </Box>
+            ))}
           </Box>
         ))}
+
+        {/* Final measure line */}
+        <Box
+          sx={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: '1px',
+            bgcolor: '#555',
+          }}
+        />
       </Box>
     </Box>
   );
@@ -158,7 +221,7 @@ function TimelineContent({
       transformOrigin: "top left",
     }}>
       <GridOverlay measureCount={measureCount} />
-      <PlaybackCursor currentTime={currentTime} />
+      <PlaybackCursor currentTime={currentTime} isPlaying={isPlaying} bpm={bpm} />
 
       {tracks.map((track, index) => (
         <Track 
@@ -184,6 +247,9 @@ function TimelineContent({
 }
 
 function GridOverlay({ measureCount }: { measureCount: number }) {
+  const beatsPerMeasure = GRID_CONSTANTS.beatsPerMeasure;
+  const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
+  
   return (
     <Box
       sx={{
@@ -196,38 +262,62 @@ function GridOverlay({ measureCount }: { measureCount: number }) {
         zIndex: 1000
       }}
     >
-      {/* Major grid lines (measures) */}
+      {/* Measure grid lines */}
       {Array.from({ length: measureCount + 1 }).map((_, i) => (
         <Box
-          key={`major-${i}`}
+          key={`measure-${i}`}
           sx={{
             position: 'absolute',
             left: `${i * GRID_CONSTANTS.measureWidth}px`,
             top: 0,
             bottom: 0,
             width: '1px',
-            bgcolor: GRID_CONSTANTS.borderColor,
-            opacity: 1,
+            bgcolor: '#555', // Stronger color for measure lines
+            opacity: 0.9,
             zIndex: 1000
           }}
         />
       ))}
 
-      {/* Minor grid lines (beats) */}
-      {Array.from({ length: measureCount * GRID_CONSTANTS.gridSubdivisions }).map((_, i) => {
-        if (i % GRID_CONSTANTS.gridSubdivisions !== 0) {
+      {/* Beat grid lines */}
+      {Array.from({ length: measureCount * beatsPerMeasure }).map((_, i) => {
+        // Skip measure lines (already drawn above)
+        if (i % beatsPerMeasure !== 0) {
           return (
             <Box
-              key={`minor-${i}`}
+              key={`beat-${i}`}
               sx={{
                 position: 'absolute',
-                left: `${i * (GRID_CONSTANTS.measureWidth / GRID_CONSTANTS.gridSubdivisions)}px`,
+                left: `${i * beatWidth}px`,
                 top: 0,
                 bottom: 0,
                 width: '1px',
-                bgcolor: GRID_CONSTANTS.borderColor,
-                opacity: 0.3,
-                zIndex: 1000
+                bgcolor: '#333', // Medium color for beat lines
+                opacity: 0.7,
+                zIndex: 999
+              }}
+            />
+          );
+        }
+        return null;
+      })}
+
+      {/* Sixteenth note grid lines (for more detailed grid) */}
+      {Array.from({ length: measureCount * beatsPerMeasure * 4 }).map((_, i) => {
+        // Skip beat lines and measure lines (already drawn above)
+        if (i % 4 !== 0) {
+          return (
+            <Box
+              key={`sixteenth-${i}`}
+              sx={{
+                position: 'absolute',
+                left: `${i * (beatWidth / 4)}px`,
+                top: 0,
+                bottom: 0,
+                width: '1px',
+                bgcolor: '#222', // Subtle color for 16th note lines
+                opacity: i % 2 === 0 ? 0.5 : 0.3, // 8th notes slightly more visible
+                zIndex: 998
               }}
             />
           );
