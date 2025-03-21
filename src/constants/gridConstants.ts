@@ -1,5 +1,5 @@
 export const GRID_CONSTANTS = {
-  headerHeight: 48,
+  headerHeight: 28,
   trackHeight: 80,
   drumPadHeight: 20,
   measureWidth: 200,

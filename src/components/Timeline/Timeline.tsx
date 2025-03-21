@@ -159,8 +159,8 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, onTimeChange = () =
             {/* Measure number */}
             <Box sx={{
               position: 'absolute',
-              top: '6px',
-              left: '4px',
+              top: '4px',
+              left: '6px',
               fontSize: '12px',
               fontWeight: 'bold',
               color: '#999',
@@ -186,27 +186,28 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, onTimeChange = () =
                 }}
               >
                 {/* Beat number under measure number */}
-                {measureIndex === 0 && (
+                {beatIndex !== 0 && (
                   <Box sx={{
                     position: 'absolute',
                     bottom: '6px',
+                    left: '4px',
                     width: '100%',
-                    textAlign: 'center',
-                    fontSize: '10px',
-                    color: '#777',
-                    userSelect: 'none',
-                  }}>
+                    textAlign: 'left',
+                  fontSize: '8px',
+                  color: '#777',
+                  userSelect: 'none',
+                }}>
                     {beatIndex + 1}
                   </Box>
                 )}
 
                 {/* Sub-beat markings (16ths) */}
-                {beatIndex !== beatsPerMeasure - 1 && Array.from({ length: 3 }).map((_, subBeatIndex) => (
+                {beatIndex !== beatsPerMeasure && Array.from({ length: 3 }).map((_, subBeatIndex) => (
                   <Box 
                     key={`sub-${measureIndex}-${beatIndex}-${subBeatIndex}`}
                     sx={{
                       position: 'absolute',
-                      top: '50%',
+                      top: '95%',
                       left: `${((subBeatIndex + 1) * (beatWidth / 4))}px`,
                       height: '4px',
                       width: '1px',

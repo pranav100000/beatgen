@@ -643,7 +643,7 @@ function NewProject() {
             borderBottom: gridLineStyle.borderRight,
             display: 'flex',
             alignItems: 'center',
-            p: 1.5,
+            p: 0.3,
             boxSizing: 'border-box'
           }}>
             <Button
@@ -651,12 +651,16 @@ function NewProject() {
               variant="contained"
               onClick={handleOpenMenu}
               sx={{
-                bgcolor: '#333',
+                bgcolor: '#1A1A1A',
                 color: 'white',
                 '&:hover': { bgcolor: '#444' },
-                height: 36,
+                height: 24,
                 textTransform: 'none',
-                width: '100%'
+                width: '100%',
+                mx: 'auto',  // Add horizontal margin auto
+                display: 'flex',
+                fontSize: '12px',
+                fontWeight: 'bold'
               }}
             >
               Add Track

@@ -43,7 +43,7 @@ function TrackControls({
       <Box sx={{ 
         display: 'flex',
         flexDirection: 'column',
-        height: GRID_CONSTANTS.trackHeight,
+        height: GRID_CONSTANTS.trackHeight - 1,
         bgcolor: '#1A1A1A',
         p: 0.5,
         alignItems: 'center',

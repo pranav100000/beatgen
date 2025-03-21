@@ -90,17 +90,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '12px 16px',
-            borderBottom: '1px solid #333',
-            backgroundColor: '#242424',
-            height: '24px',
+            //borderBottom: '1px solid #333',
+            //backgroundColor: '#242424',
+            height: '28px',
           }}
         >
-          <Box sx={{ color: 'white', fontWeight: 500 }}>Chat</Box>
+          <Box sx={{ color: 'white', fontWeight: 500, paddingLeft: '8px' }}>Chat</Box>
           <IconButton
             size="small"
             onClick={onClose}
-            sx={{ color: 'white' }}
+            sx={{ color: 'white', paddingRight: '2px' }}
           >
             <CloseIcon />
           </IconButton>
