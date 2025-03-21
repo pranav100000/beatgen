@@ -209,13 +209,17 @@ const PianoRoll: React.FC = () => {
     );
     
     // Add some padding columns and ensure we're not smaller than minGridColumns
-    return Math.max(minGridColumns, farthestPosition + 4);
+    return Math.max(minGridColumns, farthestPosition + 1);
   };
 
   // Update grid columns whenever notes change
   useEffect(() => {
     setGridColumns(prev => Math.max(prev, calculateMinimumGridColumns(notes)));
   }, [notes]);
+
+  useEffect(() => {
+    scrollContainerRef.current?.scrollTo(0, (scrollContainerRef.current?.scrollHeight - scrollContainerRef.current?.clientHeight) / 2);
+  }, []);
 
   // Modify the existing resize observer to maintain minimum width
   useEffect(() => {
