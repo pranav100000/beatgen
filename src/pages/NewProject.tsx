@@ -32,7 +32,8 @@ import KeySelector from '../components/KeySelector';
 import { PianoRollProvider } from '../components/piano-roll/PianoRollWindow';
 import { StoreProvider } from '../core/state/StoreContext';
 import { useStore } from '../core/state/StoreContext';
-import { ChatBubble, ChatBubbleRounded, ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
+import { ChatBubble, ChatBubbleOutlineRounded, ChatBubbleRounded, ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
+import ChatWindow from '../components/chat/ChatWindow';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -52,6 +53,7 @@ function NewProject() {
   const animationFrameRef = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [projectTitle, setProjectTitle] = useState("Untitled Project");
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Update undo/redo state whenever history changes
   useEffect(() => {
@@ -469,13 +471,17 @@ function NewProject() {
     }
   };
 
+  const handleChatToggle = () => {
+    setIsChatOpen(prev => !prev);
+  };
+
   return (
     <Box sx={{ 
       height: '100vh', 
       bgcolor: '#000000', 
       color: 'white',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
     }}>
       {/* Top Control Bar */}
       <Box sx={{ 
@@ -485,7 +491,8 @@ function NewProject() {
         borderBottom: '1px solid #333',
         gap: 2,
         paddingLeft: 2,
-        position: 'relative'  // Add this for absolute positioning context
+        position: 'relative',
+        zIndex: 1300, // Ensure nav bar stays on top
       }}>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton 
@@ -613,15 +620,24 @@ function NewProject() {
             alignItems: 'center',
             pr: 2  // Add some padding on the right
           }}>
-            <IconButton size="small" sx={{ color: 'white' }} onClick={() => {}}>
-              <ChatBubbleRounded />
+            <IconButton 
+              size="small" 
+              sx={{ color: 'white' }} 
+              onClick={handleChatToggle}
+            >
+              {isChatOpen ? <ChatBubbleRounded /> : <ChatBubbleOutlineRounded />}
             </IconButton>
           </Box>
         </Box>
       </Box>
 
-      {/* Main Content Area */}
-      <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* Main Content Area - Make this a relative container */}
+      <Box sx={{ 
+        display: 'flex', 
+        flex: 1, 
+        overflow: 'hidden',
+        position: 'relative' // This is important for chat window positioning
+      }}>
         {/* Left Sidebar */}
         <Box sx={{ 
           width: GRID_CONSTANTS.sidebarWidth,
@@ -842,6 +858,12 @@ function NewProject() {
             </Box>
           )}
         </Box>
+
+        {/* Chat Window - Move it inside the main content area */}
+        <ChatWindow
+          isOpen={isChatOpen}
+          onClose={handleChatToggle}
+        />
       </Box>
 
       <AddTrackMenu
