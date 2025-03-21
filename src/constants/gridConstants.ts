@@ -6,7 +6,7 @@ export const GRID_CONSTANTS = {
   borderWidth: 1,
   borderColor: '#333',
   sidebarWidth: 200,
-  measureCount: 100,
+  measureCount: 20,
   pixelsPerSecond: 100,
   controlsWidth: 0,
   gridSubdivisions: 4,

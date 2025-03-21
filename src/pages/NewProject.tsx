@@ -618,7 +618,7 @@ function NewProject() {
               borderBottom: gridLineStyle.borderRight
             }}>
               {/* Vertical grid lines */}
-              {Array.from({ length: GRID_CONSTANTS.measureCount + 1 }).map((_, i) => (
+              {Array.from({ length: measureCount + 1 }).map((_, i) => (
                 <Box
                   key={`grid-${i}`}
                   sx={{
@@ -635,7 +635,7 @@ function NewProject() {
               ))}
 
               {/* Measure numbers */}
-              {Array.from({ length: GRID_CONSTANTS.measureCount }).map((_, i) => (
+              {Array.from({ length: measureCount }).map((_, i) => (
                 <Box 
                   key={`number-${i}`}
                   sx={{ 
@@ -664,7 +664,7 @@ function NewProject() {
             <Box sx={{ 
               minHeight: '100%',
               position: 'relative',
-              overflow: 'hidden',
+              // overflow: 'hidden',
               transform: `scaleX(${zoomLevel})`,
               willChange: "transform",
               imageRendering: "crisp-edges",
@@ -683,7 +683,7 @@ function NewProject() {
                 }}
               >
                 {/* Major grid lines (measures) */}
-                {Array.from({ length: GRID_CONSTANTS.measureCount + 1 }).map((_, i) => (
+                {Array.from({ length: measureCount + 1 }).map((_, i) => (
                   <Box
                     key={`major-${i}`}
                     sx={{
@@ -700,7 +700,7 @@ function NewProject() {
                 ))}
 
                 {/* Minor grid lines (beats) */}
-                {Array.from({ length: GRID_CONSTANTS.measureCount * GRID_CONSTANTS.gridSubdivisions }).map((_, i) => {
+                {Array.from({ length: measureCount * GRID_CONSTANTS.gridSubdivisions }).map((_, i) => {
                   if (i % GRID_CONSTANTS.gridSubdivisions !== 0) { // Skip positions where major lines exist
                     return (
                       <Box
