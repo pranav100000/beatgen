@@ -10,6 +10,7 @@ export interface Transport {
     pause(): void;
     stop(): void;
     seek(position: number): void;
+    setPosition(position: number): void;  // Alias for seek for better naming
 }
 
 export class TransportController implements Transport {
@@ -161,5 +162,10 @@ export class TransportController implements Transport {
                 .filter(t => t.id !== trackId)
                 .map(t => t.player?.buffer?.duration ?? 0)
         );
+    }
+    
+    public setPosition(position: number): void {
+        // Just an alias for seek
+        this.seek(position);
     }
 }
