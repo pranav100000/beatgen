@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Box, IconButton, Button, TextField } from '@mui/material';
+import { Box, IconButton, Button, TextField, Tooltip } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
 import PauseIcon from '@mui/icons-material/Pause';
@@ -32,7 +32,7 @@ import KeySelector from '../components/KeySelector';
 import { PianoRollProvider } from '../components/piano-roll/PianoRollWindow';
 import { StoreProvider } from '../core/state/StoreContext';
 import { useStore } from '../core/state/StoreContext';
-import { ChatBubble, ChatBubbleOutlineRounded, ChatBubbleRounded, ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
+import { ArrowBack, ChatBubble, ChatBubbleOutlineRounded, ChatBubbleRounded, ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
 import ChatWindow from '../components/chat/ChatWindow';
 import { Timeline } from '../components/Timeline/Timeline';
 
@@ -132,19 +132,28 @@ function NewProject() {
         }
 
         // Create track data with initial position
+        const initialPosition = {
+          x: 0,
+          y: tracks.length * GRID_CONSTANTS.trackHeight
+        };
+        
         const trackData: TrackState = {
           ...newTrack,
           ...audioTrack,
           audioFile: trackTypeOrFile,
           dbId,
           duration,
-          position: {
-            x: 0,
-            y: tracks.length * GRID_CONSTANTS.trackHeight
-          },
+          position: initialPosition,
           // Calculate initial width based on duration and current BPM
           _calculatedWidth: duration ? calculateTrackWidth(duration, bpm) : undefined
         };
+        
+        // Make sure the AudioEngine knows the position
+        store.getAudioEngine().setTrackPosition(
+          trackData.id,
+          initialPosition.x,
+          initialPosition.y
+        );
 
         // Create and execute the add track action
         const action = new AddTrackAction(store, trackData, setTracks);
@@ -182,17 +191,26 @@ function NewProject() {
           }
         }
         
+        const initialPosition = {
+          x: 0,
+          y: tracks.length * GRID_CONSTANTS.trackHeight
+        };
+        
         const trackData: TrackState = {
           ...newTrack,
           ...audioTrack,
-          position: {
-            x: 0,
-            y: tracks.length * GRID_CONSTANTS.trackHeight
-          },
+          position: initialPosition,
           duration: defaultDuration,
           _calculatedWidth: defaultDuration ? calculateTrackWidth(defaultDuration, bpm) : undefined,
           dbId
         };
+        
+        // Make sure the AudioEngine knows the position
+        store.getAudioEngine().setTrackPosition(
+          trackData.id,
+          initialPosition.x,
+          initialPosition.y
+        );
 
         // Create and execute the add track action
         const action = new AddTrackAction(store, trackData, setTracks);
@@ -399,12 +417,19 @@ function NewProject() {
       );
       await historyManager.executeAction(action);
     } else {
-      // During drag, just update the state directly
+      // During drag, update the state directly and notify AudioEngine
       setTracks(prev => prev.map(t => 
         t.id === trackId 
           ? { ...t, position: newPosition }
           : t
       ));
+      
+      // Update AudioEngine immediately during drag for responsive playback
+      store.getAudioEngine().setTrackPosition(
+        trackId,
+        newPosition.x,
+        newPosition.y
+      );
     }
   };
 
@@ -486,6 +511,16 @@ function NewProject() {
         zIndex: 1300, // Ensure nav bar stays on top
       }}>
         <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title="Go back to Projects" arrow>
+            <IconButton 
+              size="small" 
+              sx={{ color: canUndo ? 'white' : '#666' }}
+              onClick={handleUndo}
+              disabled={!canUndo}
+            >
+              <ArrowBack />
+            </IconButton>
+          </Tooltip>
           <IconButton 
             size="small" 
             sx={{ color: canUndo ? 'white' : '#666' }}
