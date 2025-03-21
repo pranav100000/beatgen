@@ -9,9 +9,11 @@ interface KeySelectorProps {
 const DIATONIC_KEY_LIST = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const ACCIDENTAL_KEY_LIST = ['C♯/D♭', 'D♯/E♭', 'F♯/G♭', 'G♯/A♭', 'A♯/B♭'];
 
-const KeySelector: React.FC<KeySelectorProps> = ({ selectedKey, onKeyChange }) => {
+const KeySelector: React.FC<KeySelectorProps> = ({ selectedKey = 'C major', onKeyChange }) => {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const [mode, setMode] = useState<'major' | 'minor'>('major');
+  const [mode, setMode] = useState<'major' | 'minor'>(
+    selectedKey.toLowerCase().includes('minor') ? 'minor' : 'major'
+  );
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -104,8 +106,8 @@ const KeySelector: React.FC<KeySelectorProps> = ({ selectedKey, onKeyChange }) =
               }
             }}
           >
-            <ToggleButton value="Major" sx={{ px: 2 }}>Major</ToggleButton>
-            <ToggleButton value="Minor" sx={{ px: 2 }}>Minor</ToggleButton>
+            <ToggleButton value="major" sx={{ px: 2 }}>Major</ToggleButton>
+            <ToggleButton value="minor" sx={{ px: 2 }}>Minor</ToggleButton>
           </ToggleButtonGroup>
         </Box>
         <Box

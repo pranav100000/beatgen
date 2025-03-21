@@ -32,7 +32,7 @@ import KeySelector from '../components/KeySelector';
 import { PianoRollProvider } from '../components/piano-roll/PianoRollWindow';
 import { StoreProvider } from '../core/state/StoreContext';
 import { useStore } from '../core/state/StoreContext';
-import { ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
+import { ChatBubble, ChatBubbleRounded, ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -45,12 +45,14 @@ function NewProject() {
   const [timeSignature, setTimeSignature] = useState<[number, number]>([4, 4]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
-  const [key, setKey] = useState<string>('C');
+  const [key, setKey] = useState<string>();
   const [zoomLevel, setZoomLevel] = useState(1);
   const [measureCount, setMeasureCount] = useState<number>(GRID_CONSTANTS.measureCount);
   const store = useStore();
   const animationFrameRef = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [projectTitle, setProjectTitle] = useState("Untitled Project");
+
   // Update undo/redo state whenever history changes
   useEffect(() => {
     const updateHistoryState = () => {
@@ -460,6 +462,13 @@ function NewProject() {
     return () => scrollContainer.removeEventListener("scroll", debounceScroll);
   }, [handleScroll]);
 
+  const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setProjectTitle(event.target.value);
+    if (store) {
+      store.projectManager.setProjectName(event.target.value);
+    }
+  };
+
   return (
     <Box sx={{ 
       height: '100vh', 
@@ -476,6 +485,7 @@ function NewProject() {
         borderBottom: '1px solid #333',
         gap: 2,
         paddingLeft: 2,
+        position: 'relative'  // Add this for absolute positioning context
       }}>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton 
@@ -530,6 +540,42 @@ function NewProject() {
           </IconButton>
         </Box>
 
+        {/* Add this new title section */}
+        <Box sx={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 1
+        }}>
+          <TextField
+            variant="standard"
+            value={projectTitle}
+            onChange={handleTitleChange}
+            sx={{
+              '& input': {
+                color: 'white',
+                textAlign: 'center',
+                fontSize: '1rem',
+                fontWeight: 500,
+                padding: '4px 8px',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                }
+              },
+              '& .MuiInput-underline:before': {
+                borderBottom: 'none'
+              },
+              '& .MuiInput-underline:hover:before': {
+                borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+              },
+              '& .MuiInput-underline:after': {
+                borderBottom: '2px solid white'
+              }
+            }}
+          />
+        </Box>
+
         {/* Remove the separate boxes and combine them */}
         <Box sx={{ 
           borderLeft: gridLineStyle.borderRight,
@@ -568,7 +614,7 @@ function NewProject() {
             pr: 2  // Add some padding on the right
           }}>
             <IconButton size="small" sx={{ color: 'white' }} onClick={() => {}}>
-              <ViewSidebarRounded />
+              <ChatBubbleRounded />
             </IconButton>
           </Box>
         </Box>
