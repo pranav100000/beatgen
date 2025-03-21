@@ -32,6 +32,12 @@ export class ProjectManager {
     return this.currentProject;
   }
 
+  public setProjectName(name: string): void {
+    if (this.currentProject) {
+      this.currentProject.name = name;
+    }
+  }
+
   public getCurrentProject(): Project | undefined {
     return this.currentProject;
   }
