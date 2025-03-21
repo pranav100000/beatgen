@@ -45,10 +45,11 @@ function NewProject() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [key, setKey] = useState<string>('C');
-
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [measureCount, setMeasureCount] = useState<number>(GRID_CONSTANTS.measureCount);
   const store = useStore();
   const animationFrameRef = useRef<number | null>(null);
-
+  const scrollRef = useRef<HTMLDivElement>(null);
   // Update undo/redo state whenever history changes
   useEffect(() => {
     const updateHistoryState = () => {
@@ -418,6 +419,46 @@ function NewProject() {
     }
   };
 
+  const handleZoomIn = () => {
+    setZoomLevel((prevZoom) => Math.min(prevZoom + 0.1, 4)); // Zoom in by 10%, max at 2x
+  };
+
+  // Function to zoom out
+  const handleZoomOut = () => {
+    setZoomLevel((prevZoom) => Math.max(prevZoom - 0.1, 0.3)); // Zoom out by 10%, min at 0.5x
+  };
+
+  const handleScroll = useCallback(() => {
+    if (!scrollRef.current) return;
+
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+
+    if (scrollLeft + clientWidth >= scrollWidth - 100) {
+      setMeasureCount((prev) => prev + 20);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tracks.length === 0) return;
+    const maxTrackWidth = Math.max(...tracks.map(track => track._calculatedWidth || 0));
+
+    const newMeasureCount = Math.ceil(maxTrackWidth / GRID_CONSTANTS.measureWidth);
+
+    if (newMeasureCount > measureCount) {
+      setMeasureCount(newMeasureCount);
+    }
+  }, [tracks, measureCount]);
+
+  useEffect(() => {
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
+
+    const debounceScroll = () => requestAnimationFrame(handleScroll);
+    scrollContainer.addEventListener("scroll", debounceScroll);
+
+    return () => scrollContainer.removeEventListener("scroll", debounceScroll);
+  }, [handleScroll]);
+
   return (
     <Box sx={{ 
       height: '100vh', 
@@ -554,7 +595,7 @@ function NewProject() {
         </Box>
 
         {/* Timeline Area */}
-        <Box sx={{ flex: 1, position: 'relative', overflow: 'auto' }}>
+        <Box sx={{ flex: 1, position: 'relative', overflow: 'auto' }} ref={scrollRef}>
           {/* Time Markers */}
           <Box sx={{ 
             display: 'flex',
@@ -563,7 +604,11 @@ function NewProject() {
             bgcolor: '#000',
             zIndex: 2,
             height: GRID_CONSTANTS.headerHeight,
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            transform: `scaleX(${zoomLevel})`,
+            willChange: "transform",
+            imageRendering: "crisp-edges",
+            transformOrigin: "top left",
           }}>
             {/* Measure numbers container */}
             <Box sx={{ 
@@ -619,7 +664,11 @@ function NewProject() {
             <Box sx={{ 
               minHeight: '100%',
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              transform: `scaleX(${zoomLevel})`,
+              willChange: "transform",
+              imageRendering: "crisp-edges",
+              transformOrigin: "top left",
             }}>
               {/* Grid Overlay */}
               <Box
@@ -725,10 +774,13 @@ function NewProject() {
           <IconButton size="small" sx={{ color: 'white' }}>
             <ShuffleIcon />
           </IconButton>
-          <IconButton size="small" sx={{ color: 'white' }}>
+          <IconButton size="small" sx={{ color: 'white' }} onClick={handleZoomIn}>
             <ZoomInIcon />
           </IconButton>
-          <IconButton size="small" sx={{ color: 'white' }}>
+          <Box sx={{ color: "white", fontWeight: "bold", backgroundColor: "#333", minWidth: 40, textAlign: "center", border: "1px solid rgba(255, 255, 255, 0.2)", padding: "4px 4px", borderRadius: "6px", marginRight: '2px' }}>
+            {zoomLevel.toFixed(1)}x
+          </Box>
+          <IconButton size="small" sx={{ color: 'white' }} onClick={handleZoomOut}>
             <ZoomOutIcon />
           </IconButton>
         </Box>
