@@ -79,6 +79,9 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const noteChangeSubscribers = useRef<NoteChangeSubscriber[]>([]);
 
   const openPianoRoll = (trackId?: string, instrumentId?: string, initialNotes?: Note[]) => {
+    // CRITICAL FIX: Always clear notes first to prevent inherited state
+    setNotes([]);
+    
     setActiveTrackId(trackId || null);
     setActiveInstrumentId(instrumentId || null);
     if (initialNotes && initialNotes.length > 0) {

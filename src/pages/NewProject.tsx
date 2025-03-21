@@ -34,6 +34,7 @@ import { StoreProvider } from '../core/state/StoreContext';
 import { useStore } from '../core/state/StoreContext';
 import { ChatBubble, ChatBubbleOutlineRounded, ChatBubbleRounded, ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
 import ChatWindow from '../components/chat/ChatWindow';
+import { Timeline } from '../components/Timeline/Timeline';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -75,22 +76,9 @@ function NewProject() {
 
   // Initialize store only (not audio) on mount
   useEffect(() => {
-    const initializeStore = async () => {
-      try {
-        if (!store.projectManager.getCurrentProject()) {
-          store.projectManager.createProject('New Project');
-        }
-        Tone.Transport.bpm.value = bpm;
-        
-        // Initialize audio immediately
-        await store.initialize();
-        setIsInitialized(true);
-      } catch (error) {
-        console.error('Failed to initialize store:', error);
-      }
-    };
-
-    initializeStore();
+    store.projectManager.createProject('New Project');
+    Tone.Transport.bpm.value = bpm;
+    setIsInitialized(true);
 
     // Clear database on window unload/refresh
     const handleUnload = async () => {
@@ -115,6 +103,9 @@ function NewProject() {
     }
 
     try {
+      // Initialize audio before creating track
+      await store.initializeAudio();
+
       if (trackTypeOrFile instanceof File) {
         // Handle audio file
         const newTrack = store.createTrack('Audio Track', 'audio');
@@ -692,172 +683,17 @@ function NewProject() {
         </Box>
 
         {/* Timeline Area */}
-        <Box sx={{ flex: 1, position: 'relative', overflow: 'auto' }} ref={scrollRef}>
-          {/* Time Markers */}
-          <Box sx={{ 
-            display: 'flex',
-            position: 'sticky',
-            top: 0,
-            bgcolor: '#000',
-            zIndex: 2,
-            height: GRID_CONSTANTS.headerHeight,
-            boxSizing: 'border-box',
-            transform: `scaleX(${zoomLevel})`,
-            willChange: "transform",
-            imageRendering: "crisp-edges",
-            transformOrigin: "top left",
-          }}>
-            {/* Measure numbers container */}
-            <Box sx={{ 
-              display: 'flex',
-              position: 'relative',
-              flex: 1,
-              borderBottom: gridLineStyle.borderRight
-            }}>
-              {/* Vertical grid lines */}
-              {Array.from({ length: measureCount + 1 }).map((_, i) => (
-                <Box
-                  key={`grid-${i}`}
-                  sx={{
-                    position: 'absolute',
-                    left: `${(i * GRID_CONSTANTS.measureWidth)}px`,
-                    top: 0,
-                    bottom: 0,
-                    width: 2,
-                    height: '1',
-                    bgcolor: GRID_CONSTANTS.borderColor,
-                    zIndex: 10
-                  }}
-                />
-              ))}
-
-              {/* Measure numbers */}
-              {Array.from({ length: measureCount }).map((_, i) => (
-                <Box 
-                  key={`number-${i}`}
-                  sx={{ 
-                    width: GRID_CONSTANTS.measureWidth,
-                    height: GRID_CONSTANTS.headerHeight,
-                    display: 'flex',
-                    alignItems: 'center',
-                    color: '#666',
-                    flexShrink: 0,
-                    position: 'relative',
-                    zIndex: 2,
-                    '& > span': {
-                      position: 'absolute',
-                      left: 20  // Fixed distance from the left grid line
-                    }
-                  }}
-                >
-                  <span>{i + 1}</span>
-                </Box>
-              ))}
-            </Box>
-          </Box>
-
-          {/* Tracks or Drop Zone */}
-          {tracks.length > 0 ? (
-            <Box sx={{ 
-              minHeight: '100%',
-              position: 'relative',
-              // overflow: 'hidden',
-              transform: `scaleX(${zoomLevel})`,
-              willChange: "transform",
-              imageRendering: "crisp-edges",
-              transformOrigin: "top left",
-            }}>
-              {/* Grid Overlay */}
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  pointerEvents: 'none',
-                  zIndex: 1000
-                }}
-              >
-                {/* Major grid lines (measures) */}
-                {Array.from({ length: measureCount + 1 }).map((_, i) => (
-                  <Box
-                    key={`major-${i}`}
-                    sx={{
-                      position: 'absolute',
-                      left: `${i * GRID_CONSTANTS.measureWidth}px`,
-                      top: 0,
-                      bottom: 0,
-                      width: '1px',
-                      bgcolor: GRID_CONSTANTS.borderColor,
-                      opacity: 1,
-                      zIndex: 1000
-                    }}
-                  />
-                ))}
-
-                {/* Minor grid lines (beats) */}
-                {Array.from({ length: measureCount * GRID_CONSTANTS.gridSubdivisions }).map((_, i) => {
-                  if (i % GRID_CONSTANTS.gridSubdivisions !== 0) { // Skip positions where major lines exist
-                    return (
-                      <Box
-                        key={`minor-${i}`}
-                        sx={{
-                          position: 'absolute',
-                          left: `${i * (GRID_CONSTANTS.measureWidth / GRID_CONSTANTS.gridSubdivisions)}px`,
-                          top: 0,
-                          bottom: 0,
-                          width: '1px',
-                          bgcolor: GRID_CONSTANTS.borderColor,
-                          opacity: 0.3,
-                          zIndex: 1000
-                        }}
-                      />
-                    );
-                  }
-                  return null;
-                })}
-              </Box>
-
-              <PlaybackCursor currentTime={currentTime} />
-
-              {tracks.map((track, index) => (
-                <Track 
-                  key={track.id}
-                  id={track.id}
-                  index={index}
-                  type={track.type}
-                  audioFile={track.audioFile}
-                  isPlaying={isPlaying}
-                  currentTime={currentTime}
-                  gridLineStyle={gridLineStyle}
-                  measureCount={GRID_CONSTANTS.measureCount}
-                  position={track.position}
-                  onPositionChange={(newPosition, isDragEnd) => handleTrackPositionChange(track.id, newPosition, isDragEnd)}
-                  bpm={bpm}
-                  duration={track.duration}
-                  _calculatedWidth={track._calculatedWidth}
-                />
-              ))}
-            </Box>
-          ) : (
-            <Box sx={{ 
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'column',
-              color: '#666',
-              height: '100%',
-              border: '2px dashed #333',
-              m: 2,
-              borderRadius: 2
-            }}>
-              <Box sx={{ fontSize: 24, mb: 1 }}>♫</Box>
-              <Box>Drop a loop or an audio/MIDI/Video file</Box>
-            </Box>
-          )}
-        </Box>
+        <Timeline
+          tracks={tracks}
+          currentTime={currentTime}
+          isPlaying={isPlaying}
+          measureCount={measureCount}
+          zoomLevel={zoomLevel}
+          bpm={bpm}
+          onTrackPositionChange={handleTrackPositionChange}
+          gridLineStyle={gridLineStyle}
+          ref={scrollRef}
+        />
 
         {/* Chat Window - Move it inside the main content area */}
         <ChatWindow

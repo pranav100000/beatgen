@@ -19,7 +19,7 @@ export interface StoreInterface {
   getAudioEngine(): AudioEngine;
   getTransport(): TransportController;
   projectManager: ProjectManager;
-  initialize(): Promise<void>;
+  initializeAudio(): Promise<void>;
   createTrack(name: string, type: 'audio' | 'midi' | 'video' | 'drum'): Track;
   getInstrumentManager(): InstrumentManager;
   getMidiManager(): MidiManager;
@@ -41,19 +41,18 @@ export class Store implements StoreInterface {
     this.transportController = new TransportController();
     this.midiManager = new MidiManager();
     this.instrumentManager = new InstrumentManager();
+    this.initialized = true;
   }
 
-  public async initialize(): Promise<void> {
+  public async initializeAudio(): Promise<void> {
     if (this.initialized) return;
     
     try {
       await this.audioEngine.initialize();
       this.initialized = true;
-      
-      // After initialization, sync any tracks from project manager
       this.syncTracksFromProjectManager();
     } catch (error) {
-      console.error('Store: Initialization failed:', error);
+      console.error('Store: Audio initialization failed:', error);
       throw error;
     }
   }

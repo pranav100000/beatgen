@@ -3,6 +3,9 @@ import { TrackControlsSidebar } from '../Sidebar/TrackControlsSidebar';
 import { Timeline } from '../Timeline/Timeline';
 import { AudioTrack } from '../../core/audio-engine/audioEngine';
 import AudioEngine from '../../core/audio-engine/audioEngine';
+import { TrackState, Position } from '../../core/types/track';
+import { GRID_CONSTANTS } from '../../constants/gridConstants';
+import { Track as TrackType } from '../../core/state/project';
 
 export const MainLayout: React.FC = () => {
   const [tracks, setTracks] = useState<AudioTrack[]>([]);
@@ -51,6 +54,32 @@ export const MainLayout: React.FC = () => {
     }
   }, [tracks]);
 
+  // Add the missing properties to your tracks
+  const tracksWithPosition: TrackState[] = tracks.map((track, index) => {
+    // Determine track type based on track properties
+    let trackType: TrackType['type'];
+    
+    if ('audioFile' in track) {
+      trackType = 'audio';
+    } else if ('midiData' in track) {
+      trackType = 'midi';
+    } else if ('drumPattern' in track) {
+      trackType = 'drum';
+    } else {
+      // Default fallback - you might want to adjust this based on your needs
+      trackType = 'audio';
+    }
+
+    return {
+      ...track,
+      position: {
+        x: 0,
+        y: index * GRID_CONSTANTS.trackHeight
+      },
+      type: trackType
+    };
+  });
+
   return (
     <div className="main-layout">
       <div className="sidebar">
@@ -72,7 +101,14 @@ export const MainLayout: React.FC = () => {
       </div>
       
       <div className="timeline-container">
-        <Timeline tracks={tracks} />
+        <Timeline 
+          tracks={tracksWithPosition}
+          currentTime={0}
+          isPlaying={false}
+          measureCount={GRID_CONSTANTS.measureCount}
+          zoomLevel={1}
+          bpm={120}
+        />
       </div>
     </div>
   );
