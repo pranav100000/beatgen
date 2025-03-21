@@ -9,6 +9,10 @@ export interface AudioTrack {
   pan: number;
   muted: boolean;
   soloed: boolean;
+  position?: {
+    x: number; // Position in pixels from left (timeline position)
+    y: number; // Position in pixels from top (track order)
+  };
 }
 
 class AudioEngine {
@@ -157,6 +161,15 @@ class AudioEngine {
     const track = this.tracks.get(id);
     if (track) {
       track.name = name;
+    }
+  }
+  
+  // Set a track's position on the timeline
+  public setTrackPosition(id: string, x: number, y: number): void {
+    const track = this.tracks.get(id);
+    if (track) {
+      track.position = { x, y };
+      console.log(`AudioEngine: Set track ${id} position to x:${x}, y:${y}`);
     }
   }
 }

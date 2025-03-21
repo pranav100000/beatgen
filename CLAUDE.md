@@ -22,3 +22,21 @@
 - Timeline synchronization with audio/MIDI needs precise timing via Tone.js
 - All UI interactions should be logged as actions via the history manager
 - Piano roll integrates with MIDI manager for note input/editing
+
+## Tone.js Best Practices
+- When working with players positioned on the timeline, use the following pattern:
+  - Unsync player before repositioning: `player.unsync()`
+  - Then use `player.sync().start(0, offset)` with the correct offset value
+  - Don't mix `sync()` with `seek()` - use `start()` with offset parameter instead
+- For tracks that should start later, use Transport scheduling:
+  ```javascript
+  const eventId = Tone.Transport.schedule(time => {
+    player.start(time, offset);
+  }, delayTime);
+  ```
+- Always clear scheduled events when stopping/pausing/seeking:
+  ```javascript
+  scheduledEvents.forEach(id => Tone.Transport.clear(id));
+  ```
+- Handle track positions by converting pixel positions to time offsets
+- Always track scheduled event IDs for proper cleanup

@@ -94,11 +94,20 @@ export class MoveTrackAction implements Action {
     }
 
     async execute(): Promise<void> {
+        // Update UI state
         this.setTracks(prev => prev.map(track => 
             track.id === this.trackId 
                 ? { ...track, position: this.newPosition }
                 : track
         ));
+        
+        // Update AudioEngine state to affect playback
+        this.store.getAudioEngine().setTrackPosition(
+            this.trackId, 
+            this.newPosition.x, 
+            this.newPosition.y
+        );
+        
         console.log('🔄 Execute MoveTrackAction:', { 
             trackId: this.trackId, 
             from: this.oldPosition, 
@@ -107,11 +116,20 @@ export class MoveTrackAction implements Action {
     }
 
     async undo(): Promise<void> {
+        // Update UI state
         this.setTracks(prev => prev.map(track => 
             track.id === this.trackId 
                 ? { ...track, position: this.oldPosition }
                 : track
         ));
+        
+        // Update AudioEngine state to affect playback
+        this.store.getAudioEngine().setTrackPosition(
+            this.trackId, 
+            this.oldPosition.x, 
+            this.oldPosition.y
+        );
+        
         console.log('↩️ Undo MoveTrackAction:', { 
             trackId: this.trackId, 
             from: this.newPosition, 
