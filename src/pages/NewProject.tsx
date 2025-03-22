@@ -36,6 +36,7 @@ import { ArrowBack, ChatBubble, ChatBubbleOutlineRounded, ChatBubbleRounded, Vie
 import ChatWindow from '../components/chat/ChatWindow';
 import { Timeline } from '../components/Timeline/Timeline';
 import { useNavigate } from 'react-router-dom';
+import { TimeDisplay } from '../components/TimeDisplay';
 
 function NewProject() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
@@ -300,13 +301,6 @@ function NewProject() {
       }
     };
   }, [isPlaying]);
-
-  const formatTime = (timeInSeconds: number) => {
-    const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = Math.floor(timeInSeconds % 60);
-    const tenths = Math.floor((timeInSeconds * 10) % 10);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${tenths}`;
-  };
 
   const gridLineStyle = {
     borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`,
@@ -632,7 +626,7 @@ function NewProject() {
           display: 'flex',
           alignItems: 'center',
           gap: 2,
-          marginLeft: 'auto'  // This pushes everything to the right
+          marginLeft: 'auto'
         }}>
           <Box sx={{ 
             display: 'flex',
@@ -650,18 +644,13 @@ function NewProject() {
             </IconButton>
           </Box>
 
+          <TimeDisplay currentTime={currentTime} />
+
           <Box sx={{ 
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
-          }}>
-            {formatTime(currentTime)}
-          </Box>
-          <Box sx={{ 
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            pr: 2  // Add some padding on the right
+            pr: 2
           }}>
             <IconButton 
               size="small" 
