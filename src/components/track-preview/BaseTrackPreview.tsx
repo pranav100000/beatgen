@@ -13,7 +13,8 @@ const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   onPositionChange,
   renderContent,
   onTrackClick,
-  bpm
+  bpm,
+  timeSignature = [4, 4]
 }) => {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -117,9 +118,14 @@ const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       return Math.round(value / gridSize) * gridSize;
     };
 
-    // Snap X to beats (quarter notes)
-    const beatWidth = GRID_CONSTANTS.measureWidth / 4;
-    const snappedX = snapToGrid(newX, beatWidth);
+    // Snap X based on time signature
+    const beatsPerMeasure = timeSignature[0];
+    const subdivisionsPerBeat = timeSignature[1];
+    // Calculate total subdivisions per measure (numerator * denominator)
+    const subdivisionsPerMeasure = beatsPerMeasure * subdivisionsPerBeat;
+    // Width of each subdivision
+    const subdivisionWidth = GRID_CONSTANTS.measureWidth / subdivisionsPerMeasure;
+    const snappedX = snapToGrid(newX, subdivisionWidth);
 
     // Snap Y to track height
     const snappedY = snapToGrid(newY, GRID_CONSTANTS.trackHeight);
@@ -169,7 +175,8 @@ const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     currentTime,
     measureCount,
     trackWidth,
-    bpm
+    bpm,
+    timeSignature
   };
 
   return (

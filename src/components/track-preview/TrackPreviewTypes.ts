@@ -12,6 +12,7 @@ export interface TrackPreviewProps {
   gridLineStyle: { borderRight: string };
   onPositionChange: (newPosition: Position, isDragEnd: boolean) => void;
   bpm: number; // Project-wide BPM value
+  timeSignature?: [number, number]; // Project-wide time signature
 }
 
 // Props for the base track preview component
@@ -28,6 +29,7 @@ export interface TrackContentProps {
   measureCount: number;
   trackWidth: number | string;
   bpm: number; // Pass BPM to content renderers
+  timeSignature?: [number, number]; // Pass time signature to content renderers
   notes?: Note[]; // Optional MIDI notes for MIDI tracks
   trackId?: string; // Track ID for registration
   registerRerenderCallback?: (callback: () => void) => (() => void); // For registering re-render callbacks

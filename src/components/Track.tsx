@@ -16,6 +16,7 @@ interface TrackProps {
   bpm: number;
   duration?: number;
   _calculatedWidth?: number;
+  timeSignature?: [number, number];
 }
 
 // Updated Track component that simply passes props to the new TrackPreview
@@ -33,7 +34,8 @@ function Track(props: TrackProps) {
     bpm,
     duration,
     _calculatedWidth,
-    index
+    index,
+    timeSignature = [4, 4]
   } = props;
 
   // Convert the props to the format expected by TrackPreview
@@ -62,6 +64,7 @@ function Track(props: TrackProps) {
       gridLineStyle={gridLineStyle}
       onPositionChange={onPositionChange}
       bpm={bpm}
+      timeSignature={timeSignature}
     />
   );
 }
