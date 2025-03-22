@@ -1,4 +1,21 @@
-# Getting Started with Create React App
+# Beat Generator - A Digital Audio Workstation
+
+A web-based Digital Audio Workstation (DAW) for beat creation and music production.
+
+## Authentication Setup
+
+This project uses Supabase for authentication. Follow these steps to set up authentication:
+
+1. Create a Supabase account at [https://supabase.com/](https://supabase.com/)
+2. Create a new project
+3. Go to Project Settings > API to find your project URL and anon key
+4. Copy `.env.example` to `.env.local` and fill in your Supabase credentials:
+   ```
+   REACT_APP_SUPABASE_URL=https://your-project-id.supabase.co
+   REACT_APP_SUPABASE_ANON_KEY=your-supabase-anon-key
+   ```
+5. Configure authentication providers in the Supabase dashboard under Authentication > Providers
+6. Update the redirect URLs in the Supabase dashboard to match your application URLs
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
