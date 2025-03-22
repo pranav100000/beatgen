@@ -83,7 +83,7 @@ export default function Projects() {
   };
 
   const handleCreateProject = () => {
-    navigate('/new-project');
+    navigate('/studio');
   };
 
   const handleEditProject = (project: Project) => {
@@ -162,8 +162,13 @@ export default function Projects() {
   };
 
   const openProject = (projectId: string) => {
-    // For now, just navigate to new project page
-    navigate(`/new-project`);
+    // In a real implementation, you would load this project
+    // Either:
+    // 1. Navigate to studio with query parameter: /studio?projectId=xyz
+    // 2. Or to a specific edit route: /project/xyz
+    
+    // For now, just navigate to studio page with ID as query param
+    navigate(`/studio?projectId=${projectId}`);
   };
 
   // We'll keep the page loaded and only show a spinner in the projects area
@@ -218,7 +223,7 @@ export default function Projects() {
             variant="contained" 
             color="primary" 
             startIcon={<AddIcon />}
-            onClick={() => navigate('/new-project')}
+            onClick={() => navigate('/studio')}
           >
             Create Project
           </Button>

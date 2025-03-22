@@ -17,7 +17,7 @@ root.render(
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<App />} />
-          <Route path="/new-project" element={<NewProject />} />
+          <Route path="/studio" element={<NewProject />} />
           <Route path="/account" element={
             <ProtectedRoute>
               <UserAccount />

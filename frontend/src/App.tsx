@@ -99,7 +99,7 @@ function App() {
           <Button
             variant="outlined"
             startIcon={<MusicNote />}
-            onClick={() => navigate('/new-project')}
+            onClick={() => navigate('/studio')}
             sx={{
               color: '#1a237e',
               borderColor: '#1a237e',

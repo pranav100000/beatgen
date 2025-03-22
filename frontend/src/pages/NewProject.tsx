@@ -32,10 +32,11 @@ import KeySelector from '../components/KeySelector';
 import { PianoRollProvider } from '../components/piano-roll/PianoRollWindow';
 import { StoreProvider } from '../core/state/StoreContext';
 import { useStore } from '../core/state/StoreContext';
-import { ArrowBack, ChatBubble, ChatBubbleOutlineRounded, ChatBubbleRounded, ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
+import { ArrowBack, ChatBubble, ChatBubbleOutlineRounded, ChatBubbleRounded, Save, ViewSidebar, ViewSidebarRounded } from '@mui/icons-material';
+import { SaveProjectButton } from '../components/SaveProjectButton';
 import ChatWindow from '../components/chat/ChatWindow';
 import { Timeline } from '../components/Timeline/Timeline';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { TimeDisplay } from '../components/TimeDisplay';
 
 function NewProject() {
@@ -57,7 +58,9 @@ function NewProject() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [projectTitle, setProjectTitle] = useState("Untitled Project");
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [existingProjectId, setExistingProjectId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Update undo/redo state whenever history changes
   useEffect(() => {
@@ -77,11 +80,56 @@ function NewProject() {
     };
   }, []);
 
-  // Initialize store only (not audio) on mount
+  // Parse query parameters for projectId
   useEffect(() => {
-    store.projectManager.createProject('New Project');
-    Tone.Transport.bpm.value = bpm;
-    setIsInitialized(true);
+    const queryParams = new URLSearchParams(location.search);
+    const projectId = queryParams.get('projectId');
+    if (projectId) {
+      setExistingProjectId(projectId);
+    }
+  }, [location]);
+
+  // Initialize store and potentially load existing project
+  useEffect(() => {
+    const initializeProject = async () => {
+      // First create a default project
+      store.projectManager.createProject('New Project');
+      Tone.Transport.bpm.value = bpm;
+      
+      // If we have an existing project ID, try to load it
+      if (existingProjectId) {
+        try {
+          // Import the getProject function here to avoid circular dependencies
+          const { getProject } = await import('../api/projects');
+          const project = await getProject(existingProjectId);
+          
+          // Update project metadata
+          setProjectTitle(project.name);
+          if (project.bpm) {
+            setBpm(project.bpm);
+            Tone.Transport.bpm.value = project.bpm;
+          }
+          
+          if (project.time_signature) {
+            const [num, denom] = project.time_signature.split('/').map(Number);
+            if (!isNaN(num) && !isNaN(denom)) {
+              setTimeSignature([num, denom]);
+            }
+          }
+          
+          // TODO: Load tracks from project.tracks
+          // This would require more complex logic to convert from stored track data
+          // to actual Track objects with audio buffers, etc.
+          console.log('Loaded project:', project);
+        } catch (error) {
+          console.error('Failed to load project:', error);
+        }
+      }
+      
+      setIsInitialized(true);
+    };
+    
+    initializeProject();
 
     // Clear database on window unload/refresh
     const handleUnload = async () => {
@@ -97,7 +145,7 @@ function NewProject() {
     return () => {
       window.removeEventListener('beforeunload', handleUnload);
     };
-  }, []);
+  }, [existingProjectId]);
 
   const handleAddTrack = async (trackTypeOrFile: string | File) => {
     if (!store || !isInitialized) {
@@ -650,8 +698,24 @@ function NewProject() {
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
-            pr: 2
+            pr: 2,
+            gap: 2
           }}>
+            <SaveProjectButton 
+              projectTitle={projectTitle}
+              bpm={bpm}
+              timeSignature={timeSignature}
+              tracks={tracks}
+              projectId={existingProjectId || undefined}
+              onSaved={(project) => {
+                console.log('Project saved:', project);
+                // Update the URL with the project ID
+                if (!existingProjectId && project.id) {
+                  navigate(`/studio?projectId=${project.id}`, { replace: true });
+                  setExistingProjectId(project.id);
+                }
+              }}
+            />
             <IconButton 
               size="small" 
               sx={{ color: 'white' }} 
