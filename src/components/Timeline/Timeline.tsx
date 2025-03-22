@@ -355,6 +355,7 @@ function TimelineContent({
           bpm={bpm}
           duration={track.duration}
           _calculatedWidth={track._calculatedWidth}
+          timeSignature={timeSignature}
         />
       ))}
     </Box>
