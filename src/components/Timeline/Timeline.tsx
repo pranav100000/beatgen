@@ -363,11 +363,154 @@ function TimelineContent({
 }
 
 function GridOverlay({ measureCount, timeSignature = [4, 4] }: { measureCount: number, timeSignature?: [number, number] }) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const beatsPerMeasure = timeSignature[0];
   const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
   
+  // Draw grid lines on canvas
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+    
+    // Set canvas size to match container
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === container) {
+          canvas.width = container.clientWidth;
+          canvas.height = container.clientHeight;
+          drawGrid();
+        }
+      }
+    });
+    
+    resizeObserver.observe(container);
+    
+    // Initial sizing
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    
+    // Draw grid function
+    function drawGrid() {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      // Enable high-DPI rendering for crisp lines
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = container.clientWidth * dpr;
+      canvas.height = container.clientHeight * dpr;
+      ctx.scale(dpr, dpr);
+      
+      // Clear canvas
+      ctx.clearRect(0, 0, container.clientWidth, container.clientHeight);
+      
+      const denominator = timeSignature[1];
+      
+      // For visual clarity, use these constants
+      const MEASURE_COLOR = 'rgba(85, 85, 85, 0.9)';
+      const BEAT_COLOR = 'rgba(51, 51, 51, 0.7)';
+      const SUBDIVISION_COLOR = 'rgba(34, 34, 34, 0.3)';
+      
+      // Ensure pixel-perfect rendering
+      const drawLine = (x: number, opacity: number, color?: string) => {
+        // Align to nearest pixel for sharp lines
+        const xPos = Math.round(x) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(xPos, 0);
+        ctx.lineTo(xPos, container.clientHeight);
+        ctx.strokeStyle = color || `rgba(34, 34, 34, ${opacity})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      };
+      
+      // Draw all subdivisions (with different opacities)
+      // IMPORTANT: For time signatures, denominator tells us the type of note that gets one beat
+      // 4 = quarter note gets one beat, 8 = eighth note gets one beat
+      // This means we need to adjust how we interpret subdivisions based on the denominator
+      console.log(`Drawing grid with time signature ${timeSignature[0]}/${timeSignature[1]}`);
+      
+      const subdivisionsPerBeat = Math.max(timeSignature[1], 4); // Ensure we have enough subdivisions
+      const totalBeats = measureCount * beatsPerMeasure;
+      const totalSubdivisions = totalBeats * subdivisionsPerBeat;
+      
+      // 1. First draw all regular subdivisions
+      // Calculate the width of each subdivision
+      const subdivisionWidth = beatWidth / subdivisionsPerBeat;
+      
+      // Debug output
+      console.log('Grid subdivision calculation:', {
+        measureWidth: GRID_CONSTANTS.measureWidth,
+        beatsPerMeasure,
+        beatWidth,
+        denominator: timeSignature[1],
+        subdivisionsPerBeat,
+        subdivisionWidth,
+        expectedSubdivisionsPerMeasure: beatsPerMeasure * subdivisionsPerBeat
+      });
+
+      // For each beat in our timeline
+      for (let beatIndex = 0; beatIndex < totalBeats; beatIndex++) {
+        const beatStartPosition = beatIndex * beatWidth;
+        
+        // For each subdivision within this beat (skip the beat itself at position 0)
+        for (let subdivision = 1; subdivision < subdivisionsPerBeat; subdivision++) {
+          // Calculate the exact position of this subdivision
+          const position = beatStartPosition + (subdivision * subdivisionWidth);
+          
+          // Determine opacity based on subdivision importance
+          let opacity = 0.15; // Default for minor subdivisions
+          
+          // Special-case important subdivisions for better visual hierarchy
+          // Half-beat is most important (e.g., the "and" in "1 and 2 and")
+          const isHalfBeat = subdivision === Math.floor(subdivisionsPerBeat / 2);
+          
+          // Quarter-beat is next most important (the "e" and "a" in "1 e + a")
+          const isQuarterBeat = subdivision === Math.floor(subdivisionsPerBeat / 4) || 
+                                subdivision === Math.floor(3 * subdivisionsPerBeat / 4);
+                                
+          // Apply opacity based on importance
+          if (isHalfBeat) {
+            opacity = 0.7; // Most visible - half-beat marks
+          } else if (isQuarterBeat) {
+            opacity = 0.5; // Medium visibility - quarter-beat marks
+          } else {
+            // Ensure all other subdivisions are at least somewhat visible
+            opacity = 0.35; 
+          }
+          
+          // Draw this subdivision line
+          drawLine(position, opacity);
+        }
+      }
+      
+      // 2. Now draw beat lines on top
+      for (let i = 0; i <= totalBeats; i++) {
+        // Skip measure lines (we'll draw them last)
+        if (i % beatsPerMeasure !== 0) {
+          const x = i * beatWidth;
+          drawLine(x, 0.7, BEAT_COLOR);
+        }
+      }
+      
+      // 3. Finally draw measure lines (most prominent)
+      for (let i = 0; i <= measureCount; i++) {
+        const x = i * GRID_CONSTANTS.measureWidth;
+        drawLine(x, 0.9, MEASURE_COLOR);
+      }
+    }
+    
+    drawGrid();
+    
+    // Cleanup
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [measureCount, beatsPerMeasure, beatWidth, timeSignature]);
+  
   return (
     <Box
+      ref={containerRef}
       sx={{
         position: 'absolute',
         top: 0,
@@ -377,107 +520,18 @@ function GridOverlay({ measureCount, timeSignature = [4, 4] }: { measureCount: n
         pointerEvents: 'none', // Important: this makes the grid not catch any mouse events
         zIndex: 1000
       }}
-      onClick={(e) => {
-        console.log('Grid overlay clicked - this should not happen with pointerEvents: none');
-        e.stopPropagation();
-      }}
     >
-      {/* Measure grid lines */}
-      {Array.from({ length: measureCount + 1 }).map((_, i) => (
-        <Box
-          key={`measure-${i}`}
-          sx={{
-            position: 'absolute',
-            left: `${i * GRID_CONSTANTS.measureWidth}px`,
-            top: 0,
-            bottom: 0,
-            width: '1px',
-            bgcolor: '#555', // Stronger color for measure lines
-            opacity: 0.9,
-            zIndex: 1000
-          }}
-        />
-      ))}
-
-      {/* Beat grid lines */}
-      {Array.from({ length: measureCount * beatsPerMeasure }).map((_, i) => {
-        // Skip measure lines (already drawn above)
-        if (i % beatsPerMeasure !== 0) {
-          return (
-            <Box
-              key={`beat-${i}`}
-              sx={{
-                position: 'absolute',
-                left: `${i * beatWidth}px`,
-                top: 0,
-                bottom: 0,
-                width: '1px',
-                bgcolor: '#333', // Medium color for beat lines
-                opacity: 0.7,
-                zIndex: 999
-              }}
-            />
-          );
-        }
-        return null;
-      })}
-
-      {/* Subdivision grid lines based on time signature */}
-      {(() => {
-        const denominator = timeSignature[1];
-        // Determine how many subdivisions we need per beat
-        const subdivisionsPerBeat = denominator;
-        // Total number of subdivisions for the entire timeline
-        const totalSubdivisions = measureCount * beatsPerMeasure * subdivisionsPerBeat;
-        
-        return Array.from({ length: totalSubdivisions }).map((_, i) => {
-          // Skip main beat lines (already drawn above)
-          if (i % subdivisionsPerBeat === 0) return null;
-          
-          // Calculate position
-          const position = i * (beatWidth / subdivisionsPerBeat);
-          
-          // Determine opacity based on position in the beat
-          let opacity = 0;
-          
-          // For eighth notes (denominator=8), show all subdivisions
-          // For quarter notes (denominator=4), show half and quarter subdivisions
-          // For half notes (denominator=2), just show the middle subdivision
-          
-          // Is this a half-beat subdivision?
-          const isHalfBeat = i % (subdivisionsPerBeat / 2) === 0;
-          // Is this a quarter-beat subdivision?
-          const isQuarterBeat = i % (subdivisionsPerBeat / 4) === 0;
-          
-          if (isHalfBeat) {
-            opacity = 0.6; // Highest visibility for half-beat marks
-          } else if (isQuarterBeat && denominator >= 4) {
-            opacity = 0.4; // Medium visibility for quarter-beat marks
-          } else if (denominator >= 8) {
-            opacity = 0.2; // Lowest visibility for other subdivisions
-          }
-          
-          // Only render if visible
-          if (opacity > 0) {
-            return (
-              <Box
-                key={`subdivision-${i}`}
-                sx={{
-                  position: 'absolute',
-                  left: `${position}px`,
-                  top: 0,
-                  bottom: 0,
-                  width: '1px',
-                  bgcolor: '#222', // Subtle color for subdivision lines
-                  opacity,
-                  zIndex: 998
-                }}
-              />
-            );
-          }
-          return null;
-        });
-      })()}
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          display: 'block'
+        }}
+      />
     </Box>
   );
 }
