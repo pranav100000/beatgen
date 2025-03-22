@@ -108,6 +108,9 @@ export class MoveTrackAction implements Action {
             this.newPosition.y
         );
         
+        // If playback is active, tell the transport controller to adjust this track's playback
+        this.store.getTransport().handleTrackPositionChange(this.trackId, this.newPosition.x);
+        
         console.log('🔄 Execute MoveTrackAction:', { 
             trackId: this.trackId, 
             from: this.oldPosition, 
@@ -129,6 +132,9 @@ export class MoveTrackAction implements Action {
             this.oldPosition.x, 
             this.oldPosition.y
         );
+        
+        // If playback is active, tell the transport controller to adjust this track's playback
+        this.store.getTransport().handleTrackPositionChange(this.trackId, this.oldPosition.x);
         
         console.log('↩️ Undo MoveTrackAction:', { 
             trackId: this.trackId, 

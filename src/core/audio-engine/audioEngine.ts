@@ -70,8 +70,8 @@ class AudioEngine {
         autostart: false,
       }).connect(channel);
       
-      // Sync with transport immediately
-      player.sync();
+      // Do NOT sync with transport immediately
+      // This would cause unexpected behavior - players should only be synced right before playing
       track.player = player;
       await Tone.loaded();
       console.log(`Audio loaded for track ${id}`);
@@ -137,8 +137,8 @@ class AudioEngine {
           track.player.stop();  
         }
         
-        // Keep synced with transport
-        track.player.sync();
+        // Do NOT resync here - this is a critical fix
+        // Players should only be synced right before starting them with a specific offset
       }
     });
   }

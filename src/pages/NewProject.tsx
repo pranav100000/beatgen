@@ -432,6 +432,9 @@ function NewProject() {
         newPosition.x,
         newPosition.y
       );
+      
+      // Also tell the transport controller to adjust playback if playing
+      store.getTransport().handleTrackPositionChange(trackId, newPosition.x);
     }
   };
 
@@ -746,13 +749,15 @@ function NewProject() {
           timeSignature={timeSignature}
           onTrackPositionChange={handleTrackPositionChange}
           onTimeChange={(newTime) => {
+            const previousTime = currentTime;
             setCurrentTime(newTime);
             
             // Log detailed debug info
-            console.log(`Setting playback position to: ${newTime}s`, {
+            console.log(`Changing playback position from ${previousTime}s to ${newTime}s (delta: ${newTime - previousTime}s)`, {
               store: !!store,
               transport: store ? !!store.getTransport() : false,
-              hasSetPosition: store && store.getTransport() ? typeof store.getTransport().setPosition === 'function' : false
+              hasSetPosition: store && store.getTransport() ? typeof store.getTransport().setPosition === 'function' : false,
+              isPlaying: isPlaying
             });
             
             try {
