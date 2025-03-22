@@ -196,23 +196,29 @@ export class TransportController implements Transport {
                         
                         console.log(`Scheduling track ${track.id} to start in ${scheduleTime} seconds`);
                         
+                        // CRITICAL FIX: Use a simpler, more direct approach
+                        // Schedule the track to play from its beginning at the right time
                         const eventId = Tone.Transport.schedule(time => {
                             try {
-                                // Explicitly check player state before starting
-                                if (track.player?.state !== "started") {
-                                    // Start from beginning of the track at the scheduled time
-                                    // We use start(time, 0) because at this point, we're starting the track
-                                    // from its beginning (0 seconds into the audio)
-                                    track.player?.start(time, 0);
-                                    
-                                    // Fade in volume
-                                    track.player.volume.value = -Infinity;
-                                    track.player.volume.rampTo(track.muted ? -Infinity : track.volume, TransportController.FADE_TIME);
-                                    
-                                    console.log(`Track ${track.id} started at scheduled time ${time}`);
-                                } else {
-                                    console.warn(`Track ${track.id} already playing, skipping scheduled start`);
+                                console.log(`EXECUTING SCHEDULE: Track ${track.id} at time ${time}`);
+                                
+                                // Stop and unsync to be 100% certain of state
+                                if (track.player?.state === "started") {
+                                    track.player.stop();
                                 }
+                                track.player?.unsync();
+                                
+                                // Set volume directly to avoid fade issues
+                                track.player.volume.value = track.muted ? -Infinity : track.volume;
+                                
+                                // Explicitly start the player at the scheduled time from the beginning
+                                track.player?.start(time, 0);
+                                
+                                // Sync AFTER starting to ensure future transport control works
+                                // This is a crucial ordering detail based on Tone.js behavior
+                                track.player?.sync();
+                                
+                                console.log(`Track ${track.id} started at scheduled time ${time}`);
                             } catch (error) {
                                 console.error(`Error starting scheduled track ${track.id}:`, error);
                             }
@@ -340,43 +346,54 @@ export class TransportController implements Transport {
         const wasPlaying = this.isPlaying;
         const prevPosition = this.position;
         
-        console.log(`Seeking from ${prevPosition}s to ${position}s (delta: ${position - prevPosition}s)`);
+        console.log(`SEEKING: From ${prevPosition}s to ${position}s (delta: ${position - prevPosition}s)`);
         
-        // CRITICAL FIX ORDER:
-        // 1. First pause the transport to stop scheduling
-        Tone.getTransport().pause();
+        // COMPLETELY RESET EVERYTHING
         
-        // 2. Clear any scheduled events
+        // 1. First stop the Transport entirely
+        // This is more aggressive than pause and ensures a clean slate
+        Tone.getTransport().stop();
+        
+        // 2. Clear all scheduled events
         this.clearScheduledEvents();
         
-        // 3. Completely tear down all players - this is crucial for reliable seeking
+        // 3. Completely reset all players
         this.audioEngine.getAllTracks().forEach(track => {
             if (track.player) {
                 // Ensure player is fully stopped
                 if (track.player.state === "started") {
                     track.player.stop();
                 }
-                // CRITICAL: Ensure player is completely unsynced
+                
+                // Completely reset player state
                 track.player.unsync();
                 
-                // Reset volume to normal to avoid issues with volume ramps
+                // Clear any volume automations
                 track.player.volume.cancelScheduledValues(Tone.now());
                 track.player.volume.value = track.muted ? -Infinity : track.volume;
             }
         });
         
-        // 4. Set the transport position only after all players are cleaned up
+        // 4. Set the Transport position with a clean state
+        // Because we completely stopped the transport, this should be reliable
         Tone.getTransport().seconds = position;
         
-        console.log(`Transport position set to ${position}s, actual: ${Tone.getTransport().seconds}s`);
+        // Double check that it actually set correctly
+        console.log(`Transport position set to ${position}s, verified: ${Tone.getTransport().seconds}s`);
         
-        // If was playing, restart with the new position after a more reliable delay
+        if (Math.abs(Tone.getTransport().seconds - position) > 0.001) {
+            console.warn("Transport position didn't set properly - forcing again");
+            Tone.getTransport().seconds = position;
+        }
+        
+        // If was playing, restart with the new position
         if (wasPlaying) {
-            // Use a larger timeout to ensure Tone.js internal state is fully updated
+            // Use a small delay to ensure Tone.js state is updated
+            // This is a crucial step to ensure reliable seeking
             setTimeout(() => {
-                console.log(`Restarting playback after seeking, transport position: ${Tone.getTransport().seconds}s`);
-                this.play();
-            }, 50); // Increased timeout for reliability
+                console.log(`Restarting playback from position: ${Tone.getTransport().seconds}s`);
+                this.play(); 
+            }, 30); // 30ms is a good compromise
         }
     }
 
