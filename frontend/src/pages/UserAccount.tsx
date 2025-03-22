@@ -12,7 +12,7 @@ import { useAuth } from '../core/auth/auth-context';
 import { useState } from 'react';
 
 export default function UserAccount() {
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -55,8 +55,9 @@ export default function UserAccount() {
         <Box sx={{ mb: 4 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Profile Information</Typography>
           <Typography><strong>Email:</strong> {user?.email}</Typography>
-          <Typography><strong>Email Verified:</strong> {user?.email_confirmed_at ? 'Yes' : 'No'}</Typography>
-          <Typography><strong>Last Sign In:</strong> {user?.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : 'N/A'}</Typography>
+          <Typography><strong>Username:</strong> {profile?.username || 'Not set'}</Typography>
+          <Typography><strong>Display Name:</strong> {profile?.display_name || 'Not set'}</Typography>
+          <Typography><strong>Account Created:</strong> {profile?.created_at ? new Date(profile.created_at).toLocaleString() : 'N/A'}</Typography>
         </Box>
 
         <Divider sx={{ mb: 3 }} />

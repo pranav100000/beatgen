@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useState } from 'react';
-import { useAuth } from '../core/auth/auth-context';
+import { requestPasswordReset } from '../api/auth';
 
 const style = {
   position: 'absolute',
@@ -24,21 +24,17 @@ const style = {
   p: 4,
 };
 
-interface SignupModalProps {
+interface PasswordResetModalProps {
   open: boolean;
   onClose: () => void;
   onLoginClick?: () => void;
 }
 
-export default function SignupModal({ open, onClose, onLoginClick }: SignupModalProps) {
+export default function PasswordResetModal({ open, onClose, onLoginClick }: PasswordResetModalProps) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  
-  const { signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,23 +42,11 @@ export default function SignupModal({ open, onClose, onLoginClick }: SignupModal
     setError(null);
     setSuccess(false);
     
-    // Validate passwords match
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      setIsLoading(false);
-      return;
-    }
-    
     try {
-      const { error, success } = await signUp(email, password);
-      
-      if (success) {
-        setSuccess(true);
-      } else if (error) {
-        setError(error.message);
-      }
-    } catch (err) {
-      setError('An unexpected error occurred');
+      await requestPasswordReset(email);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'An unexpected error occurred');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -73,7 +57,7 @@ export default function SignupModal({ open, onClose, onLoginClick }: SignupModal
     <Modal
       open={open}
       onClose={onClose}
-      aria-labelledby="signup-modal-title"
+      aria-labelledby="password-reset-modal-title"
     >
       <Box sx={style}>
         <IconButton
@@ -89,14 +73,14 @@ export default function SignupModal({ open, onClose, onLoginClick }: SignupModal
           <CloseIcon />
         </IconButton>
 
-        <Typography id="signup-modal-title" variant="h6" component="h2" sx={{ mb: 3 }}>
-          Create Your Account
+        <Typography id="password-reset-modal-title" variant="h6" component="h2" sx={{ mb: 3 }}>
+          Reset Your Password
         </Typography>
 
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {success && (
           <Alert severity="success" sx={{ mb: 2 }}>
-            Registration successful! Please check your email to confirm your account.
+            Password reset instructions have been sent to your email.
           </Alert>
         )}
         
@@ -109,28 +93,6 @@ export default function SignupModal({ open, onClose, onLoginClick }: SignupModal
             variant="outlined"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={isLoading || success}
-          />
-          
-          <TextField
-            required
-            label="Password"
-            type="password"
-            fullWidth
-            variant="outlined"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading || success}
-          />
-          
-          <TextField
-            required
-            label="Confirm Password"
-            type="password"
-            fullWidth
-            variant="outlined"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
             disabled={isLoading || success}
           />
 
@@ -146,11 +108,11 @@ export default function SignupModal({ open, onClose, onLoginClick }: SignupModal
               }
             }}
           >
-            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Sign Up'}
+            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Send Reset Instructions'}
           </Button>
 
           <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
-            Already have an account?{' '}
+            Remembered your password?{' '}
             <Button 
               variant="text" 
               sx={{ 

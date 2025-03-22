@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useState } from 'react';
-import { supabase } from '../core/auth/supabase-client';
+import { useAuth } from '../core/auth/auth-context';
 
 const style = {
   position: 'absolute',
@@ -24,33 +24,49 @@ const style = {
   p: 4,
 };
 
-interface PasswordResetModalProps {
+interface SignupModalProps {
   open: boolean;
   onClose: () => void;
   onLoginClick?: () => void;
 }
 
-export default function PasswordResetModal({ open, onClose, onLoginClick }: PasswordResetModalProps) {
+export default function SignupModal({ open, onClose, onLoginClick }: SignupModalProps) {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string>('Registration successful! Please check your email to confirm your account.');
+  
+  const { signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     setSuccess(false);
+    setSuccessMessage('Registration successful! Please check your email to confirm your account.');
+    
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      setIsLoading(false);
+      return;
+    }
     
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/reset-password',
-      });
+      const { error, success, message } = await signUp(email, password);
       
-      if (error) {
-        setError(error.message);
-      } else {
+      if (success) {
+        // If we got a custom message from the backend (e.g., about email verification)
+        if (message) {
+          setSuccessMessage(message);
+        }
         setSuccess(true);
+      } else if (error) {
+        // Use the message from the error if available
+        setError(message || error.message || 'Failed to create account');
       }
     } catch (err) {
       setError('An unexpected error occurred');
@@ -64,7 +80,7 @@ export default function PasswordResetModal({ open, onClose, onLoginClick }: Pass
     <Modal
       open={open}
       onClose={onClose}
-      aria-labelledby="password-reset-modal-title"
+      aria-labelledby="signup-modal-title"
     >
       <Box sx={style}>
         <IconButton
@@ -80,14 +96,14 @@ export default function PasswordResetModal({ open, onClose, onLoginClick }: Pass
           <CloseIcon />
         </IconButton>
 
-        <Typography id="password-reset-modal-title" variant="h6" component="h2" sx={{ mb: 3 }}>
-          Reset Your Password
+        <Typography id="signup-modal-title" variant="h6" component="h2" sx={{ mb: 3 }}>
+          Create Your Account
         </Typography>
 
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {success && (
           <Alert severity="success" sx={{ mb: 2 }}>
-            Password reset instructions have been sent to your email.
+            {successMessage}
           </Alert>
         )}
         
@@ -100,6 +116,28 @@ export default function PasswordResetModal({ open, onClose, onLoginClick }: Pass
             variant="outlined"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={isLoading || success}
+          />
+          
+          <TextField
+            required
+            label="Password"
+            type="password"
+            fullWidth
+            variant="outlined"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading || success}
+          />
+          
+          <TextField
+            required
+            label="Confirm Password"
+            type="password"
+            fullWidth
+            variant="outlined"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             disabled={isLoading || success}
           />
 
@@ -115,11 +153,11 @@ export default function PasswordResetModal({ open, onClose, onLoginClick }: Pass
               }
             }}
           >
-            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Send Reset Instructions'}
+            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Sign Up'}
           </Button>
 
           <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
-            Remembered your password?{' '}
+            Already have an account?{' '}
             <Button 
               variant="text" 
               sx={{ 
