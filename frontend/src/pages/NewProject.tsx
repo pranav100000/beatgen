@@ -110,11 +110,8 @@ function NewProject() {
             Tone.Transport.bpm.value = project.bpm;
           }
           
-          if (project.time_signature) {
-            const [num, denom] = project.time_signature.split('/').map(Number);
-            if (!isNaN(num) && !isNaN(denom)) {
-              setTimeSignature([num, denom]);
-            }
+          if (project.time_signature_numerator && project.time_signature_denominator) {
+            setTimeSignature([project.time_signature_numerator, project.time_signature_denominator]);
           }
           
           // TODO: Load tracks from project.tracks

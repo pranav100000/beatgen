@@ -16,9 +16,9 @@ export interface Project {
   id: string;
   user_id: string;
   name: string;
-  description?: string;
   bpm: number;
-  time_signature: string;
+  time_signature_numerator: number;
+  time_signature_denominator: number;
   tracks: Track[];
   created_at: string;
   updated_at: string;
@@ -26,16 +26,16 @@ export interface Project {
 
 export interface ProjectCreateDto {
   name: string;
-  description?: string;
   bpm?: number;
-  time_signature?: string;
+  time_signature_numerator: number;
+  time_signature_denominator: number;
 }
 
 export interface ProjectUpdateDto {
   name?: string;
-  description?: string;
   bpm?: number;
-  time_signature?: string;
+  time_signature_numerator: number;
+  time_signature_denominator: number;
 }
 
 export const getProjects = async (): Promise<Project[]> => {

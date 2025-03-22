@@ -74,33 +74,78 @@ async def create_project(
     """
     Create a new project
     """
+    import logging
+    import traceback
+    logger = logging.getLogger("beatgen.projects")
+    
+    logger.info(f"Creating project for user ID: {current_user['id']}")
+    logger.info(f"Project data: {project_data}")
+    
     try:
         now = datetime.utcnow().isoformat()
         
-        # Prepare project data
+        # Prepare project data using the exact schema
         project = {
-            **project_data.dict(),
+            "name": project_data.name,
             "user_id": current_user["id"],
-            "tracks": [],
-            "created_at": now,
-            "updated_at": now
+            "bpm": project_data.bpm,
+            "time_signature_numerator": project_data.time_signature_numerator,
+            "time_signature_denominator": project_data.time_signature_denominator,
+            "tracks": []
+            # Omitting created_at and updated_at as they have database defaults
         }
         
-        # Insert project into Supabase
-        response = supabase.table("projects").insert(project).execute()
+        logger.info(f"Prepared project data: {project}")
         
-        if response.error:
+        # First, check if the table exists
+        try:
+            # Using consistent table name "project" throughout
+            check_table = supabase.table("project").select("count").limit(1).execute()
+            logger.info(f"Table check response: {check_table}")
+        except Exception as table_err:
+            logger.error(f"Error checking table existence: {str(table_err)}")
+            logger.error(traceback.format_exc())
+            # If the table doesn't exist, this could be our issue
+            if "relation \"project\" does not exist" in str(table_err).lower():
+                logger.critical("The 'project' table does not exist in the database")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database setup error: The project table does not exist. Please set up the database tables first."
+                )
+            
+        # Insert project into Supabase
+        logger.info("Attempting to insert project into Supabase...")
+        response = supabase.table("project").insert(project).execute()
+        
+        logger.info(f"Supabase insert response: {response}")
+        
+        if hasattr(response, 'error') and response.error:
+            logger.error(f"Error creating project: {response.error}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=response.error.message
+                detail=f"Error creating project: {response.error.message if hasattr(response.error, 'message') else str(response.error)}"
             )
         
+        if not response.data or len(response.data) == 0:
+            logger.error("No data returned from project creation")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Project created but no data was returned"
+            )
+            
+        logger.info(f"Successfully created project with ID: {response.data[0].get('id', 'unknown')}")
         return response.data[0]
     
+    except HTTPException as he:
+        # Re-raise HTTP exceptions as they already have the right status code
+        logger.error(f"HTTP exception in create_project: {str(he)}")
+        raise
     except Exception as e:
+        logger.error(f"Unexpected exception in create_project: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=f"Error creating project: {str(e)}"
         )
 
 @router.get("/{project_id}", response_model=Project)
@@ -111,21 +156,47 @@ async def get_project(
     """
     Get a specific project by ID
     """
+    import logging
+    import traceback
+    logger = logging.getLogger("beatgen.projects")
+    
+    logger.info(f"Getting project with ID: {project_id} for user: {current_user['id']}")
+    
     try:
-        response = supabase.table("projects").select("*").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
+        # Query the specific project
+        logger.info(f"Executing query: SELECT * FROM project WHERE id = {str(project_id)} AND user_id = {current_user['id']}")
+        response = supabase.table("project").select("*").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
         
-        if response.error:
+        # Log the response
+        logger.info(f"Supabase response: {response}")
+        
+        if hasattr(response, 'error') and response.error:
+            logger.error(f"Error fetching project: {response.error}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found: {response.error.message if hasattr(response.error, 'message') else str(response.error)}"
+            )
+        
+        if not response.data:
+            logger.error(f"No project found with ID: {project_id} for user: {current_user['id']}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Project not found"
             )
         
+        logger.info(f"Successfully retrieved project: {response.data}")
         return response.data
     
+    except HTTPException as he:
+        # Re-raise HTTP exceptions as they already have the right status code
+        logger.error(f"HTTP exception in get_project: {str(he)}")
+        raise
     except Exception as e:
+        logger.error(f"Unexpected exception in get_project: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=f"Error retrieving project: {str(e)}"
         )
 
 @router.patch("/{project_id}", response_model=Project)
@@ -137,11 +208,29 @@ async def update_project(
     """
     Update a project
     """
+    import logging
+    import traceback
+    logger = logging.getLogger("beatgen.projects")
+    
+    logger.info(f"Updating project with ID: {project_id} for user: {current_user['id']}")
+    logger.info(f"Update data: {project_update}")
+    
     try:
         # Verify project exists and belongs to user
-        check_response = supabase.table("projects").select("id").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
+        logger.info(f"Checking if project exists: ID={project_id}, user_id={current_user['id']}")
+        check_response = supabase.table("project").select("id").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
         
-        if check_response.error or not check_response.data:
+        logger.info(f"Check response: {check_response}")
+        
+        if hasattr(check_response, 'error') and check_response.error:
+            logger.error(f"Error checking project existence: {check_response.error}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found: {check_response.error.message if hasattr(check_response.error, 'message') else str(check_response.error)}"
+            )
+            
+        if not check_response.data:
+            logger.error(f"No project found with ID: {project_id} for user: {current_user['id']}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Project not found"
@@ -153,20 +242,38 @@ async def update_project(
             "updated_at": datetime.utcnow().isoformat()
         }
         
-        response = supabase.table("projects").update(update_data).eq("id", str(project_id)).execute()
+        logger.info(f"Executing update with data: {update_data}")
+        response = supabase.table("project").update(update_data).eq("id", str(project_id)).execute()
         
-        if response.error:
+        logger.info(f"Update response: {response}")
+        
+        if hasattr(response, 'error') and response.error:
+            logger.error(f"Error updating project: {response.error}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=response.error.message
+                detail=f"Project update failed: {response.error.message if hasattr(response.error, 'message') else str(response.error)}"
             )
         
+        if not response.data or len(response.data) == 0:
+            logger.error("No data returned from project update")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Project updated but no data was returned"
+            )
+            
+        logger.info(f"Successfully updated project: {response.data[0]}")
         return response.data[0]
     
+    except HTTPException as he:
+        # Re-raise HTTP exceptions as they already have the right status code
+        logger.error(f"HTTP exception in update_project: {str(he)}")
+        raise
     except Exception as e:
+        logger.error(f"Unexpected exception in update_project: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=f"Error updating project: {str(e)}"
         )
 
 @router.delete("/{project_id}")
@@ -179,7 +286,7 @@ async def delete_project(
     """
     try:
         # Verify project exists and belongs to user
-        check_response = supabase.table("projects").select("id").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
+        check_response = supabase.table("project").select("id").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
         
         if check_response.error or not check_response.data:
             raise HTTPException(
@@ -188,7 +295,7 @@ async def delete_project(
             )
         
         # Delete project
-        response = supabase.table("projects").delete().eq("id", str(project_id)).execute()
+        response = supabase.table("project").delete().eq("id", str(project_id)).execute()
         
         if response.error:
             raise HTTPException(
@@ -215,7 +322,7 @@ async def add_track(
     """
     try:
         # Get project data including tracks
-        project_response = supabase.table("projects").select("*").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
+        project_response = supabase.table("project").select("*").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
         
         if project_response.error or not project_response.data:
             raise HTTPException(
@@ -235,7 +342,7 @@ async def add_track(
             "updated_at": datetime.utcnow().isoformat()
         }
         
-        response = supabase.table("projects").update(update_data).eq("id", str(project_id)).execute()
+        response = supabase.table("project").update(update_data).eq("id", str(project_id)).execute()
         
         if response.error:
             raise HTTPException(
@@ -263,7 +370,7 @@ async def update_track(
     """
     try:
         # Get project data including tracks
-        project_response = supabase.table("projects").select("*").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
+        project_response = supabase.table("project").select("*").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
         
         if project_response.error or not project_response.data:
             raise HTTPException(
@@ -297,7 +404,7 @@ async def update_track(
             "updated_at": datetime.utcnow().isoformat()
         }
         
-        response = supabase.table("projects").update(update_data).eq("id", str(project_id)).execute()
+        response = supabase.table("project").update(update_data).eq("id", str(project_id)).execute()
         
         if response.error:
             raise HTTPException(
@@ -324,7 +431,7 @@ async def delete_track(
     """
     try:
         # Get project data including tracks
-        project_response = supabase.table("projects").select("*").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
+        project_response = supabase.table("project").select("*").eq("id", str(project_id)).eq("user_id", current_user["id"]).single().execute()
         
         if project_response.error or not project_response.data:
             raise HTTPException(
@@ -350,7 +457,7 @@ async def delete_track(
             "updated_at": datetime.utcnow().isoformat()
         }
         
-        response = supabase.table("projects").update(update_data).eq("id", str(project_id)).execute()
+        response = supabase.table("project").update(update_data).eq("id", str(project_id)).execute()
         
         if response.error:
             raise HTTPException(

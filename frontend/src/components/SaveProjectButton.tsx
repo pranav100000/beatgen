@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, CircularProgress, Snackbar, Alert, Tooltip } from '@mui/material';
+import { IconButton, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { Save as SaveIcon } from '@mui/icons-material';
 import { createProject, updateProject, Project } from '../api/projects';
 import { useAuth } from '../core/auth/auth-context';
@@ -67,17 +67,15 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
         };
       });
 
-      const timeSignatureStr = `${timeSignature[0]}/${timeSignature[1]}`;
-      
       // Determine if we should create or update
       let savedProject;
       if (projectId) {
         // Update existing project
         savedProject = await updateProject(projectId, {
           name: projectTitle,
-          description: `BPM: ${bpm}, Time Signature: ${timeSignatureStr}`,
           bpm: bpm,
-          time_signature: timeSignatureStr
+          time_signature_numerator: timeSignature[0],
+          time_signature_denominator: timeSignature[1]
         });
         
         // Note: In a real implementation, you would also update the tracks
@@ -92,9 +90,9 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
         // Create new project
         savedProject = await createProject({
           name: projectTitle,
-          description: `BPM: ${bpm}, Time Signature: ${timeSignatureStr}`,
           bpm: bpm,
-          time_signature: timeSignatureStr
+          time_signature_numerator: timeSignature[0],
+          time_signature_denominator: timeSignature[1]
         });
         
         // Note: In a real implementation, you would also save the tracks
@@ -132,23 +130,14 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
 
   return (
     <>
-      <Tooltip title="Save project" arrow>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
-          onClick={handleSave}
-          disabled={saving}
-          sx={{
-            backgroundColor: '#1976D2',
-            '&:hover': {
-              backgroundColor: '#1565C0'
-            }
-          }}
-        >
-          Save
-        </Button>
-      </Tooltip>
+      <IconButton
+        size="small"
+        onClick={handleSave}
+        disabled={saving}
+        sx={{ color: 'white' }}
+      >
+        {saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+      </IconButton>
       
       <Snackbar 
         open={snackbar.open} 

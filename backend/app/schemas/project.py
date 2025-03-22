@@ -21,9 +21,9 @@ class Track(TrackBase):
 
 class ProjectBase(BaseModel):
     name: str
-    description: Optional[str] = None
     bpm: float = 120.0
-    time_signature: str = "4/4"
+    time_signature_numerator: int
+    time_signature_denominator: int
 
 
 class ProjectCreate(ProjectBase):
@@ -43,6 +43,6 @@ class Project(ProjectBase):
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
-    description: Optional[str] = None
     bpm: Optional[float] = None
-    time_signature: Optional[str] = None
+    time_signature_numerator: int
+    time_signature_denominator: int

@@ -45,15 +45,7 @@ export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState<ProjectCreateDto>({
-    name: '',
-    description: '',
-    bpm: 120,
-    time_signature: '4/4'
-  });
+  // No dialog state needed anymore
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -87,15 +79,8 @@ export default function Projects() {
   };
 
   const handleEditProject = (project: Project) => {
-    setDialogMode('edit');
-    setCurrentProject(project);
-    setFormData({
-      name: project.name,
-      description: project.description || '',
-      bpm: project.bpm,
-      time_signature: project.time_signature
-    });
-    setOpenDialog(true);
+    // Navigate directly to studio with project ID
+    navigate(`/studio?projectId=${project.id}`);
   };
 
   const handleDeleteProject = async (projectId: string) => {
@@ -111,40 +96,7 @@ export default function Projects() {
     }
   };
 
-  const handleDialogClose = () => {
-    setOpenDialog(false);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: name === 'bpm' ? parseInt(value, 10) : value
-    });
-  };
-
-  const handleSubmit = async () => {
-    try {
-      if (dialogMode === 'create') {
-        const newProject = await createProject(formData);
-        setProjects([...projects, newProject]);
-        showSnackbar('Project created successfully', 'success');
-      } else if (dialogMode === 'edit' && currentProject) {
-        const updatedProject = await updateProject(
-          currentProject.id,
-          formData as ProjectUpdateDto
-        );
-        setProjects(
-          projects.map(p => (p.id === updatedProject.id ? updatedProject : p))
-        );
-        showSnackbar('Project updated successfully', 'success');
-      }
-      setOpenDialog(false);
-    } catch (err) {
-      console.error(`Error ${dialogMode === 'create' ? 'creating' : 'updating'} project:`, err);
-      showSnackbar(`Failed to ${dialogMode === 'create' ? 'create' : 'update'} project`, 'error');
-    }
-  };
+  // Removed dialog-related handlers
 
   const showSnackbar = (message: string, severity: 'success' | 'error') => {
     setSnackbar({
@@ -191,7 +143,7 @@ export default function Projects() {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          onClick={() => navigate('/new-project')}
+          onClick={() => navigate('/studio')}
         >
           New Project
         </Button>
@@ -239,7 +191,7 @@ export default function Projects() {
                   </Typography>
                   
                   <Typography variant="body2" color="text.secondary" paragraph>
-                    {project.description || 'No description'}
+                    {`BPM: ${project.bpm}, Time: ${project.time_signature_numerator}/${project.time_signature_denominator}`}
                   </Typography>
                   
                   <Divider className="project-divider" />
@@ -249,7 +201,7 @@ export default function Projects() {
                       BPM: {project.bpm}
                     </Typography>
                     <Typography variant="body2">
-                      Time: {project.time_signature}
+                      Time: {project.time_signature_numerator}/{project.time_signature_denominator}
                     </Typography>
                   </Box>
                   
@@ -268,7 +220,7 @@ export default function Projects() {
                   </Button>
                   <IconButton 
                     size="small" 
-                    onClick={() => handleEditProject(project)} 
+                    onClick={() => navigate(`/studio?projectId=${project.id}`)} 
                     aria-label="edit"
                   >
                     <EditIcon fontSize="small" />
@@ -287,74 +239,7 @@ export default function Projects() {
         </Grid>
       )}
 
-      {/* Project Dialog */}
-      <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {dialogMode === 'create' ? 'Create New Project' : 'Edit Project'}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            name="name"
-            label="Project Name"
-            type="text"
-            fullWidth
-            value={formData.name}
-            onChange={handleInputChange}
-            required
-            sx={{ mb: 2, mt: 1 }}
-          />
-          <TextField
-            margin="dense"
-            name="description"
-            label="Description"
-            type="text"
-            fullWidth
-            value={formData.description}
-            onChange={handleInputChange}
-            multiline
-            rows={3}
-            sx={{ mb: 2 }}
-          />
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              margin="dense"
-              name="bpm"
-              label="BPM"
-              type="number"
-              value={formData.bpm}
-              onChange={handleInputChange}
-              sx={{ mb: 2, width: '50%' }}
-              InputProps={{
-                inputProps: {
-                  min: 40,
-                  max: 300
-                }
-              }}
-            />
-            <TextField
-              margin="dense"
-              name="time_signature"
-              label="Time Signature"
-              type="text"
-              value={formData.time_signature}
-              onChange={handleInputChange}
-              sx={{ mb: 2, width: '50%' }}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDialogClose}>Cancel</Button>
-          <Button 
-            onClick={handleSubmit} 
-            variant="contained" 
-            disabled={!formData.name.trim()}
-          >
-            {dialogMode === 'create' ? 'Create' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Project Dialog removed - users go directly to studio page */}
 
       {/* Snackbar for notifications */}
       <Snackbar 
