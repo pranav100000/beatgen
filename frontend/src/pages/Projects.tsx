@@ -20,11 +20,13 @@ import {
   Alert,
   Snackbar
 } from '@mui/material';
+import '../styles/Projects.css';
 import { 
   Add as AddIcon, 
   Delete as DeleteIcon, 
   Edit as EditIcon, 
-  MusicNote as MusicNoteIcon 
+  MusicNote as MusicNoteIcon,
+  ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import { useAuth } from '../core/auth/auth-context';
 import { 
@@ -81,14 +83,7 @@ export default function Projects() {
   };
 
   const handleCreateProject = () => {
-    setDialogMode('create');
-    setFormData({
-      name: '',
-      description: '',
-      bpm: 120,
-      time_signature: '4/4'
-    });
-    setOpenDialog(true);
+    navigate('/new-project');
   };
 
   const handleEditProject = (project: Project) => {
@@ -167,21 +162,23 @@ export default function Projects() {
   };
 
   const openProject = (projectId: string) => {
-    // Navigate to project editor page - this will be implemented later
-    navigate(`/project/${projectId}`);
+    // For now, just navigate to new project page
+    navigate(`/new-project`);
   };
 
-  if (loading) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
+  // We'll keep the page loaded and only show a spinner in the projects area
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+    <Container maxWidth="lg" className="projects-container">
+      <Button
+        variant="text"
+        startIcon={<ArrowBackIcon />}
+        onClick={() => navigate('/')}
+        sx={{ mb: 2 }}
+      >
+        Back to Home
+      </Button>
+      <Box className="project-header">
         <Typography variant="h4" component="h1">
           My Projects
         </Typography>
@@ -189,7 +186,7 @@ export default function Projects() {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          onClick={handleCreateProject}
+          onClick={() => navigate('/new-project')}
         >
           New Project
         </Button>
@@ -201,9 +198,16 @@ export default function Projects() {
         </Alert>
       )}
 
-      {projects.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <MusicNoteIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+      {loading ? (
+        <Paper className="project-empty-state" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
+          <CircularProgress sx={{ mb: 2 }} />
+          <Typography variant="body1" color="text.secondary">
+            Loading your projects...
+          </Typography>
+        </Paper>
+      ) : projects.length === 0 ? (
+        <Paper className="project-empty-state">
+          <MusicNoteIcon className="project-empty-icon" />
           <Typography variant="h6" gutterBottom>
             No projects yet
           </Typography>
@@ -214,7 +218,7 @@ export default function Projects() {
             variant="contained" 
             color="primary" 
             startIcon={<AddIcon />}
-            onClick={handleCreateProject}
+            onClick={() => navigate('/new-project')}
           >
             Create Project
           </Button>
@@ -223,19 +227,8 @@ export default function Projects() {
         <Grid container spacing={3}>
           {projects.map((project) => (
             <Grid item xs={12} sm={6} md={4} key={project.id}>
-              <Card 
-                sx={{ 
-                  height: '100%', 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  transition: 'transform 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4
-                  }
-                }}
-              >
-                <CardContent sx={{ flexGrow: 1 }}>
+              <Card className="project-card">
+                <CardContent className="project-card-content">
                   <Typography variant="h6" component="h2" gutterBottom>
                     {project.name}
                   </Typography>
@@ -244,13 +237,13 @@ export default function Projects() {
                     {project.description || 'No description'}
                   </Typography>
                   
-                  <Divider sx={{ my: 1 }} />
+                  <Divider className="project-divider" />
                   
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
+                  <Box className="project-metadata">
+                    <Typography variant="body2">
                       BPM: {project.bpm}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2">
                       Time: {project.time_signature}
                     </Typography>
                   </Box>
@@ -260,7 +253,7 @@ export default function Projects() {
                   </Typography>
                 </CardContent>
                 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1 }}>
+                <Box className="project-card-actions">
                   <Button 
                     size="small" 
                     onClick={() => openProject(project.id)}

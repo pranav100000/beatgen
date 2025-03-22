@@ -15,7 +15,7 @@ export default function ProtectedRoute({
 
   if (loading) {
     // You could render a loading spinner here
-    return <div>Loading...</div>;
+    return <div></div>;
   }
 
   if (!user) {

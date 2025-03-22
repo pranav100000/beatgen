@@ -31,22 +31,41 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any
     """
     Get the current user from the token using Supabase's auth
     """
+    import logging
+    logger = logging.getLogger("beatgen.auth")
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     
+    if not token:
+        logger.error("No token provided in request")
+        raise credentials_exception
+        
     try:
         # Use Supabase to verify the token and get user
+        logger.info(f"Verifying token: {token[:10]}...")
         user_response = supabase.auth.get_user(token)
         
         if user_response.user is None:
+            logger.error("No user found for provided token")
             raise credentials_exception
+            
+        # Log successful authentication
+        logger.info(f"Successfully authenticated user: {user_response.user.id}")
             
         # Return user ID from Supabase
         return {"id": user_response.user.id}
         
     except Exception as e:
-        print(f"Auth error: {str(e)}")
-        raise credentials_exception
+        logger.error(f"Authentication error: {str(e)}")
+        logger.error(f"Token: {token[:10]}...")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Authentication error: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )

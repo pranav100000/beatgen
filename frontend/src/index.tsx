@@ -4,6 +4,7 @@ import './index.css';
 import App from './App';
 import NewProject from './pages/NewProject';
 import UserAccount from './pages/UserAccount';
+import Projects from './pages/Projects';
 import reportWebVitals from './reportWebVitals';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './core/auth/auth-context';
@@ -20,6 +21,11 @@ root.render(
           <Route path="/account" element={
             <ProtectedRoute>
               <UserAccount />
+            </ProtectedRoute>
+          } />
+          <Route path="/projects" element={
+            <ProtectedRoute>
+              <Projects />
             </ProtectedRoute>
           } />
           <Route path="/reset-password" element={<App />} />

@@ -12,22 +12,46 @@ async def get_current_user_profile(current_user: dict = Depends(get_current_user
     """
     Get current user profile
     """
+    import logging
+    import traceback
+    logger = logging.getLogger("beatgen.users")
+    
+    logger.info(f"Getting profile for user ID: {current_user['id']}")
+    
     try:
         # Get profile from Supabase
+        logger.info(f"Querying 'person' table for user ID: {current_user['id']}")
         response = supabase.table("person").select("*").eq("id", current_user["id"]).single().execute()
         
+        # Debug response
+        logger.info(f"Supabase response data: {response.data}")
+        
         if response.error:
+            logger.error(f"Error retrieving profile: {response.error.message}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Profile not found"
+                detail=f"Profile not found: {response.error.message}"
             )
+            
+        if not response.data:
+            logger.error(f"No profile data found for user ID: {current_user['id']}")
+            # Create a profile if it doesn't exist
+            from app.core.supabase import create_user_profile
+            logger.info(f"Creating new profile for user ID: {current_user['id']}")
+            profile = create_user_profile(
+                user_id=current_user["id"],
+                email="placeholder@example.com"  # You might want to get this from somewhere
+            )
+            return profile[0] if isinstance(profile, list) else profile
         
         return response.data
     
     except Exception as e:
+        logger.error(f"Exception when getting user profile: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=f"Error retrieving user profile: {str(e)}"
         )
 
 @router.patch("/me", response_model=UserProfile)

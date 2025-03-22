@@ -16,21 +16,54 @@ async def get_projects(
     """
     Get all projects for the current user
     """
+    import logging
+    import traceback
+    logger = logging.getLogger("beatgen.projects")
+    
+    logger.info(f"Getting projects for user ID: {current_user['id']}")
+    
     try:
-        response = supabase.table("projects").select("*").eq("user_id", current_user["id"]).execute()
+        # Try to check if the projects table exists (depends on Supabase access level)
+        try:
+            metadata = supabase.table("project").select("count").limit(1).execute()
+            logger.info(f"Project table access check: {metadata}")
+        except Exception as table_err:
+            logger.warning(f"Could not verify table existence: {str(table_err)}")
         
-        if response.error:
+        # Query the projects table
+        logger.info(f"Querying 'project' table for user ID: {current_user['id']}")
+        response = supabase.table("project").select("*").eq("user_id", current_user["id"]).execute()
+        
+        # Debug response
+        logger.info(f"Supabase response for projects: {response}")
+        
+        if hasattr(response, 'error') and response.error:
+            logger.error(f"Error retrieving projects: {response.error.message}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=response.error.message
+                detail=f"Error retrieving projects: {response.error.message}"
             )
         
+        # If projects table doesn't exist yet or is empty, return empty list
+        if not response.data:
+            logger.info(f"No projects found for user ID: {current_user['id']}")
+            return []
+            
+        logger.info(f"Found {len(response.data)} projects for user ID: {current_user['id']}")
         return response.data
     
     except Exception as e:
+        logger.error(f"Exception when getting projects: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # If table doesn't exist, return empty list instead of error
+        if "relation \"projects\" does not exist" in str(e).lower():
+            logger.warning("Projects table does not exist yet - returning empty list")
+            return []
+            
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=f"Error retrieving projects: {str(e)}"
         )
 
 @router.post("/", response_model=Project)

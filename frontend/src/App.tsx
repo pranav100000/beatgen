@@ -13,38 +13,82 @@ function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="App">
       <nav className="nav-header">
-        <div className="logo">beatgen</div>
+        <div className="logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
+          beatgen
+        </div>
         <div className="nav-links">
-          <Button 
-            variant="text" 
-            href="/saved"
-            sx={{ color: '#1a237e', marginLeft: 2 }}
-          >
-            SAVED
-          </Button>
-{user ? (
-            <Button 
-              variant="text" 
-              onClick={() => {
-                navigate('/account');
-              }}
-              sx={{ color: '#1a237e', marginLeft: 2 }}
-            >
-              MY ACCOUNT
-            </Button>
+          {user ? (
+            <>
+              <Button 
+                variant="text" 
+                onClick={() => navigate('/projects')}
+                sx={{ color: '#1a237e', marginLeft: 2 }}
+              >
+                MY PROJECTS
+              </Button>
+              <Button 
+                variant="text" 
+                onClick={() => navigate('/account')}
+                sx={{ color: '#1a237e', marginLeft: 2 }}
+              >
+                MY ACCOUNT
+              </Button>
+              <Button 
+                variant="outlined" 
+                onClick={async () => {
+                  await signOut();
+                  navigate('/');
+                }}
+                sx={{ 
+                  color: '#1a237e', 
+                  borderColor: '#1a237e',
+                  marginLeft: 2,
+                  '&:hover': {
+                    borderColor: '#1a237e',
+                    backgroundColor: 'rgba(26, 35, 126, 0.04)'
+                  }
+                }}
+              >
+                LOGOUT
+              </Button>
+            </>
           ) : (
-            <Button 
-              variant="text" 
-              onClick={() => setIsLoginModalOpen(true)}
-              sx={{ color: '#1a237e', marginLeft: 2 }}
-            >
-              LOGIN
-            </Button>
+            <>
+              <Button 
+                variant="text" 
+                href="/saved"
+                sx={{ color: '#1a237e', marginLeft: 2 }}
+              >
+                FEATURES
+              </Button>
+              <Button 
+                variant="text" 
+                onClick={() => setIsLoginModalOpen(true)}
+                sx={{ color: '#1a237e', marginLeft: 2 }}
+              >
+                LOGIN
+              </Button>
+              <Button 
+                variant="outlined" 
+                onClick={() => setIsSignupModalOpen(true)}
+                sx={{ 
+                  color: '#1a237e', 
+                  borderColor: '#1a237e',
+                  marginLeft: 2,
+                  '&:hover': {
+                    borderColor: '#1a237e',
+                    backgroundColor: 'rgba(26, 35, 126, 0.04)'
+                  }
+                }}
+              >
+                SIGN UP
+              </Button>
+            </>
           )}
         </div>
       </nav>

@@ -1,13 +1,33 @@
 from supabase import create_client, Client
 from app.core.config import settings
 from typing import Dict, Any, Optional
+import logging
+import sys
+
+logger = logging.getLogger("beatgen.supabase")
+
+# Check if Supabase credentials are present
+if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
+    logger.critical("Supabase URL or key is missing. Please check your .env file")
+    logger.critical(f"SUPABASE_URL: {'SET' if settings.SUPABASE_URL else 'MISSING'}")
+    logger.critical(f"SUPABASE_KEY: {'SET' if settings.SUPABASE_KEY else 'MISSING'}")
+    # Don't crash immediately to allow for better error reporting
+    # But log critical error
 
 # Initialize Supabase client with URL and anon key
-# Make sure these values are correctly set in your .env file
-supabase: Client = create_client(
-    settings.SUPABASE_URL, 
-    settings.SUPABASE_KEY
-)
+try:
+    logger.info(f"Initializing Supabase client with URL: {settings.SUPABASE_URL[:20]}...")
+    supabase: Client = create_client(
+        settings.SUPABASE_URL, 
+        settings.SUPABASE_KEY
+    )
+    logger.info("Supabase client initialized successfully")
+except Exception as e:
+    logger.critical(f"Failed to initialize Supabase client: {str(e)}")
+    # Create a dummy client that will raise appropriate errors when used
+    from unittest.mock import MagicMock
+    supabase = MagicMock()
+    supabase.table.side_effect = Exception("Supabase client failed to initialize")
 
 def verify_supabase_token(token: str) -> Dict[str, Any]:
     """
