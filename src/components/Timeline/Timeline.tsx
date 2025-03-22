@@ -430,7 +430,7 @@ function GridOverlay({ measureCount, timeSignature = [4, 4] }: { measureCount: n
       // This means we need to adjust how we interpret subdivisions based on the denominator
       console.log(`Drawing grid with time signature ${timeSignature[0]}/${timeSignature[1]}`);
       
-      const subdivisionsPerBeat = Math.max(timeSignature[1], 4); // Ensure we have enough subdivisions
+      const subdivisionsPerBeat = timeSignature[1]; // Use the denominator directly
       const totalBeats = measureCount * beatsPerMeasure;
       const totalSubdivisions = totalBeats * subdivisionsPerBeat;
       

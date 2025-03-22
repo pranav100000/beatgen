@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useState } from 'react';
-import { useAuth } from '../core/auth/auth-context';
+import { supabase } from '../core/auth/supabase-client';
 
 const style = {
   position: 'absolute',
@@ -24,32 +24,33 @@ const style = {
   p: 4,
 };
 
-interface LoginModalProps {
+interface PasswordResetModalProps {
   open: boolean;
   onClose: () => void;
-  onSignupClick?: () => void;
+  onLoginClick?: () => void;
 }
 
-export default function LoginModal({ open, onClose, onSignupClick }: LoginModalProps) {
+export default function PasswordResetModal({ open, onClose, onLoginClick }: PasswordResetModalProps) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  const { signIn } = useAuth();
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccess(false);
     
     try {
-      const { error, success } = await signIn(email, password);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password',
+      });
       
-      if (success) {
-        onClose();
-      } else if (error) {
+      if (error) {
         setError(error.message);
+      } else {
+        setSuccess(true);
       }
     } catch (err) {
       setError('An unexpected error occurred');
@@ -63,7 +64,7 @@ export default function LoginModal({ open, onClose, onSignupClick }: LoginModalP
     <Modal
       open={open}
       onClose={onClose}
-      aria-labelledby="login-modal-title"
+      aria-labelledby="password-reset-modal-title"
     >
       <Box sx={style}>
         <IconButton
@@ -79,11 +80,16 @@ export default function LoginModal({ open, onClose, onSignupClick }: LoginModalP
           <CloseIcon />
         </IconButton>
 
-        <Typography id="login-modal-title" variant="h6" component="h2" sx={{ mb: 3 }}>
-          Welcome Back
+        <Typography id="password-reset-modal-title" variant="h6" component="h2" sx={{ mb: 3 }}>
+          Reset Your Password
         </Typography>
 
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Password reset instructions have been sent to your email.
+          </Alert>
+        )}
         
         <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
@@ -94,24 +100,13 @@ export default function LoginModal({ open, onClose, onSignupClick }: LoginModalP
             variant="outlined"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={isLoading}
-          />
-          
-          <TextField
-            required
-            label="Password"
-            type="password"
-            fullWidth
-            variant="outlined"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || success}
           />
 
           <Button 
             variant="contained" 
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || success}
             sx={{ 
               mt: 2,
               bgcolor: '#1a237e',
@@ -120,11 +115,11 @@ export default function LoginModal({ open, onClose, onSignupClick }: LoginModalP
               }
             }}
           >
-            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Log In'}
+            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Send Reset Instructions'}
           </Button>
 
           <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
-            Don't have an account?{' '}
+            Remembered your password?{' '}
             <Button 
               variant="text" 
               sx={{ 
@@ -134,31 +129,16 @@ export default function LoginModal({ open, onClose, onSignupClick }: LoginModalP
               }}
               onClick={() => {
                 onClose();
-                if (onSignupClick) {
-                  onSignupClick();
+                if (onLoginClick) {
+                  onLoginClick();
                 }
               }}
             >
-              Sign up
-            </Button>
-          </Typography>
-          <Typography variant="body2" sx={{ mt: 1, textAlign: 'center' }}>
-            <Button 
-              variant="text" 
-              sx={{ 
-                p: 0, 
-                textTransform: 'none',
-                color: '#1a237e'
-              }}
-              onClick={() => {
-                onClose();
-              }}
-            >
-              Forgot password?
+              Log in
             </Button>
           </Typography>
         </Box>
       </Box>
     </Modal>
   );
-} 
+}
