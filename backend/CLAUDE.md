@@ -31,9 +31,13 @@
 
 - **audio_track**
   - id uuid (primary key)
-  - project_id uuid (references project.id)
   - user_id uuid (references person.id)
   - name text
+  - file_format text
+  - duration float
+  - file_size int
+  - sample_rate int
+  - waveform_data jsonb
   - created_at timestamp
   - updated_at timestamp
   - storage_key text

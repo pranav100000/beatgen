@@ -73,9 +73,13 @@ create index project_user_id_idx on project(user_id);
 -- Create audio_track table
 create table audio_track (
   id uuid default uuid_generate_v4() primary key,
-  project_id uuid not null references project(id),
   user_id uuid not null references person(id),
   name text not null,
+  file_format text not null,
+  duration float not null,
+  file_size int not null,
+  sample_rate int not null,
+  waveform_data jsonb not null,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now(),
   storage_key text not null
@@ -85,7 +89,6 @@ create index audio_track_user_id_idx on audio_track(user_id);
 -- Create midi_track table
 create table midi_track (
   id uuid default uuid_generate_v4() primary key,
-  project_id uuid not null references project(id),
   user_id uuid not null references person(id),
   name text not null,
   bpm float not null,

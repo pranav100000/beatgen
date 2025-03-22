@@ -241,6 +241,57 @@ export default function Projects() {
 
       {/* Project Dialog removed - users go directly to studio page */}
 
+      {/* My Sounds Section */}
+      <Box sx={{ mt: 6, mb: 3 }}>
+        <Box className="project-header">
+          <Typography variant="h4" component="h1">
+            My Sounds
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => console.log('Upload sound clicked')}
+          >
+            Upload Sound
+          </Button>
+        </Box>
+
+        <Paper 
+          sx={{ 
+            p: 3, 
+            mt: 2, 
+            bgcolor: '#1A1A1A', 
+            color: 'white',
+            border: '1px solid #333'
+          }}
+        >
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            py: 4
+          }}>
+            <MusicNoteIcon sx={{ fontSize: 60, color: '#666', mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              No sounds uploaded yet
+            </Typography>
+            <Typography variant="body1" color="text.secondary" paragraph align="center">
+              Upload audio files that you can use in your projects.<br />
+              Supported formats: MP3, WAV, AIFF
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() => console.log('Upload sound clicked')}
+              sx={{ mt: 2 }}
+            >
+              Upload Your First Sound
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
+
       {/* Snackbar for notifications */}
       <Snackbar 
         open={snackbar.open} 
