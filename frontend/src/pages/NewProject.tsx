@@ -200,7 +200,7 @@ function NewProject() {
                   
                   // Set track properties from saved data
                   const initialPosition = {
-                    x: 0,
+                    x: trackData.x_position || 0,
                     y: trackData.y_position || 0
                   };
                   
@@ -243,7 +243,7 @@ function NewProject() {
                   const audioTrack = await store.getAudioEngine().createTrack(newTrack.id);
                   
                   const initialPosition = {
-                    x: 0,
+                    x: trackData.x_position || 0,
                     y: trackData.y_position || 0
                   };
                   

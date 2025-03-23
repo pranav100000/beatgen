@@ -73,6 +73,7 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
           audioTracksToUpload.push({
             id: trackId, // Use consistent ID across systems
             file: track.audioFile,
+            x_position: track.position?.x || 0,
             y_position: track.position?.y || 0,
             track_number: track.trackIndex || 0,
             left_trim_ms: 0, // Default for now
@@ -96,6 +97,7 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
           pan: track.pan || 0,
           mute: track.muted || false,
           color: track.color || '#4285F4',
+          x_position: track.position?.x || 0,
           y_position: track.position?.y || 0,
           duration: track.duration,
           storage_key: track.storage_key, // Include storage key if available

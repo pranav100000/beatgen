@@ -16,6 +16,7 @@ class TrackBase(BaseModel):
 class Track(TrackBase):
     id: str
     duration: Optional[float] = None
+    x_position: int = 0
     y_position: int = 0
     storage_key: str
     left_trim_ms: int = 0

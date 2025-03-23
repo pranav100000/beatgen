@@ -9,6 +9,7 @@ export interface Track {
   mute: boolean;
   color?: string;
   duration?: number;
+  x_position?: number;
   y_position?: number;
   storage_key?: string;
   left_trim_ms?: number;
@@ -97,6 +98,7 @@ export interface AudioTrackData {
   id?: string;                   // Optional track ID (will be generated if not provided)
   file: File;                    // The audio file to upload
   storage_key?: string;          // Will be populated after upload
+  x_position: number;            // Horizontal position (time) in the track layout
   y_position: number;            // Vertical position in the track layout
   track_number: number;          // Track order number
   left_trim_ms: number;          // Left trim in milliseconds (0 for now)
@@ -187,6 +189,7 @@ export const saveProjectWithSounds = async (
     mute: track.is_muted,
     duration: track.duration,
     storage_key: track.storage_key,
+    x_position: track.x_position,
     y_position: track.y_position,
     track_number: track.track_number,
     left_trim_ms: track.left_trim_ms,
