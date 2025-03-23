@@ -2,7 +2,7 @@ import React from 'react';
 import { IconButton, Tooltip } from '@mui/material';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { Note } from '../../core/types/note';
-import { MidiManager } from '../../core/midi/MidiManager';
+import { useStore } from '../../core/state/StoreContext';
 
 interface MidiExportButtonProps {
   trackId: string;
@@ -22,7 +22,9 @@ const MidiExportButton: React.FC<MidiExportButtonProps> = ({
   bpm,
   timeSignature = [4, 4]
 }) => {
-  const handleExport = () => {
+  const store = useStore();
+  
+  const handleExport = async () => {
     if (!notes || notes.length === 0) {
       console.warn('No notes to export');
       alert('This track has no notes to export');
@@ -30,17 +32,21 @@ const MidiExportButton: React.FC<MidiExportButtonProps> = ({
     }
 
     try {
-      // Create a new instance of MidiManager
-      const midiManager = new MidiManager();
+      if (!store) {
+        throw new Error('Store not available');
+      }
       
-      // Convert notes to MIDI format
-      const midiData = midiManager.notesToMidi(notes, bpm);
+      const midiManager = store.getMidiManager();
       
-      // Update time signature
-      midiData.timeSignature = timeSignature;
+      // Attempt to export directly from DB or generate new MIDI file
+      console.log(`Exporting MIDI for track ${trackId} with ${notes.length} notes`);
       
-      // Create the MIDI file
-      const midiBlob = midiManager.createMidiFile(midiData);
+      // First try to export from DB using the exported method
+      const midiBlob = await midiManager.exportMidiFileFromDB(trackId);
+      
+      if (!midiBlob) {
+        throw new Error('Failed to generate MIDI file');
+      }
       
       // Create a download link and trigger download
       const downloadLink = document.createElement('a');
@@ -59,7 +65,7 @@ const MidiExportButton: React.FC<MidiExportButtonProps> = ({
       document.body.removeChild(downloadLink);
       URL.revokeObjectURL(downloadLink.href);
       
-      console.log(`Exported MIDI file for track ${trackId} with ${notes.length} notes`);
+      console.log(`Exported MIDI file for track ${trackId}`);
     } catch (error) {
       console.error('Error exporting MIDI:', error);
       alert('Failed to export MIDI file');

@@ -20,8 +20,10 @@ export interface MidiFile {
     data: Blob;
     type: string;
     size: number;
-    tempo?: number;
-    timeSignature?: string;
+    trackId?: string;        // App track ID (UUID) to link with application tracks
+    instrumentId?: string;   // Instrument ID for this track
+    tempo?: number;          // BPM value 
+    timeSignature?: string;  // Format: "4/4"
     createdAt: Date;
     updatedAt: Date;
     tags?: string[];
@@ -50,7 +52,7 @@ export class BeatGenDB extends Dexie {
 
         this.version(1).stores({
             audioFiles: '++id, name, type, createdAt, updatedAt, *tags',
-            midiFiles: '++id, name, type, createdAt, updatedAt, *tags',
+            midiFiles: '++id, name, type, trackId, createdAt, updatedAt, *tags',
             drumMachineFiles: '++id, name, trackId, createdAt, updatedAt, *tags'
         });
 
@@ -190,6 +192,119 @@ export class BeatGenDB extends Dexie {
     async deleteMidiFile(id: number): Promise<void> {
         this.logOperation('Deleting MIDI file', { id });
         await this.midiFiles.delete(id);
+        await this.logDbState();
+    }
+    
+    // Track-specific MIDI operations
+    
+    // Store a MIDI blob for a specific track
+    async storeMidiTrackBlob(trackId: string, name: string, midiBlob: Blob, 
+                           bpm: number, timeSignature: [number, number], 
+                           instrumentId?: string): Promise<number> {
+        this.logOperation('Storing MIDI track blob', {
+            trackId,
+            name,
+            size: midiBlob.size,
+            bpm,
+            timeSignature
+        });
+        
+        // Check if this track already has a MIDI file
+        const existingFile = await this.midiFiles
+            .where('trackId')
+            .equals(trackId)
+            .first();
+            
+        const timeSignatureStr = `${timeSignature[0]}/${timeSignature[1]}`;
+        
+        if (existingFile) {
+            // Update existing record
+            await this.midiFiles.update(existingFile.id!, {
+                data: midiBlob,
+                type: 'audio/midi',
+                size: midiBlob.size,
+                tempo: bpm,
+                timeSignature: timeSignatureStr,
+                updatedAt: new Date(),
+                instrumentId
+            });
+            
+            this.logOperation('Updated existing MIDI track', {
+                trackId,
+                fileId: existingFile.id
+            });
+            
+            await this.logDbState();
+            return existingFile.id!;
+        } else {
+            // Create new record
+            const metadata = {
+                name,
+                trackId,
+                data: midiBlob,
+                type: 'audio/midi',
+                size: midiBlob.size,
+                tempo: bpm,
+                timeSignature: timeSignatureStr,
+                instrumentId,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+            
+            const id = await this.midiFiles.add(metadata);
+            
+            this.logOperation('Created new MIDI track record', {
+                trackId,
+                fileId: id
+            });
+            
+            await this.logDbState();
+            return id;
+        }
+    }
+    
+    // Get MIDI blob for a specific track
+    async getMidiTrackBlob(trackId: string): Promise<Blob | null> {
+        this.logOperation('Getting MIDI track blob', { trackId });
+        
+        const file = await this.midiFiles
+            .where('trackId')
+            .equals(trackId)
+            .first();
+            
+        if (file) {
+            this.logOperation('Found MIDI track blob', {
+                trackId,
+                fileId: file.id,
+                size: file.size
+            });
+            return file.data;
+        } else {
+            this.logOperation('MIDI track blob not found', { trackId });
+            return null;
+        }
+    }
+    
+    // Check if a track has a MIDI file
+    async hasMidiTrack(trackId: string): Promise<boolean> {
+        const count = await this.midiFiles
+            .where('trackId')
+            .equals(trackId)
+            .count();
+            
+        return count > 0;
+    }
+    
+    // Delete MIDI file for a specific track
+    async deleteMidiTrack(trackId: string): Promise<void> {
+        this.logOperation('Deleting MIDI track', { trackId });
+        
+        await this.midiFiles
+            .where('trackId')
+            .equals(trackId)
+            .delete();
+            
+        this.logOperation('Deleted MIDI track', { trackId });
         await this.logDbState();
     }
 

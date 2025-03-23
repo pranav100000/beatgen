@@ -20,7 +20,7 @@ export interface StoreInterface {
   getTransport(): TransportController;
   projectManager: ProjectManager;
   initializeAudio(): Promise<void>;
-  createTrack(name: string, type: 'audio' | 'midi' | 'video' | 'drum'): Track;
+  createTrack(name: string, type: 'audio' | 'midi' | 'video' | 'drum'): Promise<Track>;
   getInstrumentManager(): InstrumentManager;
   getMidiManager(): MidiManager;
 }
@@ -41,6 +41,14 @@ export class Store implements StoreInterface {
     this.transportController = new TransportController();
     this.midiManager = new MidiManager();
     this.instrumentManager = new InstrumentManager();
+    
+    // Initialize with project defaults
+    const project = this.projectManager.getCurrentProject();
+    if (project) {
+      this.midiManager.setBpm(project.tempo);
+      this.midiManager.setTimeSignature([4, 4]); // Default time signature
+    }
+    
     this.initialized = true;
   }
 
@@ -77,13 +85,36 @@ export class Store implements StoreInterface {
     return this.transportController;
   }
 
-  public createTrack(name: string, type: 'audio' | 'midi' | 'video' | 'drum'): Track {
+  public async createTrack(name: string, type: 'audio' | 'midi' | 'video' | 'drum'): Promise<Track> {
     if (!this.initialized) {
       throw new Error('Store must be initialized before creating tracks');
     }
     
     // Create track in project manager
     const track = this.projectManager.addTrack(name, type);
+    
+    // For MIDI and drum tracks, handle persistence
+    if (type === 'midi' || type === 'drum') {
+      try {
+        // Use MIDI persistence
+        const project = this.projectManager.getCurrentProject();
+        if (project) {
+          // Ensure BPM is set
+          this.midiManager.setBpm(project.tempo);
+          
+          // Create persisted track directly in MidiManager
+          await this.midiManager.createTrackWithPersistence(
+            track.id, // Use track ID as the instrument ID for now
+            name
+          );
+          
+          console.log(`Store: Created persisted ${type} track: ${track.id}`);
+        }
+      } catch (error) {
+        console.error(`Store: Error creating persisted ${type} track:`, error);
+        // Continue even if persistence fails
+      }
+    }
     
     // Add track to our internal _tracks array
     this.addTrackToInternalState(track);
@@ -127,7 +158,7 @@ export class Store implements StoreInterface {
     await this.transportController.loadAudioFile(trackId, file);
   }
 
-  public removeTrack(id: string): void {
+  public async removeTrack(id: string): Promise<void> {
     // Remove track from project manager
     this.projectManager.removeTrack(id);
     
@@ -136,6 +167,12 @@ export class Store implements StoreInterface {
     
     // Remove from audio engine
     this.audioEngine.removeTrack(id);
+    
+    // Clean up MIDI resources if it's a MIDI or drum track
+    const track = this._tracks.find(t => t.id === id);
+    if (track && (track.type === 'midi' || track.type === 'drum')) {
+      await this.midiManager.deleteTrackWithPersistence(id);
+    }
     
     // Notify listeners of track changes
     this._notifyListeners();
@@ -206,32 +243,12 @@ export class Store implements StoreInterface {
    */
   public toggleDrumPad(trackId: string, column: number, row: number): void {
     console.log(`Store.toggleDrumPad called for track ${trackId}, column ${column}, row ${row}`);
-    console.log(`Current tracks in store: ${this._tracks.length}`);
     
-    if (this._tracks.length > 0) {
-      console.log(`Track IDs: ${this._tracks.map(t => t.id).join(', ')}`);
-    }
-    
-    // First, check our internal tracks array
-    let track = this._tracks.find(t => t.id === trackId);
-    
-    // If not found, check project manager and try to sync
-    if (!track) {
-      console.log(`Track ${trackId} not found in internal state, checking ProjectManager...`);
-      const pmTrack = this.projectManager.getTrackById(trackId);
-      
-      if (pmTrack) {
-        console.log(`Track ${trackId} found in ProjectManager, adding to internal state`);
-        this.addTrackToInternalState(pmTrack);
-        
-        // Try to get the track again
-        track = this._tracks.find(t => t.id === trackId);
-      }
-    }
+    // Find the track directly
+    const track = this.getTrackById(trackId);
     
     if (!track || track.type !== 'drum') {
       console.warn(`Cannot toggle drum pad: Track ${trackId} not found or not a drum track`);
-      console.log(`Track found: ${!!track}, type: ${track?.type}`);
       return;
     }
     
@@ -244,9 +261,6 @@ export class Store implements StoreInterface {
     const existingPadIndex = track.drumPads.findIndex(
       p => p.column === column && p.row === row
     );
-    
-    // Current pads for logging
-    const beforeCount = track.drumPads.length;
     
     if (existingPadIndex >= 0) {
       // Remove the pad if it exists
@@ -262,9 +276,8 @@ export class Store implements StoreInterface {
       console.log(`Added drum pad at column ${column}, row ${row} for track ${trackId}`);
     }
     
-    // Log state change
-    console.log(`Drum pads for track ${trackId}: ${beforeCount} → ${track.drumPads.length}`);
-    console.log('Current drum pads:', JSON.stringify(track.drumPads));
+    // Log current state
+    console.log(`Drum pads for track ${trackId}: ${track.drumPads.length}`);
     
     // Notify listeners of track changes
     this._notifyListeners();

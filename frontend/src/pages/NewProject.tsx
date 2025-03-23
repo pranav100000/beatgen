@@ -152,7 +152,7 @@ function NewProject() {
                   console.log('Loading audio track with storage key:', trackData.storage_key);
                   
                   // Create the track in store
-                  const newTrack = store.createTrack(trackData.name, 'audio');
+                  const newTrack = await store.createTrack(trackData.name, 'audio');
                   
                   // Find the audio file URL using storage key
                   // storage_key format is audio/{user_id}/{track_id}.{extension}
@@ -223,6 +223,7 @@ function NewProject() {
                     pan: pan, // Use the pan value
                     muted: trackData.mute || false,
                     soloed: false, // We don't use solo anymore but it's still in the interface
+                    type: 'audio', // Explicitly set type to ensure TrackState compatibility
                     _calculatedWidth: trackData.duration ? calculateTrackWidth(trackData.duration, bpm) : undefined
                   };
                   
@@ -239,7 +240,7 @@ function NewProject() {
                   // Handle other track types
                   console.log('Loading non-audio track:', trackData);
                   
-                  const newTrack = store.createTrack(trackData.name, trackData.type as TrackType['type']);
+                  const newTrack = await store.createTrack(trackData.name, trackData.type as TrackType['type']);
                   const audioTrack = await store.getAudioEngine().createTrack(newTrack.id);
                   
                   const initialPosition = {
@@ -264,6 +265,7 @@ function NewProject() {
                     muted: trackData.mute || false,
                     soloed: false, // We don't use solo anymore but it's still in the interface
                     dbId: trackData.id, // Store ID for reference
+                    type: trackData.type as 'audio' | 'midi' | 'video' | 'drum',  // Explicitly set type
                     _calculatedWidth: trackData.duration ? calculateTrackWidth(trackData.duration, bpm) : undefined
                   };
                   
@@ -322,7 +324,7 @@ function NewProject() {
 
       if (trackTypeOrFile instanceof File) {
         // Handle audio file
-        const newTrack = store.createTrack('Audio Track', 'audio');
+        const newTrack = await store.createTrack('Audio Track', 'audio');
         const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, trackTypeOrFile);
         
         // Save to database
@@ -360,6 +362,7 @@ function NewProject() {
           dbId,
           duration,
           position: initialPosition,
+          type: 'audio', // Explicitly set type
           // Calculate initial width based on duration and current BPM
           _calculatedWidth: duration ? calculateTrackWidth(duration, bpm) : undefined
         };
@@ -377,7 +380,7 @@ function NewProject() {
 
       } else {
         // Handle other track types
-        const newTrack = store.createTrack(trackTypeOrFile, trackTypeOrFile as TrackType['type']);
+        const newTrack = await store.createTrack(trackTypeOrFile, trackTypeOrFile as TrackType['type']);
         const audioTrack = await store.getAudioEngine().createTrack(newTrack.id);
         
         // Default duration for MIDI tracks (4 bars at 4/4 time signature = 16 beats)
@@ -418,6 +421,7 @@ function NewProject() {
           ...audioTrack,
           position: initialPosition,
           duration: defaultDuration,
+          type: trackTypeOrFile as 'midi' | 'drum', // Explicitly set type
           _calculatedWidth: defaultDuration ? calculateTrackWidth(defaultDuration, bpm) : undefined,
           dbId
         };
