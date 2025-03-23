@@ -16,6 +16,7 @@ class TrackBase(BaseModel):
 class Track(TrackBase):
     id: str
     duration: Optional[float] = None
+    x_position: int = 0
     y_position: int = 0
     storage_key: str
     left_trim_ms: int = 0
@@ -28,6 +29,7 @@ class ProjectBase(BaseModel):
     bpm: float = 120.0
     time_signature_numerator: int
     time_signature_denominator: int
+    key_signature: str
 
 
 class ProjectCreate(ProjectBase):
@@ -50,4 +52,5 @@ class ProjectUpdate(BaseModel):
     bpm: Optional[float] = None
     time_signature_numerator: int
     time_signature_denominator: int
+    key_signature: str
     tracks: Optional[List[Track]] = None

@@ -91,6 +91,7 @@ async def create_project(
             "bpm": project_data.bpm,
             "time_signature_numerator": project_data.time_signature_numerator,
             "time_signature_denominator": project_data.time_signature_denominator,
+            "key_signature": project_data.key_signature,
             "tracks": []
             # Omitting created_at and updated_at as they have database defaults
         }
@@ -260,6 +261,14 @@ async def update_project(
         
         # Process the update data
         update_data = project_update.dict(exclude_unset=True)
+        
+        # Ensure key_signature is included
+        if "key_signature" not in update_data:
+            logger.error("key_signature not provided in update data")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="key_signature is required"
+            )
         
         # If tracks are present, process them
         if 'tracks' in update_data and update_data['tracks'] is not None:
