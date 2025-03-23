@@ -28,6 +28,8 @@ import {
   MusicNote as MusicNoteIcon,
   ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
+import SoundUploader from '../components/SoundUploader';
+import SoundLibrary from '../components/SoundLibrary';
 import { useAuth } from '../core/auth/auth-context';
 import { 
   getProjects, 
@@ -45,7 +47,7 @@ export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // No dialog state needed anymore
+  const [showSoundUploader, setShowSoundUploader] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -59,6 +61,13 @@ export default function Projects() {
   useEffect(() => {
     fetchProjects();
   }, []);
+  
+  // Function to fetch sounds (will be passed to SoundLibrary for reloading)
+  const fetchSounds = () => {
+    // SoundLibrary component has its own fetch logic
+    // This is just a placeholder to refresh the component when needed
+    console.log('Refreshing sounds library');
+  };
 
   const fetchProjects = async () => {
     try {
@@ -251,45 +260,26 @@ export default function Projects() {
             variant="contained"
             color="primary"
             startIcon={<AddIcon />}
-            onClick={() => console.log('Upload sound clicked')}
+            onClick={() => setShowSoundUploader(true)}
           >
             Upload Sound
           </Button>
         </Box>
 
-        <Paper 
-          sx={{ 
-            p: 3, 
-            mt: 2, 
-            bgcolor: '#1A1A1A', 
-            color: 'white',
-            border: '1px solid #333'
-          }}
-        >
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center',
-            py: 4
-          }}>
-            <MusicNoteIcon sx={{ fontSize: 60, color: '#666', mb: 2 }} />
-            <Typography variant="h6" gutterBottom>
-              No sounds uploaded yet
-            </Typography>
-            <Typography variant="body1" color="text.secondary" paragraph align="center">
-              Upload audio files that you can use in your projects.<br />
-              Supported formats: MP3, WAV, AIFF
-            </Typography>
-            <Button
-              variant="outlined"
-              startIcon={<AddIcon />}
-              onClick={() => console.log('Upload sound clicked')}
-              sx={{ mt: 2 }}
-            >
-              Upload Your First Sound
-            </Button>
+        {showSoundUploader && (
+          <Box sx={{ mt: 2, mb: 3 }}>
+            <SoundUploader
+              onSoundUploaded={(soundId) => {
+                setShowSoundUploader(false);
+                fetchSounds();
+                showSnackbar('Sound uploaded successfully', 'success');
+              }}
+              onCancel={() => setShowSoundUploader(false)}
+            />
           </Box>
-        </Paper>
+        )}
+
+        <SoundLibrary onReload={fetchSounds} />
       </Box>
 
       {/* Snackbar for notifications */}

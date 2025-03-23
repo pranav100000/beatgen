@@ -26,11 +26,12 @@ async def get_current_user_profile(current_user: dict = Depends(get_current_user
         # Debug response
         logger.info(f"Supabase response data: {response.data}")
         
-        if response.error:
-            logger.error(f"Error retrieving profile: {response.error.message}")
+        if hasattr(response, 'error') and response.error:
+            error_message = response.error.message if hasattr(response.error, 'message') else str(response.error)
+            logger.error(f"Error retrieving profile: {error_message}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Profile not found: {response.error.message}"
+                detail=f"Profile not found: {error_message}"
             )
             
         if not response.data:
