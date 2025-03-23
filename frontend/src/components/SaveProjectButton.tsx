@@ -15,7 +15,8 @@ interface SaveProjectButtonProps {
   bpm: number;
   timeSignature: [number, number];
   tracks: any[];
-  projectId?: string;
+  projectId: string;
+  keySignature: string; // Musical key signature
   onSaved?: (project: Project) => void;
 }
 
@@ -25,6 +26,7 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
   timeSignature,
   tracks,
   projectId,
+  keySignature,
   onSaved
 }) => {
   const [saving, setSaving] = useState(false);
@@ -75,8 +77,8 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
             track_number: track.trackIndex || 0,
             left_trim_ms: 0, // Default for now
             right_trim_ms: 0, // Default for now
-            volume: (track.volume || 1) * 100, // Convert to 0-100 scale
-            pan: (track.pan || 0) * 100, // Convert to -100 to 100 scale
+            volume: track.volume || 1, // Keep as 0-1 scale
+            pan: track.pan || 0, // Keep as -1 to 1 scale
             is_muted: track.muted || false,
             name: track.name
           });
@@ -85,7 +87,7 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
           return null;
         }
         
-        // For other tracks, convert to API format
+        // For other tracks, convert to API format (using flattened structure)
         return {
           id: track.id,
           name: track.name,
@@ -96,6 +98,7 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
           color: track.color || '#4285F4',
           y_position: track.position?.y || 0,
           duration: track.duration,
+          storage_key: track.storage_key, // Include storage key if available
         };
       }).filter(track => track !== null); // Remove null placeholders
       
@@ -106,7 +109,8 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
         name: projectTitle,
         bpm: bpm,
         time_signature_numerator: timeSignature[0],
-        time_signature_denominator: timeSignature[1]
+        time_signature_denominator: timeSignature[1],
+        key_signature: keySignature
       };
       
       // If we have audio files to upload, use the special save function

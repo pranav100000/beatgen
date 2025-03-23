@@ -114,6 +114,10 @@ function NewProject() {
             setTimeSignature([project.time_signature_numerator, project.time_signature_denominator]);
           }
           
+          if (project.key_signature) {
+            setKey(project.key_signature);
+          }
+          
           // Load tracks from project.tracks
           if (project.tracks && project.tracks.length > 0) {
             console.log('Loading tracks from project:', project.tracks);
@@ -128,7 +132,17 @@ function NewProject() {
               
               // Process each track in the project
               for (const trackData of project.tracks) {
-                console.log('Processing track:', trackData);
+                console.log('Processing track:', {
+                  id: trackData.id,
+                  name: trackData.name,
+                  type: trackData.type,
+                  volume: trackData.volume,
+                  pan: trackData.pan,
+                  mute: trackData.mute,
+                  storage_key: trackData.storage_key,
+                  y_position: trackData.y_position,
+                  duration: trackData.duration
+                });
                 
                 // Initialize audio before creating track
                 await store.initializeAudio();
@@ -142,12 +156,15 @@ function NewProject() {
                   
                   // Find the audio file URL using storage key
                   // storage_key format is audio/{user_id}/{track_id}.{extension}
-                  const storageUrl = `https://dsscfzvrjlyfktnrpukj.supabase.co/storage/v1/object/public/tracks/${trackData.storage_key}`;
+                  const baseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://dsscfzvrjlyfktnrpukj.supabase.co';
+                  const storageUrl = `${baseUrl}/storage/v1/object/public/tracks/${trackData.storage_key}`;
                   console.log('Audio URL:', storageUrl);
                   console.log('Track ID:', trackData.id);
                   
-                  // Create an audio element to load the file
-                  const audioEl = new Audio(storageUrl);
+                  // Create an audio element to load the file with CORS handling
+                  const audioEl = new Audio();
+                  audioEl.crossOrigin = "anonymous"; // Important for CORS
+                  audioEl.src = storageUrl;
                   
                   // Wait for metadata to load
                   await new Promise(resolve => {
@@ -159,9 +176,24 @@ function NewProject() {
                   });
                   
                   // Create a blob from the audio element (via fetch)
-                  const response = await fetch(storageUrl);
-                  const blob = await response.blob();
-                  const audioFile = new File([blob], trackData.name, { type: 'audio/wav' });
+                  let audioFile;
+                  try {
+                    console.log('Fetching audio file from URL:', storageUrl);
+                    const response = await fetch(storageUrl, { 
+                      mode: 'cors',
+                      credentials: 'same-origin'
+                    });
+                    
+                    if (!response.ok) {
+                      throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const blob = await response.blob();
+                    audioFile = new File([blob], trackData.name, { type: 'audio/wav' });
+                  } catch (error) {
+                    console.error('Error fetching audio file:', error);
+                    throw new Error(`Failed to load audio file: ${error.message}`);
+                  }
                   
                   // Create the audio track using the file
                   const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, audioFile);
@@ -172,9 +204,9 @@ function NewProject() {
                     y: trackData.y_position || 0
                   };
                   
-                  // Set volume and pan (convert from 0-100 scale to 0-1 scale)
-                  const volume = trackData.volume ? trackData.volume / 100 : 1;
-                  const pan = trackData.pan ? trackData.pan / 100 : 0;
+                  // Use volume and pan directly (already in 0-1 and -1 to 1 scale)
+                  const volume = trackData.volume !== undefined ? trackData.volume : 1;
+                  const pan = trackData.pan !== undefined ? trackData.pan : 0;
                   store.getAudioEngine().setTrackVolume(newTrack.id, volume);
                   store.getAudioEngine().setTrackPan(newTrack.id, pan);
                   store.getAudioEngine().setTrackMute(newTrack.id, trackData.mute || false);
@@ -187,8 +219,8 @@ function NewProject() {
                     dbId: trackData.id, // Now it's a string so this works fine
                     duration: trackData.duration,
                     position: initialPosition,
-                    volume: volume, // Use the converted volume
-                    pan: pan, // Use the converted pan
+                    volume: volume, // Use the volume value
+                    pan: pan, // Use the pan value
                     muted: trackData.mute || false,
                     soloed: false, // We don't use solo anymore but it's still in the interface
                     _calculatedWidth: trackData.duration ? calculateTrackWidth(trackData.duration, bpm) : undefined
@@ -215,9 +247,9 @@ function NewProject() {
                     y: trackData.y_position || 0
                   };
                   
-                  // Convert volume and pan from 0-100 to 0-1 scale
-                  const volume = trackData.volume ? trackData.volume / 100 : 1;
-                  const pan = trackData.pan ? trackData.pan / 100 : 0;
+                  // Use volume and pan directly (already in 0-1 and -1 to 1 scale)
+                  const volume = trackData.volume !== undefined ? trackData.volume : 1;
+                  const pan = trackData.pan !== undefined ? trackData.pan : 0;
                   store.getAudioEngine().setTrackVolume(newTrack.id, volume);
                   store.getAudioEngine().setTrackPan(newTrack.id, pan);
                   store.getAudioEngine().setTrackMute(newTrack.id, trackData.mute || false);
@@ -227,8 +259,8 @@ function NewProject() {
                     ...audioTrack,
                     position: initialPosition,
                     duration: trackData.duration,
-                    volume: volume,
-                    pan: pan,
+                    volume: volume, // Use the volume value
+                    pan: pan, // Use the pan value
                     muted: trackData.mute || false,
                     soloed: false, // We don't use solo anymore but it's still in the interface
                     dbId: trackData.id, // Store ID for reference
@@ -840,7 +872,8 @@ function NewProject() {
               bpm={bpm}
               timeSignature={timeSignature}
               tracks={tracks}
-              projectId={existingProjectId || undefined}
+              projectId={existingProjectId || ""}
+              keySignature={key}
               onSaved={(project) => {
                 console.log('Project saved:', project);
                 // Update the URL with the project ID

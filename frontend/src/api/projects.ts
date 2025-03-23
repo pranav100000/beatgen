@@ -28,6 +28,7 @@ export interface Project {
   bpm: number;
   time_signature_numerator: number;
   time_signature_denominator: number;
+  key_signature: string;
   tracks: Track[];
   created_at: string;
   updated_at: string;
@@ -38,6 +39,7 @@ export interface ProjectCreateDto {
   bpm?: number;
   time_signature_numerator: number;
   time_signature_denominator: number;
+  key_signature: string;
 }
 
 export interface ProjectUpdateDto {
@@ -45,6 +47,7 @@ export interface ProjectUpdateDto {
   bpm?: number;
   time_signature_numerator: number;
   time_signature_denominator: number;
+  key_signature: string;
   tracks?: Track[];
 }
 

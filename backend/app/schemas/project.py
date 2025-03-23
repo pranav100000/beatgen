@@ -28,6 +28,7 @@ class ProjectBase(BaseModel):
     bpm: float = 120.0
     time_signature_numerator: int
     time_signature_denominator: int
+    key_signature: str
 
 
 class ProjectCreate(ProjectBase):
@@ -50,4 +51,5 @@ class ProjectUpdate(BaseModel):
     bpm: Optional[float] = None
     time_signature_numerator: int
     time_signature_denominator: int
+    key_signature: str
     tracks: Optional[List[Track]] = None
