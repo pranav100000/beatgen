@@ -70,7 +70,8 @@ Once in the workspace, the user can also use the integrated AI features to gener
 *   **Backend:**
 
     *   Node.js – to create API endpoints for user management, project saving, and AI requests.
-    *   MongoDB – for persisting user projects and data.
+    *   Postgres – for persisting user projects and data.
+    *   Supabase Storage – for storing audio files and MIDI files.
     *   JWT – for managing user authentication and session security.
 
 *   **AI Integration:**
