@@ -21,10 +21,14 @@ export interface SoundCreateRequest {
 /**
  * Get a presigned URL for uploading an audio file
  * @param fileName The name of the file to upload
+ * @param id The ID to use for the sound (UUID)
  * @returns Object containing upload URL, ID, and storage key
  */
-export const getUploadUrl = async (fileName: string): Promise<UploadUrlResponse> => {
-  const response = await apiClient.post('/sounds/upload-url', { file_name: fileName });
+export const getUploadUrl = async (fileName: string, id: string): Promise<UploadUrlResponse> => {
+  const response = await apiClient.post('/sounds/upload-url', { 
+    file_name: fileName,
+    id: id // Always pass the ID
+  });
   return response.data;
 };
 
@@ -34,8 +38,23 @@ export const getUploadUrl = async (fileName: string): Promise<UploadUrlResponse>
  * @returns The created sound object
  */
 export const createSoundRecord = async (soundData: SoundCreateRequest): Promise<Sound> => {
-  const response = await apiClient.post('/sounds', soundData);
-  return response.data;
+  console.log('Creating sound record with data:', {
+    ...soundData,
+    waveform_data: soundData.waveform_data ? `[${soundData.waveform_data.length} points]` : 'none'
+  });
+  
+  try {
+    const response = await apiClient.post('/sounds', soundData);
+    console.log('Sound record created successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating sound record:', error);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    throw error;
+  }
 };
 
 /**

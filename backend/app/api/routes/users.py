@@ -67,10 +67,11 @@ async def update_user_profile(
         # Update profile in Supabase
         response = supabase.table("person").update(profile_update.dict(exclude_unset=True)).eq("id", current_user["id"]).execute()
         
-        if response.error:
+        if hasattr(response, 'error') and response.error:
+            error_message = response.error.message if hasattr(response.error, 'message') else str(response.error)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=response.error.message
+                detail=error_message
             )
         
         return response.data[0]

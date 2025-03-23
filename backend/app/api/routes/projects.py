@@ -207,13 +207,35 @@ async def update_project(
 ) -> Any:
     """
     Update a project
+    
+    This endpoint handles updating a project with all its tracks. If tracks are provided, 
+    they will replace all existing tracks in the project. The front-end handles:
+    1. Uploading sound files to Supabase storage
+    2. Creating audio track records in the database
+    3. Saving the project with the track data that includes storage keys
     """
     import logging
     import traceback
     logger = logging.getLogger("beatgen.projects")
     
     logger.info(f"Updating project with ID: {project_id} for user: {current_user['id']}")
-    logger.info(f"Update data: {project_update}")
+    
+    # Track info for logging
+    if project_update.tracks:
+        logger.info(f"Update includes {len(project_update.tracks)} tracks")
+        # Log some info about the first few tracks
+        for i, track in enumerate(project_update.tracks[:3]):
+            track_info = {
+                'name': track.name,
+                'type': track.type,
+                'id': track.id
+            }
+            if track.type == 'audio':
+                track_info['storage_key'] = track.storage_key if hasattr(track, 'storage_key') else 'not set'
+                track_info['duration'] = track.duration if hasattr(track, 'duration') else 'not set'
+            logger.info(f"Track {i}: {track_info}")
+    else:
+        logger.info("Update does not include tracks")
     
     try:
         # Verify project exists and belongs to user
@@ -236,16 +258,35 @@ async def update_project(
                 detail="Project not found"
             )
         
-        # Update project
-        update_data = {
-            **project_update.dict(exclude_unset=True),
-            "updated_at": datetime.utcnow().isoformat()
-        }
+        # Process the update data
+        update_data = project_update.dict(exclude_unset=True)
         
-        logger.info(f"Executing update with data: {update_data}")
+        # If tracks are present, process them
+        if 'tracks' in update_data and update_data['tracks'] is not None:
+            # Convert Track objects to dictionaries with proper serialization
+            tracks_data = []
+            for track in update_data['tracks']:
+                # If it's a Pydantic model, convert to dict
+                if hasattr(track, 'dict'):
+                    track_dict = track.dict()
+                else:
+                    track_dict = track
+                
+                # Convert any UUID values to strings
+                for key, value in track_dict.items():
+                    if isinstance(value, UUID):
+                        track_dict[key] = str(value)
+                
+                tracks_data.append(track_dict)
+            
+            update_data['tracks'] = tracks_data
+            logger.info(f"Processed {len(tracks_data)} tracks for update")
+        
+        # Add updated timestamp
+        update_data["updated_at"] = datetime.utcnow().isoformat()
+        
+        logger.info(f"Executing update with data keys: {update_data.keys()}")
         response = supabase.table("project").update(update_data).eq("id", str(project_id)).execute()
-        
-        logger.info(f"Update response: {response}")
         
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error updating project: {response.error}")
@@ -261,7 +302,7 @@ async def update_project(
                 detail="Project updated but no data was returned"
             )
             
-        logger.info(f"Successfully updated project: {response.data[0]}")
+        logger.info(f"Successfully updated project with ID: {response.data[0].get('id', 'unknown')}")
         return response.data[0]
     
     except HTTPException as he:
@@ -333,8 +374,13 @@ async def add_track(
         project = project_response.data
         tracks = project.get("tracks", [])
         
+        # Convert track data to dict, ensuring UUID is converted to string
+        track_dict = track_data.dict()
+        if isinstance(track_dict['id'], UUID):
+            track_dict['id'] = str(track_dict['id'])
+        
         # Add new track
-        tracks.append(track_data.dict())
+        tracks.append(track_dict)
         
         # Update project with new tracks
         update_data = {
@@ -472,3 +518,4 @@ async def delete_track(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+

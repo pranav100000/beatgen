@@ -16,6 +16,7 @@ router = APIRouter()
 
 class UploadUrlRequest(BaseModel):
     file_name: str
+    id: str  # ID for the sound (UUID)
 
 class UploadUrlResponse(BaseModel):
     id: str
@@ -49,9 +50,9 @@ async def get_upload_url(
     logger.info(f"Upload URL requested for file: {request_data.file_name} by user: {current_user['id']}")
     
     try:
-        # Generate UUID for sound
-        sound_id = str(uuid.uuid4())
-        logger.info(f"Generated sound ID: {sound_id}")
+        # Use the provided ID
+        sound_id = request_data.id
+        logger.info(f"Using provided sound ID: {sound_id}")
         
         # Define storage path
         file_extension = request_data.file_name.split('.')[-1]

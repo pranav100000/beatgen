@@ -114,9 +114,143 @@ function NewProject() {
             setTimeSignature([project.time_signature_numerator, project.time_signature_denominator]);
           }
           
-          // TODO: Load tracks from project.tracks
-          // This would require more complex logic to convert from stored track data
-          // to actual Track objects with audio buffers, etc.
+          // Load tracks from project.tracks
+          if (project.tracks && project.tracks.length > 0) {
+            console.log('Loading tracks from project:', project.tracks);
+            
+            // Import the necessary modules
+            const { getSounds } = await import('../api/sounds');
+            
+            try {
+              // Get all user's sounds for reference
+              const userSounds = await getSounds();
+              console.log('User sounds:', userSounds);
+              
+              // Process each track in the project
+              for (const trackData of project.tracks) {
+                console.log('Processing track:', trackData);
+                
+                // Initialize audio before creating track
+                await store.initializeAudio();
+                
+                if (trackData.type === 'audio' && trackData.storage_key) {
+                  // This is an audio track with storage_key
+                  console.log('Loading audio track with storage key:', trackData.storage_key);
+                  
+                  // Create the track in store
+                  const newTrack = store.createTrack(trackData.name, 'audio');
+                  
+                  // Find the audio file URL using storage key
+                  // storage_key format is audio/{user_id}/{track_id}.{extension}
+                  const storageUrl = `https://dsscfzvrjlyfktnrpukj.supabase.co/storage/v1/object/public/tracks/${trackData.storage_key}`;
+                  console.log('Audio URL:', storageUrl);
+                  console.log('Track ID:', trackData.id);
+                  
+                  // Create an audio element to load the file
+                  const audioEl = new Audio(storageUrl);
+                  
+                  // Wait for metadata to load
+                  await new Promise(resolve => {
+                    audioEl.addEventListener('loadedmetadata', resolve);
+                    audioEl.addEventListener('error', () => {
+                      console.error('Error loading audio file:', audioEl.error);
+                      resolve(null);
+                    });
+                  });
+                  
+                  // Create a blob from the audio element (via fetch)
+                  const response = await fetch(storageUrl);
+                  const blob = await response.blob();
+                  const audioFile = new File([blob], trackData.name, { type: 'audio/wav' });
+                  
+                  // Create the audio track using the file
+                  const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, audioFile);
+                  
+                  // Set track properties from saved data
+                  const initialPosition = {
+                    x: 0,
+                    y: trackData.y_position || 0
+                  };
+                  
+                  // Set volume and pan (convert from 0-100 scale to 0-1 scale)
+                  const volume = trackData.volume ? trackData.volume / 100 : 1;
+                  const pan = trackData.pan ? trackData.pan / 100 : 0;
+                  store.getAudioEngine().setTrackVolume(newTrack.id, volume);
+                  store.getAudioEngine().setTrackPan(newTrack.id, pan);
+                  store.getAudioEngine().setTrackMute(newTrack.id, trackData.mute || false);
+                  
+                  // Create track state object
+                  const trackState: TrackState = {
+                    ...newTrack,
+                    ...audioTrack,
+                    audioFile,
+                    dbId: trackData.id, // Now it's a string so this works fine
+                    duration: trackData.duration,
+                    position: initialPosition,
+                    volume: volume, // Use the converted volume
+                    pan: pan, // Use the converted pan
+                    muted: trackData.mute || false,
+                    soloed: false, // We don't use solo anymore but it's still in the interface
+                    _calculatedWidth: trackData.duration ? calculateTrackWidth(trackData.duration, bpm) : undefined
+                  };
+                  
+                  // Set track position in the audio engine
+                  store.getAudioEngine().setTrackPosition(
+                    trackState.id,
+                    initialPosition.x,
+                    initialPosition.y
+                  );
+                  
+                  // Add track to state
+                  setTracks(prev => [...prev, trackState]);
+                } else {
+                  // Handle other track types
+                  console.log('Loading non-audio track:', trackData);
+                  
+                  const newTrack = store.createTrack(trackData.name, trackData.type as TrackType['type']);
+                  const audioTrack = await store.getAudioEngine().createTrack(newTrack.id);
+                  
+                  const initialPosition = {
+                    x: 0,
+                    y: trackData.y_position || 0
+                  };
+                  
+                  // Convert volume and pan from 0-100 to 0-1 scale
+                  const volume = trackData.volume ? trackData.volume / 100 : 1;
+                  const pan = trackData.pan ? trackData.pan / 100 : 0;
+                  store.getAudioEngine().setTrackVolume(newTrack.id, volume);
+                  store.getAudioEngine().setTrackPan(newTrack.id, pan);
+                  store.getAudioEngine().setTrackMute(newTrack.id, trackData.mute || false);
+                  
+                  const trackState: TrackState = {
+                    ...newTrack,
+                    ...audioTrack,
+                    position: initialPosition,
+                    duration: trackData.duration,
+                    volume: volume,
+                    pan: pan,
+                    muted: trackData.mute || false,
+                    soloed: false, // We don't use solo anymore but it's still in the interface
+                    dbId: trackData.id, // Store ID for reference
+                    _calculatedWidth: trackData.duration ? calculateTrackWidth(trackData.duration, bpm) : undefined
+                  };
+                  
+                  // Set track position in the audio engine
+                  store.getAudioEngine().setTrackPosition(
+                    trackState.id,
+                    initialPosition.x,
+                    initialPosition.y
+                  );
+                  
+                  // Add track to state
+                  setTracks(prev => [...prev, trackState]);
+                }
+              }
+            } catch (error) {
+              console.error('Error loading tracks:', error);
+            }
+          }
+          
           console.log('Loaded project:', project);
         } catch (error) {
           console.error('Failed to load project:', error);
@@ -160,12 +294,13 @@ function NewProject() {
         const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, trackTypeOrFile);
         
         // Save to database
-        let dbId: number;
+        let dbId: string;
         let duration: number | undefined;
         
         if (trackTypeOrFile.type.includes('audio')) {
           duration = await db.getAudioDuration(trackTypeOrFile);
-          dbId = await db.addAudioFile(trackTypeOrFile, duration);
+          const numericDbId = await db.addAudioFile(trackTypeOrFile, duration);
+          dbId = numericDbId.toString(); // Convert numeric ID to string
           
           console.log('Adding audio track with duration:', {
             duration,
@@ -174,7 +309,8 @@ function NewProject() {
           });
         } else if (trackTypeOrFile.type.includes('midi')) {
           // For MIDI files, we could potentially extract tempo and time signature here
-          dbId = await db.addMidiFile(trackTypeOrFile);
+          const numericDbId = await db.addMidiFile(trackTypeOrFile);
+          dbId = numericDbId.toString(); // Convert numeric ID to string
         } else {
           throw new Error('Unsupported file type');
         }
@@ -214,7 +350,7 @@ function NewProject() {
         
         // Default duration for MIDI tracks (4 bars at 4/4 time signature = 16 beats)
         let defaultDuration;
-        let dbId: number | undefined;
+        let dbId: string | undefined;
         
         if (trackTypeOrFile === 'midi' || trackTypeOrFile === 'drum') {
           // Convert beats to seconds based on current BPM
@@ -235,7 +371,8 @@ function NewProject() {
           
           // Add record to database based on track type
           if (trackTypeOrFile === 'drum') {
-            dbId = await db.addDrumMachineTrack(newTrack.id, `Drum Machine ${tracks.length + 1}`);
+            const numericDbId = await db.addDrumMachineTrack(newTrack.id, `Drum Machine ${tracks.length + 1}`);
+            dbId = numericDbId.toString(); // Convert numeric ID to string
           }
         }
         

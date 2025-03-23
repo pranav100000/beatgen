@@ -9,14 +9,18 @@ class TrackBase(BaseModel):
     type: str  # "midi", "audio", "drum"
     volume: float = 1.0
     pan: float = 0.0
-    solo: bool = False
     mute: bool = False
     color: Optional[str] = None
 
 
 class Track(TrackBase):
-    id: UUID = Field(default_factory=uuid4)
-    content: Dict[str, Any] = {}  # Flexible content based on track type
+    id: str
+    duration: Optional[float] = None
+    y_position: int = 0
+    storage_key: str
+    left_trim_ms: int = 0
+    track_number: int = 0
+    right_trim_ms: int = 0
 
 
 class ProjectBase(BaseModel):
@@ -46,3 +50,4 @@ class ProjectUpdate(BaseModel):
     bpm: Optional[float] = None
     time_signature_numerator: int
     time_signature_denominator: int
+    tracks: Optional[List[Track]] = None

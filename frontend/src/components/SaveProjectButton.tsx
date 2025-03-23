@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { IconButton, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { Save as SaveIcon } from '@mui/icons-material';
-import { createProject, updateProject, Project } from '../api/projects';
+import { 
+  createProject, 
+  updateProject, 
+  Project, 
+  saveProjectWithSounds,
+  AudioTrackData
+} from '../api/projects';
 import { useAuth } from '../core/auth/auth-context';
 
 interface SaveProjectButtonProps {
@@ -45,64 +51,114 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
 
     setSaving(true);
     try {
-      // Extract necessary data from tracks and convert any special objects
-      const simplifiedTracks = tracks.map(track => {
+      console.log('Starting project save with tracks:', tracks);
+      
+      // Collect audio tracks that need to be uploaded
+      const audioTracksToUpload: AudioTrackData[] = [];
+      
+      // Process all tracks
+      const projectTracks = tracks.map(track => {
+        console.log('Processing track:', track);
+        
+        // For audio tracks with files, prepare for upload
+        if (track.type === 'audio' && track.audioFile) {
+          console.log('Found audio track with file:', track.audioFile.name);
+          
+          // Generate a UUID for this track to use consistently across systems
+          const trackId = crypto.randomUUID();
+          
+          // Add to upload list
+          audioTracksToUpload.push({
+            id: trackId, // Use consistent ID across systems
+            file: track.audioFile,
+            y_position: track.position?.y || 0,
+            track_number: track.trackIndex || 0,
+            left_trim_ms: 0, // Default for now
+            right_trim_ms: 0, // Default for now
+            volume: (track.volume || 1) * 100, // Convert to 0-100 scale
+            pan: (track.pan || 0) * 100, // Convert to -100 to 100 scale
+            is_muted: track.muted || false,
+            name: track.name
+          });
+          
+          // Return a placeholder - this will be replaced by the upload process
+          return null;
+        }
+        
+        // For other tracks, convert to API format
         return {
           id: track.id,
           name: track.name,
           type: track.type,
           volume: track.volume || 1,
           pan: track.pan || 0,
-          solo: track.soloed || false,
           mute: track.muted || false,
           color: track.color || '#4285F4',
-          content: {
-            position: track.position,
-            duration: track.duration,
-            // Convert any complex objects to JSON-friendly formats
-            // For example, audio data references, MIDI notes, etc.
-            audioFileId: track.dbId || null,
-            // Add any other track-specific data you need to store
-          }
+          y_position: track.position?.y || 0,
+          duration: track.duration,
         };
-      });
-
-      // Determine if we should create or update
+      }).filter(track => track !== null); // Remove null placeholders
+      
       let savedProject;
-      if (projectId) {
-        // Update existing project
-        savedProject = await updateProject(projectId, {
-          name: projectTitle,
-          bpm: bpm,
-          time_signature_numerator: timeSignature[0],
-          time_signature_denominator: timeSignature[1]
-        });
+      
+      // Project data structure
+      const projectData = {
+        name: projectTitle,
+        bpm: bpm,
+        time_signature_numerator: timeSignature[0],
+        time_signature_denominator: timeSignature[1]
+      };
+      
+      // If we have audio files to upload, use the special save function
+      if (audioTracksToUpload.length > 0) {
+        console.log(`Saving project with ${audioTracksToUpload.length} audio tracks to upload`);
         
-        // Note: In a real implementation, you would also update the tracks
-        // This would require additional API endpoints for track management
-        
-        setSnackbar({
-          open: true,
-          message: 'Project updated successfully',
-          severity: 'success'
-        });
+        if (projectId) {
+          // Update existing project with audio uploads
+          savedProject = await saveProjectWithSounds(projectId, projectData, audioTracksToUpload);
+          
+          setSnackbar({
+            open: true,
+            message: 'Project updated with audio tracks successfully',
+            severity: 'success'
+          });
+        } else {
+          // For new projects, create the project first, then add audio tracks
+          const newProject = await createProject(projectData);
+          savedProject = await saveProjectWithSounds(newProject.id, projectData, audioTracksToUpload);
+          
+          setSnackbar({
+            open: true,
+            message: 'Project saved with audio tracks successfully',
+            severity: 'success'
+          });
+        }
       } else {
-        // Create new project
-        savedProject = await createProject({
-          name: projectTitle,
-          bpm: bpm,
-          time_signature_numerator: timeSignature[0],
-          time_signature_denominator: timeSignature[1]
-        });
+        // No audio files to upload, use standard project save
+        console.log('Saving project without audio uploads');
         
-        // Note: In a real implementation, you would also save the tracks
-        // This would require additional API endpoints for track management
-        
-        setSnackbar({
-          open: true,
-          message: 'Project saved successfully',
-          severity: 'success'
-        });
+        if (projectId) {
+          // Update existing project
+          savedProject = await updateProject(projectId, {
+            ...projectData,
+            tracks: projectTracks
+          });
+          
+          setSnackbar({
+            open: true,
+            message: 'Project updated successfully',
+            severity: 'success'
+          });
+        } else {
+          // Create new project
+          savedProject = await createProject(projectData);
+          
+          setSnackbar({
+            open: true,
+            message: 'Project saved successfully',
+            severity: 'success'
+          });
+        }
       }
       
       // Call the onSaved callback if provided
@@ -113,7 +169,7 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
       console.error('Error saving project:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to save project. Please try again.',
+        message: `Failed to save project: ${error.message}`,
         severity: 'error'
       });
     } finally {
