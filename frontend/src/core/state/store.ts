@@ -20,7 +20,17 @@ export interface StoreInterface {
   getTransport(): TransportController;
   projectManager: ProjectManager;
   initializeAudio(): Promise<void>;
-  createTrack(name: string, type: 'audio' | 'midi' | 'video' | 'drum'): Promise<Track>;
+  createTrack(
+    name: string, 
+    type: 'audio' | 'midi' | 'video' | 'drum', 
+    existingTrackData?: {
+      id: string;
+      volume?: number;
+      pan?: number;
+      muted?: boolean;
+      soloed?: boolean;
+    }
+  ): Promise<Track>;
   getInstrumentManager(): InstrumentManager;
   getMidiManager(): MidiManager;
 }
