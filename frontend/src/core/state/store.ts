@@ -46,7 +46,7 @@ export class Store implements StoreInterface {
     const project = this.projectManager.getCurrentProject();
     if (project) {
       this.midiManager.setBpm(project.tempo);
-      this.midiManager.setTimeSignature([4, 4]); // Default time signature
+      this.midiManager.setTimeSignature(project.timeSignature); // Default time signature
     }
     
     this.initialized = true;
