@@ -51,7 +51,7 @@ export class ProjectManager {
       id: crypto.randomUUID(),
       name,
       type,
-      volume: 1,
+      volume: 80,
       pan: 0,
       muted: false,
       soloed: false
@@ -82,7 +82,7 @@ export class ProjectManager {
       id: trackProps.id,
       name: trackProps.name,
       type: trackProps.type,
-      volume: trackProps.volume ?? 1,
+      volume: trackProps.volume ?? 80,
       pan: trackProps.pan ?? 0,
       muted: trackProps.muted ?? false,
       soloed: trackProps.soloed ?? false

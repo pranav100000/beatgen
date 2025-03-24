@@ -98,3 +98,30 @@ export async function uploadFileWithProgress(
     xhr.send(file);
   });
 }
+
+/**
+ * Convert from UI volume range (0-100) to appropriate dB scale for Tone.js
+ * 
+ * The conversion ensures:
+ * - 0% volume = -Infinity dB (silent)
+ * - 80% volume = 0dB (original unmodified volume)
+ * - 100% volume = +6dB (boosted volume)
+ * 
+ * @param volume Volume value in range 0-100
+ * @param isMuted Whether the track is muted (returns -Infinity if true)
+ * @returns Volume in decibels (dB)
+ */
+export function convertVolumeToDecibels(volume: number, isMuted: boolean = false): number {
+  if (isMuted) return -Infinity;
+  
+  // If volume is very low, return silence
+  if (volume < 1) {
+    return -Infinity; 
+  } else if (volume <= 80) {
+    // Scale from -60dB to 0dB between 1% and 80%
+    return (volume / 80) * 60 - 60;
+  } else {
+    // Scale from 0dB to +6dB between 80% and 100%
+    return (volume - 80) / 20 * 6;
+  }
+}

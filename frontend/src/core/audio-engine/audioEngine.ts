@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { convertVolumeToDecibels } from '../../utils/audioProcessing';
 
 export interface AudioTrack {
   id: string;
@@ -51,11 +52,17 @@ class AudioEngine {
 
     const channel = new Tone.Channel().connect(this.mainOutput);
     
+    // Default volume is 80 (on 0-100 scale, which represents original volume)
+    const defaultVolume = 80;
+    
+    // Convert the default volume to decibels and set the channel volume
+    channel.volume.value = convertVolumeToDecibels(defaultVolume, false);
+    
     const track: AudioTrack = {
       id,
       name: `Track ${id}`,
       channel,
-      volume: 0,
+      volume: defaultVolume,
       pan: 0,
       muted: false,
       soloed: false
@@ -97,7 +104,17 @@ class AudioEngine {
     const track = this.tracks.get(id);
     if (track) {
       track.volume = volume;
-      track.channel.volume.value = track.muted ? -Infinity : volume;
+      
+      // Convert UI volume (0-100) to appropriate dB scale using the utility function
+      const volumeInDB = convertVolumeToDecibels(volume, track.muted);
+      
+      // Set the channel's volume
+      track.channel.volume.value = volumeInDB;
+      
+      // If there's a player, also set its volume directly to ensure consistency
+      if (track.player) {
+        track.player.volume.value = volumeInDB;
+      }
     }
   }
 
@@ -105,7 +122,9 @@ class AudioEngine {
     const track = this.tracks.get(id);
     if (track) {
       track.pan = pan;
-      track.channel.pan.value = pan;
+      // Convert from UI range (-100 to 100) to Tone.js range (-1 to 1)
+      const normalizedPan = pan / 100;
+      track.channel.pan.value = normalizedPan;
     }
   }
 

@@ -1,5 +1,6 @@
 import * as Tone from 'tone';
 import AudioEngine from '../audio-engine/audioEngine';
+import { convertVolumeToDecibels } from '../../utils/audioProcessing';
 import { calculatePositionTime } from '../../constants/gridConstants';
 
 export interface Transport {
@@ -159,8 +160,8 @@ export class TransportController implements Transport {
                         // Completely reset the player
                         track.player.unsync();
                         
-                        // Set volume to normal first
-                        track.player.volume.value = track.muted ? -Infinity : track.volume;
+                        // Set volume using our conversion utility
+                        track.player.volume.value = convertVolumeToDecibels(track.volume, track.muted);
                         
                         // CRITICAL FIX: There may be a bug in our usage of the sync()/start() pattern
                         // Let's try a different approach with explicit start timing
@@ -208,8 +209,8 @@ export class TransportController implements Transport {
                                 }
                                 track.player?.unsync();
                                 
-                                // Set volume directly to avoid fade issues
-                                track.player.volume.value = track.muted ? -Infinity : track.volume;
+                                // Set volume using our conversion utility
+                                track.player.volume.value = convertVolumeToDecibels(track.volume, track.muted);
                                 
                                 // Explicitly start the player at the scheduled time from the beginning
                                 track.player?.start(time, 0);
@@ -370,7 +371,8 @@ export class TransportController implements Transport {
                 
                 // Clear any volume automations
                 track.player.volume.cancelScheduledValues(Tone.now());
-                track.player.volume.value = track.muted ? -Infinity : track.volume;
+                // Set volume using our conversion utility
+                track.player.volume.value = convertVolumeToDecibels(track.volume, track.muted);
             }
         });
         
