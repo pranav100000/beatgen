@@ -35,36 +35,36 @@ const trackTypes = [
     title: 'Upload Sound',
     description: 'Import your own audio file',
     icon: CloudUploadIcon,
-    color: '#34495E',
+    color: '#2ECC71',
     isUpload: true
   },
-  {
-    id: 'voice',
-    title: 'Voice/Audio',
-    description: 'Record with AutoPitch + Fx',
-    icon: MicIcon,
-    color: '#E74C3C'
-  },
+  // {
+  //   id: 'voice',
+  //   title: 'Voice/Audio',
+  //   description: 'Record with AutoPitch + Fx',
+  //   icon: MicIcon,
+  //   color: '#E74C3C'
+  // },
   {
     id: 'virtual',
     title: 'Virtual instruments',
     description: 'Record kits, keys and more',
+    color: '#9B59B6',
     icon: PianoIcon,
-    color: '#2ECC71'
   },
   {
     id: 'drum',
     title: 'Drum Machine',
     description: 'Create beats in seconds',
     icon: GridOnIcon,
-    color: '#F1C40F'
+    color: '#2196F3'
   },
   {
     id: 'sampler',
     title: 'Sampler',
     description: 'Turn any sound into an instrument',
     icon: GraphicEqIcon,
-    color: '#9B59B6'
+    color: '#E91E63',
   }
 ];
 
@@ -136,8 +136,6 @@ interface AddTrackMenuProps {
 
 function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuProps) {
   const [isVirtualInstrumentsOpen, setIsVirtualInstrumentsOpen] = useState(false);
-  const { openPianoRoll } = usePianoRoll();
-
 
   const handleTrackSelect = (trackIdOrFile: string | File) => {
     if (trackIdOrFile === 'virtual') {

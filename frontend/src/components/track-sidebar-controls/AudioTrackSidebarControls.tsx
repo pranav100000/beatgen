@@ -16,7 +16,7 @@ const AudioTrackSidebarControls: React.FC<AudioTrackSidebarControlsProps> = (pro
     <BaseTrackSidebarControls
       {...props}
       renderAdditionalControls={renderAdditionalControls}
-      sliderColor="#2196f3" // Blue color for audio tracks
+      color={props.color}
     />
   );
 };

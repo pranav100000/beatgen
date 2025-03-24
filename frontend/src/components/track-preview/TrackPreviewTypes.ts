@@ -13,6 +13,7 @@ export interface TrackPreviewProps {
   onPositionChange: (newPosition: Position, isDragEnd: boolean) => void;
   bpm: number; // Project-wide BPM value
   timeSignature?: [number, number]; // Project-wide time signature
+  trackIndex?: number; // Index to determine track color
 }
 
 // Props for the base track preview component
@@ -33,6 +34,7 @@ export interface TrackContentProps {
   notes?: Note[]; // Optional MIDI notes for MIDI tracks
   trackId?: string; // Track ID for registration
   registerRerenderCallback?: (callback: () => void) => (() => void); // For registering re-render callbacks
+  trackColor?: string; // Color for track elements
 }
 
 // Interface for track-specific behavior

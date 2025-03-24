@@ -58,9 +58,12 @@ class AudioEngine {
     // Convert the default volume to decibels and set the channel volume
     channel.volume.value = convertVolumeToDecibels(defaultVolume, false);
     
+    // Get track name from the filename if available
+    let trackName = audioFile ? audioFile.name.split('.')[0] : `Track ${id}`;
+    
     const track: AudioTrack = {
       id,
-      name: `Track ${id}`,
+      name: trackName,
       channel,
       volume: defaultVolume,
       pan: 0,

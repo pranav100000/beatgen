@@ -22,6 +22,7 @@ interface DrumMachineTrackContentProps {
   width: number;
   height: number;
   playheadPosition: number;
+  color: string
 }
 
 // Style components for the grid
@@ -61,6 +62,7 @@ interface CellProps {
   $rowHeight: number;
   $isBeatDivider: boolean;
   $isMeasureDivider: boolean;
+  $color: string;
 }
 
 const Cell = styled.div<CellProps>`
@@ -105,7 +107,7 @@ const Cell = styled.div<CellProps>`
     background-color: ${props => {
       if (props.$active) {
         // Color based on row (instrument type) - brighter for active
-          return '#4caf50'; // Default blue
+          return props.$color; // Default blue
       }
       
       if (props.$hover && !props.$active) {
@@ -115,7 +117,7 @@ const Cell = styled.div<CellProps>`
       return 'transparent';
     }};
     box-shadow: ${props => props.$active ? '0 0 10px 2px ' + 
-      ('#4caf50')
+      ('#666666')
     : 'none'};
     border: ${props => !props.$active && !props.$hover ? '1px solid #444' : 'none'};
     display: ${props => !props.$active ? (props.$hover ? 'block' : 'none') : 'block'};
@@ -150,7 +152,8 @@ const DrumMachineTrackContent: React.FC<DrumMachineTrackContentProps> = ({
   handler, 
   width, 
   height,
-  playheadPosition 
+  playheadPosition,
+  color
 }) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [hoverCell, setHoverCell] = useState<{row: number, column: number} | null>(null);
@@ -244,6 +247,7 @@ const DrumMachineTrackContent: React.FC<DrumMachineTrackContentProps> = ({
                 $isMeasureDivider={isMeasureDivider}
                 onMouseDown={() => handleCellClick(rowIndex, columnIndex)}
                 onMouseEnter={() => handleCellMouseEnter(rowIndex, columnIndex)}
+                $color={color}
               />
             );
           })}

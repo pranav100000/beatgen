@@ -17,6 +17,21 @@ export const GRID_CONSTANTS = {
   scrollThreshold: 50,
   cursorColor: '#ff5555', // Color for the playback cursor
   cursorColorInactive: '#aaaaaa', // Color for inactive cursor
+  borderRadiusMedium: '10px',
+  borderRadiusLarge: '50px',
+  
+  // Track color palette - 10 distinct colors distributed evenly around the color wheel
+  trackColors: [
+    '#4CAF50', // Green (Material UI's default green)
+    '#673AB7', // Deep Purple
+    '#E91E63', // Pink
+    '#2196F3', // Blue
+    '#FF9800', // Orange
+    '#00BCD4', // Cyan
+    '#9C27B0', // Purple
+    '#FF5252', // Red
+    '#FFEB3B' // Yellow
+  ],
 } as const;
 
 /**
@@ -123,4 +138,18 @@ export const calculatePositionTime = (
   const timeInSeconds = totalBeats / beatsPerSecond;
   
   return timeInSeconds;
+};
+
+/**
+ * Get track color based on track index
+ * Colors are selected in sequence from the trackColors array
+ * After reaching the end of the array, it cycles back to the beginning
+ * 
+ * @param trackIndex The index of the track (0-based)
+ * @returns The color as a hex string
+ */
+export const getTrackColor = (trackIndex: number): string => {
+  // Use modulo to cycle through the colors
+  const colorIndex = trackIndex % GRID_CONSTANTS.trackColors.length;
+  return GRID_CONSTANTS.trackColors[colorIndex];
 }; 

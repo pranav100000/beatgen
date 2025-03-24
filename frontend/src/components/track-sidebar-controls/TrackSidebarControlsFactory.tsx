@@ -16,6 +16,7 @@ interface TrackWithType {
   // Optional properties
   instrument?: string;
   drumKit?: string;
+  color?: string;
 }
 
 // Extend BaseTrackSidebarControlsProps and add track and type-specific props

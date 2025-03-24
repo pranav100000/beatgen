@@ -24,7 +24,6 @@ const KnobControl: React.FC<KnobControlProps> = ({
   color = '#1976d2',
   size = 60,
   label,
-  type,
   valueFormatter = (val) => `${val}`
 }) => {
   const [anchorEl, setAnchorEl] = useState<HTMLDivElement | null>(null);

@@ -201,6 +201,7 @@ export class MidiTrackHandler implements TrackTypeHandler {
       
       // Temporarily "activate" the track in the PianoRollContext
       // This doesn't actually open the piano roll UI but sets the track as active in the context
+      // Use the current track color (already set by TrackPreview)
       this.pianoRollHook.openPianoRoll(trackId, trackId, notes);
       
       // Close the piano roll UI immediately (without clearing the active track)

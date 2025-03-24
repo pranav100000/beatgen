@@ -11,6 +11,7 @@ interface NoteRendererProps {
   onResizeStart: (e: React.MouseEvent, noteId: number, side: 'left' | 'right') => void;
   draggedNote: number | null;
   resizingNote: number | null;
+  noteColor: string; // Required color for the notes
 }
 
 const NoteRenderer: React.FC<NoteRendererProps> = ({
@@ -21,7 +22,8 @@ const NoteRenderer: React.FC<NoteRendererProps> = ({
   onNoteDragStart,
   onResizeStart,
   draggedNote,
-  resizingNote
+  resizingNote,
+  noteColor
 }) => {
   // Handle note drag start and stop events from bubbling
   const handleNoteDragStart = (e: React.MouseEvent, noteId: number) => {
