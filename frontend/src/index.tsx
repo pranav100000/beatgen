@@ -9,13 +9,48 @@ import reportWebVitals from './reportWebVitals';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './core/auth/auth-context';
 import ProtectedRoute from './components/ProtectedRoute';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+
+const theme = createTheme({
+  typography: {
+    fontFamily: '"Sen", sans-serif',
+    button: {
+      fontFamily: '"Sen", sans-serif',
+    },
+    body1: {
+      fontFamily: '"Sen", sans-serif',
+    },
+    body2: {
+      fontFamily: '"Sen", sans-serif',
+    },
+    h1: {
+      fontFamily: '"Sen", sans-serif',
+    },
+    h2: {
+      fontFamily: '"Sen", sans-serif',
+    },
+    h3: {
+      fontFamily: '"Sen", sans-serif',
+    },
+    h4: {
+      fontFamily: '"Sen", sans-serif',
+    },
+    h5: {
+      fontFamily: '"Sen", sans-serif',
+    },
+    h6: {
+      fontFamily: '"Sen", sans-serif',
+    },
+  },
+});
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+    <ThemeProvider theme={theme}>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
           <Route path="/" element={<App />} />
           <Route path="/studio" element={<NewProject />} />
           <Route path="/account" element={
@@ -32,6 +67,7 @@ root.render(
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
 

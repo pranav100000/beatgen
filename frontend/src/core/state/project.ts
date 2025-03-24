@@ -60,6 +60,37 @@ export class ProjectManager {
     this.currentProject.tracks.push(track);
     return track;
   }
+  
+  /**
+   * Add a track with a specific ID and properties (for loading saved projects)
+   * This ensures track IDs and settings are preserved across saves
+   */
+  public addTrackWithProperties(trackProps: {
+    id: string;
+    name: string;
+    type: Track['type'];
+    volume?: number;
+    pan?: number;
+    muted?: boolean;
+    soloed?: boolean;
+  }): Track {
+    if (!this.currentProject) {
+      throw new Error('No project loaded');
+    }
+
+    const track: Track = {
+      id: trackProps.id,
+      name: trackProps.name,
+      type: trackProps.type,
+      volume: trackProps.volume ?? 1,
+      pan: trackProps.pan ?? 0,
+      muted: trackProps.muted ?? false,
+      soloed: trackProps.soloed ?? false
+    };
+
+    this.currentProject.tracks.push(track);
+    return track;
+  }
 
   public getTrackById(id: string): Track | undefined {
     return this.currentProject?.tracks.find(track => track.id === id);

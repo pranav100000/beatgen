@@ -111,20 +111,38 @@ export interface AudioTrackData {
 }
 
 /**
- * Save a project with all its audio tracks
- * This handles uploading sounds and creating the project structure
+ * Interface for MIDI track data within a project
+ */
+export interface MidiTrackData {
+  id: string;                    // Track ID
+  file: Blob;                    // The MIDI file to upload
+  storage_key?: string;          // Will be populated after upload
+  x_position: number;            // Horizontal position (time) in the track layout
+  y_position: number;            // Vertical position in the track layout
+  volume: number;                // Volume level 0-1
+  pan: number;                   // Pan level -1 to 1
+  is_muted: boolean;             // Whether track is muted
+  name: string;                  // Track name
+  bpm: number;                   // Track BPM
+  time_signature: [number, number]; // Track time signature
+}
+
+/**
+ * Save a project with all its audio and MIDI tracks
+ * This handles uploading files and creating the project structure
  */
 export const saveProjectWithSounds = async (
   projectId: string, 
   projectData: ProjectUpdateDto,
-  audioTracks: AudioTrackData[]
+  audioTracks: AudioTrackData[] = [],
+  midiTracks: MidiTrackData[] = []
 ): Promise<Project> => {
   // Import the necessary utilities
   const { processAudioFile, uploadFileWithProgress } = await import('../utils/audioProcessing');
   const { getUploadUrl, createSoundRecord } = await import('./sounds');
   
-  // 1. Upload all sounds in parallel
-  const uploadPromises = audioTracks.map(async (track) => {
+  // 1. Upload all audio tracks in parallel
+  const audioUploadPromises = audioTracks.map(async (track) => {
     try {
       // Get upload URL using the track's ID
       const { id, upload_url, storage_key } = await getUploadUrl(track.file.name, track.id);
@@ -176,16 +194,50 @@ export const saveProjectWithSounds = async (
     }
   });
   
-  // Wait for all uploads to complete
-  const processedTracks = await Promise.all(uploadPromises);
+  // 2. Upload all MIDI tracks in parallel
+  const midiUploadPromises = midiTracks.map(async (track) => {
+    try {
+      // Determine file name
+      const fileName = `${track.name.replace(/\s+/g, '_')}.mid`;
+      
+      // Get upload URL with a midi/ prefix in the storage path using the enhanced getUploadUrl function
+      // Set shouldOverwrite to true to handle the case of updating an existing MIDI file
+      const { id, upload_url, storage_key } = await getUploadUrl(fileName, track.id, 'midi', true);
+      
+      // Convert Blob to File if needed
+      const midiFile = track.file instanceof File 
+        ? track.file 
+        : new File([track.file], fileName, { type: 'audio/midi' });
+      
+      // Upload the file
+      await uploadFileWithProgress(midiFile, upload_url, () => {});
+      
+      console.log(`MIDI file ${fileName} uploaded successfully to ${storage_key}`);
+      
+      // Return updated track with storage info
+      return {
+        ...track,
+        storage_key
+      };
+    } catch (error) {
+      console.error('Failed to upload MIDI file:', error);
+      throw new Error(`Failed to upload MIDI file: ${error.message}`);
+    }
+  });
   
-  // 2. Create track objects for the project structure
-  const tracks = processedTracks.map(track => ({
-    id: track.id, // Use the same ID that was generated and used for upload
+  // Wait for all uploads to complete
+  const [processedAudioTracks, processedMidiTracks] = await Promise.all([
+    Promise.all(audioUploadPromises),
+    Promise.all(midiUploadPromises)
+  ]);
+  
+  // 3. Create combined track objects for the project structure
+  const audioTrackObjects = processedAudioTracks.map(track => ({
+    id: track.id,
     name: track.name,
     type: 'audio',
-    volume: track.volume, // Keep original values
-    pan: track.pan,       // Keep original values
+    volume: track.volume,
+    pan: track.pan,
     mute: track.is_muted,
     duration: track.duration,
     storage_key: track.storage_key,
@@ -196,10 +248,25 @@ export const saveProjectWithSounds = async (
     right_trim_ms: track.right_trim_ms
   }));
   
-  // 3. Update the project with new tracks using the standard update endpoint
+  const midiTrackObjects = processedMidiTracks.map(track => ({
+    id: track.id,
+    name: track.name,
+    type: 'midi',
+    volume: track.volume,
+    pan: track.pan,
+    mute: track.is_muted,
+    storage_key: track.storage_key,
+    x_position: track.x_position,
+    y_position: track.y_position
+  }));
+  
+  // Combine all tracks
+  const allTracks = [...audioTrackObjects, ...midiTrackObjects];
+  
+  // 4. Update the project with all tracks
   const response = await apiClient.patch(`/projects/${projectId}`, {
     ...projectData,
-    tracks
+    tracks: allTracks
   });
   
   return response.data;

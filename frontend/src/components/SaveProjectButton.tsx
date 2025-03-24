@@ -6,9 +6,11 @@ import {
   updateProject, 
   Project, 
   saveProjectWithSounds,
-  AudioTrackData
+  AudioTrackData,
+  MidiTrackData
 } from '../api/projects';
 import { useAuth } from '../core/auth/auth-context';
+import { db } from '../core/db/dexie-client';
 
 interface SaveProjectButtonProps {
   projectTitle: string;
@@ -55,8 +57,9 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
     try {
       console.log('Starting project save with tracks:', tracks);
       
-      // Collect audio tracks that need to be uploaded
+      // Collect tracks that need to be uploaded
       const audioTracksToUpload: AudioTrackData[] = [];
+      const midiTracksToUpload: MidiTrackData[] = [];
       
       // Process all tracks
       const projectTracks = tracks.map(track => {
@@ -67,7 +70,7 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
           console.log('Found audio track with file:', track.audioFile.name);
           
           // Generate a UUID for this track to use consistently across systems
-          const trackId = crypto.randomUUID();
+          const trackId = track.id || crypto.randomUUID();
           
           // Add to upload list
           audioTracksToUpload.push({
@@ -88,6 +91,15 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
           return null;
         }
         
+        // For MIDI tracks, get the MIDI file from IndexedDB and prepare for upload
+        if (track.type === 'midi') {
+          console.log('Found MIDI track to save:', track.id);
+          
+          // We'll fetch the MIDI data from IndexedDB and add it to upload list asynchronously
+          // Add this track to the placeholders list and process it separately
+          return null;
+        }
+        
         // For other tracks, convert to API format (using flattened structure)
         return {
           id: track.id,
@@ -104,9 +116,63 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
         };
       }).filter(track => track !== null); // Remove null placeholders
       
+      // Now handle the MIDI tracks - fetch from IndexedDB
+      const midiTracks = tracks.filter(track => track.type === 'midi');
+      
+      // Get MIDI files from IndexedDB for MIDI tracks
+      for (const track of midiTracks) {
+        try {
+          console.log(`Fetching MIDI data for track ${track.id} from DB`);
+          const midiBlob = await db.getMidiTrackBlob(track.id);
+          
+          if (midiBlob) {
+            console.log(`Found MIDI blob for track ${track.id}, size: ${midiBlob.size} bytes`);
+            
+            // Add to upload list
+            midiTracksToUpload.push({
+              id: track.id,
+              file: midiBlob,
+              x_position: track.position?.x || 0,
+              y_position: track.position?.y || 0,
+              volume: track.volume || 1,
+              pan: track.pan || 0,
+              is_muted: track.muted || false,
+              name: track.name,
+              bpm: bpm,
+              time_signature: timeSignature
+            });
+          } else {
+            console.log(`No MIDI data found in DB for track ${track.id}, adding to standard tracks`);
+            // Add to regular project tracks since there's no file to upload
+            projectTracks.push({
+              id: track.id,
+              name: track.name,
+              type: track.type,
+              volume: track.volume || 1,
+              pan: track.pan || 0,
+              mute: track.muted || false,
+              color: track.color || '#4285F4',
+              x_position: track.position?.x || 0,
+              y_position: track.position?.y || 0,
+              duration: track.duration,
+              storage_key: track.storage_key // Include storage key if available
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching MIDI data for track ${track.id}:`, error);
+        }
+      }
+      
       let savedProject;
       
       // Project data structure
+      console.log('Project data being prepared for save:', {
+        name: projectTitle,
+        bpm: bpm,
+        time_signature: timeSignature,
+        key_signature: keySignature
+      });
+      
       const projectData = {
         name: projectTitle,
         bpm: bpm,
@@ -115,33 +181,43 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
         key_signature: keySignature
       };
       
-      // If we have audio files to upload, use the special save function
-      if (audioTracksToUpload.length > 0) {
-        console.log(`Saving project with ${audioTracksToUpload.length} audio tracks to upload`);
+      // If we have files to upload, use the special save function
+      if (audioTracksToUpload.length > 0 || midiTracksToUpload.length > 0) {
+        console.log(`Saving project with ${audioTracksToUpload.length} audio tracks and ${midiTracksToUpload.length} MIDI tracks to upload`);
         
         if (projectId) {
-          // Update existing project with audio uploads
-          savedProject = await saveProjectWithSounds(projectId, projectData, audioTracksToUpload);
+          // Update existing project with uploads
+          savedProject = await saveProjectWithSounds(
+            projectId, 
+            projectData, 
+            audioTracksToUpload,
+            midiTracksToUpload
+          );
           
           setSnackbar({
             open: true,
-            message: 'Project updated with audio tracks successfully',
+            message: 'Project updated with tracks successfully',
             severity: 'success'
           });
         } else {
-          // For new projects, create the project first, then add audio tracks
+          // For new projects, create the project first, then add tracks
           const newProject = await createProject(projectData);
-          savedProject = await saveProjectWithSounds(newProject.id, projectData, audioTracksToUpload);
+          savedProject = await saveProjectWithSounds(
+            newProject.id, 
+            projectData, 
+            audioTracksToUpload,
+            midiTracksToUpload
+          );
           
           setSnackbar({
             open: true,
-            message: 'Project saved with audio tracks successfully',
+            message: 'Project saved with tracks successfully',
             severity: 'success'
           });
         }
       } else {
-        // No audio files to upload, use standard project save
-        console.log('Saving project without audio uploads');
+        // No files to upload, use standard project save
+        console.log('Saving project without file uploads');
         
         if (projectId) {
           // Update existing project

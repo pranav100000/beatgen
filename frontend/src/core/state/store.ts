@@ -85,13 +85,33 @@ export class Store implements StoreInterface {
     return this.transportController;
   }
 
-  public async createTrack(name: string, type: 'audio' | 'midi' | 'video' | 'drum'): Promise<Track> {
+  public async createTrack(
+    name: string, 
+    type: 'audio' | 'midi' | 'video' | 'drum',
+    existingTrackData?: {
+      id: string;
+      volume?: number;
+      pan?: number;
+      muted?: boolean;
+      soloed?: boolean;
+    }
+  ): Promise<Track> {
     if (!this.initialized) {
       throw new Error('Store must be initialized before creating tracks');
     }
     
-    // Create track in project manager
-    const track = this.projectManager.addTrack(name, type);
+    // Create track in project manager - use existing data if provided
+    const track = existingTrackData 
+      ? this.projectManager.addTrackWithProperties({
+          id: existingTrackData.id,
+          name,
+          type,
+          volume: existingTrackData.volume,
+          pan: existingTrackData.pan,
+          muted: existingTrackData.muted,
+          soloed: existingTrackData.soloed
+        })
+      : this.projectManager.addTrack(name, type);
     
     // For MIDI and drum tracks, handle persistence
     if (type === 'midi' || type === 'drum') {
@@ -104,11 +124,15 @@ export class Store implements StoreInterface {
           
           // Create persisted track directly in MidiManager
           await this.midiManager.createTrackWithPersistence(
-            track.id, // Use track ID as the instrument ID for now
+            track.id, // Always use the track ID (whether new or existing)
             name
           );
           
-          console.log(`Store: Created persisted ${type} track: ${track.id}`);
+          if (existingTrackData) {
+            console.log(`Store: Using existing ${type} track ID: ${track.id} for persistence`);
+          } else {
+            console.log(`Store: Created persisted ${type} track: ${track.id}`);
+          }
         }
       } catch (error) {
         console.error(`Store: Error creating persisted ${type} track:`, error);

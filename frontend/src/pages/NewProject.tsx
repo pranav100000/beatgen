@@ -50,7 +50,7 @@ function NewProject() {
   const [timeSignature, setTimeSignature] = useState<[number, number]>([4, 4]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
-  const [key, setKey] = useState<string>();
+  const [key, setKey] = useState<string>("C major");
   const [zoomLevel, setZoomLevel] = useState(1);
   const [measureCount, setMeasureCount] = useState<number>(GRID_CONSTANTS.measureCount);
   const store = useStore();
@@ -236,9 +236,96 @@ function NewProject() {
                   
                   // Add track to state
                   setTracks(prev => [...prev, trackState]);
+                } else if (trackData.type === 'midi' && trackData.storage_key) {
+                  // Handle MIDI track with storage_key
+                  console.log('Loading MIDI track with storage key:', trackData.storage_key, 'id:', trackData.id);
+                  
+                  // Import from sounds API instead of midi API
+                  const { downloadMidiFile } = await import('../api/sounds');
+                  
+                  try {
+                    // Create the track in store with the SAME ID from the saved project
+                    // This ensures we use the same sound_id for storage paths
+                    const newTrack = await store.createTrack(trackData.name, 'midi', {
+                      id: trackData.id,
+                      volume: trackData.volume,
+                      pan: trackData.pan,
+                      muted: trackData.mute,
+                      soloed: false
+                    });
+                    const audioTrack = await store.getAudioEngine().createTrack(newTrack.id);
+                    
+                    // Initialize position and properties
+                    const initialPosition = {
+                      x: trackData.x_position || 0,
+                      y: trackData.y_position || 0
+                    };
+                    
+                    // Use volume and pan directly (already in 0-1 and -1 to 1 scale)
+                    const volume = trackData.volume !== undefined ? trackData.volume : 1;
+                    const pan = trackData.pan !== undefined ? trackData.pan : 0;
+                    store.getAudioEngine().setTrackVolume(newTrack.id, volume);
+                    store.getAudioEngine().setTrackPan(newTrack.id, pan);
+                    store.getAudioEngine().setTrackMute(newTrack.id, trackData.mute || false);
+                    
+                    // Download the MIDI file from storage
+                    console.log('Downloading MIDI file from:', trackData.storage_key);
+                    const midiBlob = await downloadMidiFile(trackData.storage_key);
+                    console.log(`Retrieved MIDI blob for track ${trackData.id}, size: ${midiBlob.size} bytes`);
+                    
+                    // Save to IndexedDB for local access
+                    // Convert time signature to BPM and time signature data for storage
+                    const timeSignature: [number, number] = [4, 4]; // Default
+                    await db.storeMidiTrackBlob(newTrack.id, trackData.name, midiBlob, bpm, timeSignature);
+                    
+                    // Parse the MIDI file and load notes via MidiManager
+                    // MidiManager will work with the data in IndexedDB
+                    try {
+                      console.log('Loading MIDI notes into MidiManager from DB');
+                      // Now load it through MidiManager which will handle parsing
+                      if (store.getMidiManager) {
+                        const midiManager = store.getMidiManager();
+                        const notes = await midiManager.loadTrackFromDB(newTrack.id);
+                        console.log(`Loaded ${notes.length} notes from DB for track ${newTrack.id}`);
+                      } else {
+                        console.warn('MidiManager not available. Store might be missing getMidiManager method.');
+                      }
+                    } catch (error) {
+                      console.error('Failed to load MIDI notes from DB:', error);
+                    }
+                    
+                    // Create track state
+                    const trackState: TrackState = {
+                      ...newTrack,
+                      ...audioTrack,
+                      position: initialPosition,
+                      duration: trackData.duration,
+                      volume: volume,
+                      pan: pan,
+                      muted: trackData.mute || false,
+                      soloed: false,
+                      dbId: trackData.id,
+                      type: 'midi',
+                      _calculatedWidth: trackData.duration ? calculateTrackWidth(trackData.duration, bpm) : undefined,
+                      storage_key: trackData.storage_key
+                    };
+                    
+                    // Set track position in the audio engine
+                    store.getAudioEngine().setTrackPosition(
+                      trackState.id,
+                      initialPosition.x,
+                      initialPosition.y
+                    );
+                    
+                    // Add track to state
+                    setTracks(prev => [...prev, trackState]);
+                    
+                  } catch (error) {
+                    console.error(`Error loading MIDI file for track ${trackData.id}:`, error);
+                  }
                 } else {
                   // Handle other track types
-                  console.log('Loading non-audio track:', trackData);
+                  console.log('Loading non-audio/non-MIDI track:', trackData);
                   
                   const newTrack = await store.createTrack(trackData.name, trackData.type as TrackType['type']);
                   const audioTrack = await store.getAudioEngine().createTrack(newTrack.id);

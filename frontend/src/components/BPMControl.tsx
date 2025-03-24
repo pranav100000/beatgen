@@ -29,7 +29,7 @@ const BPMControl: React.FC<BPMControlProps> = ({ bpm, onBpmChange }) => {
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-      <Box sx={{ width: '40px', textAlign: 'right' }}>
+      <Box sx={{ width: '28px', textAlign: 'right' }}>
         <TextField
           value={bpm}
           onChange={onBpmChange}
@@ -42,7 +42,7 @@ const BPMControl: React.FC<BPMControlProps> = ({ bpm, onBpmChange }) => {
             min: 1,
             max: 999,
             style: {
-              padding: '0px 2px',
+              padding: '0px 0px',
               width: getInputWidth(bpm),
               color: 'white',
               backgroundColor: 'transparent',
