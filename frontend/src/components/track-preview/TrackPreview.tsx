@@ -8,7 +8,7 @@ import { TrackTypeHandler } from './TrackTypeHandler';
 import { usePianoRoll } from '../piano-roll/PianoRollWindow';
 import { useStore } from '../../core/state/StoreContext';
 import { Store } from '../../core/state/store';
-import { GRID_CONSTANTS } from '../../constants/gridConstants';
+import { GRID_CONSTANTS, getTrackColor } from '../../constants/gridConstants';
 
 // Constants for drum machine grid subdivisions
 const COLUMNS_PER_BEAT = 4; // 16th note resolution
@@ -92,6 +92,9 @@ const TrackPreview: React.FC<TrackPreviewProps> = (props) => {
     return gridPosition;
   }, [props.isPlaying, props.currentTime, props.bpm]);
 
+  // Get track color based on the track index (default to 0 if not provided)
+  const trackColor = getTrackColor(props.trackIndex || 0);
+  
   // Prepare the content props for the handler
   const contentProps = {
     width: props.track._calculatedWidth || 500,
@@ -103,7 +106,8 @@ const TrackPreview: React.FC<TrackPreviewProps> = (props) => {
     track: props.track,
     measureCount: props.measureCount || 4,
     timeSignature: props.timeSignature || [4, 4], // Pass timeSignature from props
-    trackWidth: typeof props.track._calculatedWidth === 'number' ? props.track._calculatedWidth : 500 // Ensure it's always a number
+    trackWidth: typeof props.track._calculatedWidth === 'number' ? props.track._calculatedWidth : 500, // Ensure it's always a number
+    trackColor: trackColor // Pass the track color to content renderers
   };
 
   return (

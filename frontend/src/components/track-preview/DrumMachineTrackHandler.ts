@@ -192,14 +192,13 @@ export class DrumMachineTrackHandler implements TrackTypeHandler {
    * Render the track content
    */
   public renderContent = (props: TrackContentProps): React.ReactElement => {
-    // The actual rendering is done in DrumMachineTrackContent.tsx
-    // This just returns the JSX element with appropriate props
     const DrumMachineTrackContent = require('./DrumMachineTrackContent').default;
     return React.createElement(DrumMachineTrackContent, {
       handler: this,
       width: props.width,
       height: props.height,
-      playheadPosition: props.playheadPosition
+      playheadPosition: props.playheadPosition,
+      color: props.trackColor
     });
   };
 } 

@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { AudioTrack } from '../../core/audio-engine/audioEngine';
 import TrackSidebarControlsFactory from '../track-sidebar-controls/TrackSidebarControlsFactory';
 import { TrackState } from '../../core/types/track';
+import { getTrackColor } from '../../constants/gridConstants';
 
 interface TrackControlsSidebarProps {
   tracks: AudioTrack[] | TrackState[];
@@ -51,6 +52,8 @@ export const TrackControlsSidebar: React.FC<TrackControlsSidebarProps> = ({
         const instrument = trackType === 'midi' ? getPropertySafely(track, 'instrument', undefined) : undefined;
         const drumKit = trackType === 'drum' ? getPropertySafely(track, 'drumKit', undefined) : undefined;
 
+        const color = getTrackColor(index);
+
         // Create a properly typed track object for the factory
         const factoryTrack = {
           id: track.id,
@@ -82,6 +85,7 @@ export const TrackControlsSidebar: React.FC<TrackControlsSidebarProps> = ({
             onMute={(muted) => onMute(track.id, muted)}
             onSolo={(soloed) => onSolo(track.id, soloed)}
             onNameChange={(name) => onTrackNameChange?.(track.id, name)}
+            color={color}
           />
         );
       })}

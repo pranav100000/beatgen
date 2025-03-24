@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Box } from '@mui/material';
 import { BaseTrackPreviewProps, TrackContentProps } from './TrackPreviewTypes';
 import { Position } from '../../core/types/track';
-import { GRID_CONSTANTS } from '../../constants/gridConstants';
+import { GRID_CONSTANTS, getTrackColor } from '../../constants/gridConstants';
 
 const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   track,
@@ -49,14 +49,15 @@ const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       left: `${track.position.x}px`,
       top: `${track.position.y}px`,
       cursor: isDragging ? 'grabbing' : 'grab',
-      zIndex: isDragging ? 2 : 1,
+      zIndex: isDragging ? 1001 : 1000,
       transition: isDragging ? 'none' : 'width 0.2s ease',
       '&:hover': {
-        boxShadow: '0 0 10px rgba(0,0,0,0.3)'
+        boxShadow: '0 0 12px rgba(100, 100, 255, 0.5)',
+        zIndex: 9999
       },
       bgcolor: 'rgba(26, 26, 26, 0.8)',
       margin: 0,
-      padding: 0
+      padding: 0,
     };
 
     // Add width-specific styles

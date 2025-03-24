@@ -65,6 +65,7 @@ function Track(props: TrackProps) {
       onPositionChange={onPositionChange}
       bpm={bpm}
       timeSignature={timeSignature}
+      trackIndex={index} // Pass the track index for color determination
     />
   );
 }

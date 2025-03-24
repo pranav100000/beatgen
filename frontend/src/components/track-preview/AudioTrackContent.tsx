@@ -10,7 +10,8 @@ const AudioTrackContent: React.FC<TrackContentProps> = ({
   currentTime,
   measureCount,
   trackWidth,
-  bpm
+  bpm,
+  trackColor
 }) => {
   const { audioFile } = track;
 
@@ -80,7 +81,7 @@ const AudioTrackContent: React.FC<TrackContentProps> = ({
           <WaveformDisplay 
             audioFile={audioFile}
             isPlaying={isPlaying}
-            color="#4CAF50"
+            color={trackColor}
             width={typeof trackWidth === 'number' ? trackWidth : undefined}
             bpm={bpm}
           />

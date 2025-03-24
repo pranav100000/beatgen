@@ -21,7 +21,7 @@ export interface BaseTrackSidebarControlsProps {
   onSolo: (soloed: boolean) => void;
   onNameChange: (name: string) => void;
   renderAdditionalControls?: () => React.ReactNode;
-  sliderColor?: string; // New prop for customizing slider color
+  color?: string; // New prop for customizing slider color
 }
 
 const BaseTrackSidebarControls: React.FC<BaseTrackSidebarControlsProps> = ({
@@ -38,7 +38,7 @@ const BaseTrackSidebarControls: React.FC<BaseTrackSidebarControlsProps> = ({
   onSolo,
   onNameChange,
   renderAdditionalControls,
-  sliderColor = '#1976d2' // Default MUI primary color
+  color = '#1976d2' // Default MUI primary color
 }) => {
   return (
     <Box sx={{
@@ -121,7 +121,7 @@ const BaseTrackSidebarControls: React.FC<BaseTrackSidebarControlsProps> = ({
             onChange={onVolumeChange}
             min={0}
             max={100}
-            color={sliderColor}
+            color={color}
             size={25}
             label="Vol"
             type="volume"
@@ -134,7 +134,7 @@ const BaseTrackSidebarControls: React.FC<BaseTrackSidebarControlsProps> = ({
             min={-100}
             max={100}
             step={1}
-            color={sliderColor}
+            color={color}
             size={25}
             label="Pan"
             type="pan"
@@ -161,7 +161,7 @@ const BaseTrackSidebarControls: React.FC<BaseTrackSidebarControlsProps> = ({
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#666',
+              color: color,
               width: '100%',
               fontSize: '0.85rem',
               resize: 'none',

@@ -41,4 +41,9 @@ export interface TrackContentProps {
    * Track data
    */
   track?: any;
+
+  /**
+   * Color of the track
+   */
+  trackColor?: string;
 } 

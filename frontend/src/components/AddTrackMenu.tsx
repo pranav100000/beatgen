@@ -136,8 +136,6 @@ interface AddTrackMenuProps {
 
 function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuProps) {
   const [isVirtualInstrumentsOpen, setIsVirtualInstrumentsOpen] = useState(false);
-  const { openPianoRoll } = usePianoRoll();
-
 
   const handleTrackSelect = (trackIdOrFile: string | File) => {
     if (trackIdOrFile === 'virtual') {

@@ -30,7 +30,8 @@ const MidiTrackContent: React.FC<ExtendedTrackContentProps> = ({
   notes = [], // Default to empty array if notes aren't provided
   trackId,
   registerRerenderCallback,
-  timeSignature = [4, 4] // Default time signature if not provided
+  timeSignature = [4, 4], // Default time signature if not provided
+  trackColor
 }) => {
   // Create a reducer to force updates with a counter for debugging
   const [forceRenderCounter, forceUpdate] = useReducer(state => state + 1, 0);
@@ -265,7 +266,6 @@ const MidiTrackContent: React.FC<ExtendedTrackContentProps> = ({
       position: 'relative',
       width: '100%',
       height: '100%',
-      backgroundColor: '#1E1E1E',
       overflow: 'hidden'
     }}>
       {/* MIDI Export Button */}
@@ -319,7 +319,7 @@ const MidiTrackContent: React.FC<ExtendedTrackContentProps> = ({
               top: `${note.top}px`,
               width: `${note.width}px`,
               height: `${note.height}px`,
-              bgcolor: isBlackKey(note.midiNote) ? '#38a169' : '#4CAF50', // Slightly different color for black keys
+              bgcolor: trackColor, // Slightly different color for black keys
               opacity: 0.8,
               borderRadius: '2px',
               boxShadow: '0 1px 2px rgba(0,0,0,0.15)',

@@ -3,6 +3,7 @@ import { BaseTrackSidebarControlsProps } from './BaseTrackSidebarControls';
 import AudioTrackSidebarControls, { AudioTrackSidebarControlsProps } from './AudioTrackSidebarControls';
 import MidiTrackSidebarControls, { MidiTrackSidebarControlsProps } from './MidiTrackSidebarControls';
 import DrumTrackSidebarControls, { DrumTrackSidebarControlsProps } from './DrumTrackSidebarControls';
+import { getTrackColor } from '../../constants/gridConstants';
 
 // Define a track interface for what our factory needs
 interface TrackWithType {
@@ -16,6 +17,7 @@ interface TrackWithType {
   // Optional properties
   instrument?: string;
   drumKit?: string;
+  color?: string;
 }
 
 // Extend BaseTrackSidebarControlsProps and add track and type-specific props

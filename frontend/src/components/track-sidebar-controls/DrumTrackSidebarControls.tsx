@@ -30,7 +30,7 @@ const DrumTrackSidebarControls: React.FC<DrumTrackSidebarControlsProps> = (props
     <BaseTrackSidebarControls
       {...props}
       renderAdditionalControls={renderAdditionalControls}
-      sliderColor="#ff9800" // Orange color for drum tracks
+      color={props.color} // Orange color for drum tracks
     />
   );
 };
