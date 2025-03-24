@@ -24,8 +24,8 @@ export const GRID_CONSTANTS = {
   trackColors: [
     '#4CAF50', // Green (Material UI's default green)
     '#673AB7', // Deep Purple
-    '#2196F3', // Blue
     '#E91E63', // Pink
+    '#2196F3', // Blue
     '#FF9800', // Orange
     '#00BCD4', // Cyan
     '#9C27B0', // Purple

@@ -413,8 +413,10 @@ function NewProject() {
       await store.initializeAudio();
 
       if (trackTypeOrFile instanceof File) {
+        // Use file name (without extension) as the track name
+        const fileName = trackTypeOrFile.name.split('.')[0];
         // Handle audio file
-        const newTrack = await store.createTrack('Audio Track', 'audio');
+        const newTrack = await store.createTrack(fileName, 'audio');
         const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, trackTypeOrFile);
         
         // Save to database

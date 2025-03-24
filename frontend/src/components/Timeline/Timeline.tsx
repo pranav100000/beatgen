@@ -58,7 +58,7 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
       />
 
       {/* Tracks or Drop Zone */}
-      {tracks.length > 0 ? (
+      {tracks.length > -1 ? (
         <TimelineContent
           tracks={tracks}
           measureCount={measureCount}

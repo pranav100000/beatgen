@@ -38,7 +38,7 @@ const BaseTrackSidebarControls: React.FC<BaseTrackSidebarControlsProps> = ({
   onSolo,
   onNameChange,
   renderAdditionalControls,
-  color = '#1976d2' // Default MUI primary color
+  color
 }) => {
   return (
     <Box sx={{
