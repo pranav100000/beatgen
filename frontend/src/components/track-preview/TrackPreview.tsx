@@ -102,6 +102,7 @@ const TrackPreview: React.FC<TrackPreviewProps> = (props) => {
     bpm: props.bpm,
     track: props.track,
     measureCount: props.measureCount || 4,
+    timeSignature: props.timeSignature || [4, 4], // Pass timeSignature from props
     trackWidth: typeof props.track._calculatedWidth === 'number' ? props.track._calculatedWidth : 500 // Ensure it's always a number
   };
 

@@ -17,7 +17,8 @@ router = APIRouter()
 class UploadUrlRequest(BaseModel):
     file_name: str
     id: str  # ID for the sound (UUID)
-
+    file_type: str  # 'audio' or 'midi'
+    should_overwrite: bool = False  # Whether to overwrite existing file
 class UploadUrlResponse(BaseModel):
     id: str
     upload_url: str
@@ -56,7 +57,17 @@ async def get_upload_url(
         
         # Define storage path
         file_extension = request_data.file_name.split('.')[-1]
-        storage_key = f"audio/{current_user['id']}/{sound_id}.{file_extension}"
+        prefix = "" 
+        if request_data.file_type == "audio":
+            prefix = "audio"
+        elif request_data.file_type == "midi":
+            prefix = "midi"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file type"
+            )
+        storage_key = f"{prefix}/{current_user['id']}/{sound_id}.{file_extension}"
         logger.info(f"Storage key: {storage_key}")
         
         # Check if bucket exists - we know from logs it returns a list of SyncBucket objects
@@ -88,7 +99,32 @@ async def get_upload_url(
         # According to docs: https://supabase.com/docs/reference/python/storage-from-createsigneduploadurl
         logger.info("Generating presigned upload URL...")
         try:
-            response = supabase.storage.from_("tracks").create_signed_upload_url(storage_key)
+            try:
+                # First attempt to create a signed URL directly
+                response = supabase.storage.from_("tracks").create_signed_upload_url(storage_key)
+                logger.info(f"Presigned URL created successfully on first attempt")
+            except Exception as e:
+                # If the error is a duplicate and we should_overwrite, delete and try again
+                error_str = str(e).lower()
+                if request_data.should_overwrite and ("duplicate" in error_str or "already exists" in error_str):
+                    logger.info(f"Duplicate detected and overwrite flag is set. Removing file: {storage_key}")
+                    try:
+                        # Try to remove the file first
+                        bucket = supabase.storage.from_("tracks")
+                        bucket.remove([storage_key])
+                        logger.info(f"Successfully removed existing file: {storage_key}")
+                        
+                        # Try again to create a signed URL
+                        response = supabase.storage.from_("tracks").create_signed_upload_url(storage_key)
+                        logger.info(f"Presigned URL created successfully after removing duplicate")
+                    except Exception as remove_err:
+                        logger.error(f"Error removing existing file: {str(remove_err)}")
+                        # Re-raise the original error since we couldn't fix the issue
+                        raise e
+                else:
+                    # If it's not a duplicate error or we shouldn't overwrite, re-raise
+                    raise e
+            
             logger.info(f"Presigned URL response type: {type(response)}")
             logger.info(f"Presigned URL response data: {response}")
             

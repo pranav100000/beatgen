@@ -1,5 +1,5 @@
 /**
- * Utility functions for audio file processing
+ * Utility functions for audio and MIDI file processing
  */
 
 /**

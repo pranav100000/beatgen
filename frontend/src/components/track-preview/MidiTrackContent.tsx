@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { TrackContentProps } from './TrackPreviewTypes';
 import { GRID_CONSTANTS } from '../../constants/gridConstants';
 import { Note } from '../../core/types/note';
+import { MidiExportButton } from '../midi';
 
 // Extended props for MidiTrackContent
 interface ExtendedTrackContentProps extends TrackContentProps {
@@ -28,7 +29,8 @@ const MidiTrackContent: React.FC<ExtendedTrackContentProps> = ({
   bpm,
   notes = [], // Default to empty array if notes aren't provided
   trackId,
-  registerRerenderCallback
+  registerRerenderCallback,
+  timeSignature = [4, 4] // Default time signature if not provided
 }) => {
   // Create a reducer to force updates with a counter for debugging
   const [forceRenderCounter, forceUpdate] = useReducer(state => state + 1, 0);
@@ -266,6 +268,16 @@ const MidiTrackContent: React.FC<ExtendedTrackContentProps> = ({
       backgroundColor: '#1E1E1E',
       overflow: 'hidden'
     }}>
+      {/* MIDI Export Button */}
+      {trackId && notes.length > 0 && (
+        <MidiExportButton
+          trackId={trackId}
+          trackName={track.name}
+          notes={notes}
+          bpm={bpm}
+          timeSignature={timeSignature}
+        />
+      )}
       {/* Background Grid */}
       <Box sx={{
         position: 'absolute',
