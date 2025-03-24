@@ -204,8 +204,9 @@ function NewProject() {
                     y: trackData.y_position || 0
                   };
                   
-                  // Use volume and pan directly (already in 0-1 and -1 to 1 scale)
-                  const volume = trackData.volume !== undefined ? trackData.volume : 1;
+                  // Convert volume from 0-1 scale to 0-100 scale
+                  // If trackData.volume is undefined, use 80 as the default (80%)
+                  const volume = trackData.volume !== undefined ? Math.round(trackData.volume * 100) : 80;
                   const pan = trackData.pan !== undefined ? trackData.pan : 0;
                   store.getAudioEngine().setTrackVolume(newTrack.id, volume);
                   store.getAudioEngine().setTrackPan(newTrack.id, pan);
@@ -261,8 +262,9 @@ function NewProject() {
                       y: trackData.y_position || 0
                     };
                     
-                    // Use volume and pan directly (already in 0-1 and -1 to 1 scale)
-                    const volume = trackData.volume !== undefined ? trackData.volume : 1;
+                    // Convert volume from 0-1 scale to 0-100 scale
+                    // If trackData.volume is undefined, use 80 as the default (80%)
+                    const volume = trackData.volume !== undefined ? Math.round(trackData.volume * 100) : 80;
                     const pan = trackData.pan !== undefined ? trackData.pan : 0;
                     store.getAudioEngine().setTrackVolume(newTrack.id, volume);
                     store.getAudioEngine().setTrackPan(newTrack.id, pan);
@@ -335,8 +337,9 @@ function NewProject() {
                     y: trackData.y_position || 0
                   };
                   
-                  // Use volume and pan directly (already in 0-1 and -1 to 1 scale)
-                  const volume = trackData.volume !== undefined ? trackData.volume : 1;
+                  // Convert volume from 0-1 scale to 0-100 scale
+                  // If trackData.volume is undefined, use 80 as the default (80%)
+                  const volume = trackData.volume !== undefined ? Math.round(trackData.volume * 100) : 80;
                   const pan = trackData.pan !== undefined ? trackData.pan : 0;
                   store.getAudioEngine().setTrackVolume(newTrack.id, volume);
                   store.getAudioEngine().setTrackPan(newTrack.id, pan);

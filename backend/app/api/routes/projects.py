@@ -35,7 +35,7 @@ async def get_projects(
         response = supabase.table("project").select("*").eq("user_id", current_user["id"]).execute()
         
         # Debug response
-        logger.info(f"Supabase response for projects: {response}")
+        logger.info(f"Found {len(response.data)} projects for user ID: {current_user['id']}")
         
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error retrieving projects: {response.error.message}")
