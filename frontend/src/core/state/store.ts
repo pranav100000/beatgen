@@ -183,6 +183,13 @@ export class Store implements StoreInterface {
   }
 
   public async removeTrack(id: string): Promise<void> {
+    // Clean up MIDI resources if it's a MIDI or drum track
+    // IMPORTANT: Do this BEFORE removing the track from _tracks
+    const track = this._tracks.find(t => t.id === id);
+    if (track && (track.type === 'midi' || track.type === 'drum')) {
+      await this.midiManager.deleteTrackWithPersistence(id);
+    }
+    
     // Remove track from project manager
     this.projectManager.removeTrack(id);
     
@@ -191,12 +198,6 @@ export class Store implements StoreInterface {
     
     // Remove from audio engine
     this.audioEngine.removeTrack(id);
-    
-    // Clean up MIDI resources if it's a MIDI or drum track
-    const track = this._tracks.find(t => t.id === id);
-    if (track && (track.type === 'midi' || track.type === 'drum')) {
-      await this.midiManager.deleteTrackWithPersistence(id);
-    }
     
     // Notify listeners of track changes
     this._notifyListeners();
