@@ -30,7 +30,7 @@ const MidiTrackSidebarControls: React.FC<MidiTrackSidebarControlsProps> = (props
     <BaseTrackSidebarControls
       {...props}
       renderAdditionalControls={renderAdditionalControls}
-      color={props.color} // Green color for MIDI tracks
+      color={props.color}
     />
   );
 };
