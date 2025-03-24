@@ -161,7 +161,7 @@ const BaseTrackSidebarControls: React.FC<BaseTrackSidebarControlsProps> = ({
             style={{
               background: 'transparent',
               border: 'none',
-              color: color,
+              color: '#FFFFFF',
               width: '100%',
               fontSize: '0.85rem',
               resize: 'none',
