@@ -29,7 +29,7 @@ export interface MidiManagerInterface {
   notesToMidi(notes: Note[], bpm: number): MidiData;
   
   // Track operations
-  createTrack(instrumentId: string): MidiTrack;
+  createTrack(instrumentId: string, name: string): MidiTrack;
   updateTrack(trackId: string, notes: Note[]): void;
   
   // Playback integration

@@ -47,15 +47,15 @@ const trackTypes = [
   // },
   {
     id: 'virtual',
-    title: 'Virtual instruments',
-    description: 'Record kits, keys and more',
+    title: 'Virtual Instruments',
+    description: 'Create a melody with a virtual instrument',
     color: '#9B59B6',
     icon: PianoIcon,
   },
   {
     id: 'drum',
     title: 'Drum Machine',
-    description: 'Create beats in seconds',
+    description: 'Create drum patterns in seconds',
     icon: GridOnIcon,
     color: '#2196F3'
   },
@@ -130,7 +130,7 @@ const TrackOption: React.FC<TrackOptionProps> = ({ id, title, description, icon:
 interface AddTrackMenuProps {
   open: boolean;
   onClose: () => void;
-  onSelectTrack: (trackIdOrFile: string | File) => void;
+  onSelectTrack: (trackIdOrFile: string | File, name: string) => void;
   anchorEl: HTMLElement | null;
 }
 
@@ -142,20 +142,17 @@ function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuPr
       setIsVirtualInstrumentsOpen(true);
     } else if (trackIdOrFile === 'drum') {
       // Handle drum machine creation directly
-      onSelectTrack('drum');
+      onSelectTrack('drum', 'Drum Machine');
       onClose();
     } else {
-      onSelectTrack(trackIdOrFile);
+      onSelectTrack(trackIdOrFile, "trackIdOrFile");
       onClose();
     }
   };
 
-  const handleInstrumentSelect = (instrumentId: string) => {
-    // Create a MIDI track first - this will then be handled by the track creation system
-    // which will set up the proper subscriptions and activations
-    onSelectTrack('midi');
-    
-    // Close the menu
+  const handleInstrumentSelect = (instrumentId: string, instrumentName: string) => {
+    // Pass the instrument name as a special format so NewProject can distinguish it
+    onSelectTrack('midi', instrumentName);
     onClose();
   };
 

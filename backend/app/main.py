@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from app.api.routes import auth, users, projects, sounds
+from app.api.routes import auth, users, projects, sounds, soundfonts
 import logging
 import traceback
 
@@ -64,6 +64,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(sounds.router, prefix="/api/sounds", tags=["sounds"])
+app.include_router(soundfonts.router, prefix="/api/soundfonts", tags=["soundfonts"])
 
 @app.get("/")
 async def root():

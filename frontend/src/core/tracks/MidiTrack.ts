@@ -7,8 +7,10 @@ export class MidiTrack {
   private trackId: string;
   private instrumentId: string;
   private unsubscribe?: () => void;
-
-  constructor(trackId: string, instrumentId: string, initialNotes: Note[] = [], midiManager?: MidiManager) {
+  private instrumentName: string;
+  
+  constructor(instrumentName: string, trackId: string, instrumentId: string, initialNotes: Note[] = [], midiManager?: MidiManager) {
+    this.instrumentName = instrumentName;
     this.trackId = trackId;
     this.instrumentId = instrumentId;
     this.notes = [...initialNotes];

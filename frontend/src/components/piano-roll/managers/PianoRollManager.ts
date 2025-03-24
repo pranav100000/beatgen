@@ -37,8 +37,8 @@ export class PianoRollManager {
   }
 
   // Track operations
-  async createNewTrack(instrumentId: string): Promise<MidiTrack> {
-    return this.midiManager.createTrack(instrumentId);
+  async createNewTrack(instrumentId: string, name: string): Promise<MidiTrack> {
+    return this.midiManager.createTrack(instrumentId, name);
   }
 
   // MIDI file operations

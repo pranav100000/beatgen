@@ -21,9 +21,9 @@ export class AddTrackAction implements Action {
 
     async execute(): Promise<void> {
         if (this.trackData.audioFile) {
-            await this.store.getAudioEngine().createTrack(this.trackData.id, this.trackData.audioFile);
+            await this.store.getAudioEngine().createTrack(this.trackData.id, this.trackData.name, this.trackData.audioFile);
         } else {
-            await this.store.getAudioEngine().createTrack(this.trackData.id);
+            await this.store.getAudioEngine().createTrack(this.trackData.id, this.trackData.name);
         }
         this.setTracks(prev => [...prev, this.trackData]);
         console.log('🔄 Execute AddTrackAction:', { trackId: this.trackData.id });
@@ -61,9 +61,9 @@ export class DeleteTrackAction implements Action {
 
     async undo(): Promise<void> {
         if (this.trackData.audioFile) {
-            await this.store.getAudioEngine().createTrack(this.trackData.id, this.trackData.audioFile);
+            await this.store.getAudioEngine().createTrack(this.trackData.id, this.trackData.name, this.trackData.audioFile);
         } else {
-            await this.store.getAudioEngine().createTrack(this.trackData.id);
+            await this.store.getAudioEngine().createTrack(this.trackData.id, this.trackData.name);
         }
         this.setTracks(prev => [...prev, this.trackData]);
         console.log('↩️ Undo DeleteTrackAction:', { trackId: this.trackData.id });

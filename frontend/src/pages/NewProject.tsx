@@ -196,7 +196,7 @@ function NewProject() {
                   }
                   
                   // Create the audio track using the file
-                  const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, audioFile);
+                  const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, trackData.name, audioFile);
                   
                   // Set track properties from saved data
                   const initialPosition = {
@@ -247,14 +247,14 @@ function NewProject() {
                   try {
                     // Create the track in store with the SAME ID from the saved project
                     // This ensures we use the same sound_id for storage paths
-                    const newTrack = await store.createTrack(trackData.name, 'midi', {
+                    const newTrack = await store.createTrack("HERE", 'midi', {
                       id: trackData.id,
                       volume: trackData.volume,
                       pan: trackData.pan,
                       muted: trackData.mute,
                       soloed: false
                     });
-                    const audioTrack = await store.getAudioEngine().createTrack(newTrack.id);
+                    const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, newTrack.name);
                     
                     // Initialize position and properties
                     const initialPosition = {
@@ -330,7 +330,7 @@ function NewProject() {
                   console.log('Loading non-audio/non-MIDI track:', trackData);
                   
                   const newTrack = await store.createTrack(trackData.name, trackData.type as TrackType['type']);
-                  const audioTrack = await store.getAudioEngine().createTrack(newTrack.id);
+                  const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, newTrack.name);
                   
                   const initialPosition = {
                     x: trackData.x_position || 0,
@@ -402,7 +402,7 @@ function NewProject() {
     };
   }, [existingProjectId]);
 
-  const handleAddTrack = async (trackTypeOrFile: string | File) => {
+  const handleAddTrack = async (trackTypeOrFile: string | File, name: string) => {
     if (!store || !isInitialized) {
       console.warn('Store not initialized');
       return;
@@ -417,7 +417,7 @@ function NewProject() {
         const fileName = trackTypeOrFile.name.split('.')[0];
         // Handle audio file
         const newTrack = await store.createTrack(fileName, 'audio');
-        const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, trackTypeOrFile);
+        const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, fileName, trackTypeOrFile);
         
         // Save to database
         let dbId: string;
@@ -472,8 +472,18 @@ function NewProject() {
 
       } else {
         // Handle other track types
-        const newTrack = await store.createTrack(trackTypeOrFile, trackTypeOrFile as TrackType['type']);
-        const audioTrack = await store.getAudioEngine().createTrack(newTrack.id);
+        // Use appropriate names based on track type
+        let trackName;
+        if (trackTypeOrFile === 'midi') {
+          trackName = name;
+        } else if (trackTypeOrFile === 'drum') {
+          trackName = "Drum Machine";
+        } else {
+          trackName = trackTypeOrFile; // Fallback to type name
+        }
+        
+        const newTrack = await store.createTrack(trackName, trackTypeOrFile as TrackType['type']);
+        const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, newTrack.name);
         
         // Default duration for MIDI tracks (4 bars at 4/4 time signature = 16 beats)
         let defaultDuration;

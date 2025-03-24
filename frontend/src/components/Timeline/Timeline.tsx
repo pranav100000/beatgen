@@ -342,6 +342,7 @@ function TimelineContent({
         <Track 
           key={track.id}
           id={track.id}
+          name={track.name}
           index={index}
           type={track.type}
           audioFile={track.audioFile}
@@ -351,7 +352,7 @@ function TimelineContent({
           measureCount={GRID_CONSTANTS.measureCount}
           position={track.position}
           onPositionChange={(newPosition, isDragEnd) => 
-            onTrackPositionChange(track.id, newPosition, isDragEnd)}
+          onTrackPositionChange(track.id, newPosition, isDragEnd)}
           bpm={bpm}
           duration={track.duration}
           _calculatedWidth={track._calculatedWidth}
