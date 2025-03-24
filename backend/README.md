@@ -98,6 +98,18 @@ create table midi_track (
 );
 create index midi_track_user_id_idx on midi_track(user_id);
 
+create table soundfont_public (
+   id uuid primary key,
+   name text not null,
+   display_name text not null,
+   category text not null, -- e.g., "piano", "strings", "brass", "synth"
+   description text,
+   storage_key text not null, -- path in the soundfonts bucket
+   created_at timestamp with time zone default now()
+);
+
+create index soundfont_public_category_idx on soundfont_public(category);
+
 -- Create Row Level Security policies
 -- Profiles: Users can only read their own profile
 alter table person enable row level security;

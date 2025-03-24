@@ -24,7 +24,6 @@ const KnobControl: React.FC<KnobControlProps> = ({
   color = '#1976d2',
   size = 60,
   label,
-  type,
   valueFormatter = (val) => `${val}`
 }) => {
   const [anchorEl, setAnchorEl] = useState<HTMLDivElement | null>(null);
@@ -151,7 +150,7 @@ const KnobControl: React.FC<KnobControlProps> = ({
             readOnly={true}
             disabled={false} // Still want it to look active
             size={size}
-            strokeWidth={size <= 30 ? 6 : 4}
+            strokeWidth={size <= 30 ? 3 : 4}
             textColor="#888"
             valueColor={color}
             rangeColor="rgba(255,255,255,0.2)"
