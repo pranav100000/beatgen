@@ -9,11 +9,19 @@ console.log('Source path exists:', fs.existsSync(srcPath))
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      // Explicitly set the refresh configuration for HMR
+      refresh: true,
+      // If you're still having issues, try these options
+      fastRefresh: true,
+    }),
+  ],
   define: {
     // Provide browser-compatible values for Node.js globals
     'process.env': JSON.stringify({}),
-    'process.env.NODE_ENV': JSON.stringify('production'),
+    // Set NODE_ENV based on mode
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
   },
   resolve: {
     alias: [
@@ -45,7 +53,7 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
     lib: {
-      entry: 'src/Studio.tsx',
+      entry: 'src/main.tsx', // Changed from Studio.tsx to main.tsx
       formats: ['es'],
       fileName: 'studio'
     },

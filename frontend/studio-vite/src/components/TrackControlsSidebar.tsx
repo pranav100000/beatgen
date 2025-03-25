@@ -15,7 +15,8 @@ import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import { TrackState } from '../core/types/track';
-import { getTrackColor } from '../constants/gridConstants';
+import { getTrackColor, GRID_CONSTANTS } from '../constants/gridConstants';
+import ControlKnob from './ControlKnob';
 
 // Interface for the component props
 interface TrackControlsSidebarProps {
@@ -175,65 +176,80 @@ const TrackControls: React.FC<TrackControlsProps> = ({
     switch(track.type) {
       case 'midi':
         return (
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-              Instrument
+          <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="caption" sx={{ 
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: '9px',
+              mr: 0.5,
+              whiteSpace: 'nowrap'
+            }}>
+              Inst:
             </Typography>
             <Select
               size="small"
               value="synth"
               fullWidth
               sx={{ 
-                mt: 0.5,
-                fontSize: '12px',
-                '.MuiSelect-select': { py: 0.5 },
+                fontSize: '10px',
+                height: '22px',
+                '.MuiSelect-select': { py: 0 },
                 bgcolor: 'rgba(0,0,0,0.2)'
               }}
             >
-              <MenuItem value="synth">Synth</MenuItem>
-              <MenuItem value="piano">Piano</MenuItem>
-              <MenuItem value="bass">Bass</MenuItem>
+              <MenuItem value="synth" sx={{ fontSize: '10px' }}>Synth</MenuItem>
+              <MenuItem value="piano" sx={{ fontSize: '10px' }}>Piano</MenuItem>
+              <MenuItem value="bass" sx={{ fontSize: '10px' }}>Bass</MenuItem>
             </Select>
           </Box>
         );
       
       case 'drum':
         return (
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-              Drum Kit
+          <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="caption" sx={{ 
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: '9px',
+              mr: 0.5,
+              whiteSpace: 'nowrap'
+            }}>
+              Kit:
             </Typography>
             <Select
               size="small"
               value="808"
               fullWidth
               sx={{ 
-                mt: 0.5,
-                fontSize: '12px',
-                '.MuiSelect-select': { py: 0.5 },
+                fontSize: '10px',
+                height: '22px',
+                '.MuiSelect-select': { py: 0 },
                 bgcolor: 'rgba(0,0,0,0.2)'
               }}
             >
-              <MenuItem value="808">808 Kit</MenuItem>
-              <MenuItem value="acoustic">Acoustic Kit</MenuItem>
-              <MenuItem value="electronic">Electronic Kit</MenuItem>
+              <MenuItem value="808" sx={{ fontSize: '10px' }}>808 Kit</MenuItem>
+              <MenuItem value="acoustic" sx={{ fontSize: '10px' }}>Acoustic Kit</MenuItem>
+              <MenuItem value="electronic" sx={{ fontSize: '10px' }}>Electronic Kit</MenuItem>
             </Select>
           </Box>
         );
         
       case 'audio':
         return (
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-              Audio File
+          <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="caption" sx={{ 
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: '9px',
+              mr: 0.5,
+              whiteSpace: 'nowrap'
+            }}>
+              File:
             </Typography>
             <Box sx={{ 
-              mt: 0.5,
-              fontSize: '12px',
+              fontSize: '10px',
               color: 'rgba(255,255,255,0.8)',
               bgcolor: 'rgba(0,0,0,0.2)',
               p: 0.5,
               borderRadius: 1,
+              flexGrow: 1,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
@@ -250,21 +266,23 @@ const TrackControls: React.FC<TrackControlsProps> = ({
   
   return (
     <Box sx={{
-      p: 1,
-      mb: 0.5,
+      p: 0.7,
+      mb: 0.3,
+      height: `${GRID_CONSTANTS.trackHeight}px`,
+      boxSizing: 'border-box',
       borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-      borderLeft: `4px solid ${trackColor}`,
+      borderLeft: `3px solid ${trackColor}`,
       bgcolor: 'rgba(30, 30, 30, 0.7)',
       '&:hover': {
         bgcolor: 'rgba(40, 40, 40, 0.9)',
-      },
+      }
     }}>
-      {/* Track Name and Type Indicator */}
+      {/* Track Name and Delete Button */}
       <Box sx={{ 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'space-between',
-        mb: 1
+        mb: 0.4
       }}>
         {isEditingName ? (
           <TextField
@@ -284,178 +302,91 @@ const TrackControls: React.FC<TrackControlsProps> = ({
               minWidth: '120px',
               '.MuiInputBase-input': {
                 color: 'white',
-                fontSize: '13px',
-                py: 0.5,
-                px: 1
+                fontSize: '12px',
+                py: 0.3,
+                px: 0.8
               }
             }}
           />
         ) : (
-          <Typography 
-            variant="subtitle2" 
-            sx={{ 
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              '&:hover': { textDecoration: 'underline' }
-            }}
-            onClick={() => setIsEditingName(true)}
-          >
-            {track.name}
-          </Typography>
-        )}
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
-          <Tooltip title="Delete track">
-            <IconButton 
-              size="small" 
-              onClick={handleDelete}
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography 
+              variant="subtitle2" 
               sx={{ 
-                color: 'rgba(255, 255, 255, 0.7)',
-                '&:hover': { 
-                  color: '#ff5252',
-                  bgcolor: 'rgba(255, 82, 82, 0.1)'
-                }
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                fontSize: '12px',
+                '&:hover': { textDecoration: 'underline' }
+              }}
+              onClick={() => setIsEditingName(true)}
+            >
+              {track.name}
+            </Typography>
+            
+            {/* Track Type Tag */}
+            <Box 
+              sx={{ 
+                bgcolor: track.type === 'audio' ? '#4caf50' : 
+                      track.type === 'midi' ? '#2196f3' : 
+                      track.type === 'drum' ? '#ff9800' : '#9c27b0', 
+                borderRadius: '3px',
+                px: 0.5,
+                py: 0.1,
+                fontSize: '8px',
+                fontWeight: 'bold',
+                color: 'white',
+                ml: 0.8
               }}
             >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      </Box>
-      
-      {/* Track Type Indicator */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 0.5 }}>
-        <Box 
-          sx={{ 
-            bgcolor: track.type === 'audio' ? '#4caf50' : 
-                   track.type === 'midi' ? '#2196f3' : 
-                   track.type === 'drum' ? '#ff9800' : '#9c27b0', 
-            borderRadius: '3px',
-            px: 0.7,
-            py: 0.2,
-            fontSize: '10px',
-            fontWeight: 'bold',
-            color: 'white'
-          }}
-        >
-          {track.type.toUpperCase()}
-        </Box>
-        <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-          {track.type === 'audio' ? 'Audio Track' : 
-           track.type === 'midi' ? 'MIDI Instrument' : 
-           track.type === 'drum' ? 'Drum Machine' : 'Video Track'}
-        </Typography>
+              {track.type.toUpperCase()}
+            </Box>
+          </Box>
+        )}
+        
+        <Tooltip title="Delete track">
+          <IconButton 
+            size="small" 
+            onClick={handleDelete}
+            sx={{ 
+              color: 'rgba(255, 255, 255, 0.7)',
+              padding: '3px',
+              '&:hover': { 
+                color: '#ff5252',
+                bgcolor: 'rgba(255, 82, 82, 0.1)'
+              }
+            }}
+          >
+            <DeleteIcon sx={{ fontSize: '16px' }} />
+          </IconButton>
+        </Tooltip>
       </Box>
       
       {/* Type-specific controls */}
       {renderTypeSpecificControls()}
       
-      {/* Volume Control */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+      {/* Controls row - Mute, Solo, Volume, Pan */}
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        mb: 0.5
+      }}>
+        {/* Mute button */}
         <Tooltip title={track.muted ? "Unmute" : "Mute"}>
           <IconButton 
             size="small" 
             onClick={handleMuteToggle}
             sx={{ 
               color: track.muted ? 'rgba(255, 82, 82, 0.9)' : 'rgba(255, 255, 255, 0.7)',
-              '&:hover': { color: track.muted ? '#ff5252' : 'white' }
+              '&:hover': { color: track.muted ? '#ff5252' : 'white' },
+              padding: '4px'
             }}
           >
             {track.muted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
           </IconButton>
         </Tooltip>
-        <Slider
-          size="small"
-          value={localVolume}
-          onChange={handleVolumeChange}
-          onChangeCommitted={handleVolumeChangeCommitted}
-          aria-label="Volume"
-          min={0}
-          max={100}
-          sx={{ 
-            mx: 1,
-            color: track.muted ? 'rgba(255, 255, 255, 0.3)' : trackColor,
-            opacity: track.muted ? 0.5 : 1,
-            '& .MuiSlider-thumb': {
-              width: 12,
-              height: 12,
-              '&:hover, &.Mui-focusVisible': {
-                boxShadow: `0px 0px 0px 8px ${trackColor}20`
-              }
-            }
-          }}
-        />
-        <Typography variant="caption" sx={{ 
-          minWidth: '30px', 
-          textAlign: 'right',
-          color: track.muted ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.8)'
-        }}>
-          {localVolume}%
-        </Typography>
-      </Box>
-      
-      {/* Pan Control */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-        <Tooltip title="Pan">
-          <PanToolIcon 
-            fontSize="small" 
-            sx={{ 
-              color: 'rgba(255, 255, 255, 0.7)',
-              transform: 'rotate(90deg)',
-              fontSize: 18,
-              mx: 0.5
-            }} 
-          />
-        </Tooltip>
-        <Slider
-          size="small"
-          value={localPan}
-          onChange={handlePanChange}
-          onChangeCommitted={handlePanChangeCommitted}
-          aria-label="Pan"
-          min={-100}
-          max={100}
-          sx={{ 
-            mx: 1,
-            color: trackColor,
-            '& .MuiSlider-thumb': {
-              width: 12,
-              height: 12,
-              '&:hover, &.Mui-focusVisible': {
-                boxShadow: `0px 0px 0px 8px ${trackColor}20`
-              }
-            },
-            '& .MuiSlider-track': {
-              // Makes the track always grow from center for pan
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                height: '100%',
-                width: '2px',
-                backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                left: '50%',
-                transform: 'translateX(-50%)'
-              }
-            }
-          }}
-          marks={[
-            { value: -100, label: 'L' },
-            { value: 0, label: 'C' },
-            { value: 100, label: 'R' }
-          ]}
-        />
-        <Typography variant="caption" sx={{ 
-          minWidth: '36px', 
-          textAlign: 'right',
-          color: 'rgba(255, 255, 255, 0.8)'
-        }}>
-          {localPan === 0 ? 'C' : 
-           localPan < 0 ? `L${Math.abs(localPan)}` : 
-           `R${localPan}`}
-        </Typography>
-      </Box>
-      
-      {/* Solo Button */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+        
+        {/* Solo Button */}
         <Tooltip title={track.soloed ? "Unsolo" : "Solo"}>
           <Box 
             onClick={handleSoloToggle}
@@ -463,8 +394,8 @@ const TrackControls: React.FC<TrackControlsProps> = ({
               bgcolor: track.soloed ? '#ffc107' : 'rgba(255, 255, 255, 0.1)',
               color: track.soloed ? '#000' : 'rgba(255, 255, 255, 0.7)',
               borderRadius: '3px',
-              px: 1,
-              py: 0.3,
+              px: 0.8,
+              py: 0.2,
               fontSize: '10px',
               fontWeight: 'bold',
               cursor: 'pointer',
@@ -476,6 +407,31 @@ const TrackControls: React.FC<TrackControlsProps> = ({
             S
           </Box>
         </Tooltip>
+        
+        {/* Volume Knob */}
+        <ControlKnob
+          value={localVolume}
+          min={0}
+          max={100}
+          size={32}
+          color={track.muted ? 'rgba(255, 255, 255, 0.3)' : trackColor}
+          label="Vol"
+          onChange={handleVolumeChange}
+          onChangeCommitted={handleVolumeChangeCommitted}
+          disabled={track.muted}
+        />
+        
+        {/* Pan Knob */}
+        <ControlKnob
+          value={localPan}
+          min={-100}
+          max={100}
+          size={32}
+          color={trackColor}
+          label="Pan"
+          onChange={handlePanChange}
+          onChangeCommitted={handlePanChangeCommitted}
+        />
       </Box>
     </Box>
   );
