@@ -153,9 +153,8 @@ function drawWaveform(
   ctx.fillStyle = 'rgba(255,255,255,0.2)';
   ctx.fillRect(0, middle, width, 1);
   
-  // Use a semi-transparent version of the track color for the fill
-  // Making sure it's properly formatted with alpha
-  ctx.fillStyle = trackColor.startsWith('rgba') ? trackColor : `${trackColor}80`;
+  // Change this line to use white with 75% opacity instead of the track color
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
   
   // For each pixel column in the canvas
   for (let x = 0; x < width; x++) {
@@ -199,9 +198,9 @@ function drawWaveform(
     ctx.fillRect(x, topY, 1, barHeight);
   }
 
-  // Draw the waveform outline with a brighter color
-  ctx.strokeStyle = 'rgba(255,255,255,0.8)'; // White outline
-  ctx.lineWidth = 1; // Thicker line for visibility
+  // Keep the outline white but maybe make it a bit more visible
+  ctx.strokeStyle = 'rgba(255,255,255,1.0)'; // Slightly more opaque white outline
+  ctx.lineWidth = 1;
   
   // Top outline
   ctx.beginPath();

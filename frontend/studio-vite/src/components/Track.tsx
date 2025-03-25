@@ -1,7 +1,9 @@
 import React from 'react';
+import { Box } from '@mui/material';
 import { Position } from '../core/types/track';
 import TrackPreview from './track-preview/TrackPreview';
 import { useStudioStore } from '../stores/useStudioStore';
+import { usePianoRoll } from './piano-roll';
 
 interface TrackProps {
   name: string;
@@ -44,6 +46,9 @@ function Track(props: TrackProps) {
   const store = useStudioStore(state => state.store);
   const fullTrack = store?.getTrackById?.(id);
   
+  // Get piano roll context
+  const { openPianoRoll } = usePianoRoll();
+  
   // Convert the props to the format expected by TrackPreview
   const trackState = {
     name,
@@ -61,6 +66,28 @@ function Track(props: TrackProps) {
     channel: fullTrack?.channel ?? ({} as any)
   };
 
+  // Handle piano roll opening when track is clicked
+  const handleTrackClick = (e: React.MouseEvent) => {
+    console.log('Track clicked', {
+      target: e.target,
+      trackId: id,
+      type,
+      eventType: e.type
+    });
+    
+    // For MIDI and drum tracks, directly open the piano roll
+    if (type === 'midi' || type === 'drum') {
+      e.stopPropagation();
+      console.log('Opening piano roll for track:', {
+        trackId: id,
+        type
+      });
+      openPianoRoll(id);
+    } else {
+      console.log('Not opening piano roll - track type is not midi or drum:', type);
+    }
+  };
+
   // Add console log to debug position changes
   const handlePositionChange = (trackId: string, newPosition: Position, isDragEnd: boolean) => {
     console.log("Track: Position change called", {
@@ -75,17 +102,27 @@ function Track(props: TrackProps) {
   };
 
   return (
-    <TrackPreview
-      track={trackState}
-      isPlaying={isPlaying}
-      currentTime={currentTime}
-      measureCount={measureCount}
-      gridLineStyle={gridLineStyle}
-      onPositionChange={handlePositionChange}
-      bpm={bpm}
-      timeSignature={timeSignature}
-      trackIndex={index} // Pass the track index for color determination
-    />
+    <Box 
+      onClick={handleTrackClick} 
+      sx={{ 
+        position: 'relative',
+        cursor: 'pointer'
+      }}
+      data-track-id={id}
+      data-track-type={type}
+    >
+      <TrackPreview
+        track={trackState}
+        isPlaying={isPlaying}
+        currentTime={currentTime}
+        measureCount={measureCount}
+        gridLineStyle={gridLineStyle}
+        onPositionChange={handlePositionChange}
+        bpm={bpm}
+        timeSignature={timeSignature}
+        trackIndex={index} // Pass the track index for color determination
+      />
+    </Box>
   );
 }
 

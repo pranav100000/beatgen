@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import { GRID_CONSTANTS, getTrackColor } from '../../constants/gridConstants';
 import { TrackState, Position } from '../../core/types/track';
 import WaveformDisplay from '../../components/WaveformDisplay';
+import { MidiNotesPreview } from '../piano-roll';
 
 // Simplified TrackPreview component without complex handlers
 
@@ -393,7 +394,7 @@ const TrackPreview: React.FC<TrackPreviewProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-start',
-          opacity: track.type === 'audio' ? 1 : 0.4,
+          opacity: 0.8, // Full opacity for all track types
           pointerEvents: 'none' // Don't interfere with drag events
         }}>
           {track.type === 'audio' && track.audioFile && (
@@ -418,59 +419,63 @@ const TrackPreview: React.FC<TrackPreviewProps> = ({
           ))}
           
           {track.type === 'midi' && (
-            <Box sx={{ 
-              height: '100%', 
-              width: '100%', 
-              display: 'flex', 
-              flexWrap: 'wrap',
-              alignContent: 'center',
-              opacity: 0.4
-            }}>
-              {Array.from({length: 60}).map((_, i) => (
-                <Box 
-                  key={i}
-                  sx={{
-                    height: Math.random() * 12 + 4,
-                    width: 6,
-                    mx: 0.5,
-                    my: 0.2,
-                    bgcolor: 'white',
-                    borderRadius: '2px'
-                  }}
-                />
-              ))}
-            </Box>
+            <>
+              <Box
+                className="piano-roll-trigger"
+                data-testid="piano-roll-trigger"
+                data-track-id={track.id}
+                data-track-type={track.type}
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  cursor: 'pointer',
+                  zIndex: 100, // Increased zIndex to ensure it's on top
+                  opacity: 0.3, // Make more visible for debugging
+                  backgroundColor: 'rgba(0, 100, 255, 0.1)', // Add background color
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.3)'
+                  }
+                }}
+              />
+              <MidiNotesPreview 
+                trackId={track.id}
+                width={typeof trackWidth === 'number' ? trackWidth : 500}
+                height={GRID_CONSTANTS.trackHeight - 6}
+                trackColor={trackColor}
+              />
+            </>
           )}
           {track.type === 'drum' && (
-            <Box sx={{ display: 'flex', width: '100%', px: 2 }}>
-              {Array.from({length: 8}).map((_, i) => (
-                <Box 
-                  key={i}
-                  sx={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: 20,
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    opacity: 0.7
-                  }}
-                >
-                  {Array.from({length: 4}).map((_, j) => (
-                    <Box 
-                      key={j}
-                      sx={{
-                        height: 3,
-                        width: 8,
-                        borderRadius: 1,
-                        my: 0.4,
-                        bgcolor: Math.random() > 0.7 ? 'white' : 'transparent'
-                      }}
-                    />
-                  ))}
-                </Box>
-              ))}
-            </Box>
+            <>
+              <Box
+                className="piano-roll-trigger"
+                data-testid="piano-roll-trigger"
+                data-track-id={track.id}
+                data-track-type={track.type}
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  cursor: 'pointer',
+                  zIndex: 10,
+                  opacity: 0.1, // Make slightly visible for debugging
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.15)'
+                  }
+                }}
+              />
+              <MidiNotesPreview 
+                trackId={track.id}
+                width={typeof trackWidth === 'number' ? trackWidth : 500}
+                height={GRID_CONSTANTS.trackHeight - 6}
+                trackColor={trackColor}
+              />
+            </>
           )}
         </Box>
         

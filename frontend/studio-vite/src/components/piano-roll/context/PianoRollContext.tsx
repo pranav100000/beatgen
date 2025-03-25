@@ -35,13 +35,23 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Open a specific track's piano roll
   const openPianoRoll = (trackId: string) => {
+    console.log('Opening piano roll for track:', trackId);
+    
     setActivePianoRoll(trackId);
     setOpenedPianoRolls(prev => ({ ...prev, [trackId]: true }));
     
     // Initialize notes array for this track if it doesn't exist
     if (!notesByTrack[trackId]) {
+      console.log('Initializing notes array for track:', trackId);
       setNotesByTrack(prev => ({ ...prev, [trackId]: [] }));
     }
+    
+    // Log the current state for debugging
+    console.log('Piano roll state after opening:', {
+      activePianoRoll: trackId,
+      openedPianoRolls: { ...openedPianoRolls, [trackId]: true },
+      notesByTrack
+    });
   };
 
   // Close a specific track's piano roll

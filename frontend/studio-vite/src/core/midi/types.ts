@@ -31,6 +31,12 @@ export interface MidiManagerInterface {
   // Track operations
   createTrack(instrumentId: string, name: string): MidiTrack;
   updateTrack(trackId: string, notes: Note[]): void;
+  getNotesForTrack(trackId: string): Note[];
+  
+  // Note operations
+  addNoteToTrack(trackId: string, note: Note): Promise<void>;
+  removeNoteFromTrack(trackId: string, noteId: number): Promise<void>;
+  updateNote(trackId: string, updatedNote: Note): Promise<void>;
   
   // Playback integration
   schedulePlayback(track: MidiTrack): void;

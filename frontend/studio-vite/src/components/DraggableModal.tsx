@@ -35,11 +35,18 @@ const DraggableModal: React.FC<DraggableModalProps> = ({
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Reset position when modal opens
+  // Only set position on initial open, not on every render when isOpen is true
+  const hasInitializedRef = useRef(false);
+  
   useEffect(() => {
-    if (isOpen) {
+    // Only initialize position the first time modal opens
+    if (isOpen && !hasInitializedRef.current) {
       setPosition(initialPosition);
       setSize(initialSize);
+      hasInitializedRef.current = true;
+    } else if (!isOpen) {
+      // Reset the flag when modal closes so next time it opens position is initialized again
+      hasInitializedRef.current = false;
     }
   }, [isOpen, initialPosition, initialSize]);
 

@@ -241,6 +241,56 @@ export class MidiManager implements MidiManagerInterface {
   }
   
   /**
+   * Add a single note to a track
+   */
+  async addNoteToTrack(trackId: string, note: Note): Promise<void> {
+    console.log(`MidiManager.addNoteToTrack: Adding note to track ${trackId}`, note);
+    
+    // Get existing notes
+    const notes = this.getNotesForTrack(trackId);
+    
+    // Add the new note
+    const updatedNotes = [...notes, note];
+    
+    // Update the track with the new note
+    this.updateTrack(trackId, updatedNotes);
+  }
+  
+  /**
+   * Remove a single note from a track by its ID
+   */
+  async removeNoteFromTrack(trackId: string, noteId: number): Promise<void> {
+    console.log(`MidiManager.removeNoteFromTrack: Removing note ${noteId} from track ${trackId}`);
+    
+    // Get existing notes
+    const notes = this.getNotesForTrack(trackId);
+    
+    // Filter out the note to be removed
+    const updatedNotes = notes.filter(note => note.id !== noteId);
+    
+    // Update the track without the removed note
+    this.updateTrack(trackId, updatedNotes);
+  }
+  
+  /**
+   * Update a single note in a track
+   */
+  async updateNote(trackId: string, updatedNote: Note): Promise<void> {
+    console.log(`MidiManager.updateNote: Updating note ${updatedNote.id} in track ${trackId}`);
+    
+    // Get existing notes
+    const notes = this.getNotesForTrack(trackId);
+    
+    // Update the specific note
+    const updatedNotes = notes.map(note => 
+      note.id === updatedNote.id ? updatedNote : note
+    );
+    
+    // Update the track with the modified notes
+    this.updateTrack(trackId, updatedNotes);
+  }
+  
+  /**
    * Notify all subscribers for a specific track
    * Extracted to follow DRY principles
    */

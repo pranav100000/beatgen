@@ -20,6 +20,39 @@ import { GRID_CONSTANTS } from './constants/gridConstants';
 import * as Tone from 'tone';
 import { useStudioStore } from './stores/useStudioStore';
 
+// Import piano roll components
+import PianoRollModule, { PianoRollWindows, usePianoRoll } from './components/piano-roll';
+
+// Debug component for testing piano roll - must be used inside PianoRollProvider
+function TestPianoRollButton() {
+  const { openPianoRoll } = usePianoRoll();
+  const { tracks } = useStudioStore();
+  
+  const handleTestClick = () => {
+    // Find the first MIDI or drum track
+    const midiTrack = tracks.find(t => t.type === 'midi' || t.type === 'drum');
+    if (midiTrack) {
+      console.log('TEST: Opening piano roll for track:', midiTrack.id);
+      openPianoRoll(midiTrack.id);
+    } else {
+      console.log('TEST: No MIDI or drum tracks found to open piano roll');
+      // If no MIDI tracks exist, add one for testing
+      useStudioStore.getState().handleAddTrack('midi');
+    }
+  };
+  
+  return (
+    <Button 
+      variant="contained" 
+      color="error" 
+      onClick={handleTestClick}
+      sx={{ fontSize: '10px' }}
+    >
+      Test Piano Roll
+    </Button>
+  );
+}
+
 // Main Studio Component
 function Studio() {
   // Get state and actions from Zustand store
@@ -298,6 +331,15 @@ function Studio() {
         overflow: 'hidden',
         position: 'relative'
       }}>
+        {/* Debug Button for Piano Roll */}
+        <Box sx={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          zIndex: 9999
+        }}>
+          <TestPianoRollButton />
+        </Box>
         {/* Left Sidebar */}
         <Box sx={{ 
           width: GRID_CONSTANTS.sidebarWidth,
@@ -392,4 +434,12 @@ function Studio() {
   );
 }
 
-export default Studio;
+// Wrap with Piano Roll Module to provide context
+const StudioWithPianoRoll = () => (
+  <PianoRollModule>
+    <Studio />
+    <PianoRollWindows />
+  </PianoRollModule>
+);
+
+export default StudioWithPianoRoll;
