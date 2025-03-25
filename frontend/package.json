@@ -28,6 +28,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "build:all": "npm run build && cd studio-vite && npm run build && cp -R dist ../build/studio-vite",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

@@ -196,7 +196,7 @@ function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuPr
           </IconButton>
         </Box>
 
-        <Box sx={{ maxHeight: '70vh', overflow: 'auto' }}>
+        {/* <Box sx={{ maxHeight: '70vh', overflow: 'auto' }}>
           {trackTypes.map((track) => (
             <TrackOption
               key={track.id}
@@ -209,7 +209,7 @@ function AddTrackMenu({ open, onClose, onSelectTrack, anchorEl }: AddTrackMenuPr
               onClick={handleTrackSelect}
             />
           ))}
-        </Box>
+        </Box> */}
       </Popover>
 
       <VirtualInstrumentsModal
