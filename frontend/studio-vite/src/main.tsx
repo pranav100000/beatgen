@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import App from './App';
+import Studio from './Studio';
 import './index.css';
 
 // Import MUI fonts
@@ -23,10 +23,38 @@ const theme = createTheme({
   }
 });
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <App />
-    </ThemeProvider>
-  </React.StrictMode>
-);
+// When used directly (not through the loader)
+if (document.getElementById('root')) {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <ThemeProvider theme={theme}>
+        <Studio />
+      </ThemeProvider>
+    </React.StrictMode>
+  );
+}
+
+// For the library mode, expose the function to mount the studio
+// This is used when loaded as a module
+const mountStudio = (elementId: string) => {
+  const element = document.getElementById(elementId);
+  if (element) {
+    ReactDOM.createRoot(element).render(
+      <React.StrictMode>
+        <ThemeProvider theme={theme}>
+          <Studio />
+        </ThemeProvider>
+      </React.StrictMode>
+    );
+    return true;
+  }
+  return false;
+};
+
+// Expose the mount function to window
+(window as any).mountStudioVite = mountStudio;
+
+// Try to auto-mount to studio-vite-root if present
+if (document.getElementById('studio-vite-root')) {
+  mountStudio('studio-vite-root');
+}

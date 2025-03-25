@@ -1,11 +1,11 @@
 import React from 'react';
 import { Box, IconButton, Typography } from '@mui/material';
 import DraggableModal from '../../DraggableModal';
-import PianoRoll from './PianoRoll';
+import PianoRollCanvas from './PianoRollCanvas';
 import DrumRoll from './DrumRoll';
 import { usePianoRoll } from '../context/PianoRollContext';
 import { useStudioStore } from '../../../stores/useStudioStore';
-
+import { getTrackColor } from '../../../constants/gridConstants';
 interface PianoRollWindowProps {
   trackId: string;
 }
@@ -76,7 +76,7 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
           {isDrumTrack ? (
             <DrumRoll trackId={trackId} />
           ) : (
-            <PianoRoll trackId={trackId} />
+            <PianoRollCanvas trackId={trackId} color={getTrackColor(tracks.findIndex(t => t.id === trackId))} />
           )}
         </Box>
       </Box>

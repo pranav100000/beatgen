@@ -42,11 +42,11 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
   }
   
   // Ensure we have at least a small range for scaling
-  if (maxNoteRow - minNoteRow < 12) {
+  if (maxNoteRow - minNoteRow < 6) {
     // Expand the range to at least an octave
     const midPoint = Math.floor((maxNoteRow + minNoteRow) / 2);
-    minNoteRow = midPoint - 6;
-    maxNoteRow = midPoint + 6;
+    minNoteRow = midPoint - 3;
+    maxNoteRow = midPoint + 3;
   }
   
   // Add some padding to the range

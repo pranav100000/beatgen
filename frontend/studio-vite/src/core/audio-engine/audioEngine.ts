@@ -200,6 +200,31 @@ class AudioEngine {
       console.log(`AudioEngine: Set track ${id} position to x:${x}, y:${y}`);
     }
   }
+  
+  // Set a track's solo state
+  public setTrackSolo(id: string, soloed: boolean): void {
+    const track = this.tracks.get(id);
+    if (track) {
+      track.soloed = soloed;
+      
+      // If soloing this track, mute all other non-soloed tracks
+      if (soloed) {
+        this.tracks.forEach((otherTrack) => {
+          if (otherTrack.id !== id && !otherTrack.soloed) {
+            // Temporarily mute this track by setting volume to -Infinity
+            otherTrack.channel.volume.value = -Infinity;
+          }
+        });
+      } else {
+        // When un-soloing, restore volumes of all tracks that aren't explicitly muted
+        this.tracks.forEach((otherTrack) => {
+          if (!otherTrack.muted && !otherTrack.soloed) {
+            otherTrack.channel.volume.value = convertVolumeToDecibels(otherTrack.volume, false);
+          }
+        });
+      }
+    }
+  }
 }
 
 export default AudioEngine; 

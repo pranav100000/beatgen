@@ -58,14 +58,18 @@ const DraggableModal: React.FC<DraggableModalProps> = ({
         const newY = e.clientY - dragStart.y;
         setPosition({ x: newX, y: newY });
       } else if (isResizing) {
-        // Calculate new size based on mouse movement
-        const deltaX = e.clientX - dragStart.x;
-        const deltaY = e.clientY - dragStart.y;
-        setSize(prev => ({
-          width: Math.max(400, prev.width + deltaX),
-          height: Math.max(300, prev.height + deltaY)
-        }));
-        setDragStart({ x: e.clientX, y: e.clientY });
+        // Direct approach: set size based on mouse position relative to modal position
+        // This ensures the resize handle stays exactly under the mouse pointer
+        if (modalRef.current) {
+          const modalRect = modalRef.current.getBoundingClientRect();
+          const newWidth = Math.max(400, e.clientX - modalRect.left);
+          const newHeight = Math.max(300, e.clientY - modalRect.top);
+          
+          setSize({
+            width: newWidth,
+            height: newHeight
+          });
+        }
       }
     };
 
@@ -101,10 +105,8 @@ const DraggableModal: React.FC<DraggableModalProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
-    setDragStart({
-      x: e.clientX,
-      y: e.clientY
-    });
+    // We don't need to set a drag start position anymore
+    // since we're directly calculating the size based on mouse position
   };
 
   if (!isOpen) return null;

@@ -10,6 +10,11 @@ console.log('Source path exists:', fs.existsSync(srcPath))
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // Provide browser-compatible values for Node.js globals
+    'process.env': JSON.stringify({}),
+    'process.env.NODE_ENV': JSON.stringify('production'),
+  },
   resolve: {
     alias: [
       { find: '@src', replacement: path.resolve(__dirname, '../src') },
@@ -38,6 +43,17 @@ export default defineConfig({
   assetsInclude: ['**/*.wav', '**/*.mp3', '**/*.ogg', '**/*.midi', '**/*.mid'],
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    lib: {
+      entry: 'src/Studio.tsx',
+      formats: ['es'],
+      fileName: 'studio'
+    },
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/[name].js', // Use consistent name without hash
+        assetFileNames: 'assets/[name].[ext]'
+      }
+    }
   }
 })

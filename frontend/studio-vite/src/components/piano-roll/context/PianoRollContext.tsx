@@ -75,11 +75,12 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Create a history action
     const action = new NoteCreateAction(
       store,
-      (newNotes) => {
-        setNotesByTrack(prev => ({
-          ...prev,
-          [trackId]: newNotes
-        }));
+      (newNotes: Note[]) => {
+        setNotesByTrack(prev => {
+          const updated = {...prev};
+          updated[trackId] = newNotes;
+          return updated;
+        });
       },
       noteWithTrackId,
       trackNotes
@@ -99,11 +100,12 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Create a history action
     const action = new NoteMoveAction(
       store,
-      (newNotes) => {
-        setNotesByTrack(prev => ({
-          ...prev,
-          [trackId]: newNotes
-        }));
+      (newNotes: Note[]) => {
+        setNotesByTrack(prev => {
+          const updated = {...prev};
+          updated[trackId] = newNotes;
+          return updated;
+        });
       },
       noteId,
       oldPos,
@@ -125,11 +127,12 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Create a history action
     const action = new NoteResizeAction(
       store,
-      (newNotes) => {
-        setNotesByTrack(prev => ({
-          ...prev,
-          [trackId]: newNotes
-        }));
+      (newNotes: Note[]) => {
+        setNotesByTrack(prev => {
+          const updated = {...prev};
+          updated[trackId] = newNotes;
+          return updated;
+        });
       },
       noteId,
       oldLength,
@@ -148,11 +151,12 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!store || !activePianoRoll) return;
     
     // Get the track to find its instrument
-    const track = store.getMidiTrackById?.(activePianoRoll);
+    const track = store.getTrackById?.(activePianoRoll);
     if (!track) return;
     
     // Play the note using the instrument manager
-    store.getInstrumentManager()?.playNote(track.instrumentId, midiNote);
+    // Cast to any to bypass TypeScript error since instrumentId will be added by MidiManager
+    store.getInstrumentManager()?.playNote((track as any).instrumentId || 'default', midiNote);
   };
 
   // Stop a preview note
@@ -160,11 +164,12 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!store || !activePianoRoll) return;
     
     // Get the track to find its instrument
-    const track = store.getMidiTrackById?.(activePianoRoll);
+    const track = store.getTrackById?.(activePianoRoll);
     if (!track) return;
     
     // Stop the note using the instrument manager
-    store.getInstrumentManager()?.stopNote(track.instrumentId, midiNote);
+    // Cast to any to bypass TypeScript error since instrumentId will be added by MidiManager
+    store.getInstrumentManager()?.stopNote((track as any).instrumentId || 'default', midiNote);
   };
 
   // Create context value

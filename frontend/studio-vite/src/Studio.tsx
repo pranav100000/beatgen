@@ -442,4 +442,19 @@ const StudioWithPianoRoll = () => (
   </PianoRollModule>
 );
 
-export default StudioWithPianoRoll;
+// Mount the app to studio-vite-root when loaded from the loader
+const StudioExport = () => {
+  useEffect(() => {
+    const rootElement = document.getElementById('studio-vite-root');
+    if (rootElement) {
+      // We're being loaded through the loader component
+      document.body.style.overflow = 'hidden'; // Prevent scrolling
+      document.body.style.margin = '0';
+      document.body.style.padding = '0';
+    }
+  }, []);
+
+  return <StudioWithPianoRoll />;
+};
+
+export default StudioExport;

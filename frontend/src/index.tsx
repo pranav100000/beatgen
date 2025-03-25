@@ -4,9 +4,9 @@ import './index.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
 import App from './App';
-import NewProject from './pages/NewProject';
 import UserAccount from './pages/UserAccount';
 import Projects from './pages/Projects';
+import StudioLoader from './pages/StudioLoader';
 import reportWebVitals from './reportWebVitals';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './core/auth/auth-context';
@@ -54,7 +54,7 @@ root.render(
         <BrowserRouter>
           <Routes>
           <Route path="/" element={<App />} />
-          <Route path="/studio" element={<NewProject />} />
+          <Route path="/studio" element={<StudioLoader />} />
           <Route path="/account" element={
             <ProtectedRoute>
               <UserAccount />
