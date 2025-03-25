@@ -1,0 +1,30 @@
+* {
+  font-family: 'Sen', sans-serif !important;
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #000000;
+  color: #ffffff;
+}
+
+code {
+  font-family: 'Sen', sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+/* Fix for MUI components */
+.MuiPopover-root {
+  z-index: 9999 !important;
+}
+
+/* Hide App.css elements */
+.logo, .card, .read-the-docs {
+  display: none;
+}

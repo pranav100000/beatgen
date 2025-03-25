@@ -1,0 +1,188 @@
+import React, { createContext, useContext, useState } from 'react';
+import { Note } from '../../../core/types/note';
+import { historyManager } from '../../../core/state/history/HistoryManager';
+import { NoteCreateAction, NoteMoveAction, NoteResizeAction } from '../../../core/state/history/actions/NoteActions';
+import { useStudioStore } from '../../../stores/useStudioStore';
+
+// Define the types for the context
+interface PianoRollContextType {
+  // State
+  activePianoRoll: string | null;
+  openedPianoRolls: Record<string, boolean>;
+  notesByTrack: Record<string, Note[]>;
+  
+  // Actions
+  openPianoRoll: (trackId: string) => void;
+  closePianoRoll: (trackId: string) => void;
+  createNote: (trackId: string, note: Note) => Promise<void>;
+  moveNote: (trackId: string, noteId: number, oldPos: { x: number, y: number }, newPos: { x: number, y: number }) => Promise<void>;
+  resizeNote: (trackId: string, noteId: number, oldLength: number, newLength: number, oldColumn?: number, newColumn?: number) => Promise<void>;
+  playPreview: (midiNote: number) => void;
+  stopPreview: (midiNote: number) => void;
+}
+
+// Create the context
+const PianoRollContext = createContext<PianoRollContextType | null>(null);
+
+// Context provider component
+export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [activePianoRoll, setActivePianoRoll] = useState<string | null>(null);
+  const [openedPianoRolls, setOpenedPianoRolls] = useState<Record<string, boolean>>({});
+  const [notesByTrack, setNotesByTrack] = useState<Record<string, Note[]>>({});
+  
+  // Get access to store
+  const { store } = useStudioStore();
+
+  // Open a specific track's piano roll
+  const openPianoRoll = (trackId: string) => {
+    setActivePianoRoll(trackId);
+    setOpenedPianoRolls(prev => ({ ...prev, [trackId]: true }));
+    
+    // Initialize notes array for this track if it doesn't exist
+    if (!notesByTrack[trackId]) {
+      setNotesByTrack(prev => ({ ...prev, [trackId]: [] }));
+    }
+  };
+
+  // Close a specific track's piano roll
+  const closePianoRoll = (trackId: string) => {
+    setOpenedPianoRolls(prev => ({ ...prev, [trackId]: false }));
+    if (activePianoRoll === trackId) {
+      setActivePianoRoll(null);
+    }
+  };
+
+  // Create a new note with history tracking
+  const createNote = async (trackId: string, note: Note) => {
+    if (!store) return;
+    
+    // Get current notes for this track
+    const trackNotes = notesByTrack[trackId] || [];
+    
+    // Create a note with the trackId embedded
+    const noteWithTrackId = { ...note, trackId };
+    
+    // Create a history action
+    const action = new NoteCreateAction(
+      store,
+      (newNotes) => {
+        setNotesByTrack(prev => ({
+          ...prev,
+          [trackId]: newNotes
+        }));
+      },
+      noteWithTrackId,
+      trackNotes
+    );
+    
+    // Execute the action through history manager
+    await historyManager.executeAction(action);
+  };
+
+  // Move a note with history tracking
+  const moveNote = async (trackId: string, noteId: number, oldPos: { x: number, y: number }, newPos: { x: number, y: number }) => {
+    if (!store) return;
+    
+    // Get current notes for this track
+    const trackNotes = notesByTrack[trackId] || [];
+    
+    // Create a history action
+    const action = new NoteMoveAction(
+      store,
+      (newNotes) => {
+        setNotesByTrack(prev => ({
+          ...prev,
+          [trackId]: newNotes
+        }));
+      },
+      noteId,
+      oldPos,
+      newPos,
+      trackNotes
+    );
+    
+    // Execute the action through history manager
+    await historyManager.executeAction(action);
+  };
+
+  // Resize a note with history tracking
+  const resizeNote = async (trackId: string, noteId: number, oldLength: number, newLength: number, oldColumn?: number, newColumn?: number) => {
+    if (!store) return;
+    
+    // Get current notes for this track
+    const trackNotes = notesByTrack[trackId] || [];
+    
+    // Create a history action
+    const action = new NoteResizeAction(
+      store,
+      (newNotes) => {
+        setNotesByTrack(prev => ({
+          ...prev,
+          [trackId]: newNotes
+        }));
+      },
+      noteId,
+      oldLength,
+      newLength,
+      trackNotes,
+      oldColumn,
+      newColumn
+    );
+    
+    // Execute the action through history manager
+    await historyManager.executeAction(action);
+  };
+
+  // Play a preview of a note
+  const playPreview = (midiNote: number) => {
+    if (!store || !activePianoRoll) return;
+    
+    // Get the track to find its instrument
+    const track = store.getMidiTrackById?.(activePianoRoll);
+    if (!track) return;
+    
+    // Play the note using the instrument manager
+    store.getInstrumentManager()?.playNote(track.instrumentId, midiNote);
+  };
+
+  // Stop a preview note
+  const stopPreview = (midiNote: number) => {
+    if (!store || !activePianoRoll) return;
+    
+    // Get the track to find its instrument
+    const track = store.getMidiTrackById?.(activePianoRoll);
+    if (!track) return;
+    
+    // Stop the note using the instrument manager
+    store.getInstrumentManager()?.stopNote(track.instrumentId, midiNote);
+  };
+
+  // Create context value
+  const contextValue: PianoRollContextType = {
+    activePianoRoll,
+    openedPianoRolls,
+    notesByTrack,
+    openPianoRoll,
+    closePianoRoll,
+    createNote,
+    moveNote,
+    resizeNote,
+    playPreview,
+    stopPreview
+  };
+
+  return (
+    <PianoRollContext.Provider value={contextValue}>
+      {children}
+    </PianoRollContext.Provider>
+  );
+};
+
+// Hook to use the piano roll context
+export const usePianoRoll = (): PianoRollContextType => {
+  const context = useContext(PianoRollContext);
+  if (!context) {
+    throw new Error('usePianoRoll must be used within a PianoRollProvider');
+  }
+  return context;
+};
