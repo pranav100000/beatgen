@@ -412,7 +412,7 @@ export class TransportController implements Transport {
 
     public async loadAudioFile(trackId: string, file: File): Promise<void> {
         try {
-            await this.audioEngine.createTrack(trackId, file);
+            await this.audioEngine.createTrack(trackId, file.name, file);
             
             const track = this.audioEngine.getAllTracks().find(t => t.id === trackId);
             if (!track?.player) {

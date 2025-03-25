@@ -101,7 +101,7 @@ export class MidiManager implements MidiManagerInterface {
     };
   }
 
-  createTrack(instrumentId: string, name: string = `Track ${instrumentId}`): MidiTrack {
+  createTrack(instrumentId: string, name: string): MidiTrack {
     const trackId = uuidv4();
     // Initialize with empty notes array
     this.tracks.set(trackId, []);
@@ -201,7 +201,7 @@ export class MidiManager implements MidiManagerInterface {
    */
   async createTrackWithPersistence(
     instrumentId: string, 
-    name: string = `Track ${instrumentId}`
+    name: string = `Trackkeeee ${instrumentId}`
   ): Promise<MidiTrack> {
     // Create the track in memory
     const track = this.createTrack(instrumentId, name);
@@ -262,8 +262,8 @@ export class MidiManager implements MidiManagerInterface {
     
     // Get track name if available
     const trackName = this.tracks.get(trackId) 
-      ? `Track ${trackId}` // Fallback name
-      : `Track ${trackId}`;
+      ? `Tracko ${trackId}` // Fallback name
+      : `Trackee ${trackId}`;
     
     // Schedule a new update
     const timeoutId = setTimeout(async () => {
@@ -385,7 +385,7 @@ export class MidiManager implements MidiManagerInterface {
     notes: Note[], 
     bpm: number, 
     timeSignature: [number, number],
-    trackName: string = `Track ${trackId}`
+    trackName: string = `Midi Track`
   ): Promise<void> {
     try {
       console.log(`MidiManager: Updating MIDI file for track ${trackId} with ${notes.length} notes`);

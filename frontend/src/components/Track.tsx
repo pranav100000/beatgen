@@ -3,6 +3,7 @@ import { Position } from '../core/types/track';
 import TrackPreview from './track-preview/TrackPreview';
 
 interface TrackProps {
+  name: string;
   index: number;
   type: string;
   audioFile?: File;
@@ -22,6 +23,7 @@ interface TrackProps {
 // Updated Track component that simply passes props to the new TrackPreview
 function Track(props: TrackProps) {
   const { 
+    name,
     id, 
     type, 
     audioFile, 
@@ -40,6 +42,7 @@ function Track(props: TrackProps) {
 
   // Convert the props to the format expected by TrackPreview
   const trackState = {
+    name,
     id,
     type: type as 'audio' | 'midi' | 'video',
     audioFile,
@@ -47,7 +50,6 @@ function Track(props: TrackProps) {
     duration,
     _calculatedWidth,
     // Add other required props with default values
-    name: `Track ${id}`,
     muted: false,
     soloed: false,
     volume: 0,

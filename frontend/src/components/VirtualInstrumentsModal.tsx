@@ -1,8 +1,22 @@
-import { Box, Modal, IconButton, Typography, Grid } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { 
+  Box, 
+  Modal, 
+  IconButton, 
+  Typography, 
+  Grid, 
+  Accordion, 
+  AccordionSummary, 
+  AccordionDetails,
+  CircularProgress,
+  Alert
+} from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PianoIcon from '@mui/icons-material/Piano';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { SvgIconComponent } from '@mui/icons-material';
+import { getPublicSoundfonts, getSoundfontDownloadUrl, Soundfont } from '../api/soundfonts';
 
 interface Instrument {
   id: string;
@@ -50,16 +64,112 @@ const instruments: Instrument[] = [
   }
 ];
 
+// Map of instrument categories to colors
+const categoryColors: Record<string, string> = {
+  piano: '#2ECC71',
+  synth: '#3498DB',
+  strings: '#9B59B6',
+  bass: '#E67E22',
+  organ: '#E74C3C',
+  pad: '#1ABC9C',
+  brass: '#F1C40F',
+  woodwind: '#16A085',
+  drum: '#FF5722',
+  default: '#607D8B'
+};
+
+// Get color for a category
+const getCategoryColor = (category: string): string => {
+  return categoryColors[category] || categoryColors.default;
+};
+
+// Get icon for a category
+const getCategoryIcon = (category: string): SvgIconComponent => {
+  if (category === 'piano') return PianoIcon;
+  return MusicNoteIcon;
+};
+
 export interface VirtualInstrumentsModalProps {
   open: boolean;
   onClose: () => void;
-  onSelect: (instrumentId: string) => void;
+  onSelect: (instrumentId: string, displayName: string) => void;
 }
 
 export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInstrumentsModalProps) => {
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [soundfonts, setSoundfonts] = useState<Soundfont[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  // Fetch available soundfonts when the modal opens
+  useEffect(() => {
+    if (open) {
+      fetchSoundfonts();
+    }
+  }, [open]);
+
+  const fetchSoundfonts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const data = await getPublicSoundfonts();
+      setSoundfonts(data);
+      console.log('Fetched soundfonts:', data);
+    } catch (err) {
+      console.error('Error fetching soundfonts:', err);
+      setError('Failed to load soundfonts from library');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSelect = (instrumentId: string) => {
-    onSelect(instrumentId);
+    // Find the selected instrument to get its name
+    const instrument = instruments.find(i => i.id === instrumentId);
+    if (!instrument) {
+      console.error(`Instrument with ID ${instrumentId} not found`);
+      return;
+    }
+    onSelect(instrumentId, instrument.name);
     onClose();
+  };
+
+  const handleSoundfontSelect = async (soundfont: Soundfont) => {
+    try {
+      setDownloading(soundfont.id);
+      setError(null);
+      
+      // Get download URL
+      const downloadUrl = getSoundfontDownloadUrl(soundfont.storage_key);
+      
+      console.log(`Downloading soundfont: ${soundfont.display_name} from ${downloadUrl}`);
+      
+      // Attempt to download the soundfont
+      const response = await fetch(downloadUrl);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.statusText}`);
+      }
+      
+      // Get the binary data
+      const soundfontData = await response.arrayBuffer();
+      console.log(`Downloaded soundfont: ${soundfontData.byteLength} bytes`);
+      
+      // Here you would typically store the soundfont data or process it
+      // For now we'll just notify that it's been downloaded successfully
+      
+      // Call onSelect with the soundfont ID and display name
+      onSelect(soundfont.id, soundfont.display_name);
+      onClose();
+      
+    } catch (err) {
+      console.error('Error downloading soundfont:', err);
+      setError(`Failed to download: ${err.message}`);
+    } finally {
+      setDownloading(null);
+    }
   };
 
   return (
@@ -93,7 +203,16 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
             <CloseIcon />
           </IconButton>
         </Box>
-        <Grid container spacing={2}>
+        
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        
+        {/* Quick access - Common instruments */}
+        <Typography variant="subtitle1" sx={{ mb: 2 }}>Common Instruments</Typography>
+        <Grid container spacing={2} sx={{ mb: 3 }}>
           {instruments.map((instrument) => (
             <Grid item xs={12} sm={6} md={4} key={instrument.id}>
               <Box
@@ -135,6 +254,123 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
             </Grid>
           ))}
         </Grid>
+        
+        {/* Explore All Virtual Instruments section */}
+        <Accordion 
+          expanded={expanded}
+          onChange={() => setExpanded(!expanded)}
+          sx={{ 
+            bgcolor: 'rgba(255, 255, 255, 0.03)', 
+            color: 'white',
+            boxShadow: 'none',
+            '&:before': {
+              display: 'none',
+            },
+            borderRadius: 2,
+          }}
+        >
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon sx={{ color: 'white' }} />}
+            sx={{ 
+              borderRadius: 2,
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.05)'
+              }
+            }}
+          >
+            <Typography variant="subtitle1">Explore All Virtual Instruments</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress size={40} />
+              </Box>
+            ) : soundfonts.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" align="center" sx={{ p: 2 }}>
+                No virtual instruments found in the library
+              </Typography>
+            ) : (
+              <Grid container spacing={2}>
+                {soundfonts.map((soundfont) => {
+                  const isDownloading = downloading === soundfont.id;
+                  const color = getCategoryColor(soundfont.category);
+                  const Icon = getCategoryIcon(soundfont.category);
+                  
+                  return (
+                    <Grid item xs={12} sm={6} md={4} key={soundfont.id}>
+                      <Box
+                        onClick={() => !isDownloading && handleSoundfontSelect(soundfont)}
+                        sx={{
+                          bgcolor: 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: 2,
+                          p: 2,
+                          cursor: isDownloading ? 'wait' : 'pointer',
+                          transition: 'all 0.2s',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            transform: isDownloading ? 'none' : 'translateY(-2px)'
+                          },
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 2,
+                          position: 'relative'
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            bgcolor: color,
+                            borderRadius: 2,
+                            p: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 64,
+                            height: 64
+                          }}
+                        >
+                          <Icon sx={{ fontSize: 32, color: 'white' }} />
+                        </Box>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="subtitle1">
+                            {soundfont.display_name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {soundfont.category}
+                          </Typography>
+                        </Box>
+                        
+                        {/* Loading overlay */}
+                        {isDownloading && (
+                          <Box sx={{ 
+                            position: 'absolute', 
+                            top: 0, 
+                            left: 0, 
+                            right: 0, 
+                            bottom: 0, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            bgcolor: 'rgba(0,0,0,0.7)',
+                            borderRadius: 2,
+                            zIndex: 2
+                          }}>
+                            <Box sx={{ textAlign: 'center' }}>
+                              <CircularProgress size={40} sx={{ mb: 1 }} />
+                              <Typography variant="caption" display="block">
+                                Downloading...
+                              </Typography>
+                            </Box>
+                          </Box>
+                        )}
+                      </Box>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            )}
+          </AccordionDetails>
+        </Accordion>
       </Box>
     </Modal>
   );

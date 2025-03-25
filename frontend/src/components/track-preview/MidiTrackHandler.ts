@@ -292,7 +292,7 @@ export class MidiTrackHandler implements TrackTypeHandler {
         const instrumentId = track.id;
         
         // Create a new MidiTrack with the MidiManager for synchronization
-        const midiTrack = new MidiTrack(track.id, instrumentId, [], midiManager);
+        const midiTrack = new MidiTrack("midi track", track.id, instrumentId, [], midiManager);
         
         // Cache the track for future use
         this.midiTrackCache.set(track.id, midiTrack);

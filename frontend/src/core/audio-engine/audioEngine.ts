@@ -46,7 +46,7 @@ class AudioEngine {
     }
   }
 
-  public async createTrack(id: string, audioFile?: File): Promise<AudioTrack> {
+  public async createTrack(id: string, name: string, audioFile?: File): Promise<AudioTrack> {
     console.log(`Creating track ${id}, cleaning up existing...`);
     this.removeTrack(id);
 
@@ -59,11 +59,11 @@ class AudioEngine {
     channel.volume.value = convertVolumeToDecibels(defaultVolume, false);
     
     // Get track name from the filename if available
-    let trackName = audioFile ? audioFile.name.split('.')[0] : `Track ${id}`;
+    let trackName = audioFile ? audioFile.name.split('.')[0] : "MIDI Instrument";
     
     const track: AudioTrack = {
       id,
-      name: trackName,
+      name: name,
       channel,
       volume: defaultVolume,
       pan: 0,
