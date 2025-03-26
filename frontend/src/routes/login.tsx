@@ -1,0 +1,200 @@
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import React, { useState } from 'react'
+import { publicRoute } from '../platform/auth/auth-utils.tsx'
+import { useAuth } from '../platform/auth/auth-context'
+import Navbar from '../platform/components/Navbar'
+import { 
+  Box, 
+  Typography, 
+  TextField, 
+  Button, 
+  Card, 
+  CardContent,
+  Container,
+  Snackbar,
+  Alert,
+  CircularProgress
+} from '@mui/material'
+
+// Login route - this will render at the path '/login'
+export const Route = createFileRoute('/login')({
+  component: LoginPage,
+  // Redirect if already logged in
+  ...publicRoute('/home'),
+})
+
+function LoginPage() {
+  const navigate = useNavigate();
+  const { signIn } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    
+    // Clear any existing token to avoid issues
+    localStorage.removeItem('access_token');
+    
+    try {
+      console.log('Login attempt with email:', email);
+      
+      // Use the auth context to sign in
+      const result = await signIn(email, password);
+      console.log('Login result:', result);
+      
+      if (result.success) {
+        console.log('Login successful, redirecting to home page');
+        
+        // Ensure we have time to set the token before navigating
+        setTimeout(() => {
+          // Force reload to ensure auth state is updated
+          window.location.href = '/home';
+        }, 100);
+      } else {
+        console.warn('Login failed:', result);
+        
+        // Handle specific login error cases
+        if (result.message) {
+          setError(result.message);
+        } else if (result.error) {
+          // Handle known error types
+          if (result.error.message.includes('Network Error')) {
+            setError('Cannot connect to the authentication server. Please check your internet connection or try again later.');
+          } else {
+            setError(result.error.message || 'Invalid email or password');
+          }
+        } else {
+          setError('Authentication failed. Please check your credentials and try again.');
+        }
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      
+      // Display user-friendly error message
+      if (err instanceof Error) {
+        if (err.message.includes('Network Error')) {
+          setError('Cannot connect to the server. Please check your internet connection.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('An unexpected error occurred. Please try again later.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  return (
+    <Container maxWidth="sm" sx={{ 
+      height: '100vh', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      bgcolor: '#000',
+      color: 'white'
+    }}>
+      <Card sx={{ width: '100%', p: 2, bgcolor: '#111', color: 'white' }}>
+        <CardContent>
+          <Typography variant="h4" component="h1" gutterBottom textAlign="center">
+            Log In to BeatGen
+          </Typography>
+          
+          <Box component="form" onSubmit={handleLogin} sx={{ mt: 3 }}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="email"
+              label="Email Address"
+              name="email"
+              autoComplete="email"
+              autoFocus
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              sx={{
+                '& .MuiInputBase-input': { color: 'white' },
+                '& .MuiInputLabel-root': { color: '#aaa' },
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': { borderColor: '#333' },
+                  '&:hover fieldset': { borderColor: '#666' },
+                }
+              }}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              name="password"
+              label="Password"
+              type="password"
+              id="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              sx={{
+                '& .MuiInputBase-input': { color: 'white' },
+                '& .MuiInputLabel-root': { color: '#aaa' },
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': { borderColor: '#333' },
+                  '&:hover fieldset': { borderColor: '#666' },
+                }
+              }}
+            />
+            
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              disabled={isLoading}
+              sx={{ mt: 3, mb: 2, position: 'relative' }}
+            >
+              {isLoading ? (
+                <>
+                  <CircularProgress
+                    size={24}
+                    sx={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      marginTop: '-12px',
+                      marginLeft: '-12px',
+                    }}
+                  />
+                  Signing In...
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </Button>
+            
+            <Box sx={{ mt: 2, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Don't have an account?{' '}
+                <Button
+                  variant="text"
+                  color="primary"
+                  size="small"
+                  onClick={() => navigate({ to: '/register' })}
+                  sx={{ textTransform: 'none', p: 0, minWidth: 'auto', verticalAlign: 'baseline' }}
+                >
+                  Sign up
+                </Button>
+              </Typography>
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
+      
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
+        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
+    </Container>
+  );
+}

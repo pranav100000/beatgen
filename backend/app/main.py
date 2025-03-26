@@ -15,10 +15,13 @@ logger = logging.getLogger("beatgen")
 
 app = FastAPI(title="BeatGen API", description="Backend API for BeatGen DAW", version="0.1.0")
 
+# Disable automatic redirect of trailing slashes to make endpoints work with or without them
+app.router.redirect_slashes = False
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend
+    allow_origins=["http://localhost:5173"],  # React and Vite frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

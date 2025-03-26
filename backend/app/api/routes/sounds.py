@@ -169,6 +169,7 @@ async def get_upload_url(
             detail=f"Failed to generate upload URL: {str(e)}"
         )
 
+@router.post("", response_model=Sound)
 @router.post("/", response_model=Sound)
 async def create_sound(
     request: Request,
@@ -257,6 +258,7 @@ async def create_sound(
             detail=f"Failed to create sound record: {str(e)}"
         )
 
+@router.get("", response_model=List[Sound])
 @router.get("/", response_model=List[Sound])
 async def get_sounds(
     request: Request,

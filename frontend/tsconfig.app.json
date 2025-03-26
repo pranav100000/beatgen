@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": false,
+    
+    /* Path aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": ["../old_code/*"],
+      "@core/*": ["../old_code/core/*"],
+      "@components/*": ["../old_code/components/*"],
+      "@constants/*": ["../old_code/constants/*"],
+      "@utils/*": ["../old_code/utils/*"],
+      "@api/*": ["../old_code/api/*"]
+    }
+  },
+  "include": [
+    "src/studio",
+    "../old_code/core/**/*",
+    "../old_code/components/**/*",
+    "../old_code/constants/**/*",
+    "../old_code/utils/**/*",
+    "../old_code/api/**/*",
+    "../old_code/pages/NewProject.tsx"
+, "src/vite-env.d.ts", "src/platform/pages"  ]
+}

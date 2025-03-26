@@ -20,7 +20,7 @@ class Settings(BaseModel):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # CORS settings
-    CORS_ORIGINS: list = ["http://localhost:3000"]
+    CORS_ORIGINS: list = ["http://localhost:5173"]
 
     # Database settings
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
