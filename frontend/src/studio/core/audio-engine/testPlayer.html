@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soundfont MIDI Player Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    button {
+      padding: 10px 15px;
+      margin: 5px;
+      cursor: pointer;
+    }
+    #log {
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 300px;
+      overflow: auto;
+      margin-top: 20px;
+      font-family: monospace;
+      background-color: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <h1>Soundfont MIDI Player Test</h1>
+  
+  <div>
+    <button id="loadBtn">Load Files</button>
+    <button id="playBtn" disabled>Play</button>
+    <button id="pauseBtn" disabled>Pause</button>
+    <button id="stopBtn" disabled>Stop</button>
+  </div>
+  
+  <div id="log"></div>
+  
+  <script>
+    // Add logging functions
+    const logElement = document.getElementById('log');
+    
+    function log(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      const logItem = document.createElement('div');
+      logItem.textContent = `[${timestamp}] ${message}`;
+      logElement.appendChild(logItem);
+      logElement.scrollTop = logElement.scrollHeight;
+      console.log(message);
+    }
+    
+    function logError(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      const logItem = document.createElement('div');
+      logItem.textContent = `[${timestamp}] ERROR: ${message}`;
+      logItem.style.color = 'red';
+      logElement.appendChild(logItem);
+      logElement.scrollTop = logElement.scrollHeight;
+      console.error(message);
+    }
+    
+    // Load script dynamically
+    function loadScript(url) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
+        document.head.appendChild(script);
+      });
+    }
+    
+    // Simple implementation of SoundfontMidiPlayer
+    class SoundfontMidiPlayer {
+      constructor() {
+        this.ctx = new AudioContext();
+        this.synth = null;
+        this.seq = null;
+        this.playing = false;
+      }
+      
+      async load(soundfontUrl, midiUrl) {
+        try {
+          log(`Loading worklet...`);
+          await this.ctx.audioWorklet.addModule('https://cdn.jsdelivr.net/npm/spessasynth@latest/dist/worklet_processor.min.js');
+          
+          log(`Loading soundfont from ${soundfontUrl}...`);
+          const sfResponse = await fetch(soundfontUrl);
+          const sfData = new Uint8Array(await sfResponse.arrayBuffer());
+          
+          log(`Creating synthesizer...`);
+          this.synth = new Synthetizer(this.ctx.destination, sfData, true);
+          
+          log(`Loading MIDI from ${midiUrl}...`);
+          const midiResponse = await fetch(midiUrl);
+          const midiData = new Uint8Array(await midiResponse.arrayBuffer());
+          
+          log(`Parsing MIDI data...`);
+          const midi = new MIDI(midiData, "midi");
+          
+          log(`Creating sequencer...`);
+          this.seq = new Sequencer([midi], this.synth, { autoPlay: false });
+          
+          log(`Player ready!`);
+          
+          // Enable audio on first user interaction
+          document.addEventListener('click', () => this.ctx.resume(), { once: true });
+        } catch (error) {
+          logError(`Failed to load: ${error.message}`);
+          throw error;
+        }
+      }
+      
+      play() {
+        if (!this.playing && this.seq) {
+          log(`Starting playback...`);
+          this.ctx.resume();
+          this.seq.play();
+          this.playing = true;
+        }
+      }
+      
+      pause() {
+        if (this.playing && this.seq) {
+          log(`Pausing playback...`);
+          this.seq.pause();
+          this.playing = false;
+        }
+      }
+      
+      stop() {
+        if (this.seq) {
+          log(`Stopping playback...`);
+          this.seq.stop();
+          this.playing = false;
+        }
+      }
+      
+      isActive() {
+        return this.playing;
+      }
+    }
+    
+    // Main test function
+    async function runTest() {
+      // First, load the spessasynth library
+      try {
+        log('Loading spessasynth library...');
+        await loadScript('https://cdn.jsdelivr.net/npm/spessasynth@latest/dist/spessasynth.min.js');
+        log('Library loaded successfully');
+        
+        // Extract the required classes
+        window.Synthetizer = window.spessasynth.Synthetizer;
+        window.Sequencer = window.spessasynth.Sequencer;
+        window.MIDI = window.spessasynth.MIDI;
+        
+        log('Ready to load files');
+        document.getElementById('loadBtn').disabled = false;
+      } catch (error) {
+        logError(`Failed to load library: ${error.message}`);
+      }
+    }
+    
+    // Player instance
+    let player = null;
+    
+    // Button event listeners
+    document.getElementById('loadBtn').addEventListener('click', async () => {
+      try {
+        document.getElementById('loadBtn').disabled = true;
+        
+        player = new SoundfontMidiPlayer();
+        log('Created player instance');
+        
+        // Use the file paths where the files are located
+        const soundfontUrl = 'AI-APiano01trans.SF2';
+        const midiUrl = 'Grand Piano.mid';
+        
+        await player.load(soundfontUrl, midiUrl);
+        
+        document.getElementById('playBtn').disabled = false;
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = true;
+      } catch (error) {
+        document.getElementById('loadBtn').disabled = false;
+        logError(`Failed to load files: ${error.message}`);
+      }
+    });
+    
+    document.getElementById('playBtn').addEventListener('click', () => {
+      if (player) {
+        player.play();
+        document.getElementById('playBtn').disabled = true;
+        document.getElementById('pauseBtn').disabled = false;
+        document.getElementById('stopBtn').disabled = false;
+      }
+    });
+    
+    document.getElementById('pauseBtn').addEventListener('click', () => {
+      if (player) {
+        player.pause();
+        document.getElementById('playBtn').disabled = false;
+        document.getElementById('pauseBtn').disabled = true;
+      }
+    });
+    
+    document.getElementById('stopBtn').addEventListener('click', () => {
+      if (player) {
+        player.stop();
+        document.getElementById('playBtn').disabled = false;
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = true;
+      }
+    });
+    
+    // Initialize
+    document.getElementById('loadBtn').disabled = true;
+    document.getElementById('playBtn').disabled = true;
+    document.getElementById('pauseBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = true;
+    
+    // Start the test
+    runTest();
+  </script>
+</body>
+</html>

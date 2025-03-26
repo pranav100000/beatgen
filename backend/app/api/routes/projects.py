@@ -9,6 +9,7 @@ from app.schemas.project import Project, ProjectCreate, ProjectUpdate, Track
 
 router = APIRouter()
 
+@router.get("", response_model=List[Project])
 @router.get("/", response_model=List[Project])
 async def get_projects(
     current_user: dict = Depends(get_current_user)
@@ -66,6 +67,7 @@ async def get_projects(
             detail=f"Error retrieving projects: {str(e)}"
         )
 
+@router.post("", response_model=Project)
 @router.post("/", response_model=Project)
 async def create_project(
     project_data: ProjectCreate,
