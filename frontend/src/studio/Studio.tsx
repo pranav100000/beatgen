@@ -230,8 +230,45 @@ function Studio({ projectId }: StudioProps) {
           position: 'absolute',
           top: 10,
           right: 10,
-          zIndex: 9999
+          zIndex: 9999,
+          display: 'flex',
+          gap: 1
         }}>
+          <Button 
+            variant="contained" 
+            color="primary"
+            size="small"
+            href="/midi-test"
+            sx={{ 
+              fontSize: '0.75rem', 
+              bgcolor: '#5d4fdf', 
+              '&:hover': { bgcolor: '#4231d5' } 
+            }}
+          >
+            MIDI Player Test
+          </Button>
+          <Button 
+            variant="contained" 
+            color="secondary"
+            size="small"
+            href="/midi-direct-test"
+            sx={{ 
+              fontSize: '0.75rem'
+            }}
+          >
+            Direct MIDI Test
+          </Button>
+          <Button 
+            variant="contained" 
+            color="success"
+            size="small"
+            href="/simple-midi-test"
+            sx={{ 
+              fontSize: '0.75rem'
+            }}
+          >
+            Simple MIDI Test
+          </Button>
         </Box>
         {/* Left Sidebar */}
         <Box sx={{ 

@@ -6,8 +6,8 @@ import { convertVolumeToDecibels } from '../../utils/audioProcessing';
 // Load SpessaSynth dynamically
 let SpessaSynth: any = null;
 // We'll import SpessaSynth dynamically to avoid issues with SSR
-import('spessasynth').then(module => {
-  SpessaSynth = module.default;
+import('spessasynth_lib').then(module => {
+  SpessaSynth = module;
   console.log('SpessaSynth loaded');
 }).catch(err => {
   console.error('Failed to load SpessaSynth:', err);
@@ -106,21 +106,11 @@ class MidiPlayer {
       // Get the soundfont data
       const soundfontData = await this.soundfontManager.getSoundfont(track.instrumentId);
       
-      // Create a new SpessaSynth instance
-      const synth = new SpessaSynth();
+      // Create a new Synthetizer instance (from spessasynth_lib)
+      const synth = new SpessaSynth.Synthetizer(track.channel!, soundfontData, true);
       
-      // Load the soundfont
-      await synth.loadSoundfont(soundfontData);
-      
-      // Create an audio node to connect to Tone.js
-      const node = Tone.getContext().createMediaStreamDestination();
-      const audioNode = Tone.getContext().createMediaStreamSource(node.stream);
-      
-      // Connect to the track's channel
-      audioNode.connect(track.channel!);
-      
-      // Set the output destination on the synth
-      synth.outputDestination = node;
+      // No need to manually load the soundfont or set output destination,
+      // as the Synthetizer constructor handles this
       
       // Store the synth on the track
       track.synth = synth;

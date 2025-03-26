@@ -1,56 +1,96 @@
-// Simple test for SoundfontMidiPlayer
-import { SoundfontMidiPlayer } from './soundfontMidiPlayer';
+import { Synthetizer, Sequencer, MIDI } from 'spessasynth_lib';
 
 /**
- * This function tests the SoundfontMidiPlayer by:
- * 1. Creating a player instance
- * 2. Loading the soundfont and MIDI files
- * 3. Playing the MIDI file with the soundfont
+ * Simple test function to load and play a MIDI file with a soundfont
  */
-export async function testMidiPlayer(): Promise<SoundfontMidiPlayer> {
-  console.log('Starting MIDI player test...');
-  
+export async function testMidiPlayback(): Promise<void> {
   try {
-    // Create a new player instance
-    const player = new SoundfontMidiPlayer();
-    console.log('Created SoundfontMidiPlayer instance');
+    console.log('Starting MIDI player test...');
     
-    // Paths to the soundfont and MIDI files - they're in the same directory
-    // with relative paths from the public directory
-    const soundfontUrl = '/AI-APiano01trans.SF2';
-    const midiUrl = '/Grand Piano.mid';
+    // Create audio context
+    const ctx = new AudioContext();
     
-    console.log(`Loading soundfont from: ${soundfontUrl}`);
-    console.log(`Loading MIDI from: ${midiUrl}`);
+    // Try to resume the audio context (needed for browsers with autoplay policy)
+    await ctx.resume();
+    console.log('Audio context created and resumed');
     
-    // Load the soundfont and MIDI file
-    await player.load(soundfontUrl, midiUrl);
-    console.log('Successfully loaded soundfont and MIDI file');
+    // Load the worklet module (this might be needed for some browsers)
+    try {
+      await ctx.audioWorklet.addModule('/worklet_processor.min.js');
+      console.log('Audio worklet module loaded');
+    } catch (error) {
+      console.error('Failed to load audio worklet module:', error);
+      console.log('Continuing without worklet module...');
+    }
+    
+    // Load soundfont file
+    console.log('Loading soundfont file...');
+    const soundfontResponse = await fetch('/AI-APiano01trans.SF2');
+    if (!soundfontResponse.ok) {
+      throw new Error(`Failed to load soundfont: ${soundfontResponse.status} ${soundfontResponse.statusText}`);
+    }
+    const soundfontData = new Uint8Array(await soundfontResponse.arrayBuffer());
+    console.log(`Soundfont loaded (${soundfontData.length} bytes)`);
+    
+    // Create synthesizer
+    console.log('Creating synthesizer...');
+    const synth = new Synthetizer(ctx.destination, soundfontData, true);
+    console.log('Synthesizer created');
+    
+    // Load MIDI file
+    console.log('Loading MIDI file...');
+    const midiResponse = await fetch('/Grand Piano.mid');
+    if (!midiResponse.ok) {
+      throw new Error(`Failed to load MIDI file: ${midiResponse.status} ${midiResponse.statusText}`);
+    }
+    const midiData = new Uint8Array(await midiResponse.arrayBuffer());
+    console.log(`MIDI file loaded (${midiData.length} bytes)`);
+    
+    // Parse MIDI data
+    console.log('Parsing MIDI data...');
+    const midi = new MIDI(midiData, 'midi');
+    console.log('MIDI data parsed');
+    
+    // Create sequencer
+    console.log('Creating sequencer...');
+    const seq = new Sequencer([midi], synth, { autoPlay: false });
+    console.log('Sequencer created successfully');
     
     // Play the MIDI file
-    player.play();
-    console.log('Started playback');
+    console.log('Starting playback...');
+    seq.play();
+    console.log('Playback started');
     
-    // Return the player instance so we can control it later
-    return player;
+    // Return the sequencer for further control
+    return {
+      play: () => seq.play(),
+      pause: () => seq.pause(),
+      stop: () => seq.stop(),
+      isPlaying: () => seq.isPlaying(),
+      setPosition: (position: number) => seq.setTime(position)
+    };
   } catch (error) {
     console.error('Error in MIDI player test:', error);
     throw error;
   }
 }
 
-// Export a simple function to run the test from a UI component or console
-export function runMidiPlayerTest(): void {
-  testMidiPlayer()
-    .then((player) => {
+// Simple function to run the test
+export function runMidiTest(): void {
+  // Add a listener for user interaction before starting
+  const startTest = async () => {
+    try {
+      const player = await testMidiPlayback();
       console.log('Test completed successfully, playback started');
       
-      // Store the player in window for manual testing from console
+      // Store player controls in window for testing
       (window as any).__midiPlayer = player;
-      console.log('Player instance available as window.__midiPlayer for control via console');
-      console.log('Try: window.__midiPlayer.pause(), window.__midiPlayer.play(), window.__midiPlayer.stop()');
-    })
-    .catch((error) => {
+      console.log('Player controls available at window.__midiPlayer');
+    } catch (error) {
       console.error('Test failed:', error);
-    });
+    }
+  };
+  
+  document.addEventListener('click', startTest, { once: true });
+  console.log('Click anywhere to start the MIDI playback test');
 }

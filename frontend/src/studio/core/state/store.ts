@@ -3,6 +3,7 @@ import { TransportController } from './transport';
 import { MidiManager } from '../midi/MidiManager';
 import { InstrumentManager } from '../instruments/InstrumentManager';
 import AudioEngine from '../audio-engine/audioEngine';
+import MidiPlayer from '../audio-engine/midiPlayer';
 import { TrackState } from '../types/track';
 import * as Tone from 'tone';
 
@@ -18,6 +19,7 @@ export interface DrumPad {
 export interface StoreInterface {
   getAudioEngine(): AudioEngine;
   getTransport(): TransportController;
+  getMidiPlayer(): MidiPlayer;
   projectManager: ProjectManager;
   initializeAudio(): Promise<void>;
   createTrack(
@@ -42,6 +44,7 @@ export class Store implements StoreInterface {
   private initialized: boolean = false;
   private midiManager: MidiManager;
   private instrumentManager: InstrumentManager;
+  private midiPlayer: MidiPlayer;
   private _tracks: TrackState[] = []; // Array of tracks
   private _listeners: Function[] = []; // Track change listeners
 
@@ -51,6 +54,7 @@ export class Store implements StoreInterface {
     this.transportController = new TransportController();
     this.midiManager = new MidiManager();
     this.instrumentManager = new InstrumentManager();
+    this.midiPlayer = MidiPlayer.getInstance();
     
     // Initialize with project defaults
     const project = this.projectManager.getCurrentProject();
@@ -272,6 +276,10 @@ export class Store implements StoreInterface {
 
   public getMidiManager(): MidiManager {
     return this.midiManager;
+  }
+  
+  public getMidiPlayer(): MidiPlayer {
+    return this.midiPlayer;
   }
 
   /**

@@ -179,7 +179,7 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
     
     if (!noteExists) {
       const newNote: Note = {
-        id: Date.now(), // Use timestamp as unique ID
+        id: Math.floor(Math.random() * 1000000000), // Use random number for unique ID
         row: actualRow,
         column,
         length: 1,

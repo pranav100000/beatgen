@@ -12,7 +12,10 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as StudioImport } from './routes/studio'
+import { Route as SimpleMidiTestImport } from './routes/simple-midi-test'
 import { Route as RegisterImport } from './routes/register'
+import { Route as MidiTestImport } from './routes/midi-test'
+import { Route as MidiDirectTestImport } from './routes/midi-direct-test'
 import { Route as LoginImport } from './routes/login'
 import { Route as HomeImport } from './routes/home'
 import { Route as IndexImport } from './routes/index'
@@ -25,9 +28,27 @@ const StudioRoute = StudioImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const SimpleMidiTestRoute = SimpleMidiTestImport.update({
+  id: '/simple-midi-test',
+  path: '/simple-midi-test',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const RegisterRoute = RegisterImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const MidiTestRoute = MidiTestImport.update({
+  id: '/midi-test',
+  path: '/midi-test',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const MidiDirectTestRoute = MidiDirectTestImport.update({
+  id: '/midi-direct-test',
+  path: '/midi-direct-test',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -74,11 +95,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginImport
       parentRoute: typeof rootRoute
     }
+    '/midi-direct-test': {
+      id: '/midi-direct-test'
+      path: '/midi-direct-test'
+      fullPath: '/midi-direct-test'
+      preLoaderRoute: typeof MidiDirectTestImport
+      parentRoute: typeof rootRoute
+    }
+    '/midi-test': {
+      id: '/midi-test'
+      path: '/midi-test'
+      fullPath: '/midi-test'
+      preLoaderRoute: typeof MidiTestImport
+      parentRoute: typeof rootRoute
+    }
     '/register': {
       id: '/register'
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterImport
+      parentRoute: typeof rootRoute
+    }
+    '/simple-midi-test': {
+      id: '/simple-midi-test'
+      path: '/simple-midi-test'
+      fullPath: '/simple-midi-test'
+      preLoaderRoute: typeof SimpleMidiTestImport
       parentRoute: typeof rootRoute
     }
     '/studio': {
@@ -97,7 +139,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/midi-direct-test': typeof MidiDirectTestRoute
+  '/midi-test': typeof MidiTestRoute
   '/register': typeof RegisterRoute
+  '/simple-midi-test': typeof SimpleMidiTestRoute
   '/studio': typeof StudioRoute
 }
 
@@ -105,7 +150,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/midi-direct-test': typeof MidiDirectTestRoute
+  '/midi-test': typeof MidiTestRoute
   '/register': typeof RegisterRoute
+  '/simple-midi-test': typeof SimpleMidiTestRoute
   '/studio': typeof StudioRoute
 }
 
@@ -114,16 +162,44 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/midi-direct-test': typeof MidiDirectTestRoute
+  '/midi-test': typeof MidiTestRoute
   '/register': typeof RegisterRoute
+  '/simple-midi-test': typeof SimpleMidiTestRoute
   '/studio': typeof StudioRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/home' | '/login' | '/register' | '/studio'
+  fullPaths:
+    | '/'
+    | '/home'
+    | '/login'
+    | '/midi-direct-test'
+    | '/midi-test'
+    | '/register'
+    | '/simple-midi-test'
+    | '/studio'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/home' | '/login' | '/register' | '/studio'
-  id: '__root__' | '/' | '/home' | '/login' | '/register' | '/studio'
+  to:
+    | '/'
+    | '/home'
+    | '/login'
+    | '/midi-direct-test'
+    | '/midi-test'
+    | '/register'
+    | '/simple-midi-test'
+    | '/studio'
+  id:
+    | '__root__'
+    | '/'
+    | '/home'
+    | '/login'
+    | '/midi-direct-test'
+    | '/midi-test'
+    | '/register'
+    | '/simple-midi-test'
+    | '/studio'
   fileRoutesById: FileRoutesById
 }
 
@@ -131,7 +207,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
+  MidiDirectTestRoute: typeof MidiDirectTestRoute
+  MidiTestRoute: typeof MidiTestRoute
   RegisterRoute: typeof RegisterRoute
+  SimpleMidiTestRoute: typeof SimpleMidiTestRoute
   StudioRoute: typeof StudioRoute
 }
 
@@ -139,7 +218,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
+  MidiDirectTestRoute: MidiDirectTestRoute,
+  MidiTestRoute: MidiTestRoute,
   RegisterRoute: RegisterRoute,
+  SimpleMidiTestRoute: SimpleMidiTestRoute,
   StudioRoute: StudioRoute,
 }
 
@@ -156,7 +238,10 @@ export const routeTree = rootRoute
         "/",
         "/home",
         "/login",
+        "/midi-direct-test",
+        "/midi-test",
         "/register",
+        "/simple-midi-test",
         "/studio"
       ]
     },
@@ -169,8 +254,17 @@ export const routeTree = rootRoute
     "/login": {
       "filePath": "login.tsx"
     },
+    "/midi-direct-test": {
+      "filePath": "midi-direct-test.tsx"
+    },
+    "/midi-test": {
+      "filePath": "midi-test.tsx"
+    },
     "/register": {
       "filePath": "register.tsx"
+    },
+    "/simple-midi-test": {
+      "filePath": "simple-midi-test.tsx"
     },
     "/studio": {
       "filePath": "studio.tsx"
