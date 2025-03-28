@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import { CloudUpload as CloudUploadIcon, Close as CloseIcon } from '@mui/icons-material';
 import { getUploadUrl, createSoundRecord } from '../api/sounds';
+import { processAudioFile as processAudioFileUtil } from '../../studio/utils/audioProcessing.ts';
 
 interface SoundUploaderProps {
   onSoundUploaded?: (soundId: string) => void;
@@ -24,7 +25,7 @@ export default function SoundUploader({ onSoundUploaded, onCancel }: SoundUpload
   const [soundName, setSoundName] = useState('');
 
   const processAudioFile = async (file: File) => {
-    const metadata = await processAudioFile(file);
+    const metadata = await processAudioFileUtil(file);
     return metadata;
   };
   

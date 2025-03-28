@@ -4,6 +4,7 @@ import { GRID_CONSTANTS, getTrackColor } from '../../constants/gridConstants';
 import { TrackState, Position } from '../../core/types/track';
 import WaveformDisplay from './WaveformDisplay';
 import { MidiNotesPreview } from '../piano-roll';
+import { useGridStore } from '../../core/state/gridStore';
 
 // Simplified TrackPreview component without complex handlers
 
@@ -35,11 +36,32 @@ const TrackPreview: React.FC<TrackPreviewProps> = ({
   const [startDragMousePosition, setStartDragMousePosition] = React.useState({ x: 0, y: 0 });
   const [startDragTrackPosition, setStartDragTrackPosition] = React.useState({ x: 0, y: 0 });
   const lastMovedPositionRef = React.useRef<Position>(track.position);
+  const measureWidth = useGridStore(state => state.measureWidth);
 
   // Calculate track width based on duration and BPM
   const trackWidth = React.useMemo(() => {
-    return track._calculatedWidth || 500;
-  }, [track._calculatedWidth]);
+    const [beatsPerMeasure, beatUnit] = timeSignature;
+    const beatsPerSecond = bpm / 60;
+    const totalBeats = (track.duration || 0) * beatsPerSecond;
+    
+    // Different calculation based on track type
+    if (track.type === 'audio') {
+      // Audio tracks: only use BPM
+      return totalBeats * (measureWidth / beatsPerMeasure);
+    } else {
+      // MIDI and drum tracks: use time signature
+      const beatAdjustment = beatUnit / 4;
+      const adjustedBeats = totalBeats * beatAdjustment;
+      const measuresCount = adjustedBeats / beatsPerMeasure;
+      return measuresCount * measureWidth;
+    }
+  }, [
+    track.duration,
+    track.type,
+    measureWidth,
+    // Only include relevant dependencies based on track type
+    ...(track.type === 'audio' ? [bpm] : [timeSignature])
+  ]);
 
   // Get track color based on track index
   const trackColor = getTrackColor(trackIndex);
@@ -471,7 +493,7 @@ const TrackPreview: React.FC<TrackPreviewProps> = ({
               />
               <MidiNotesPreview 
                 trackId={track.id}
-                width={typeof trackWidth === 'number' ? trackWidth : 500}
+                width={trackWidth}
                 height={GRID_CONSTANTS.trackHeight - 6}
                 trackColor={trackColor}
               />
@@ -516,30 +538,43 @@ const TrackPreview: React.FC<TrackPreviewProps> = ({
 
 // Wrap in React.memo with custom comparison that ignores volume and pan changes
 export default React.memo(TrackPreview, (prevProps, nextProps) => {
-  // Position changes should cause re-render
+  // Early return if track types don't match (shouldn't happen, but safe)
+  if (prevProps.track.type !== nextProps.track.type) {
+    return false;
+  }
+
+  const prevMeasureWidth = useGridStore.getState().measureWidth;
+  const nextMeasureWidth = useGridStore.getState().measureWidth;
+
+  // Always check measureWidth
+  if (prevMeasureWidth !== nextMeasureWidth) {
+    return false;
+  }
+
+  // Track-type specific checks
+  if (prevProps.track.type === 'audio') {
+    // Audio tracks only care about BPM changes
+    if (prevProps.bpm !== nextProps.bpm) {
+      return false;
+    }
+  } else {
+    // MIDI and drum tracks only care about time signature changes
+    if (prevProps.timeSignature?.[0] !== nextProps.timeSignature?.[0] ||
+        prevProps.timeSignature?.[1] !== nextProps.timeSignature?.[1]) {
+      return false;
+    }
+  }
+
+  // Common checks for all track types
   if (prevProps.track.position.x !== nextProps.track.position.x || 
-      prevProps.track.position.y !== nextProps.track.position.y) {
-    return false; // Different positions, should re-render
-  }
-  
-  // Muted state changes should cause re-render (affects opacity)
-  if (prevProps.track.muted !== nextProps.track.muted) {
-    return false; // Different muted state, should re-render
-  }
-  
-  // Compare other relevant track properties that affect visualization
-  if (prevProps.track._calculatedWidth !== nextProps.track._calculatedWidth) {
-    return false; // Different width, should re-render
-  }
-  
-  // Compare other necessary props
-  if (prevProps.isPlaying !== nextProps.isPlaying ||
+      prevProps.track.position.y !== nextProps.track.position.y ||
+      prevProps.track.muted !== nextProps.track.muted ||
+      prevProps.track._calculatedWidth !== nextProps.track._calculatedWidth ||
+      prevProps.isPlaying !== nextProps.isPlaying ||
       prevProps.currentTime !== nextProps.currentTime ||
-      prevProps.measureCount !== nextProps.measureCount ||
-      prevProps.bpm !== nextProps.bpm) {
-    return false; // Relevant props changed, should re-render
+      prevProps.measureCount !== nextProps.measureCount) {
+    return false;
   }
   
-  // Ignore volume and pan changes since they don't affect visualization
-  return true; // No relevant changes, skip re-render
+  return true;
 });

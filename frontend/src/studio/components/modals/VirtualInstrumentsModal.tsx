@@ -94,7 +94,7 @@ const getCategoryIcon = (category: string): SvgIconComponent => {
 export interface VirtualInstrumentsModalProps {
     open: boolean;
     onClose: () => void;
-    onSelect: (instrumentId: string, displayName: string) => void;
+    onSelect: (instrumentId: string, displayName: string, storageKey?: string) => void;
 }
 
 export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInstrumentsModalProps) => {
@@ -160,8 +160,8 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
                 console.log(`Soundfont ${soundfont.display_name} already in cache`);
             }
             
-            // Call onSelect with the soundfont ID and display name
-            onSelect(soundfont.id, soundfont.display_name);
+            // Call onSelect with the soundfont ID, display name, and storage key
+            onSelect(soundfont.id, soundfont.display_name, soundfont.storage_key);
             onClose();
             
         } catch (err) {

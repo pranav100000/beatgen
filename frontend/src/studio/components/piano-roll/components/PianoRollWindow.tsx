@@ -19,20 +19,7 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
   const { tracks } = useStudioStore();
   const track = tracks.find(t => t.id === trackId);
   
-  // Close handler
-  const handleClose = () => {
-    closePianoRoll(trackId);
-  };
-  
-  if (!track) return null;
-  
-  // Determine if this is a drum track or regular MIDI track
-  const isDrumTrack = track.type === 'drum';
-  
-  // Modal title based on track name and type
-  const modalTitle = `${isDrumTrack ? 'Drum Editor' : 'Piano Roll'} - ${track.name}`;
-  
-  // Calculate center position for the modal
+  // Calculate center position for the modal - IMPORTANT: Always call hooks at the top level
   const initialPosition = React.useMemo(() => {
     // Use window dimensions to center the modal
     const windowWidth = window.innerWidth;
@@ -45,6 +32,19 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
       y: Math.max(0, (windowHeight - modalHeight) / 3) // Position slightly above center
     };
   }, []);
+  
+  // Close handler
+  const handleClose = () => {
+    closePianoRoll(trackId);
+  };
+  
+  if (!track) return null;
+  
+  // Determine if this is a drum track or regular MIDI track
+  const isDrumTrack = track.type === 'drum';
+  
+  // Modal title based on track name and type
+  const modalTitle = `${isDrumTrack ? 'Drum Editor' : 'Piano Roll'} - ${track.name}`;
   
   return (
     <DraggableModal

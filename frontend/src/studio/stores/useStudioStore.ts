@@ -63,11 +63,11 @@ interface StudioState {
   handleTrackMuteToggle: (trackId: string, muted: boolean) => void;
   handleTrackSoloToggle: (trackId: string, soloed: boolean) => void;
   handleTrackDelete: (trackId: string) => Promise<void>;
-  handleAddTrack: (type: 'audio' | 'midi' | 'drum', instrumentId?: string, instrumentName?: string) => Promise<void>;
+  handleAddTrack: (type: 'audio' | 'midi' | 'drum', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => Promise<void>;
   handleTrackPositionChange: (trackId: string, newPosition: Position, isDragEnd: boolean) => void;
   uploadAudioFile: (file: File) => Promise<void>;
   handleTrackNameChange: (trackId: string, name: string) => void;
-  handleInstrumentChange: (trackId: string, instrumentId: string, instrumentName: string) => void;
+  handleInstrumentChange: (trackId: string, instrumentId: string, instrumentName: string, instrumentStorageKey: string) => void;
   
   // Transport Actions
   playPause: () => Promise<void>;
@@ -276,8 +276,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         keySignature: projectData.key_signature || 'C major'
       });
       
-      // Update the core engine state
-      store.projectManager.setProjectName(projectData.name);
+      // Create a new project in the ProjectManager
+      // This is necessary before we can add tracks
+      const newProject = store.projectManager.createProject(projectData.name);
+      
+      // Update the project properties
       store.projectManager.setTempo(projectData.bpm);
       store.projectManager.setTimeSignature(
         projectData.time_signature_numerator,
@@ -295,8 +298,21 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       const tracksPromises = projectData.tracks.map(async (apiTrack, index) => {
         console.log(`Processing track ${index}: ${apiTrack.name} (${apiTrack.type})`);
         
-        // Create the track in our engine
-        const newTrack = await store.createTrack(apiTrack.name, apiTrack.type as "audio" | "midi" | "drum" | "video");
+        // Create the track in our engine with existing data
+        const newTrack = await store.createTrack(
+          apiTrack.name, 
+          apiTrack.type as "audio" | "midi" | "drum",
+          {
+            id: apiTrack.id || crypto.randomUUID(),
+            volume: apiTrack.volume,
+            pan: apiTrack.pan,
+            muted: apiTrack.mute,
+            soloed: false,
+            instrumentId: apiTrack.instrument_id, // Map API names to internal names
+            instrumentName: apiTrack.instrument_name,
+            instrumentStorageKey: apiTrack.instrument_storage_key
+          }
+        );
         
         // Create the audio track in the engine
         const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, newTrack.name);
@@ -422,11 +438,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           ...audioTrack,
           position,
           duration,
-          type: apiTrack.type as "audio" | "midi" | "drum" | "video",
+          type: apiTrack.type as "audio" | "midi" | "drum",
           volume: apiTrack.volume,
           pan: apiTrack.pan,
           muted: apiTrack.mute,
           _calculatedWidth: calculatedWidth,
+          // Add instrument data if available (for MIDI and drum tracks)
+          instrumentId: apiTrack.instrument_id,
+          instrumentName: apiTrack.instrument_name,
+          instrumentStorageKey: apiTrack.instrument_storage_key,
           // Store original API data for reference
           dbId: apiTrack.id,
           storage_key: apiTrack.storage_key
@@ -446,6 +466,22 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       set({ tracks: trackStates });
       
       console.log(`Successfully loaded project with ${trackStates.length} tracks`);
+      
+      // Connect MIDI tracks to soundfonts if they have instruments assigned
+      for (const track of trackStates) {
+        if ((track.type === 'midi' || track.type === 'drum') && track.instrumentId) {
+          try {
+            console.log(`Connecting loaded track ${track.id} to soundfont ${track.instrumentId}${track.instrumentStorageKey ? ' (with storage key)' : ''}`);
+            await store.connectTrackToSoundfont(
+              track.id, 
+              track.instrumentId
+            );
+            console.log(`Successfully connected loaded track ${track.id} to soundfont ${track.instrumentId}`);
+          } catch (error) {
+            console.error(`Failed to connect loaded track ${track.id} to soundfont:`, error);
+          }
+        }
+      }
       
       // Store the project ID for later reference (saving, etc.)
       (window as any).loadedProjectId = projectId;
@@ -646,7 +682,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
   },
   
-  handleAddTrack: async (type: 'audio' | 'midi' | 'drum', instrumentId?: string, instrumentName?: string) => {
+  handleAddTrack: async (type: 'audio' | 'midi' | 'drum', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => {
     const { store, isInitialized, tracks, timeSignature, bpm } = get();
     if (!store || !isInitialized) {
       console.warn('Store not initialized');
@@ -678,7 +714,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             muted: false,
             soloed: false,
             instrumentId: instrumentId,
-            instrumentName: instrumentName
+            instrumentName: instrumentName,
+            instrumentStorageKey: instrumentStorageKey
           }
         newTrack = await store.createTrack(trackName, type, existingTrackData)
       } else {
@@ -732,9 +769,22 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         store,
         trackData,
         // Add track callback
-        (track) => {
+        async (track) => {
           console.log('History: Adding track:', track.id);
+          
+          // First add the track to the UI
           set(state => ({ tracks: [...state.tracks, track] }));
+          
+          // Connect track to soundfont if needed
+          if ((track.type === 'midi' || track.type === 'drum') && track.instrumentId) {
+            try {
+              console.log(`Connecting new track ${track.id} to soundfont ${track.instrumentId}`);
+              await store.connectTrackToSoundfont(track.id, track.instrumentId);
+              console.log(`Successfully connected track ${track.id} to soundfont ${track.instrumentId}`);
+            } catch (error) {
+              console.error(`Failed to connect track ${track.id} to soundfont:`, error);
+            }
+          }
         },
         // Remove track callback
         (id) => {
@@ -758,6 +808,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       });
 
       console.log(`Added new ${type} track (with history support):`, trackData);
+      
+      // TEMPORARILY COMMENTED OUT TO DEBUG UI ISSUES
+      // // Soundfont connection now happens inside the Track Add callback
     } catch (error) {
       console.error(`Failed to create ${type} track:`, error);
     }
@@ -938,20 +991,40 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     store.getAudioEngine().setTrackName(trackId, name);
   },
   
-  handleInstrumentChange: (trackId, instrumentId, instrumentName) => {
+  handleInstrumentChange: async (trackId, instrumentId, instrumentName, instrumentStorageKey) => {
     const { store, tracks } = get();
     if (!store) return;
     
     console.log(`Changing instrument for track ${trackId} to ${instrumentName} (${instrumentId})`);
     
-    // Update local state
+    // Update local state with instrumentStorageKey
     const updatedTracks = tracks.map(t => 
-      t.id === trackId ? { ...t, instrumentId, instrumentName } : t
+      t.id === trackId ? { ...t, instrumentId, instrumentName, instrumentStorageKey } : t
     );
     
     set({ tracks: updatedTracks });
     
-    // MidiPlayer update will be handled in the component
+    // Connect the track to the soundfont
+    try {
+      await store.connectTrackToSoundfont(trackId, instrumentId);
+      console.log(`Successfully connected track ${trackId} to soundfont ${instrumentId}`);
+      
+      // CRITICAL FIX: Get the updated track with storage_key from the Store
+      const updatedTrackData = store.getTrackById(trackId);
+      if (updatedTrackData && (updatedTrackData.type === 'midi' || updatedTrackData.type === 'drum') && updatedTrackData.instrumentStorageKey) {
+        // Update Zustand state with the storage key that was set in connectTrackToSoundfont
+        const tracksWithStorageKey = tracks.map(t => 
+          t.id === trackId ? { 
+            ...t, 
+            instrumentStorageKey: updatedTrackData.instrumentStorageKey 
+          } : t
+        );
+        set({ tracks: tracksWithStorageKey });
+        console.log(`Updated Zustand store with instrumentStorageKey: ${updatedTrackData.instrumentStorageKey} for track ${trackId}`);
+      }
+    } catch (error) {
+      console.error(`Failed to connect track ${trackId} to soundfont:`, error);
+    }
   },
   
   // Transport actions

@@ -22,6 +22,9 @@ class Track(TrackBase):
     left_trim_ms: int = 0
     track_number: int = 0
     right_trim_ms: int = 0
+    instrument_id: Optional[str] = None
+    instrument_name: Optional[str] = None
+    instrument_storage_key: Optional[str] = None
 
 
 class ProjectBase(BaseModel):

@@ -1,12 +1,20 @@
+import { useGridStore } from '../core/state/gridStore';
+
+// Create a function to get the current measure width
+export const getMeasureWidth = () => useGridStore.getState().measureWidth;
+
 export const GRID_CONSTANTS = {
   headerHeight: 28,
   trackHeight: 80,
   drumPadHeight: 20,
-  measureWidth: 200,
+  // Use getter function for measureWidth
+  get measureWidth() {
+    return getMeasureWidth();
+  },
   borderWidth: 1,
   borderColor: '#333',
   sidebarWidth: 200,
-  measureCount: 20,
+  measureCount: 10,
   pixelsPerSecond: 100,
   controlsWidth: 0,
   gridSubdivisions: 4,
@@ -22,14 +30,14 @@ export const GRID_CONSTANTS = {
   
   // Track color palette - 10 distinct colors distributed evenly around the color wheel
   trackColors: [
-    '#4CAF50', // Green (Material UI's default green)
-    '#673AB7', // Deep Purple
     '#E91E63', // Pink
+    '#673AB7', // Deep Purple
     '#2196F3', // Blue
-    '#FF9800', // Orange
-    '#00BCD4', // Cyan
-    '#9C27B0', // Purple
+    '#4CAF50', // Green 
+    '#FF9800', // Orange 
     '#FF5252', // Red
+    '#9C27B0', // Purple
+    '#00BCD4', // Cyan
     '#FFEB3B' // Yellow
   ],
 } as const;
@@ -50,15 +58,17 @@ export const calculateTrackWidth = (
   bpm: number,
   timeSignature?: [number, number]
 ): number => {
-  // Use the passed time signature's numerator or fall back to the default
   const beatsPerMeasure = timeSignature ? timeSignature[0] : GRID_CONSTANTS.beatsPerMeasure;
+  
+  // Use getMeasureWidth() instead of GRID_CONSTANTS.measureWidth
+  const currentMeasureWidth = getMeasureWidth();
   
   console.log('Calculating track width:', {
     durationInSeconds,
     bpm,
     timeSignature,
     beatsPerMeasure,
-    measureWidth: GRID_CONSTANTS.measureWidth
+    measureWidth: currentMeasureWidth
   });
 
   // Calculate total beats in the duration
@@ -69,7 +79,7 @@ export const calculateTrackWidth = (
   const measuresCount = totalBeats / beatsPerMeasure;
   
   // Convert measures to pixels
-  const width = measuresCount * GRID_CONSTANTS.measureWidth;
+  const width = measuresCount * currentMeasureWidth;
 
   console.log('Track width calculation results:', {
     beatsPerSecond,

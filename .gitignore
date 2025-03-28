@@ -32,4 +32,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-
+# Music related files
+*.sf2
+*.sf3
+*.mid
+*.wav
+*.mp3
+*.ogg
+*.m4a
+*.aac
+*.flac

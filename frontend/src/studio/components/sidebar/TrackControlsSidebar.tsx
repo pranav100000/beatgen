@@ -27,7 +27,7 @@ interface TrackControlsSidebarProps {
   onSoloToggle: (trackId: string, soloed: boolean) => void;
   onTrackDelete: (trackId: string) => void;
   onTrackNameChange?: (trackId: string, name: string) => void;
-  onInstrumentChange?: (trackId: string, instrumentId: string, instrumentName: string) => void;
+  onInstrumentChange?: (trackId: string, instrumentId: string, instrumentName: string, instrumentStorageKey?: string) => void;
 }
 
 const TrackControlsSidebar: React.FC<TrackControlsSidebarProps> = ({

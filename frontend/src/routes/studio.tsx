@@ -3,7 +3,6 @@ import React from 'react'
 // Import Studio component with a different name to avoid any potential naming conflicts
 import StudioComponent from '../studio/Studio'
 import { requireAuth, AuthErrorComponent } from '../platform/auth/auth-utils.tsx'
-import { AuthProvider } from '../platform/auth/auth-context'
 
 // Type definition for our search parameters
 interface StudioSearchParams {
@@ -55,12 +54,6 @@ export const Route = createFileRoute('/studio')({
 function StudioPage() {
   // Get the projectId directly from search params instead of loader data
   const { projectId } = Route.useSearch()
-  
-  console.log('StudioPage received projectId from search params:', projectId);
-  console.log('Type of projectId:', typeof projectId);
-  console.log('Is projectId defined?', projectId !== undefined);
-  console.log('Is projectId truthy?', !!projectId);
-  
   // Don't wrap with AuthProvider as it should be provided at a higher level
   return <StudioComponent projectId={projectId} />
 }

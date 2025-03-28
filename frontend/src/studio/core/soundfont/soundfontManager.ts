@@ -34,13 +34,22 @@ class SoundfontManager {
   /**
    * Get a soundfont by ID, either from cache or by downloading
    * @param id Soundfont ID
-   * @returns Promise with the soundfont data
+   * @returns Promise with the soundfont data and storage key
    */
-  public async getSoundfont(id: string): Promise<ArrayBuffer> {
+  public async getSoundfont(id: string): Promise<{ data: ArrayBuffer, storage_key?: string }> {
     // First check the in-memory cache
     if (this.inMemoryCache.has(id)) {
       console.log(`Soundfont ${id} found in memory cache`);
-      return this.inMemoryCache.get(id)!;
+      
+      // Get storage key from DB even if data is in memory cache
+      try {
+        const dbInfo = await this.db.soundfonts.get(id);
+        const storage_key = dbInfo?.storage_key;
+        return { data: this.inMemoryCache.get(id)!, storage_key };
+      } catch (error) {
+        console.error(`Error retrieving storage key for ${id} from IndexedDB:`, error);
+        return { data: this.inMemoryCache.get(id)! };
+      }
     }
 
     // Then check the IndexedDB
@@ -50,7 +59,10 @@ class SoundfontManager {
         console.log(`Soundfont ${id} found in IndexedDB`);
         // Add to memory cache
         this.inMemoryCache.set(id, storedSoundfont.data);
-        return storedSoundfont.data;
+        return { 
+          data: storedSoundfont.data,
+          storage_key: storedSoundfont.storage_key 
+        };
       }
     } catch (error) {
       console.error(`Error retrieving soundfont ${id} from IndexedDB:`, error);
@@ -65,7 +77,7 @@ class SoundfontManager {
    * @param id Soundfont ID
    * @returns Promise with the soundfont data
    */
-  private async downloadSoundfont(id: string): Promise<ArrayBuffer> {
+  private async downloadSoundfont(id: string): Promise<{ data: ArrayBuffer, storage_key?: string }> {
     try {
       console.log(`Downloading soundfont ${id} from server`);
       
@@ -85,7 +97,7 @@ class SoundfontManager {
       const data = await response.arrayBuffer();
       console.log(`Downloaded soundfont ${id}: ${data.byteLength} bytes`);
       
-      // Store in IndexedDB
+      // Store in IndexedDB with storage_key
       const soundfontFile: SoundfontFile = {
         id: soundfont.id,
         name: soundfont.name,
@@ -93,7 +105,8 @@ class SoundfontManager {
         category: soundfont.category,
         data,
         dateAdded: new Date(),
-        size: data.byteLength
+        size: data.byteLength,
+        storage_key: soundfont.storage_key // Store the storage key
       };
       
       await this.db.soundfonts.put(soundfontFile);
@@ -102,7 +115,7 @@ class SoundfontManager {
       // Add to memory cache
       this.inMemoryCache.set(id, data);
       
-      return data;
+      return { data, storage_key: soundfont.storage_key };
     } catch (error) {
       console.error(`Error downloading soundfont ${id}:`, error);
       throw error;

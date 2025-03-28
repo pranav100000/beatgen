@@ -50,6 +50,7 @@ export interface SoundfontFile {
     data: ArrayBuffer;    // The actual soundfont data
     dateAdded: Date;      // When it was added to the DB
     size: number;         // Size in bytes
+    storage_key?: string; // Storage key for the soundfont (for persistent references)
 }
 
 // Database class
@@ -79,15 +80,15 @@ export class BeatGenDB extends Dexie {
     }
 
     private async logDbState() {
-        const audioCount = await this.audioFiles.count();
-        const midiCount = await this.midiFiles.count();
-        const drumMachineCount = await this.drumMachineFiles.count();
-        const soundfontCount = await this.soundfonts.count();
+        const audioFiles = await this.audioFiles.toArray();
+        const midiFiles = await this.midiFiles.toArray();
+        const drumMachineFiles = await this.drumMachineFiles.toArray();
+        const soundfonts = await this.soundfonts.toArray();
         console.log('📊 Current DB State:', {
-            audioFiles: audioCount,
-            midiFiles: midiCount,
-            drumMachineFiles: drumMachineCount,
-            soundfonts: soundfontCount
+            audioFiles: audioFiles,
+            midiFiles: midiFiles,
+            drumMachineFiles: drumMachineFiles,
+            soundfonts: soundfonts
         });
     }
 
@@ -216,8 +217,8 @@ export class BeatGenDB extends Dexie {
     
     // Store a MIDI blob for a specific track
     async storeMidiTrackBlob(trackId: string, name: string, midiBlob: Blob, 
-                           bpm: number, timeSignature: [number, number], 
-                           instrumentId?: string): Promise<number> {
+        bpm: number, timeSignature: [number, number], 
+        instrumentId?: string): Promise<number> {
         this.logOperation('Storing MIDI track blob', {
             trackId,
             name,
@@ -462,6 +463,10 @@ export class BeatGenDB extends Dexie {
         this.logOperation('Deleting drum machine track', { id });
         await this.drumMachineFiles.delete(id);
         await this.logDbState();
+    }
+
+    async getSoundfontFile(id: string): Promise<SoundfontFile | undefined> {
+        return await this.soundfonts.get(id);
     }
 }
 

@@ -9,6 +9,7 @@ export class MidiManager implements MidiManagerInterface {
   private activePlayback: Map<string, Tone.Part> = new Map();
   private tracks: Map<string, Note[]> = new Map();
   private subscribers: Map<string, ((trackId: string, notes: Note[]) => void)[]> = new Map();
+  private globalListeners: ((trackId: string, notes: Note[]) => void)[] = [];
   
   // Track metadata
   private currentBpm: number = 120;
