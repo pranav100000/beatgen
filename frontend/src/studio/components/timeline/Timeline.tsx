@@ -45,6 +45,11 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
         flex: 1, 
         position: 'relative', 
         overflow: 'auto',
+        willChange: 'transform',
+        '& > *': {
+          backfaceVisibility: 'hidden',
+          perspective: 1000,
+        }
       }}
     >
       {/* Playback Cursor - Moved here to overlay everything */}
@@ -141,7 +146,6 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
         zIndex: 2,
         height: GRID_CONSTANTS.headerHeight,
         boxSizing: 'border-box',
-        transform: `scaleX(${zoomLevel})`,
         willChange: "transform",
         imageRendering: "crisp-edges",
         transformOrigin: "top left",
@@ -349,7 +353,6 @@ function TimelineContent({
       sx={{ 
         minHeight: '100%',
         position: 'relative',
-        transform: `scaleX(${zoomLevel})`,
         willChange: "transform",
         imageRendering: "crisp-edges",
         transformOrigin: "top left",

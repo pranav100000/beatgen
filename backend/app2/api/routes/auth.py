@@ -63,51 +63,63 @@ async def signup(
             detail=f"Registration failed: {str(e)}"
         )
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=Token)
 async def login(
-    request: LoginRequest,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     auth_service: AuthService = Depends(get_auth_service)
 ) -> Any:
     """
     Authenticate user and return access token
+    
+    Uses OAuth2PasswordRequestForm for compatibility with standard OAuth2 clients.
+    The username field is used for email.
     """
-    logger.info(f"Processing login request for email: {request.email}")
+    logger.info(f"Processing login request for email: {form_data.username}")
     try:
         # Call Supabase auth service to sign in user
         result = await auth_service.login_user(
-            email=request.email,
-            password=request.password
+            email=form_data.username,  # OAuth2 form uses 'username' field for email
+            password=form_data.password
         )
         logger.info(f"User logged in successfully: {result['user_id']}")
-        return result
+        return {
+            "access_token": result["access_token"],
+            "token_type": "bearer",
+            "user_id": result.get("user_id")
+        }
     except UnauthorizedException as e:
         logger.error(f"Login failed - invalid credentials: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     except Exception as e:
         logger.error(f"Login failed - unexpected error: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Login failed: {str(e)}"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
 @router.post("/forgot-password", response_model=MessageResponse)
 async def forgot_password(
-    request: ForgotPasswordRequest,
+    email: str,  # Changed to simple string parameter to match old API
     auth_service: AuthService = Depends(get_auth_service)
 ) -> Any:
     """
     Send password reset email
+    
+    For security reasons, always returns success whether the email exists or not.
     """
-    logger.info(f"Processing password reset request for email: {request.email}")
+    logger.info(f"Processing password reset request for email: {email}")
     try:
         # Call Supabase auth service to send reset password email
-        await auth_service.send_password_reset(request.email)
-        logger.info(f"Password reset email sent to: {request.email}")
-        return {"message": "Password reset instructions sent to your email"}
+        await auth_service.send_password_reset(email)
+        logger.info(f"Password reset email sent to: {email}")
     except Exception as e:
+        # Log the error but don't expose it to the client
         logger.error(f"Password reset failed: {str(e)}")
-        # Don't expose whether email exists or not for security
-        return {"message": "If your email is registered, you will receive reset instructions"}
+        
+    # Always return the same message whether successful or not for security
+    return {"message": "If the email exists, a password reset link will be sent"}

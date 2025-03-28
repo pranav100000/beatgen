@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Note } from '../../../core/types/note';
 import { usePianoRoll } from '../context/PianoRollContext';
@@ -16,6 +16,12 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
   height,
   trackColor
 }) => {
+  // Memoize the random heights so they don't change on every render
+  const randomHeights = useMemo(() => 
+    Array.from({length: 12}).map(() => Math.random() * 12 + 4),
+    [] // Empty dependency array means this only runs once when component mounts
+  );
+
   // Get notes from context
   const { notesByTrack } = usePianoRoll();
   const notes = notesByTrack[trackId] || [];
@@ -117,12 +123,11 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
           fontSize: '10px',
           color: '#fff'
         }}>
-          {/* Placeholder pattern for empty tracks */}
-          {Array.from({length: 12}).map((_, i) => (
+          {randomHeights.map((height, i) => (
             <Box 
               key={i}
               sx={{
-                height: Math.random() * 12 + 4,
+                height: height, // Use memoized height instead of calculating new random value
                 width: 4,
                 mx: 0.5,
                 bgcolor: 'white',

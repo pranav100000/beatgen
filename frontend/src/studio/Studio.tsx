@@ -16,6 +16,7 @@ import PianoRollModule, { PianoRollWindows, usePianoRoll } from './components/pi
 import { useStudioDBSession } from './hooks/useStudioDBSession';
 
 import StudioControlBar from './components/control-bar/ControlBar';
+import { useGridStore } from './core/state/gridStore';
 
 // Studio Component Props
 interface StudioProps {
@@ -130,10 +131,16 @@ function Studio({ projectId }: StudioProps) {
 
   const handleZoomIn = () => {
     setZoomLevel(Math.min(zoomLevel + 0.1, 4));
+    // Update measureWidth in gridStore based on zoom level
+    const newMeasureWidth = 200 * (Math.min(zoomLevel + 0.1, 4));
+    useGridStore.getState().setMeasureWidth(newMeasureWidth);
   };
 
   const handleZoomOut = () => {
     setZoomLevel(Math.max(zoomLevel - 0.1, 0.3));
+    // Update measureWidth in gridStore based on zoom level
+    const newMeasureWidth = 200 * (Math.max(zoomLevel - 0.1, 0.3));
+    useGridStore.getState().setMeasureWidth(newMeasureWidth);
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,50 +233,6 @@ function Studio({ projectId }: StudioProps) {
         overflow: 'hidden',
         position: 'relative'
       }}>
-        <Box sx={{
-          position: 'absolute',
-          top: 10,
-          right: 10,
-          zIndex: 9999,
-          display: 'flex',
-          gap: 1
-        }}>
-          <Button 
-            variant="contained" 
-            color="primary"
-            size="small"
-            href="/midi-test"
-            sx={{ 
-              fontSize: '0.75rem', 
-              bgcolor: '#5d4fdf', 
-              '&:hover': { bgcolor: '#4231d5' } 
-            }}
-          >
-            MIDI Player Test
-          </Button>
-          <Button 
-            variant="contained" 
-            color="secondary"
-            size="small"
-            href="/midi-direct-test"
-            sx={{ 
-              fontSize: '0.75rem'
-            }}
-          >
-            Direct MIDI Test
-          </Button>
-          <Button 
-            variant="contained" 
-            color="success"
-            size="small"
-            href="/simple-midi-test"
-            sx={{ 
-              fontSize: '0.75rem'
-            }}
-          >
-            Simple MIDI Test
-          </Button>
-        </Box>
         {/* Left Sidebar */}
         <Box sx={{ 
           width: GRID_CONSTANTS.sidebarWidth,

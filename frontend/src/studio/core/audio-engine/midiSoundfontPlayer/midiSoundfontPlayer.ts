@@ -1,0 +1,520 @@
+// Import directly
+import { AudioWorkletNodeSynthesizer } from 'js-synthesizer';
+import { SequencerWrapper } from './sequencerWrapper';
+
+/**
+ * Options for adding a track to the player
+ */
+export interface TrackOptions {
+  /** 
+   * Start offset in ticks
+   * - Negative value (e.g., -1000): Start 1000 ticks into the track
+   * - Positive value (e.g., 1000): Delay playback by 1000 ticks
+   */
+  startTimeOffset?: number;
+  /** Optional specific channel, otherwise auto-assigned */
+  channel?: number;
+  /** Initial volume (0-127) */
+  volume?: number;
+}
+
+/**
+ * Main controller for playing multiple MIDI tracks with soundfonts
+ */
+export class MidiSoundfontPlayer {
+  private synth: AudioWorkletNodeSynthesizer;
+  private tracks: Map<string, SequencerWrapper> = new Map();
+  private isPlaying: boolean = false;
+  private masterTick: number = 0;
+  private processingInterval: ReturnType<typeof setInterval> | null = null;
+  private readonly PROCESS_INTERVAL_MS = 10;
+  private pendingTempoChange: number | null = null; // Store pending tempo change
+  private soundfontBankOffsets: Map<number, number> = new Map(); // Maps sfontId -> bankOffset
+  
+  /**
+   * Create a new MidiSoundfontPlayer
+   * @param audioContext The audio context to use
+   */
+  constructor() {
+    // Initialize synthesizer
+    this.synth = new AudioWorkletNodeSynthesizer();
+  }
+  
+  /**
+   * Initialize the synthesizer
+   * @param audioContext The audio context to use
+   */
+  async initSynthesizer(audioContext: AudioContext) {
+    try {
+      // Register worklet processor - load libfluidsynth first, then the worklet
+      await audioContext.audioWorklet.addModule('/libfluidsynth-2.3.0.js');
+      await audioContext.audioWorklet.addModule('/js-synthesizer.worklet.js');
+      
+      // Create node and connect
+      const node = this.synth.createAudioNode(audioContext, {
+        polyphony: 256 // High polyphony for multiple tracks
+      });
+      
+      node.connect(audioContext.destination);
+      
+      console.log('MidiSoundfontPlayer initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize MidiSoundfontPlayer:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Add a track to the player
+   * @param id Unique identifier for the track
+   * @param midiData MIDI file data
+   * @param soundfontData Soundfont file data
+   * @param options Additional options
+   * @returns Promise resolving to the created track
+   */
+  async addTrack(id: string, midiData: ArrayBuffer, soundfontData: ArrayBuffer, options: TrackOptions = {}) {
+    try {
+      // Load soundfont
+      console.log(`Loading soundfont for track "${id}"...`);
+      const sfontId = await this.synth.loadSFont(soundfontData);
+      
+      // Note: Bank offset and program selection are now handled in SequencerWrapper.initialize()
+      // to ensure proper offset application and bank selection in the correct order
+      
+      console.log(`Soundfont loaded with ID ${sfontId}`);
+      
+      // Still maintain the mapping for reference (SequencerWrapper will set offset = sfontId * 100)
+      this.soundfontBankOffsets.set(sfontId, sfontId * 100);
+      
+      // Auto-assign channel if not specified
+      const channel = options.channel ?? this.findFreeChannel();
+      
+      // Create sequencer wrapper
+      const track = new SequencerWrapper(
+        this.synth,
+        sfontId,
+        channel, 
+        options.startTimeOffset ?? 0, // Offset in ticks
+        options.volume ?? 100
+      );
+      
+      // Initialize with MIDI data
+      console.log(`Initializing track "${id}" with MIDI data...`);
+      await track.initialize(midiData);
+      
+      // Store in our tracks map
+      this.tracks.set(id, track);
+      
+      console.log(`Track "${id}" added on channel ${channel}`);
+      return track;
+    } catch (error) {
+      console.error(`Failed to add track "${id}":`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Remove a track from the player
+   * @param id The track ID to remove
+   */
+  removeTrack(id: string) {
+    const track = this.tracks.get(id);
+    if (track) {
+      track.dispose(); // Clean up resources
+      this.tracks.delete(id);
+      console.log(`Track "${id}" removed`);
+    } else {
+      console.warn(`Track "${id}" not found, nothing to remove`);
+    }
+  }
+  
+  /**
+   * Start or resume playback
+   */
+  async play() {
+    if (this.isPlaying) return;
+    
+    console.log(`Starting playback from tick ${this.masterTick}`);
+    
+    // Make sure we have no active processing interval
+    if (this.processingInterval !== null) {
+      clearInterval(this.processingInterval);
+      this.processingInterval = null;
+    }
+
+    //this.synth.setPlayerTempo(1, 120);
+    
+    // Start each track (in parallel for better performance)
+    const trackEntries = Array.from(this.tracks.entries());
+    const playPromises = trackEntries.map(async ([id, track]) => {
+      console.log(`Starting track "${id}" for playback at global tick ${this.masterTick}`);
+      // Use the track's play method to handle proper sequencer sync
+      await track.play(this.masterTick);
+    });
+    
+    // Wait for all tracks to be prepared
+    await Promise.all(playPromises);
+    
+    this.isPlaying = true;
+    
+    // Start processing loop - this is critical!
+    const trackList = Array.from(this.tracks.values());
+    this.processingInterval = setInterval(async () => {
+      // Check if there's a pending tempo change
+      if (this.pendingTempoChange !== null) {
+        const bpm = this.pendingTempoChange;
+        this.pendingTempoChange = null; // Clear pending change
+        
+        // Apply tempo change to all tracks - this is safe here
+        // because we're in a sequencer callback, as required by FluidSynth
+        console.log(`Applying queued tempo change to ${bpm} BPM during processing interval`);
+        
+        const trackEntries = Array.from(this.tracks.entries());
+        const promises = trackEntries.map(async ([id, track]) => {
+          await track.setBPM(bpm);
+        });
+        
+        // Wait for all tempo changes to complete
+        await Promise.all(promises);
+        
+        console.log(`Tempo change to ${bpm} BPM completed`);
+      }
+      
+      // Process all active sequencers
+      for (const track of trackList) {
+        if (!track.isMuted) {
+          track.process(this.PROCESS_INTERVAL_MS, this.masterTick);
+        }
+      }
+      
+      // Advance master timeline
+      this.masterTick += this.PROCESS_INTERVAL_MS;
+    }, this.PROCESS_INTERVAL_MS);
+  }
+  
+  /**
+   * Pause playback
+   */
+  pause() {
+    if (!this.isPlaying) return;
+    
+    console.log('Pausing playback');
+    
+    // Stop processing loop first to prevent further events
+    if (this.processingInterval !== null) {
+      clearInterval(this.processingInterval);
+      this.processingInterval = null;
+    }
+    
+    // Pause all tracks using their pause method
+    const trackList = Array.from(this.tracks.values());
+    for (const track of trackList) {
+      track.pause();
+    }
+    
+    this.isPlaying = false;
+  }
+  
+  /**
+   * Stop playback and reset position
+   */
+  async stop() {
+    console.log('Stopping playback and resetting position');
+    
+    // Stop processing loop first
+    if (this.processingInterval !== null) {
+      clearInterval(this.processingInterval);
+      this.processingInterval = null;
+    }
+    
+    // Stop each track using their stop method (in parallel)
+    const trackList = Array.from(this.tracks.values());
+    const stopPromises = trackList.map(track => track.stop());
+    await Promise.all(stopPromises);
+    
+    // Reset player state
+    this.isPlaying = false;
+    this.masterTick = 0;
+    
+    console.log('All tracks stopped and reset to beginning');
+  }
+  
+  /**
+   * Seek to a specific position
+   * @param globalTimeMs Time in milliseconds to seek to
+   */
+  async seek(globalTimeMs: number) {
+    console.log(`Seeking to ${globalTimeMs}ms`);
+    
+    const wasPlaying = this.isPlaying;
+    
+    // Pause playback during seek
+    if (wasPlaying) {
+      this.pause();
+    }
+    
+    // Update master tick
+    this.masterTick = globalTimeMs;
+    
+    // Seek each track (using Promise.all to do them in parallel)
+    const trackEntries = Array.from(this.tracks.entries());
+    const seekPromises = trackEntries.map(async ([id, track]) => {
+      console.log(`Seeking track "${id}" to global time ${globalTimeMs}ms`);
+      return track.seekToGlobalTime(globalTimeMs);
+    });
+    
+    // Wait for all seeks to complete
+    await Promise.all(seekPromises);
+    
+    // Resume if it was playing
+    if (wasPlaying) {
+      this.play();
+    }
+  }
+  
+  /**
+   * Play a specific track
+   * @param id The track ID to play
+   */
+  playTrack(id: string) {
+    const track = this.tracks.get(id);
+    if (track) {
+      console.log(`Playing track "${id}"`);
+      track.unmute();
+      
+      // If player is not running, start it now
+      if (!this.isPlaying) {
+        this.play();
+      }
+    } else {
+      console.warn(`Track "${id}" not found`);
+    }
+  }
+  
+  /**
+   * Pause a specific track
+   * @param id The track ID to pause
+   */
+  pauseTrack(id: string) {
+    const track = this.tracks.get(id);
+    if (track) {
+      console.log(`Pausing track "${id}"`);
+      track.mute(); // Simplest way to "pause" a single track
+    } else {
+      console.warn(`Track "${id}" not found`);
+    }
+  }
+  
+  /**
+   * Stop a specific track and reset its position
+   * @param id The track ID to stop
+   */
+  stopTrack(id: string) {
+    const track = this.tracks.get(id);
+    if (track) {
+      console.log(`Stopping track "${id}"`);
+      track.resetPosition();
+      track.mute();
+    } else {
+      console.warn(`Track "${id}" not found`);
+    }
+  }
+  
+  /**
+   * Mute or unmute a track
+   * @param id The track ID
+   * @param muted Whether to mute the track
+   */
+  muteTrack(id: string, muted: boolean) {
+    const track = this.tracks.get(id);
+    if (track) {
+      console.log(`${muted ? 'Muting' : 'Unmuting'} track "${id}"`);
+      if (muted) {
+        track.mute();
+      } else {
+        track.unmute();
+      }
+    } else {
+      console.warn(`Track "${id}" not found`);
+    }
+  }
+  
+  /**
+   * Set the volume of a track
+   * @param id The track ID
+   * @param volume Volume level (0-127)
+   */
+  setTrackVolume(id: string, volume: number) {
+    const track = this.tracks.get(id);
+    if (track) {
+      console.log(`Setting volume of track "${id}" to ${volume}`);
+      track.setVolume(volume);
+    } else {
+      console.warn(`Track "${id}" not found`);
+    }
+  }
+  
+  /**
+   * Set the offset for a track in ticks
+   * @param id The track ID
+   * @param offset Offset value in ticks
+   * - Negative value (e.g., -1000): Start 1000 ticks into the track
+   * - Positive value (e.g., 1000): Delay playback by 1000 ticks
+   */
+  setTrackOffset(id: string, offset: number) {
+    const track = this.tracks.get(id);
+    if (track) {
+      console.log(`Setting offset of track "${id}" to ${offset}`);
+      track.setOffset(offset);
+    } else {
+      console.warn(`Track "${id}" not found`);
+    }
+  }
+  
+  /**
+   * Get the current offset for a track
+   * @param id The track ID
+   * @returns The current offset in ticks, or undefined if track not found
+   */
+  getTrackOffset(id: string): number | undefined {
+    const track = this.tracks.get(id);
+    if (track) {
+      return track.getOffset();
+    }
+    return undefined;
+  }
+  
+  /**
+   * Set the tempo for a specific track
+   * @param id The track ID
+   * @param bpm The tempo in BPM (Beats Per Minute)
+   */
+  async setTrackBPM(id: string, bpm: number): Promise<void> {
+    const track = this.tracks.get(id);
+    if (track) {
+      console.log(`Setting tempo of track "${id}" to ${bpm} BPM`);
+      await track.setBPM(bpm);
+    } else {
+      console.warn(`Track "${id}" not found`);
+    }
+  }
+  
+  /**
+   * Get the current tempo of a track
+   * @param id The track ID
+   * @returns The current tempo in BPM, or undefined if track not found
+   */
+  getTrackBPM(id: string): number | undefined {
+    const track = this.tracks.get(id);
+    if (track) {
+      return track.getBPM();
+    }
+    return undefined;
+  }
+  
+  /**
+   * Set the global tempo for all tracks
+   * @param bpm The tempo in BPM (Beats Per Minute)
+   */
+  async setGlobalBPM(bpm: number): Promise<void> {
+    if (bpm <= 0) {
+      console.warn(`Invalid BPM value: ${bpm}, ignoring`);
+      return;
+    }
+    
+    console.log(`Queuing tempo change to ${bpm} BPM`);
+    
+    // If we're not playing, we can change the tempo immediately
+    if (!this.isPlaying) {
+      const trackEntries = Array.from(this.tracks.entries());
+      const promises = trackEntries.map(async ([id, track]) => {
+        await track.setBPM(bpm);
+      });
+      await Promise.all(promises);
+      console.log(`Applied tempo change to ${bpm} BPM immediately (not playing)`);
+    } else {
+      // If we're playing, queue the tempo change for the next processing interval
+      // This follows the FluidSynth documentation guidance to change tempo
+      // during a sequencer callback or when no events are being dispatched
+      this.pendingTempoChange = bpm;
+      console.log(`Tempo change to ${bpm} BPM queued for next processing interval`);
+    }
+  }
+  
+  /**
+   * Find a free MIDI channel
+   * @returns An available MIDI channel (0-15)
+   */
+  private findFreeChannel(): number {
+    // Find first unused channel, avoiding 9 (drums)
+    const trackList = Array.from(this.tracks.values());
+    const usedChannels = new Set(
+      trackList.map(t => t.getChannel)
+    );
+    
+    for (let i = 1; i <= 16; i++) {
+      if (i !== 9 && !usedChannels.has(i)) {
+        return i;
+      }
+    }
+    
+    // If all channels are used, reuse channel 0 (or implement more sophisticated logic)
+    console.warn('All non-drum MIDI channels are in use, reusing channel 0');
+    return 0;
+  }
+  
+  /**
+   * Clean up resources
+   */
+  dispose() {
+    console.log('Disposing MidiSoundfontPlayer');
+    
+    this.pause();
+    
+    // Clean up all tracks
+    const trackEntries = Array.from(this.tracks.entries());
+    for (const [id, track] of trackEntries) {
+      console.log(`Disposing track "${id}"`);
+      track.dispose();
+    }
+    
+    this.tracks.clear();
+  }
+  
+  /**
+   * Get current position
+   */
+  getCurrentTick(): number {
+    return this.masterTick;
+  }
+  
+  /**
+   * Check if player is currently playing
+   */
+  isPlayerPlaying(): boolean {
+    return this.isPlaying;
+  }
+  
+  /**
+   * Get track by ID
+   */
+  getTrack(id: string): SequencerWrapper | undefined {
+    return this.tracks.get(id);
+  }
+  
+  /**
+   * Get all track IDs
+   */
+  getTrackIds(): string[] {
+    return Array.from(this.tracks.keys());
+  }
+  
+  /**
+   * Get the bank offset for a soundfont
+   * @param sfontId The soundfont ID
+   * @returns The bank offset, or undefined if not found
+   */
+  getSoundfontBankOffset(sfontId: number): number | undefined {
+    return this.soundfontBankOffsets.get(sfontId);
+  }
+}
