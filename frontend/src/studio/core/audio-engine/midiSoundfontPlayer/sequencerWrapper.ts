@@ -384,6 +384,7 @@ export class SequencerWrapper {
     
     // Schedule only upcoming events
     let scheduledCount = 0;
+    let scheduledEvents = [];
     for (const event of this.noteEvents) {
       // Check if this event should be scheduled based on the position
       // This works for both positive and negative offsets because
@@ -393,11 +394,13 @@ export class SequencerWrapper {
         const relativeTick = event.tick - fromTick;
         this.sequencer.sendEventAt(event.event as any, relativeTick, true);
         scheduledCount++;
+        scheduledEvents.push(event);
       }
     }
     
     console.log(`Scheduled ${scheduledCount} events from tick ${fromTick} ` +
                 `(with offset: ${this.startOffset}) on channel ${this.channel}`);
+    console.log("________scheduledEvents", scheduledEvents);
   }
   
   // Silence all active notes and clear events
@@ -422,6 +425,12 @@ export class SequencerWrapper {
    * @param globalTick The current global timeline position
    */
   async play(globalTick: number): Promise<void> {
+
+    console.log("______currentbpm", this.currentBpm);
+    console.log("______currentppq", this.ppq);
+    console.log("______currentstartoffset", this.startOffset);
+    console.log("________play with values:", this.noteEvents);
+    console.log("________len of note_events:", this.noteEvents.length);
     this._isPlaying = true;
     const localTick = this.globalToLocalTick(globalTick);
     this.currentLocalTick = localTick;

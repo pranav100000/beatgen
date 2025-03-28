@@ -47,6 +47,10 @@ export class TransportController implements Transport {
     getSoundfontController(): SoundfontEngineController {
         return this.soundfontController;
     }
+
+    getAudioEngine(): AudioEngine {
+        return this.audioEngine;
+    }
     
     /**
      * Converts a track's UI position (in pixels) to a time offset (in seconds)

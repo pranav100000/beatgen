@@ -185,6 +185,7 @@ export class SoundfontEngineController {
         console.log(`SoundfontEngineController: Adding track ${trackId}`);
         
         try {
+            console.log("________adding track with values:", trackId, midiData, soundfontData);
             await this.midiPlayer.addTrack(trackId, midiData, soundfontData);
             console.log(`Track ${trackId} added to player`);
         } catch (error) {

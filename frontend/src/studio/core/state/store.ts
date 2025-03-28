@@ -3,9 +3,9 @@ import { TransportController } from './transport';
 import { MidiManager } from '../midi/MidiManager';
 import { InstrumentManager } from '../instruments/InstrumentManager';
 import AudioEngine from '../audio-engine/audioEngine';
-import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
 import { TrackState } from '../types/track';
 import * as Tone from 'tone';
+import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
 
 /**
  * Interface for a drum pad in the drum machine grid
@@ -17,9 +17,7 @@ export interface DrumPad {
 }
 
 export interface StoreInterface {
-  getAudioEngine(): AudioEngine;
   getTransport(): TransportController;
-  getSoundfontController(): SoundfontEngineController;
   projectManager: ProjectManager;
   initializeAudio(): Promise<void>;
   createTrack(
@@ -39,23 +37,19 @@ export interface StoreInterface {
 }
 
 export class Store implements StoreInterface {
-  private audioEngine: AudioEngine;
   public projectManager: ProjectManager;
   private transportController: TransportController;
   private initialized: boolean = false;
   private midiManager: MidiManager;
   private instrumentManager: InstrumentManager;
-  private soundfontController: SoundfontEngineController;
   private _tracks: TrackState[] = []; // Array of tracks
   private _listeners: Function[] = []; // Track change listeners
 
   constructor() {
-    this.audioEngine = AudioEngine.getInstance();
     this.projectManager = new ProjectManager();
     this.transportController = new TransportController();
     this.midiManager = new MidiManager();
     this.instrumentManager = new InstrumentManager();
-    this.soundfontController = new SoundfontEngineController(this);
     
     // Initialize with project defaults
     const project = this.projectManager.getCurrentProject();
@@ -70,7 +64,7 @@ export class Store implements StoreInterface {
     
     try {
       // Initialize audio engine
-      await this.audioEngine.initialize();
+      await this.getAudioEngine().initialize();
       
       // Get Tone.js context and extract raw audio context
       // This is a workaround since AudioEngine doesn't expose the context directly
@@ -91,9 +85,8 @@ export class Store implements StoreInterface {
         latencyHint: 'interactive',
         sampleRate: rawContext.sampleRate
       });
-      
-      // Initialize soundfont controller with the new audio context
-      await this.soundfontController.initialize(audioContext);
+
+      this.getSoundfontController().initialize(audioContext);
       
       this.initialized = true;
       this.syncTracksFromProjectManager();
@@ -287,14 +280,14 @@ export class Store implements StoreInterface {
     this._tracks = this._tracks.filter(t => t.id !== id);
     
     // Remove from audio engine
-    this.audioEngine.removeTrack(id);
+    this.getAudioEngine().removeTrack(id);
     
     // Notify listeners of track changes
     this._notifyListeners();
   }
 
   public getAudioEngine(): AudioEngine {
-    return this.audioEngine;
+    return this.getTransport().getAudioEngine();
   }
 
   public getInstrumentManager(): InstrumentManager {
@@ -306,7 +299,7 @@ export class Store implements StoreInterface {
   }
   
   public getSoundfontController(): SoundfontEngineController {
-    return this.soundfontController;
+    return this.getTransport().getSoundfontController();
   }
   
   /**
@@ -326,7 +319,7 @@ export class Store implements StoreInterface {
     try {
       console.log(`Store: Connecting track ${trackId} to soundfont ${instrumentId}`);
       
-      await this.soundfontController.connectTrackToSoundfont(
+      await this.getSoundfontController().connectTrackToSoundfont(
         trackId, 
         instrumentId, 
         this.midiManager
