@@ -42,7 +42,7 @@ const TrackPreview: React.FC<TrackPreviewProps> = ({
   const trackWidth = React.useMemo(() => {
     const [beatsPerMeasure, beatUnit] = timeSignature;
     const beatsPerSecond = bpm / 60;
-    const totalBeats = (track.duration || 0) * beatsPerSecond;
+    const totalBeats = (track.duration || 8) * beatsPerSecond;
     
     // Different calculation based on track type
     if (track.type === 'audio') {
