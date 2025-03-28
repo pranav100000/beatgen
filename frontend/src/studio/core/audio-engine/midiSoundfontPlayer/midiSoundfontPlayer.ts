@@ -47,8 +47,8 @@ export class MidiSoundfontPlayer {
   async initSynthesizer(audioContext: AudioContext) {
     try {
       // Register worklet processor - load libfluidsynth first, then the worklet
-      await audioContext.audioWorklet.addModule('/libfluidsynth-2.3.0.js');
-      await audioContext.audioWorklet.addModule('/js-synthesizer.worklet.js');
+      await audioContext.audioWorklet.addModule('/js-synthesizer/libfluidsynth-2.3.0.js');
+      await audioContext.audioWorklet.addModule('/js-synthesizer/js-synthesizer.worklet.js');
       
       // Create node and connect
       const node = this.synth.createAudioNode(audioContext, {
@@ -102,8 +102,22 @@ export class MidiSoundfontPlayer {
       console.log(`Initializing track "${id}" with MIDI data...`);
       await track.initialize(midiData);
       
+      // Debug log before adding to tracks map
+      console.log(`[DEBUG] Before adding to tracks map. Current size: ${this.tracks.size}`);
+      console.log(`[DEBUG] Adding track "${id}" to tracks map...`);
+      
       // Store in our tracks map
       this.tracks.set(id, track);
+      
+      // Debug log after adding
+      console.log(`[DEBUG] After adding to tracks map. New size: ${this.tracks.size}`);
+      console.log(`[DEBUG] Verifying track was added: ${this.tracks.has(id) ? 'SUCCESS' : 'FAILED'}`);
+      
+      // Additional check for the track in the map
+      if (this.tracks.has(id)) {
+        const retrievedTrack = this.tracks.get(id);
+        console.log(`[DEBUG] Successfully retrieved track from map: ${retrievedTrack ? 'YES' : 'NO'}`);
+      }
       
       console.log(`Track "${id}" added on channel ${channel}`);
       return track;
@@ -506,6 +520,15 @@ export class MidiSoundfontPlayer {
    * Get all track IDs
    */
   getTrackIds(): string[] {
+    // Debug log the tracks map size
+    console.log(`[DEBUG] MidiSoundfontPlayer.tracks Map contains ${this.tracks.size} entries`);
+    
+    if (this.tracks.size > 0) {
+      console.log(`[DEBUG] Track IDs in map: ${Array.from(this.tracks.keys()).join(', ')}`);
+    } else {
+      console.log(`[DEBUG] Tracks Map is empty!`);
+    }
+    
     return Array.from(this.tracks.keys());
   }
   

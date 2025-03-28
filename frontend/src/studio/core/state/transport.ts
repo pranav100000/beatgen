@@ -2,6 +2,7 @@ import * as Tone from 'tone';
 import AudioEngine from '../audio-engine/audioEngine';
 import { convertVolumeToDecibels } from '../../utils/audioProcessing';
 import { calculatePositionTime } from '../../constants/gridConstants';
+import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
 
 export interface Transport {
     position: number;        // Current playback position
@@ -17,6 +18,7 @@ export interface Transport {
 
 export class TransportController implements Transport {
     private audioEngine: AudioEngine;
+    private soundfontController: SoundfontEngineController;
     private isStarting: boolean = false;
     private maxPosition: number = 3600;  // Default to 1 hour (3600 seconds) as safety
     private static FADE_TIME = 0.01; // 10ms fade
@@ -24,6 +26,10 @@ export class TransportController implements Transport {
     constructor() {
         this.audioEngine = AudioEngine.getInstance();
         Tone.getTransport().bpm.value = 120;
+        this.soundfontController = new SoundfontEngineController();
+        
+        // We'll initialize the soundfont controller later when the audio context is available
+        // This happens in the Store's initializeAudio method via initializeSoundfont
     }
 
     get position(): number {
@@ -36,6 +42,10 @@ export class TransportController implements Transport {
 
     get tempo(): number {
         return Tone.getTransport().bpm.value;
+    }
+
+    getSoundfontController(): SoundfontEngineController {
+        return this.soundfontController;
     }
     
     /**
@@ -247,6 +257,14 @@ export class TransportController implements Transport {
             // Double check transport position is still as expected
             console.log(`Transport position before start: ${Tone.getTransport().seconds}s`);
             
+            // Start soundfont player if available
+            try {
+                console.log('Starting soundfont player');
+                this.getSoundfontController().play();
+            } catch (error) {
+                console.error('Failed to start soundfont player:', error);
+            }
+            
             // Start transport with a clean slate
             Tone.getTransport().start();
             console.log('Transport started, state:', Tone.getTransport().state);
@@ -272,6 +290,14 @@ export class TransportController implements Transport {
         
         // Clear any scheduled events
         this.clearScheduledEvents();
+        
+        // Pause soundfont player if available
+        try {
+            console.log('Pausing soundfont player');
+            this.getSoundfontController().pause();
+        } catch (error) {
+            console.error('Failed to pause soundfont player:', error);
+        }
         
         // Fade out before stopping
         this.audioEngine.getAllTracks().forEach(track => {
@@ -307,6 +333,16 @@ export class TransportController implements Transport {
         
         // Clear any scheduled events
         this.clearScheduledEvents();
+        
+        // Stop soundfont player if available
+        if (this.getSoundfontController) {
+            try {
+                console.log('Stopping soundfont player');
+                this.getSoundfontController().stop();
+            } catch (error) {
+                console.error('Failed to stop soundfont player:', error);
+            }
+        }
         
         // Stop players first with fade out
         this.audioEngine.getAllTracks().forEach(track => {
@@ -358,7 +394,15 @@ export class TransportController implements Transport {
         // 2. Clear all scheduled events
         this.clearScheduledEvents();
         
-        // 3. Completely reset all players
+        // 3. Seek in soundfont player if available
+        try {
+            console.log(`Seeking soundfont player to ${position}s`);
+            this.getSoundfontController().seek(position);
+        } catch (error) {
+            console.error('Failed to seek soundfont player:', error);
+        }
+        
+        // 4. Completely reset all players
         this.audioEngine.getAllTracks().forEach(track => {
             if (track.player) {
                 // Ensure player is fully stopped
@@ -376,7 +420,7 @@ export class TransportController implements Transport {
             }
         });
         
-        // 4. Set the Transport position with a clean state
+        // 5. Set the Transport position with a clean state
         // Because we completely stopped the transport, this should be reliable
         Tone.getTransport().seconds = position;
         

@@ -2,7 +2,8 @@ import { uploadFileWithProgress } from '../../studio/utils/audioProcessing';
 import { processAudioFile } from '../../studio/utils/audioProcessing';
 import { apiClient } from './client';
 
-export interface Track {
+type TrackState = AudioTrackState | MidiTrackState;
+export interface BaseTrackState {
   id: string;
   name: string;
   type: string;
@@ -17,11 +18,21 @@ export interface Track {
   left_trim_ms?: number;
   track_number?: number;
   right_trim_ms?: number;
+  instrument_id?: string;
+  instrument_name?: string;
+  instrument_storage_key?: string;
 }
 
-export interface AudioTrack extends Track {
+export interface AudioTrackState extends BaseTrackState {
   type: 'audio';
   duration: number;
+}
+
+export interface MidiTrackState extends BaseTrackState {
+  type: 'midi';
+  instrumentId: string;
+  instrumentName: string;
+  instrumentStorageKey: string;
 }
 
 export interface Project {
@@ -32,7 +43,7 @@ export interface Project {
   time_signature_numerator: number;
   time_signature_denominator: number;
   key_signature: string;
-  tracks: Track[];
+  tracks: TrackState[];
   created_at: string;
   updated_at: string;
 }
@@ -51,7 +62,7 @@ export interface ProjectUpdateDto {
   time_signature_numerator: number;
   time_signature_denominator: number;
   key_signature: string;
-  tracks?: Track[];
+  tracks?: TrackState[];
 }
 
 export const getProjects = async (): Promise<Project[]> => {
@@ -78,12 +89,12 @@ export const deleteProject = async (id: string): Promise<void> => {
   await apiClient.delete(`/projects/${id}`);
 };
 
-export const addTrack = async (projectId: string, track: Omit<Track, 'id'>): Promise<Project> => {
+export const addTrack = async (projectId: string, track: Omit<TrackState, 'id'>): Promise<Project> => {
   const response = await apiClient.post(`/projects/${projectId}/tracks`, track);
   return response.data;
 };
 
-export const updateTrack = async (projectId: string, trackId: string, track: Partial<Track>): Promise<Project> => {
+export const updateTrack = async (projectId: string, trackId: string, track: Partial<TrackState>): Promise<Project> => {
   const response = await apiClient.patch(`/projects/${projectId}/tracks/${trackId}`, track);
   return response.data;
 };
@@ -127,6 +138,10 @@ export interface MidiTrackData {
   name: string;                  // Track name
   bpm: number;                   // Track BPM
   time_signature: [number, number]; // Track time signature
+  // Using same naming convention as the API expects
+  instrument_id?: string;         // ID of the associated instrument/soundfont
+  instrument_name?: string;       // Display name of the instrument
+  instrument_storage_key?: string; // Storage key for the instrument
 }
 
 /**
@@ -260,11 +275,25 @@ export const saveProjectWithSounds = async (
     mute: track.is_muted,
     storage_key: track.storage_key,
     x_position: track.x_position,
-    y_position: track.y_position
+    y_position: track.y_position,
+    // Add instrument information
+    instrument_id: track.instrument_id,
+    instrument_name: track.instrument_name,
+    instrument_storage_key: track.instrument_storage_key
   }));
+  
+  // Debug MIDI track objects before combining
+  console.log('DEBUG: MIDI track objects before combining:', midiTrackObjects.map(t => ({
+    id: t.id,
+    instrument_id: t.instrument_id,
+    instrument_name: t.instrument_name,
+    instrument_storage_key: t.instrument_storage_key
+  })));
   
   // Combine all tracks
   const allTracks = [...audioTrackObjects, ...midiTrackObjects];
+
+  console.log('+++++++++++All tracks:', allTracks);
   
   // 4. Update the project with all tracks
   const response = await apiClient.patch(`/projects/${projectId}`, {

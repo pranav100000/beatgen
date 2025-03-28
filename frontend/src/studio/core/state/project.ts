@@ -1,13 +1,14 @@
 export interface Track {
   id: string;
   name: string;
-  type: 'audio' | 'midi' | 'video' | 'drum';
+  type: 'audio' | 'midi' | 'drum';
   volume: number;
   pan: number;
   muted: boolean;
   soloed: boolean;
   instrumentId?: string;    // ID of the instrument (for MIDI/drum tracks)
   instrumentName?: string;  // Display name of the instrument
+  instrumentStorageKey?: string; // Storage key for the instrument
 }
 
 export interface Project {
@@ -86,6 +87,7 @@ export class ProjectManager {
     soloed?: boolean;
     instrumentId?: string;
     instrumentName?: string;
+    instrumentStorageKey?: string;
   }): Track {
     if (!this.currentProject) {
       throw new Error('No project loaded');
@@ -105,6 +107,7 @@ export class ProjectManager {
     if ((trackProps.type === 'midi' || trackProps.type === 'drum') && trackProps.instrumentId) {
       track.instrumentId = trackProps.instrumentId;
       track.instrumentName = trackProps.instrumentName || 'Default Instrument';
+      track.instrumentStorageKey = trackProps.instrumentStorageKey;
     }
 
     this.currentProject.tracks.push(track);

@@ -3,7 +3,7 @@ import { TransportController } from './transport';
 import { MidiManager } from '../midi/MidiManager';
 import { InstrumentManager } from '../instruments/InstrumentManager';
 import AudioEngine from '../audio-engine/audioEngine';
-import { MidiSoundfontPlayer } from '../audio-engine/midiSoundfontPlayer/midiSoundfontPlayer';
+import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
 import { TrackState } from '../types/track';
 import * as Tone from 'tone';
 
@@ -19,7 +19,7 @@ export interface DrumPad {
 export interface StoreInterface {
   getAudioEngine(): AudioEngine;
   getTransport(): TransportController;
-  getMidiPlayer(): MidiSoundfontPlayer;
+  getSoundfontController(): SoundfontEngineController;
   projectManager: ProjectManager;
   initializeAudio(): Promise<void>;
   createTrack(
@@ -35,6 +35,7 @@ export interface StoreInterface {
   ): Promise<Track>;
   getInstrumentManager(): InstrumentManager;
   getMidiManager(): MidiManager;
+  connectTrackToSoundfont(trackId: string, instrumentId: string): Promise<void>;
 }
 
 export class Store implements StoreInterface {
@@ -44,7 +45,7 @@ export class Store implements StoreInterface {
   private initialized: boolean = false;
   private midiManager: MidiManager;
   private instrumentManager: InstrumentManager;
-  private midiPlayer: MidiSoundfontPlayer;
+  private soundfontController: SoundfontEngineController;
   private _tracks: TrackState[] = []; // Array of tracks
   private _listeners: Function[] = []; // Track change listeners
 
@@ -54,7 +55,7 @@ export class Store implements StoreInterface {
     this.transportController = new TransportController();
     this.midiManager = new MidiManager();
     this.instrumentManager = new InstrumentManager();
-    this.midiPlayer = new MidiSoundfontPlayer();
+    this.soundfontController = new SoundfontEngineController(this);
     
     // Initialize with project defaults
     const project = this.projectManager.getCurrentProject();
@@ -62,15 +63,38 @@ export class Store implements StoreInterface {
       this.midiManager.setBpm(project.tempo);
       this.midiManager.setTimeSignature(project.timeSignature); // Default time signature
     }
-    
-    this.initialized = true;
   }
 
   public async initializeAudio(): Promise<void> {
     if (this.initialized) return;
     
     try {
+      // Initialize audio engine
       await this.audioEngine.initialize();
+      
+      // Get Tone.js context and extract raw audio context
+      // This is a workaround since AudioEngine doesn't expose the context directly
+      const toneContext = Tone.getContext();
+      const rawContext = toneContext.rawContext;
+      
+      // Log the context type to help debug
+      console.log('Audio context type:', {
+        toneContextType: typeof toneContext,
+        rawContextType: typeof rawContext,
+        rawContextConstructorName: rawContext.constructor.name,
+        isAudioContext: rawContext instanceof AudioContext,
+        isBaseAudioContext: rawContext instanceof BaseAudioContext
+      });
+      
+      // Some browsers may need to create a new AudioContext from an existing one
+      const audioContext = new AudioContext({
+        latencyHint: 'interactive',
+        sampleRate: rawContext.sampleRate
+      });
+      
+      // Initialize soundfont controller with the new audio context
+      await this.soundfontController.initialize(audioContext);
+      
       this.initialized = true;
       this.syncTracksFromProjectManager();
     } catch (error) {
@@ -101,7 +125,7 @@ export class Store implements StoreInterface {
 
   public async createTrack(
     name: string, 
-    type: 'audio' | 'midi' | 'video' | 'drum',
+    type: 'audio' | 'midi' | 'drum',
     existingTrackData?: {
       id: string;
       volume?: number;
@@ -110,6 +134,7 @@ export class Store implements StoreInterface {
       soloed?: boolean;
       instrumentId?: string;
       instrumentName?: string;
+      instrumentStorageKey?: string;
     }
   ): Promise<Track> {
     if (!this.initialized) {
@@ -129,7 +154,8 @@ export class Store implements StoreInterface {
           muted: existingTrackData.muted,
           soloed: existingTrackData.soloed,
           instrumentId: existingTrackData.instrumentId,
-          instrumentName: existingTrackData.instrumentName
+          instrumentName: existingTrackData.instrumentName,
+          instrumentStorageKey: existingTrackData.instrumentStorageKey
         })
       : this.projectManager.addTrack(name, type);
     
@@ -198,6 +224,7 @@ export class Store implements StoreInterface {
     if ((track.type === 'midi' || track.type === 'drum') && track.instrumentId) {
       trackState.instrumentId = track.instrumentId;
       trackState.instrumentName = track.instrumentName;
+      trackState.instrumentStorageKey = track.instrumentStorageKey;
     }
     
     // Add to our internal tracks array
@@ -278,8 +305,38 @@ export class Store implements StoreInterface {
     return this.midiManager;
   }
   
-  public getMidiPlayer(): MidiSoundfontPlayer {
-    return this.midiPlayer;
+  public getSoundfontController(): SoundfontEngineController {
+    return this.soundfontController;
+  }
+  
+  /**
+   * Connect a MIDI track to a soundfont instrument
+   * This adds the track to the SoundfontPlayer and sets up subscription for updates
+   * @param trackId The track ID to connect
+   * @param instrumentId The instrument ID for the soundfont
+   */
+  public async connectTrackToSoundfont(
+    trackId: string, 
+    instrumentId: string
+  ): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('Store must be initialized before connecting tracks to soundfonts');
+    }
+    
+    try {
+      console.log(`Store: Connecting track ${trackId} to soundfont ${instrumentId}`);
+      
+      await this.soundfontController.connectTrackToSoundfont(
+        trackId, 
+        instrumentId, 
+        this.midiManager
+      );
+      
+      console.log(`Store: Successfully connected track ${trackId} to soundfont ${instrumentId}`);
+    } catch (error) {
+      console.error(`Store: Failed to connect track ${trackId} to soundfont ${instrumentId}:`, error);
+      throw error;
+    }
   }
 
   /**
