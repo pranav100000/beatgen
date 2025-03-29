@@ -29,7 +29,7 @@ export class MidiSoundfontPlayer {
   private masterTick: number = 0;
   private processingInterval: ReturnType<typeof setInterval> | null = null;
   private readonly PROCESS_INTERVAL_MS = 10;
-  private pendingTempoChange: number | null = null; // Store pending tempo change
+  private bpm: number; 
   private soundfontBankOffsets: Map<number, number> = new Map(); // Maps sfontId -> bankOffset
   private initPromise: Promise<void> | null = null; // Promise for tracking initialization
   
@@ -37,9 +37,10 @@ export class MidiSoundfontPlayer {
    * Create a new MidiSoundfontPlayer
    * @param audioContext The audio context to use
    */
-  constructor() {
+  constructor(bpm: number = 120) {
     // Initialize synthesizer
     this.synth = new AudioWorkletNodeSynthesizer();
+    this.bpm = bpm;
   }
   
   /**
@@ -508,9 +509,13 @@ export class MidiSoundfontPlayer {
       // If we're playing, queue the tempo change for the next processing interval
       // This follows the FluidSynth documentation guidance to change tempo
       // during a sequencer callback or when no events are being dispatched
-      this.pendingTempoChange = bpm;
+      this.bpm = bpm;
       console.log(`Tempo change to ${bpm} BPM queued for next processing interval`);
     }
+  }
+  
+  getGlobalBPM(): number {
+    return this.bpm;
   }
   
   /**

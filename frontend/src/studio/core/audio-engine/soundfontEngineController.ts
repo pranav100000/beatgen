@@ -313,6 +313,7 @@ export class SoundfontEngineController {
                 // Convert to ArrayBuffer for consistency
                 // const midiArrayBuffer = await midiBlob!.arrayBuffer();
                 // console.log(`MIDI data size: ${midiArrayBuffer.byteLength} bytes`);
+                console.log("________bpm", this.midiPlayer.getGlobalBPM());
                 const notes = midiManager.getNotesForTrack(trackId);
                 const midi = new Midi();
                 midi.addTrack()
@@ -321,8 +322,8 @@ export class SoundfontEngineController {
                     midi.tracks[0].addNote({
                         midi: note.row,
                         velocity: note.velocity,
-                        ticks: note.column * 160,
-                        durationTicks: note.length * 160
+                        ticks: note.column * this.midiPlayer.getGlobalBPM() * 2,
+                        durationTicks: note.length * this.midiPlayer.getGlobalBPM() * 2
                     });
                 }
 
