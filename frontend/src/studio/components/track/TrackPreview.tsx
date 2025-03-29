@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import { GRID_CONSTANTS, getTrackColor } from '../../constants/gridConstants';
 import { TrackState, Position } from '../../core/types/track';
 import WaveformDisplay from './WaveformDisplay';
-import { MidiNotesPreview } from '../piano-roll';
+import MidiNotesPreview from '../piano-roll/components/MidiNotesPreview';
 import { useGridStore } from '../../core/state/gridStore';
 
 // Simplified TrackPreview component without complex handlers

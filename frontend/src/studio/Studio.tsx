@@ -4,7 +4,7 @@ import AddIcon from '@mui/icons-material/Add';
 
 // Import components
 import TrackControlsSidebar from './components/sidebar/TrackControlsSidebar';
-import { Timeline } from './components/timeline/Timeline';
+import { Timeline, TimelineRef } from './components/timeline/Timeline';
 import AddTrackMenu from './components/sidebar/AddTrackMenu';
 import { GRID_CONSTANTS } from './constants/gridConstants';
 import { useStudioStore } from './stores/useStudioStore';
@@ -72,7 +72,7 @@ function Studio({ projectId }: StudioProps) {
     setAddMenuAnchor
   } = useStudioStore();
   
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<TimelineRef>(null);
   const animationFrameRef = useRef<number | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [existingProjectId, setExistingProjectId] = useState<string | null>(projectId || null);
@@ -147,29 +147,28 @@ function Studio({ projectId }: StudioProps) {
     setProjectTitle(event.target.value);
   };
 
-  // Update UI time display based on transport position
+  // Control playback cursor directly when playback state changes
   useEffect(() => {
-    if (!isPlaying || !store) return;
-
-    const updateTime = () => {
-      const transport = store.getTransport();
-      if (transport) {
-        // Get the current position from transport
-        // setCurrentTime(transport.position);
-        animationFrameRef.current = requestAnimationFrame(updateTime);
-      }
-    };
-
-    // Start the animation frame loop
-    animationFrameRef.current = requestAnimationFrame(updateTime);
-
-    // Cleanup
+    if (!store || !scrollRef.current?.playbackCursor) return;
+    
+    if (isPlaying) {
+      // Start the cursor animation when playback starts
+      scrollRef.current.playbackCursor.play();
+      console.log('Starting cursor animation via imperative API');
+    } else {
+      // Pause the cursor animation when playback stops
+      scrollRef.current.playbackCursor.pause();
+      console.log('Pausing cursor animation via imperative API');
+    }
+    
+    // Clean up any stray animation frames
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, store, setCurrentTime]);
+  }, [isPlaying, store]);
 
   // Handle infinite scrolling for the timeline
   const handleScroll = React.useCallback(() => {
@@ -313,9 +312,17 @@ function Studio({ projectId }: StudioProps) {
           timeSignature={timeSignature}
           onTrackPositionChange={handleTrackPositionChange}
           onTimeChange={(newTime) => {
+            // Update global state only when user explicitly changes time
             setCurrentTime(newTime);
+            
+            // Update transport position
             if (store && store.getTransport()) {
               store.getTransport().setPosition(newTime);
+            }
+            
+            // Use imperative API to update cursor position
+            if (scrollRef.current?.playbackCursor) {
+              scrollRef.current.playbackCursor.seek(newTime);
             }
           }}
           gridLineStyle={{

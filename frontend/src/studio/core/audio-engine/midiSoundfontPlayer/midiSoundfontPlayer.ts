@@ -208,59 +208,59 @@ export class MidiSoundfontPlayer {
     
     this.isPlaying = true;
     
-    // Start processing loop - this is critical!
-    const trackList = Array.from(this.tracks.values());
+    // // Start processing loop - this is critical!
+    // const trackList = Array.from(this.tracks.values());
     
     // Setup timing metrics
     let lastProcessTime = performance.now();
     let processingCycleCount = 0;
     
-    this.processingInterval = setInterval(async () => {
-      // Timing diagnostics - measure actual elapsed time
-      const currentTime = performance.now();
-      const actualElapsedMs = currentTime - lastProcessTime;
-      processingCycleCount++;
+    // this.processingInterval = setInterval(async () => {
+    //   // Timing diagnostics - measure actual elapsed time
+    //   const currentTime = performance.now();
+    //   const actualElapsedMs = currentTime - lastProcessTime;
+    //   processingCycleCount++;
       
-      // Log timing every 10 cycles
-      if (processingCycleCount % 10 === 0) {
-        console.log(`📊 TIMING: Actual interval=${actualElapsedMs.toFixed(2)}ms, Target=${this.PROCESS_INTERVAL_MS}ms, masterTick=${this.masterTick}`);
-      }
+    //   // Log timing every 10 cycles
+    //   if (processingCycleCount % 10 === 0) {
+    //     console.log(`📊 TIMING: Actual interval=${actualElapsedMs.toFixed(2)}ms, Target=${this.PROCESS_INTERVAL_MS}ms, masterTick=${this.masterTick}`);
+    //   }
       
-      // Store current time for next cycle
-      lastProcessTime = currentTime;
+    //   // Store current time for next cycle
+    //   lastProcessTime = currentTime;
       
-      // Check if there's a pending tempo change
-      if (this.pendingTempoChange !== null) {
-        const bpm = this.pendingTempoChange;
-        this.pendingTempoChange = null; // Clear pending change
+    //   // Check if there's a pending tempo change
+    //   if (this.pendingTempoChange !== null) {
+    //     const bpm = this.pendingTempoChange;
+    //     this.pendingTempoChange = null; // Clear pending change
         
-        // Apply tempo change to all tracks - this is safe here
-        // because we're in a sequencer callback, as required by FluidSynth
-        console.log(`Applying queued tempo change to ${bpm} BPM during processing interval`);
+    //     // Apply tempo change to all tracks - this is safe here
+    //     // because we're in a sequencer callback, as required by FluidSynth
+    //     console.log(`Applying queued tempo change to ${bpm} BPM during processing interval`);
         
-        const trackEntries = Array.from(this.tracks.entries());
-        const promises = trackEntries.map(async ([id, track]) => {
-          await track.setBPM(bpm);
-        });
+    //     const trackEntries = Array.from(this.tracks.entries());
+    //     const promises = trackEntries.map(async ([id, track]) => {
+    //       await track.setBPM(bpm);
+    //     });
         
-        // Wait for all tempo changes to complete
-        await Promise.all(promises);
+    //     // Wait for all tempo changes to complete
+    //     await Promise.all(promises);
         
-        console.log(`Tempo change to ${bpm} BPM completed`);
-      }
+    //     console.log(`Tempo change to ${bpm} BPM completed`);
+    //   }
       
-      // Process all active sequencers - keep processing at same rate
-      for (const track of trackList) {
-        if (!track.isMuted) {
-          // Continue using constant interval for processing
-          await track.process(this.PROCESS_INTERVAL_MS, this.masterTick);
-        }
-      }
+    //   // Process all active sequencers - keep processing at same rate
+    //   for (const track of trackList) {
+    //     if (!track.isMuted) {
+    //       // Continue using constant interval for processing
+    //       //await track.process(this.PROCESS_INTERVAL_MS, this.masterTick);
+    //     }
+    //   }
       
-      // But advance master timeline with actual elapsed time for accuracy
-      // This ensures our playback position keeps up with real-world time
-      this.masterTick += actualElapsedMs;
-    }, this.PROCESS_INTERVAL_MS);
+    //   // But advance master timeline with actual elapsed time for accuracy
+    //   // This ensures our playback position keeps up with real-world time
+    //   this.masterTick += actualElapsedMs;
+    // }, this.PROCESS_INTERVAL_MS);
   }
   
   /**

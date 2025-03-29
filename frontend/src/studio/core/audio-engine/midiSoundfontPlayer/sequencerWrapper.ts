@@ -197,18 +197,16 @@ export class SequencerWrapper {
     const ticksPerSecond = (this.currentBpm * this.ppq) / 60;
     const ticksToAdvance = (msecElapsed * ticksPerSecond) / 1000;
     
-    console.log("________lastEventTick", lastEventTick);
-    console.log("________ticksPerSecond", ticksPerSecond);
-    console.log("________ticksToAdvance", ticksToAdvance);
-    console.log("________currentLocalTick", this.currentLocalTick);
+    // console.log("________lastEventTick", lastEventTick);
+    // console.log("________ticksPerSecond", ticksPerSecond);
+    // console.log("________ticksToAdvance", ticksToAdvance);
+    // console.log("________currentLocalTick", this.currentLocalTick);
     // Only process the sequencer if we haven't reached the end of the track
     if (this.currentLocalTick <= lastEventTick + ticksPerSecond) { // Add ~1 second buffer for last note to finish playing
       // Process the sequencer using the calculated ticks
       // This correctly handles tempo changes by advancing the right number of ticks
-      console.log("________processing sequencer");
       this.sequencer.processSequencer(ticksToAdvance);
     } else {
-      console.log("________not processing sequencer");
       this.sequencer.close();
     }
     
@@ -371,9 +369,8 @@ export class SequencerWrapper {
       }
     }
     
-    console.log(`Scheduled ${scheduledCount} events from tick ${fromTick} ` +
-                `(with offset: ${this.startOffset}) on channel ${this.channel}`);
-    console.log("________scheduledEvents", scheduledEvents);
+    // console.log(`Scheduled ${scheduledCount} events from tick ${fromTick} ` +
+    //             `(with offset: ${this.startOffset}) on channel ${this.channel}`);
   }
   
   // Silence all active notes and clear events
@@ -398,12 +395,13 @@ export class SequencerWrapper {
    * @param globalTick The current global timeline position
    */
   async play(globalTick: number): Promise<void> {
+    console.log(")))))))))globalTick", globalTick);
 
-    console.log("______currentbpm", this.currentBpm);
-    console.log("______currentppq", this.ppq);
-    console.log("______currentstartoffset", this.startOffset);
-    console.log("________play with values:", this.noteEvents);
-    console.log("________len of note_events:", this.noteEvents.length);
+    // console.log("______currentbpm", this.currentBpm);
+    // console.log("______currentppq", this.ppq);
+    // console.log("______currentstartoffset", this.startOffset);
+    // console.log("________play with values:", this.noteEvents);
+    // console.log("________len of note_events:", this.noteEvents.length);
     this._isPlaying = true;
     const localTick = this.globalToLocalTick(globalTick);
     this.currentLocalTick = localTick;

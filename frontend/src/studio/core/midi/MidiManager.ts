@@ -78,7 +78,8 @@ export class MidiManager implements MidiManagerInterface {
         id: note.id,
         row: note.row,
         column: note.column,
-        length: note.length
+        length: note.length,
+        velocity: note.velocity
       }))
     );
   }
@@ -89,7 +90,7 @@ export class MidiManager implements MidiManagerInterface {
       instrumentId: 'default',
       notes: notes.map(note => ({
         ...note,
-        velocity: 0.8, // Default velocity
+        velocity: note.velocity, // Default velocity
         duration: note.length / 4, // Convert grid units to seconds
         time: note.column / 4 // Convert grid units to seconds
       }))
@@ -140,30 +141,6 @@ export class MidiManager implements MidiManagerInterface {
     return this.tracks.get(trackId) || [];
   }
 
-  schedulePlayback(track: MidiTrack): void {
-    // Stop any existing playback for this track
-    this.stopPlayback(track.id);
-
-    // Create a new Tone.js Part for playback
-    const part = new Tone.Part((time, note: MidiNote) => {
-      // This would trigger the actual instrument playback
-      // Implementation depends on your instrument system
-      Tone.Transport.schedule(() => {
-        // Trigger note through instrument system
-      }, time);
-    }, track.notes.map(note => [note.time, note]));
-
-    part.start(0);
-    this.activePlayback.set(track.id, part);
-  }
-
-  stopPlayback(trackId: string): void {
-    const part = this.activePlayback.get(trackId);
-    if (part) {
-      part.dispose();
-      this.activePlayback.delete(trackId);
-    }
-  }
   
   // BPM and time signature methods
   
@@ -382,7 +359,6 @@ export class MidiManager implements MidiManagerInterface {
     // Remove from internal maps
     this.tracks.delete(trackId);
     this.subscribers.delete(trackId);
-    this.stopPlayback(trackId);
     
     try {
       // Cancel any pending update

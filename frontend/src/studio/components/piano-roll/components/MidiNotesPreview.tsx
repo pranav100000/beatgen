@@ -92,7 +92,7 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
         const y = relativePosition * noteHeightScale;
         const w = note.length * noteWidthScale;
         const h = noteHeightScale * 0.9; // Slight gap between notes
-        
+        console.log("________note", note);
         return (
           <Box
             key={note.id}

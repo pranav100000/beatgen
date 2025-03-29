@@ -37,8 +37,4 @@ export interface MidiManagerInterface {
   addNoteToTrack(trackId: string, note: Note): Promise<void>;
   removeNoteFromTrack(trackId: string, noteId: number): Promise<void>;
   updateNote(trackId: string, updatedNote: Note): Promise<void>;
-  
-  // Playback integration
-  schedulePlayback(track: MidiTrack): void;
-  stopPlayback(trackId: string): void;
 } 

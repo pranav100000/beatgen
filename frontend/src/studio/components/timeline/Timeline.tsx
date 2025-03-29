@@ -1,8 +1,8 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useRef, useImperativeHandle } from 'react';
 import { Box } from '@mui/material';
 import { GRID_CONSTANTS, calculatePositionTime } from '../../constants/gridConstants';
 import Track from '../track/Track';
-import PlaybackCursor from './PlaybackCursor';
+import PlaybackCursor, { PlaybackCursorRef } from './PlaybackCursor';
 import { TrackState, Position } from '../../core/types/track';
 
 export interface TimelineProps {
@@ -20,7 +20,24 @@ export interface TimelineProps {
   };
 }
 
-export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
+// Define imperative handle interface
+export interface TimelineRef {
+  playbackCursor: {
+    play: () => void;
+    pause: () => void;
+    stop: () => void;
+    seek: (time: number) => void;
+  };
+  // Include the HTMLDivElement methods we need
+  addEventListener: HTMLDivElement['addEventListener'];
+  removeEventListener: HTMLDivElement['removeEventListener'];
+  // Include properties we need for scroll handling
+  scrollLeft: number;
+  scrollWidth: number;
+  clientWidth: number;
+}
+
+export const Timeline = forwardRef<TimelineRef, TimelineProps>(({
   tracks,
   currentTime = 0,
   isPlaying = false,
@@ -37,9 +54,36 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
   // Calculate the total width needed for the entire timeline
   const totalTimelineWidth = measureCount * GRID_CONSTANTS.measureWidth;
   
+  // Refs for the cursor and container
+  const cursorRef = useRef<PlaybackCursorRef>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Expose imperative methods to parent component
+  useImperativeHandle(ref, () => {
+    const divElement = containerRef.current;
+    if (!divElement) return {} as TimelineRef;
+    
+    return {
+      // Explicitly forward the HTMLDivElement methods and properties we need
+      addEventListener: divElement.addEventListener.bind(divElement),
+      removeEventListener: divElement.removeEventListener.bind(divElement),
+      get scrollLeft() { return divElement.scrollLeft; },
+      get scrollWidth() { return divElement.scrollWidth; },
+      get clientWidth() { return divElement.clientWidth; },
+      
+      // Add our custom playbackCursor methods
+      playbackCursor: {
+        play: () => cursorRef.current?.play(),
+        pause: () => cursorRef.current?.pause(),
+        stop: () => cursorRef.current?.stop(),
+        seek: (time: number) => cursorRef.current?.seek(time)
+      }
+    };
+  });
+  
   return (
     <Box 
-      ref={ref}
+      ref={containerRef}
       className="timeline-container"
       sx={{ 
         flex: 1, 
@@ -52,8 +96,9 @@ export const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
         }
       }}
     >
-      {/* Playback Cursor - Moved here to overlay everything */}
+      {/* Playback Cursor with ref for imperative control */}
       <PlaybackCursor 
+        ref={cursorRef}
         currentTime={currentTime} 
         isPlaying={isPlaying} 
         bpm={bpm} 

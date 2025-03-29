@@ -56,7 +56,7 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
     >
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* Control toolbar */}
-        <Box sx={{ 
+        {/* <Box sx={{ 
           height: '40px', 
           bgcolor: '#222', 
           borderBottom: '1px solid #333',
@@ -67,9 +67,7 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
           <Typography variant="body2" sx={{ color: '#aaa', mr: 2 }}>
             Track: {track.name}
           </Typography>
-          
-          {/* Add toolbar controls here (undo/redo, tools, quantize, etc.) */}
-        </Box>
+        </Box> */}
         
         {/* Editor content - show either PianoRoll or DrumRoll based on track type */}
         <Box sx={{ flex: 1, overflow: 'hidden' }}>
