@@ -30,6 +30,7 @@ export class MidiSoundfontPlayer {
   private readonly PROCESS_INTERVAL_MS = 10;
   private pendingTempoChange: number | null = null; // Store pending tempo change
   private soundfontBankOffsets: Map<number, number> = new Map(); // Maps sfontId -> bankOffset
+  private initPromise: Promise<void> | null = null; // Promise for tracking initialization
   
   /**
    * Create a new MidiSoundfontPlayer
@@ -44,24 +45,52 @@ export class MidiSoundfontPlayer {
    * Initialize the synthesizer
    * @param audioContext The audio context to use
    */
-  async initSynthesizer(audioContext: AudioContext) {
-    try {
-      // Register worklet processor - load libfluidsynth first, then the worklet
-      await audioContext.audioWorklet.addModule('/js-synthesizer/libfluidsynth-2.3.0.js');
-      await audioContext.audioWorklet.addModule('/js-synthesizer/js-synthesizer.worklet.js');
-      
-      // Create node and connect
-      const node = this.synth.createAudioNode(audioContext, {
-        polyphony: 256 // High polyphony for multiple tracks
-      });
-      
-      node.connect(audioContext.destination);
-      
-      console.log('MidiSoundfontPlayer initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize MidiSoundfontPlayer:', error);
-      throw error;
+  async initSynthesizer(audioContext: AudioContext): Promise<void> {
+    // If already initializing, return the existing promise
+    if (this.initPromise) {
+      return this.initPromise;
     }
+    
+    // Create a new initialization promise
+    this.initPromise = new Promise<void>((resolve, reject) => {
+      const initialize = async () => {
+        try {
+          console.log('Initializing MidiSoundfontPlayer...');
+          // Register worklet processor - load libfluidsynth first, then the worklet
+          await audioContext.audioWorklet.addModule('/js-synthesizer/libfluidsynth-2.3.0.js');
+          await audioContext.audioWorklet.addModule('/js-synthesizer/js-synthesizer.worklet.js');
+          
+          // Create node and connect
+          const node = this.synth.createAudioNode(audioContext, {
+            polyphony: 256 // High polyphony for multiple tracks
+          });
+          
+          node.connect(audioContext.destination);
+          
+          console.log('MidiSoundfontPlayer initialized successfully');
+          resolve();
+        } catch (error) {
+          console.error('Failed to initialize MidiSoundfontPlayer:', error);
+          this.initPromise = null; // Reset promise so we can try again
+          reject(error);
+        }
+      };
+      
+      initialize();
+    });
+    
+    return this.initPromise;
+  }
+  
+  /**
+   * Wait for the synthesizer to be fully initialized
+   * @returns Promise that resolves when initialization is complete
+   */
+  async waitForInitialization(): Promise<void> {
+    if (!this.initPromise) {
+      throw new Error('Synthesizer initialization not started. Call initSynthesizer() first.');
+    }
+    return this.initPromise;
   }
   
   /**
@@ -74,7 +103,15 @@ export class MidiSoundfontPlayer {
    */
   async addTrack(id: string, midiData: ArrayBuffer, soundfontData: ArrayBuffer, options: TrackOptions = {}) {
     try {
-      // Load soundfont
+      // Ensure synthesizer is initialized before proceeding
+      if (!this.initPromise) {
+        throw new Error('Cannot add track: synthesizer not initialized. Call initSynthesizer() first.');
+      }
+      
+      // Wait for full initialization to complete
+      await this.waitForInitialization();
+      
+      // Now we can safely load the soundfont
       console.log(`Loading soundfont for track "${id}"...`);
       const sfontId = await this.synth.loadSFont(soundfontData);
       
@@ -216,7 +253,7 @@ export class MidiSoundfontPlayer {
       for (const track of trackList) {
         if (!track.isMuted) {
           // Continue using constant interval for processing
-          track.process(this.PROCESS_INTERVAL_MS, this.masterTick);
+          await track.process(this.PROCESS_INTERVAL_MS, this.masterTick);
         }
       }
       

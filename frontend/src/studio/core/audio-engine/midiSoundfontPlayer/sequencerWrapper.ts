@@ -208,8 +208,8 @@ export class SequencerWrapper {
       console.log("________processing sequencer");
       this.sequencer.processSequencer(ticksToAdvance);
     } else {
-      this.recreateSequencer();
       console.log("________not processing sequencer");
+      this.sequencer.close();
     }
     
     // Update local position based on global tick

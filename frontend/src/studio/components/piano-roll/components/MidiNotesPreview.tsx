@@ -65,7 +65,7 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
   
   // Calculate the columns that should fit within the view width
   // Standard 4-bar section at 16th note resolution = 64 columns (4 * 4 * 4)
-  const standardColumns = 64;
+  const standardColumns = 32;
   
   // Determine actual scaling based on the visible area
   const effectiveMaxColumn = Math.max(standardColumns, maxColumn > 0 ? maxColumn : standardColumns);

@@ -155,7 +155,7 @@ function Studio({ projectId }: StudioProps) {
       const transport = store.getTransport();
       if (transport) {
         // Get the current position from transport
-        setCurrentTime(transport.position);
+        // setCurrentTime(transport.position);
         animationFrameRef.current = requestAnimationFrame(updateTime);
       }
     };

@@ -255,6 +255,16 @@ export class SoundfontEngineController {
         try {
             console.log(`Connecting track ${trackId} to soundfont ${instrumentId}`);
             
+            // Ensure the midiPlayer is fully initialized before proceeding
+            try {
+                // This will wait for initialization to complete or throw if not started
+                await this.midiPlayer.waitForInitialization();
+                console.log('SoundfontEngineController confirmed midiPlayer is fully initialized');
+            } catch (initError) {
+                console.error('MidiPlayer not initialized, cannot connect track to soundfont:', initError);
+                throw new Error(`Cannot connect track ${trackId} to soundfont: MidiPlayer not initialized. Error: ${initError.message}`);
+            }
+            
             // Validate track type first
             if (this.store) {
                 const trackData = this.store.getTrackById(trackId);
