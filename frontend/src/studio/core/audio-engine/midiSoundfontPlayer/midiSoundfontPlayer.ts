@@ -1,6 +1,7 @@
 // Import directly
 import { AudioWorkletNodeSynthesizer } from 'js-synthesizer';
 import { SequencerWrapper } from './sequencerWrapper';
+import { Midi } from '@tonejs/midi';
 
 /**
  * Options for adding a track to the player
@@ -101,7 +102,7 @@ export class MidiSoundfontPlayer {
    * @param options Additional options
    * @returns Promise resolving to the created track
    */
-  async addTrack(id: string, midiData: ArrayBuffer, soundfontData: ArrayBuffer, options: TrackOptions = {}) {
+  async addTrack(id: string, midiData: Midi, soundfontData: ArrayBuffer, options: TrackOptions = {}) {
     try {
       // Ensure synthesizer is initialized before proceeding
       if (!this.initPromise) {

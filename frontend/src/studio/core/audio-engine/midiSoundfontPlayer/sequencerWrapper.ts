@@ -1,6 +1,7 @@
 import { AudioWorkletNodeSynthesizer } from 'js-synthesizer';
 import { ISequencer } from 'js-synthesizer';
 import { Midi } from '@tonejs/midi';
+import { Note } from '../../types/note';
 
 /**
  * Custom types for event handling
@@ -61,7 +62,7 @@ export class SequencerWrapper {
     this.originalVolume = volume;
   }
   
-  async initialize(midiData: ArrayBuffer): Promise<SequencerWrapper> {
+  async initialize(midiData: Midi): Promise<SequencerWrapper> {
     console.log(`Initializing with sfontId ${this.sfontId} on channel ${this.channel}`);
 
     // Step 1: First set the bank offset before anything else
@@ -80,18 +81,16 @@ export class SequencerWrapper {
     this.sequencer = await this.synth.createSequencer();
     await this.sequencer.registerSynthesizer(this.synth);
     
-    // Parse MIDI data to get tempo information
-    const parsed = new Midi(midiData);
     
     // Extract PPQ from MIDI file if available
-    if (parsed.header && parsed.header.ppq) {
-      this.ppq = parsed.header.ppq;
+    if (midiData.header && midiData.header.ppq) {
+      this.ppq = midiData.header.ppq;
       console.log(`MIDI file has PPQ: ${this.ppq}`);
     }
     
     // Extract tempo from MIDI file if available
-    if (parsed.header && parsed.header.tempos && parsed.header.tempos.length > 0) {
-      this.currentBpm = parsed.header.tempos[0].bpm;
+    if (midiData.header && midiData.header.tempos && midiData.header.tempos.length > 0) {
+      this.currentBpm = midiData.header.tempos[0].bpm;
       console.log(`MIDI file has tempo: ${this.currentBpm} BPM`);
     }
     
@@ -149,7 +148,7 @@ export class SequencerWrapper {
     }
     
     // Convert MIDI to note events
-    this.noteEvents = this.convertMidiToNoteEvents(parsed, this.channel, 0);
+    this.noteEvents = this.convertMidiToNoteEvents(midiData, this.channel, 0);
     
     // Set initial volume
     this.setVolume(this.originalVolume);
@@ -635,7 +634,62 @@ export class SequencerWrapper {
   }
 
     /**
+   * Update sequencer directly with Note array
+   * This optimized method skips MIDI file conversion entirely
+   */
+  updateWithNotes(notes: Note[]): void {
+    console.log(`SequencerWrapper: Updating with ${notes.length} notes directly`);
+    
+    // Convert notes directly to event instances
+    this.noteEvents = this.convertNotesToEvents(notes, this.channel);
+    
+    // Apply the tempo
+    this.applyTempoToTimeScale();
+    
+    // If playing, reschedule events
+    if (this._isPlaying) {
+      this.scheduleEvents(this.currentLocalTick);
+    }
+  }
+  
+  /**
+   * Convert Note[] array directly to event instances
+   * This avoids the overhead of MIDI file conversion
+   */
+  private convertNotesToEvents(notes: Note[], channel: number): EventInstance[] {
+    const events: EventInstance[] = [];
+    
+    // Calculate ticks per second based on current BPM and PPQ
+    const ticksPerSecond = (this.currentBpm * this.ppq) / 60;
+    
+    for (const note of notes) {
+      // Convert grid position to time (in seconds), then to ticks
+      const timeInSeconds = note.column / 4; // Convert grid position to time in seconds
+      const startTick = Math.round(timeInSeconds * ticksPerSecond);
+      
+      // Convert grid length to duration (in ms)
+      const durationInSeconds = note.length / 4; // Convert grid length to duration in seconds
+      const duration = Math.round(durationInSeconds * 1000); // Convert to ms
+      
+      // Create note event
+      events.push({
+        tick: startTick,
+        event: {
+          type: 'note',
+          channel,
+          key: note.row, // MIDI note number
+          vel: note.velocity || 100, // Default to 100 if not specified
+          duration
+        }
+      });
+    }
+    
+    return events;
+  }
+  
+  /**
    * Convert a Midi object to a series of sequencer events
+   * Original method - kept for initial setup and backward compatibility
    */
   convertMidiToNoteEvents(midi: Midi, channel: number, trackIndex: number = 0): EventInstance[] {
     const events: EventInstance[] = [];

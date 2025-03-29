@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project aims to optimize the MIDI processing workflow in BeatGen by eliminating redundant MIDI file serialization/deserialization operations. Currently, every note modification requires converting between in-memory note objects and MIDI file format, creating significant performance overhead. This optimization will allow direct access to MIDI data without file conversions during normal operation.
+This project aims to optimize the MIDI processing workflow in BeatGen by eliminating redundant MIDI file serialization/deserialization operations. Currently, every note modification requires converting between in-memory note objects and MIDI file format, creating significant performance overhead. This optimization will allow direct processing of note data without file conversions during normal operations.
 
 ## Background
 
@@ -21,151 +21,58 @@ This creates unnecessary overhead, especially during editing sessions where user
 Optimize MIDI data handling to eliminate redundant file conversions while maintaining all existing functionality.
 
 ### Specific Objectives
-1. Maintain in-memory Tone.js `Midi` objects for all tracks
-2. Update these objects directly when notes are modified
-3. Provide these objects directly to the soundfont player
-4. Preserve MIDI file serialization only for project saving/loading
-5. Maintain full compatibility with existing history management
-6. Ensure no regression in current functionality
+1. Create a direct path for note data to flow to the soundfont player without MIDI file conversion
+2. Update the sequencer to work directly with Note objects
+3. Maintain MIDI file serialization only for project saving/loading
+4. Ensure full compatibility with existing features and UI
+5. Improve performance during note editing operations
 
 ## Technical Requirements
 
-### MidiManager Enhancements
-
-1. Add storage for Tone.js `Midi` objects in the MidiManager:
-   ```typescript
-   private midiObjects = new Map<string, Midi>();
-   ```
-
-2. Modify `updateTrack()` method to update the in-memory MIDI object when notes change:
-   ```typescript
-   updateTrack(trackId: string, notes: Note[]): void {
-     // Update persistence as before
-     this.persistNotesToDB(trackId, notes);
-     
-     // Also update MIDI object directly
-     this.updateMidiObject(trackId, notes);
-     
-     // Dispatch events as before
-     this.notifySubscribers(trackId, notes);
-   }
-   ```
-
-3. Add method to update MIDI objects without file conversion:
-   ```typescript
-   private updateMidiObject(trackId: string, notes: Note[]): void {
-     // Create or get MIDI object
-     if (!this.midiObjects.has(trackId)) {
-       const midi = new Midi();
-       midi.header.setTempo(this.bpm);
-       midi.header.timeSignatures = [{ 
-         ticks: 0, 
-         timeSignature: this.timeSignature
-       }];
-       this.midiObjects.set(trackId, midi);
-     }
-     
-     const midi = this.midiObjects.get(trackId)!;
-     
-     // Update MIDI with notes
-     midi.tracks = [];
-     const track = midi.addTrack();
-     
-     notes.forEach(note => {
-       track.addNote({
-         midi: note.row,
-         time: note.column / 4,
-         duration: note.length / 4,
-         velocity: note.velocity / 127
-       });
-     });
-   }
-   ```
-
-4. Add accessor method for MIDI objects:
-   ```typescript
-   getMidiObject(trackId: string): Midi | undefined {
-     return this.midiObjects.get(trackId);
-   }
-   ```
-
-5. Optimize `exportMidiFileFromDB()` to use in-memory objects when available:
-   ```typescript
-   async exportMidiFileFromDB(trackId: string): Promise<Blob | null> {
-     // Use cached object if available
-     if (this.midiObjects.has(trackId)) {
-       const midi = this.midiObjects.get(trackId)!;
-       const buffer = midi.toArray();
-       return new Blob([buffer], { type: 'audio/midi' });
-     }
-     
-     // Otherwise use existing DB approach
-     // ...existing code...
-   }
-   ```
-
-6. Update track loading to populate MIDI objects:
-   ```typescript
-   async loadTrackFromDB(trackId: string): Promise<Note[]> {
-     const notes = await this.db.getMidiTrackNotes(trackId);
-     
-     // Also update the MIDI object
-     if (notes && notes.length > 0) {
-       this.updateMidiObject(trackId, notes);
-     }
-     
-     return notes;
-   }
-   ```
-
 ### SequencerWrapper Enhancements
 
-1. Add method to update sequencer directly with Midi object:
+1. Add method to update sequencer directly with Note arrays:
    ```typescript
-   updateWithMidiObject(midi: Midi): void {
-     // Extract properties from MIDI
-     if (midi.header) {
-       this.ppq = midi.header.ppq;
-       
-       if (midi.header.tempos && midi.header.tempos.length > 0) {
-         this.currentBpm = midi.header.tempos[0].bpm;
-       }
-     }
+   updateWithNotes(notes: Note[]): void {
+     // Convert notes directly to event instances
+     this.noteEvents = this.convertNotesToEvents(notes);
      
-     // Get tracks with notes
-     const track = midi.tracks.find(t => t.notes.length > 0) || midi.tracks[0];
+     // Apply the tempo
+     this.applyTempoToTimeScale();
      
-     if (track) {
-       // Convert to our event format
-       this.noteEvents = this.convertMidiObjectToEvents(track, this.channel);
-       this.applyTempoToTimeScale();
-       
-       // If playing, reschedule events
-       if (this._isPlaying) {
-         this.scheduleEvents(this.currentLocalTick);
-       }
+     // If playing, reschedule events
+     if (this._isPlaying) {
+       this.scheduleEvents(this.currentLocalTick);
      }
    }
    ```
 
-2. Add helper for converting Tone.js MIDI objects to events:
+2. Add helper for converting Note arrays to events:
    ```typescript
-   private convertMidiObjectToEvents(track: Track, channel: number): EventInstance[] {
+   private convertNotesToEvents(notes: Note[], channel: number): EventInstance[] {
      const events: EventInstance[] = [];
+     
+     // Calculate ticks per second based on current BPM and PPQ
      const ticksPerSecond = (this.currentBpm * this.ppq) / 60;
      
-     for (const note of track.notes) {
-       const startTick = Math.round(note.time * ticksPerSecond);
-       const duration = Math.round(note.duration * 1000); // ms
+     for (const note of notes) {
+       // Convert grid position to time (in seconds), then to ticks
+       const timeInSeconds = note.column / 4;
+       const startTick = Math.round(timeInSeconds * ticksPerSecond);
        
+       // Convert grid length to duration (in ms)
+       const durationInSeconds = note.length / 4;
+       const duration = Math.round(durationInSeconds * 1000);
+       
+       // Create note event
        events.push({
          tick: startTick,
          event: {
            type: 'note',
-           channel: channel,
-           key: note.midi,
-           vel: Math.round(note.velocity * 127),
-           duration: duration
+           channel,
+           key: note.row,
+           vel: note.velocity || 100,
+           duration
          }
        });
      }
@@ -176,58 +83,25 @@ Optimize MIDI data handling to eliminate redundant file conversions while mainta
 
 ### SoundfontEngineController Changes
 
-1. Modify `connectTrackToSoundfont()` to use MidiManager:
+1. Update track subscription to use Note arrays directly:
    ```typescript
-   async connectTrackToSoundfont(trackId: string, instrumentId: string): Promise<void> {
-     // Get soundfont data as before
-     
-     // Get MIDI data from MidiManager instead of file
-     const midiObject = this.midiManager.getMidiObject(trackId);
-     let midiArrayBuffer: ArrayBuffer;
-     
-     if (midiObject) {
-       // Use in-memory object
-       midiArrayBuffer = midiObject.toArray();
-     } else {
-       // Fall back to file export if needed
-       const midiBlob = await this.midiManager.exportMidiFileFromDB(trackId);
-       if (!midiBlob) {
-         throw new Error(`No MIDI data found for track ${trackId}`);
-       }
-       midiArrayBuffer = await midiBlob.arrayBuffer();
+   private registerTrackSubscription(trackId: string, midiManager: MidiManager): void {
+     // Remove previous subscription if exists
+     if (this.trackSubscriptions.has(trackId)) {
+       this.trackSubscriptions.get(trackId)!.unsubscribe();
      }
      
-     // Add track to player with soundfont
-     await this.midiPlayer.addTrack(
-       trackId,
-       midiArrayBuffer,
-       soundfontResult.data
-     );
-     
-     // Subscribe to updates
-     this.registerTrackSubscription(trackId);
-   }
-   ```
-
-2. Update track subscription to use MIDI objects:
-   ```typescript
-   private registerTrackSubscription(trackId: string): void {
-     // Remove previous subscription if exists
-     
      // Subscribe to track updates
-     const unsubscribe = this.midiManager.subscribeToTrack(trackId, async () => {
+     const unsubscribe = midiManager.subscribeToTrack(trackId, (trackId, notes) => {
        try {
-         // Get updated MIDI object directly
-         const midiObject = this.midiManager.getMidiObject(trackId);
-         if (!midiObject) return;
-         
-         // Get sequencer and update it directly
+         // Get sequencer and update it directly with notes
          const sequencer = this.midiPlayer.getTrack(trackId);
          if (sequencer) {
-           sequencer.updateWithMidiObject(midiObject);
+           sequencer.updateWithNotes(notes);
+           console.log(`Updated sequencer for track ${trackId} with ${notes.length} notes directly`);
          }
        } catch (error) {
-         console.error(`Failed to update MIDI playback:`, error);
+         console.error(`Failed to update sequencer for track ${trackId}:`, error);
        }
      });
      
@@ -236,20 +110,43 @@ Optimize MIDI data handling to eliminate redundant file conversions while mainta
    }
    ```
 
-3. Update play method to refresh all tracks before playback:
+2. Keep MIDI file conversion for initial setup only:
+   ```typescript
+   async connectTrackToSoundfont(trackId: string, instrumentId: string, midiManager: MidiManager): Promise<void> {
+     // Get soundfont data as before
+     
+     // Get MIDI data from MidiManager - this is needed just for initial setup
+     const midiBlob = await midiManager.exportMidiFileFromDB(trackId);
+     if (!midiBlob) {
+       throw new Error(`No MIDI data found for track ${trackId}`);
+     }
+     
+     // Add track to player with soundfont
+     await this.midiPlayer.addTrack(
+       trackId,
+       await midiBlob.arrayBuffer(),
+       soundfontResult.data
+     );
+     
+     // Subscribe to updates - this is where direct note processing happens
+     this.registerTrackSubscription(trackId, midiManager);
+   }
+   ```
+
+3. Update play method for direct note access:
    ```typescript
    async play(): Promise<void> {
-     console.log('Starting playback');
-     
-     // For each track, update with latest MIDI data before playing
+     // For each track, ensure it has the latest notes
      const trackIds = this.midiPlayer.getTrackIds();
      
      for (const trackId of trackIds) {
+       // Get direct access to notes
+       const notes = this.midiManager.getNotesForTrack(trackId);
        const sequencer = this.midiPlayer.getTrack(trackId);
-       const midiObject = this.midiManager.getMidiObject(trackId);
        
-       if (sequencer && midiObject) {
-         sequencer.updateWithMidiObject(midiObject);
+       if (sequencer && notes && notes.length > 0) {
+         // Update with latest notes directly before playing
+         sequencer.updateWithNotes(notes);
        }
      }
      
@@ -260,15 +157,14 @@ Optimize MIDI data handling to eliminate redundant file conversions while mainta
 
 ## Testing Requirements
 
-1. Unit tests for new MidiManager methods
-   - Test `updateMidiObject()` correctly converts notes to MIDI
-   - Test `getMidiObject()` returns expected object
-   - Test modifications to `updateTrack()` still notify subscribers
+1. Unit tests for new SequencerWrapper methods
+   - Test `updateWithNotes()` correctly converts notes to events
+   - Test `convertNotesToEvents()` properly calculates timing 
 
-2. Integration tests for the optimized workflow
-   - Test note creation updates MIDI object correctly
-   - Test MIDI object is used when exporting
-   - Test SequencerWrapper handles MIDI objects correctly
+2. Integration tests
+   - Test note creation flows through to sequencer without file conversion
+   - Test note updates are immediately reflected in playback
+   - Test MIDI file operations still work for project saving/loading
 
 3. Performance tests
    - Measure time difference between current and optimized approach 
@@ -280,39 +176,35 @@ Optimize MIDI data handling to eliminate redundant file conversions while mainta
 1. All existing functionality continues to work without regression
 2. No MIDI file serialization/deserialization occurs during normal note editing
 3. MIDI data is still correctly persisted to IndexedDB for project saving
-4. History system (undo/redo) works correctly with in-memory MIDI objects
+4. History system (undo/redo) works correctly with the optimized flow
 5. Performance improvement is measurable (>50% reduction in processing time for note edits)
 6. No new memory leaks are introduced
 
 ## Implementation Strategy
 
-1. Phase 1: Add MIDI object storage to MidiManager without changing existing code paths
-2. Phase 2: Modify SequencerWrapper to accept MIDI objects directly
-3. Phase 3: Update SoundfontEngineController to use MIDI objects when available
-4. Phase 4: Optimize all note editing operations to use the new direct path
-5. Phase 5: Run performance tests and fix any issues
-6. Phase 6: Clean up any remaining file-based operations that can be optimized
+1. Phase 1: Add the direct note processing methods to SequencerWrapper
+2. Phase 2: Update SoundfontEngineController to use direct note processing
+3. Phase 3: Test full workflow with optimized path
+4. Phase 4: Run performance tests and fix any issues
 
 ## Timeline
 
 1. Phase 1: 1 day
 2. Phase 2: 1 day
 3. Phase 3: 1 day
-4. Phase 4: 2 days
-5. Phase 5: 1 day
-6. Phase 6: 1 day
+4. Phase 4: 1 day
 
-Total estimated time: 7 days
+Total estimated time: 4 days
 
 ## Additional Considerations
 
-1. Memory usage should be monitored as we'll be keeping more data in memory
-2. Edge cases like MIDI import/export need special attention
-3. Backward compatibility should be maintained for all existing components
-4. Complete documentation of the optimization should be provided
+1. This approach minimizes changes to the existing architecture
+2. No new data structures are introduced, reducing risk
+3. The optimization is focused on the most performance-critical path
+4. Backward compatibility is maintained for all existing components
 
 ## Future Extensions
 
-1. Consider adding a periodic persistence mechanism to save MIDI data during editing
+1. Consider extending the direct note processing approach to other areas of the application
 2. Add optimization for drum tracks with similar direct access patterns
 3. Explore optimizations for audio track playback using similar techniques

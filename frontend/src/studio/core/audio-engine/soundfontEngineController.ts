@@ -3,6 +3,7 @@ import { MidiManager } from '../midi/MidiManager';
 import { Store } from '../state/store';
 import { Note } from '../types/note';
 import { db } from '../db/dexie-client';
+import { Midi } from '@tonejs/midi';
 
 /**
  * Controller for the MidiSoundfontPlayer that integrates with the app's architecture
@@ -49,51 +50,61 @@ export class SoundfontEngineController {
         // Subscribe to track updates
         const unsubscribe = midiManager.subscribeToTrack(trackId, async (trackId, notes) => {
             try {
-                console.log(`SoundfontEngineController: Notes updated for track ${trackId}, updating playback`);
+                console.log(`SoundfontEngineController: Notes updated for track ${trackId}, updating playback directly`);
                 
-                // Get the updated MIDI blob from MidiManager
-                const midiBlob = await midiManager.exportMidiFileFromDB(trackId);
-                if (!midiBlob) {
-                    console.warn(`No MIDI data found for track ${trackId}`);
-                    return;
-                }
-                
-                // Get track data and associated soundfont data
-                if (!this.store) return;
-                const trackData = this.store.getTrackById(trackId);
-                if (!trackData || trackData.type !== 'midi' && trackData.type !== 'drum' || !trackData.instrumentId) {
-                    console.warn(`Track ${trackId} is not a MIDI/drum track or has no instrumentId, skipping update`);
-                    return;
-                }
-                
-                const soundfontResult = await this.getSoundfontData(trackData.instrumentId);
-                if (!soundfontResult) {
-                    console.warn(`No soundfont data found for instrument ${trackData.instrumentId}`);
-                    return;
-                }
-                
-                // Update the track with the storage key if available
-                if (soundfontResult.storage_key && trackData.instrumentStorageKey !== soundfontResult.storage_key) {
-                    trackData.instrumentStorageKey = soundfontResult.storage_key;
-                    console.log(`Updated instrumentStorageKey for track ${trackId} to ${soundfontResult.storage_key}`);
-                }
-                
-                // Check if track exists in player
+                // OPTIMIZATION: Get the sequencer directly and update it with notes
                 const existingTrack = this.midiPlayer.getTrack(trackId);
                 if (existingTrack) {
-                    // Remove and re-add to update
-                    this.midiPlayer.removeTrack(trackId);
-                    console.log(`Removed existing track ${trackId} from player to update`);
+                    // Update directly with notes - no MIDI file conversion needed!
+                    existingTrack.updateWithNotes(notes);
+                    console.log(`Directly updated sequencer for track ${trackId} with ${notes.length} notes`);
+                    return;
                 }
                 
-                // Add updated track
-                await this.midiPlayer.addTrack(
-                    trackId,
-                    await midiBlob.arrayBuffer(),
-                    soundfontResult.data
-                );
+                // // If sequencer doesn't exist yet, we need to set it up first (this is rare)
+                // console.log(`No existing sequencer for track ${trackId}, performing full setup`);
                 
-                console.log(`Updated MIDI playback for track ${trackId} with ${notes.length} notes`);
+                // // Get track data and associated soundfont data
+                // if (!this.store) return;
+                // const trackData = this.store.getTrackById(trackId);
+                // if (!trackData || trackData.type !== 'midi' && trackData.type !== 'drum' || !trackData.instrumentId) {
+                //     console.warn(`Track ${trackId} is not a MIDI/drum track or has no instrumentId, skipping update`);
+                //     return;
+                // }
+                
+                // const soundfontResult = await this.getSoundfontData(trackData.instrumentId);
+                // if (!soundfontResult) {
+                //     console.warn(`No soundfont data found for instrument ${trackData.instrumentId}`);
+                //     return;
+                // }
+                
+                // // Update the track with the storage key if available
+                // if (soundfontResult.storage_key && trackData.instrumentStorageKey !== soundfontResult.storage_key) {
+                //     trackData.instrumentStorageKey = soundfontResult.storage_key;
+                //     console.log(`Updated instrumentStorageKey for track ${trackId} to ${soundfontResult.storage_key}`);
+                // }
+                
+                // // For initial setup only, we still need a MIDI file
+                // const midiBlob = await midiManager.exportMidiFileFromDB(trackId);
+                // if (!midiBlob) {
+                //     console.warn(`No MIDI data found for track ${trackId}`);
+                //     return;
+                // }
+                
+                // // Add the track with soundfont
+                // await this.midiPlayer.addTrack(
+                //     trackId,
+                //     await midiBlob.arrayBuffer(),
+                //     soundfontResult.data
+                // );
+                
+                // // Once track is created, update it with the latest notes
+                // const newTrack = this.midiPlayer.getTrack(trackId);
+                // if (newTrack) {
+                //     newTrack.updateWithNotes(notes);
+                // }
+                
+                console.log(`Created and updated MIDI playback for track ${trackId} with ${notes.length} notes`);
             } catch (error) {
                 console.error(`Failed to update MIDI playback for track ${trackId}:`, error);
             }
@@ -181,7 +192,7 @@ export class SoundfontEngineController {
      * @param midiData MIDI file data as ArrayBuffer
      * @param soundfontData Soundfont file data as ArrayBuffer
      */
-    async addTrack(trackId: string, midiData: ArrayBuffer, soundfontData: ArrayBuffer): Promise<void> {
+    async addTrack(trackId: string, midiData: Midi, soundfontData: ArrayBuffer): Promise<void> {
         console.log(`SoundfontEngineController: Adding track ${trackId}`);
         
         try {
@@ -265,28 +276,20 @@ export class SoundfontEngineController {
                 throw new Error(`Cannot connect track ${trackId} to soundfont: MidiPlayer not initialized. Error: ${initError.message}`);
             }
             
-            // Validate track type first
-            if (this.store) {
-                const trackData = this.store.getTrackById(trackId);
-                if (!trackData || (trackData.type !== 'midi' && trackData.type !== 'drum')) {
-                    throw new Error(`Cannot connect track ${trackId} to soundfont: track not found or not a MIDI/drum track`);
-                }
-            }
-            
-            // Get the MIDI data for the track
-            const midiBlob = await midiManager.exportMidiFileFromDB(trackId);
-            if (!midiBlob) {
-                console.warn(`No MIDI data found for track ${trackId}, creating default MIDI data`);
-                // Create default MIDI file if none exists
-                const emptyNotes: Note[] = [];
-                midiManager.updateTrack(trackId, emptyNotes);
+            // // Get the MIDI data for the track
+            // const midiBlob = await midiManager.exportMidiFileFromDB(trackId);
+            // if (!midiBlob) {
+            //     console.warn(`No MIDI data found for track ${trackId}, creating default MIDI data`);
+            //     // Create default MIDI file if none exists
+            //     const emptyNotes: Note[] = [];
+            //     midiManager.updateTrack(trackId, emptyNotes);
                 
-                // Try again
-                const newMidiBlob = await midiManager.exportMidiFileFromDB(trackId);
-                if (!newMidiBlob) {
-                    throw new Error(`Failed to create MIDI data for track ${trackId}`);
-                }
-            }
+            //     // Try again
+            //     const newMidiBlob = await midiManager.exportMidiFileFromDB(trackId);
+            //     if (!newMidiBlob) {
+            //         throw new Error(`Failed to create MIDI data for track ${trackId}`);
+            //     }
+            // }
             
             // Get soundfont data
             const soundfontResult = await this.getSoundfontData(instrumentId);
@@ -294,27 +297,39 @@ export class SoundfontEngineController {
                 throw new Error(`No soundfont data found for instrument ${instrumentId}`);
             }
             
-            // Update the track with the storage key if available
-            if (this.store && soundfontResult.storage_key) {
-                const trackData = this.store.getTrackById(trackId);
-                if (trackData && (trackData.type === 'midi' || trackData.type === 'drum')) {
-                    // Set the storage key on the track
-                    trackData.instrumentStorageKey = soundfontResult.storage_key;
-                    console.log(`Set instrumentStorageKey for track ${trackId} to ${soundfontResult.storage_key}`);
-                }
-            }
+            // // Update the track with the storage key if available
+            // if (this.store && soundfontResult.storage_key) {
+            //     const trackData = this.store.getTrackById(trackId);
+            //     if (trackData && (trackData.type === 'midi' || trackData.type === 'drum')) {
+            //         // Set the storage key on the track
+            //         trackData.instrumentStorageKey = soundfontResult.storage_key;
+            //         console.log(`Set instrumentStorageKey for track ${trackId} to ${soundfontResult.storage_key}`);
+            //     }
+            // }
             
             // Add to SoundfontPlayer with detailed logging
             console.log(`About to add track ${trackId} to player, current tracks:`, this.midiPlayer.getTrackIds());
             try {
                 // Convert to ArrayBuffer for consistency
-                const midiArrayBuffer = await midiBlob!.arrayBuffer();
-                console.log(`MIDI data size: ${midiArrayBuffer.byteLength} bytes`);
-                
+                // const midiArrayBuffer = await midiBlob!.arrayBuffer();
+                // console.log(`MIDI data size: ${midiArrayBuffer.byteLength} bytes`);
+                const notes = midiManager.getNotesForTrack(trackId);
+                const midi = new Midi();
+                midi.addTrack()
+                console.log("________notes", notes);
+                for (const note of notes) {
+                    midi.tracks[0].addNote({
+                        midi: note.row,
+                        velocity: note.velocity,
+                        ticks: note.column * 160,
+                        durationTicks: note.length * 160
+                    });
+                }
+
                 // Add the track
                 await this.addTrack(
                     trackId, 
-                    midiArrayBuffer,
+                    midi,
                     soundfontResult.data
                 );
                 

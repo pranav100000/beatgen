@@ -202,7 +202,8 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
         background: `
           linear-gradient(180deg, 
             rgba(255,255,255,0.08) 0%, 
-            rgba(17,17,17,1) 30%
+            rgba(17,17,17,1) 30%,
+            rgba(0,0,0,1) 100%
           )
         `,
         '& > div > div > div': {
