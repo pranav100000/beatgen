@@ -11,7 +11,7 @@ export interface Position {
 export interface BaseTrackState {
     id: string;
     name: string;
-    type: 'audio' | 'midi' | 'video' | 'drum';
+    type: 'audio' | 'midi' | 'drum';
     channel: Tone.Channel;
     volume: number;
     pan: number;

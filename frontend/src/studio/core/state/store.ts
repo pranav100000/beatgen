@@ -22,7 +22,7 @@ export interface StoreInterface {
   initializeAudio(): Promise<void>;
   createTrack(
     name: string, 
-    type: 'audio' | 'midi' | 'video' | 'drum', 
+    type: 'audio' | 'midi' | 'drum', 
     existingTrackData?: {
       id: string;
       volume?: number;
