@@ -71,7 +71,7 @@ interface StudioState {
   
   // Transport Actions
   playPause: () => Promise<void>;
-  stop: () => void;
+  stop: () => Promise<void>;
   seekToPosition: (position: number) => void;
   
   // History Actions
@@ -1048,12 +1048,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
   },
   
-  stop: () => {
+  stop: async () => {
     const { store } = get();
     if (!store) return;
     
     console.log('🎮 UI: Triggering stop');
-    store.getTransport().stop();
+    await store.getTransport().stop();
     set({ 
       isPlaying: false,
       currentTime: 0

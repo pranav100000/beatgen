@@ -63,7 +63,11 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return () => {
       window.removeEventListener('midi-notes-loaded', handleMidiNotesLoaded);
     };
-  }, [openedPianoRolls]);
+  }, []); // Empty dependency array to prevent re-rendering loop
+  
+  // IMPORTANT: The above effect uses an empty dependency array despite referencing openedPianoRolls.
+  // This is intentional to prevent a circular dependency that causes excessive re-rendering during playback.
+  // The functional state updates (prev => ...) ensure we always work with current state values.
 
   // Open a specific track's piano roll
   const openPianoRoll = (trackId: string) => {

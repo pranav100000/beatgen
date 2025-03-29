@@ -173,7 +173,25 @@ export class MidiSoundfontPlayer {
     
     // Start processing loop - this is critical!
     const trackList = Array.from(this.tracks.values());
+    
+    // Setup timing metrics
+    let lastProcessTime = performance.now();
+    let processingCycleCount = 0;
+    
     this.processingInterval = setInterval(async () => {
+      // Timing diagnostics - measure actual elapsed time
+      const currentTime = performance.now();
+      const actualElapsedMs = currentTime - lastProcessTime;
+      processingCycleCount++;
+      
+      // Log timing every 10 cycles
+      if (processingCycleCount % 10 === 0) {
+        console.log(`📊 TIMING: Actual interval=${actualElapsedMs.toFixed(2)}ms, Target=${this.PROCESS_INTERVAL_MS}ms, masterTick=${this.masterTick}`);
+      }
+      
+      // Store current time for next cycle
+      lastProcessTime = currentTime;
+      
       // Check if there's a pending tempo change
       if (this.pendingTempoChange !== null) {
         const bpm = this.pendingTempoChange;
@@ -194,15 +212,17 @@ export class MidiSoundfontPlayer {
         console.log(`Tempo change to ${bpm} BPM completed`);
       }
       
-      // Process all active sequencers
+      // Process all active sequencers - keep processing at same rate
       for (const track of trackList) {
         if (!track.isMuted) {
+          // Continue using constant interval for processing
           track.process(this.PROCESS_INTERVAL_MS, this.masterTick);
         }
       }
       
-      // Advance master timeline
-      this.masterTick += this.PROCESS_INTERVAL_MS;
+      // But advance master timeline with actual elapsed time for accuracy
+      // This ensures our playback position keeps up with real-world time
+      this.masterTick += actualElapsedMs;
     }, this.PROCESS_INTERVAL_MS);
   }
   

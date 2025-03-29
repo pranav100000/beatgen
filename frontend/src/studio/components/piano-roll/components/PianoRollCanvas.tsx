@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect, Line, Group, Text } from 'react-konva';
 import { Box } from '@mui/material';
 import { Note } from '../../../core/types/note';
@@ -49,7 +49,7 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
   
   // Local state for notes being manipulated (for performance)
   const [localNotes, setLocalNotes] = useState<Note[]>([]);
-  const [visibleNotes, setVisibleNotes] = useState<Note[]>([]);
+  // Removed visibleNotes state - using memoizedVisibleNotes directly
   const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 });
   
   // Initialize local notes from context
@@ -113,14 +113,15 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
   }, [gridColumns, cellWidth, minGridColumns, keyWidth]);
   
   // Calculate which notes are visible based on scroll position
-  useEffect(() => {
+  // Using useMemo directly to avoid the need for a separate state variable
+  const memoizedVisibleNotes = useMemo(() => {
     const visibleStartColumn = Math.floor(scrollPosition.x / cellWidth);
     const visibleEndColumn = visibleStartColumn + Math.ceil(dimensions.width / cellWidth);
     const visibleStartRow = Math.floor(scrollPosition.y / cellHeight);
     const visibleEndRow = visibleStartRow + Math.ceil(dimensions.height / cellHeight);
     
     // Filter notes to only those visible in the viewport
-    const visible = localNotes.filter(note => {
+    return localNotes.filter(note => {
       const displayRow = actualRowToDisplayRow(note.row);
       return (
         note.column + note.length >= visibleStartColumn &&
@@ -129,9 +130,10 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
         displayRow <= visibleEndRow
       );
     });
-    
-    setVisibleNotes(visible);
-  }, [localNotes, scrollPosition, dimensions, cellWidth, cellHeight]);
+  }, [localNotes, scrollPosition, dimensions, cellWidth, cellHeight, actualRowToDisplayRow]);
+  
+  // No need for calculateVisibleNotes function or separate effect
+  // This way we avoid the circular dependency that was causing the infinite loop
   
   // Simple scroll handler based on the working implementation
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -179,7 +181,7 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
     
     if (!noteExists) {
       const newNote: Note = {
-        id: Math.floor(Math.random() * 1000000000), // Use random number for unique ID
+        id: Date.now(), // Use timestamp as unique ID
         row: actualRow,
         column,
         length: 1,
@@ -518,9 +520,10 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
     return keys;
   }, [cellHeight, totalNotes, displayRowToActualRow, playPreview, stopPreview]);
   
-  // Render notes
+  // Render notes - use memoized notes for better performance
   const renderNotes = useCallback(() => {
-    return visibleNotes.map((note) => {
+    // Use memoizedVisibleNotes directly to prevent re-renders during playback
+    return memoizedVisibleNotes.map((note) => {
       const isBeingDragged = draggedNote === note.id;
       const isBeingResized = resizingNote === note.id;
       const isHovered = hoveredNote === note.id;
@@ -594,7 +597,7 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
         </Group>
       );
     });
-  }, [visibleNotes, cellWidth, cellHeight, draggedNote, resizingNote, handleNoteClick, handleNoteDragStart, handleResizeStart, actualRowToDisplayRow]);
+  }, [memoizedVisibleNotes, cellWidth, cellHeight, draggedNote, resizingNote, hoveredNote, color, handleNoteClick, handleNoteDragStart, handleResizeStart, actualRowToDisplayRow]);
 
   return (
     <Box 

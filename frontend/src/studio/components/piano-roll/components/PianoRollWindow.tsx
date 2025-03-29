@@ -84,4 +84,8 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
   );
 };
 
-export default PianoRollWindow;
+// Export a memoized version to prevent unnecessary re-renders during playback
+export default React.memo(PianoRollWindow, (prevProps, nextProps) => {
+  // Only re-render if the trackId changes
+  return prevProps.trackId === nextProps.trackId;
+});

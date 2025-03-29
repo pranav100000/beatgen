@@ -12,7 +12,7 @@ export class SoundfontEngineController {
     private midiPlayer: MidiSoundfontPlayer;
     private trackSubscriptions: Map<string, () => void> = new Map();
     
-    constructor(private store?: Store) {
+    constructor() {
         this.midiPlayer = new MidiSoundfontPlayer();
     }
     
@@ -133,9 +133,9 @@ export class SoundfontEngineController {
     /**
      * Start or resume playback
      */
-    play(): void {
+    async play(): Promise<void> {
         console.log('SoundfontEngineController: Starting playback');
-        this.midiPlayer.play();
+        await this.midiPlayer.play();
     }
     
     /**
@@ -159,18 +159,18 @@ export class SoundfontEngineController {
     /**
      * Stop playback and reset position
      */
-    stop(): void {
+    async stop(): Promise<void> {
         console.log('SoundfontEngineController: Stopping playback');
-        this.midiPlayer.stop();
+        await this.midiPlayer.stop();
     }
     
     /**
      * Seek to a specific position
      * @param position Position in milliseconds or seconds
      */
-    seek(position: number): void {
+    async seek(position: number): Promise<void> {
         console.log(`SoundfontEngineController: Seeking to ${position}`);
-        this.midiPlayer.seek(position);
+        await this.midiPlayer.seek(position);
     }
     
     // Track operations
@@ -239,9 +239,9 @@ export class SoundfontEngineController {
      * Set the global BPM for all tracks
      * @param bpm Tempo in BPM
      */
-    setGlobalBPM(bpm: number): void {
+    async setGlobalBPM(bpm: number): Promise<void> {
         console.log(`SoundfontEngineController: Setting global BPM to ${bpm}`);
-        this.midiPlayer.setGlobalBPM(bpm);
+        await this.midiPlayer.setGlobalBPM(bpm);
     }
     
     /**

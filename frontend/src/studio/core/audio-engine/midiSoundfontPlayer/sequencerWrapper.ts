@@ -30,41 +30,6 @@ interface ActiveNote {
 }
 
 /**
- * Convert a Midi object to a series of sequencer events
- */
-function convertMidiToNoteEvents(midi: Midi, channel: number, trackIndex: number = 0): EventInstance[] {
-  const events: EventInstance[] = [];
-  
-  // Use the first track, or specified track
-  const track = midi.tracks[trackIndex] || midi.tracks[0];
-  if (!track) {
-    console.warn('No tracks found in MIDI file');
-    return events;
-  }
-  
-  // Process all notes in the track
-  for (const note of track.notes) {
-    // Convert note timing from seconds to ticks
-    const startTick = Math.round(note.time * 1000); // Convert to ms
-    const duration = Math.round(note.duration * 1000); // Convert to ms
-    
-    // Create note event (single event with duration)
-    events.push({
-      tick: startTick,
-      event: {
-        type: 'note',
-        channel: channel,
-        key: note.midi,
-        vel: Math.round(note.velocity * 127), // Convert 0-1 to 0-127
-        duration: duration
-      }
-    });
-  }
-  
-  return events;
-}
-
-/**
  * Wrapper for js-synthesizer sequencer to handle a single MIDI track
  */
 export class SequencerWrapper {
@@ -184,7 +149,7 @@ export class SequencerWrapper {
     }
     
     // Convert MIDI to note events
-    this.noteEvents = convertMidiToNoteEvents(parsed, this.channel, 0);
+    this.noteEvents = this.convertMidiToNoteEvents(parsed, this.channel, 0);
     
     // Set initial volume
     this.setVolume(this.originalVolume);
@@ -232,11 +197,19 @@ export class SequencerWrapper {
     const ticksPerSecond = (this.currentBpm * this.ppq) / 60;
     const ticksToAdvance = (msecElapsed * ticksPerSecond) / 1000;
     
+    console.log("________lastEventTick", lastEventTick);
+    console.log("________ticksPerSecond", ticksPerSecond);
+    console.log("________ticksToAdvance", ticksToAdvance);
+    console.log("________currentLocalTick", this.currentLocalTick);
     // Only process the sequencer if we haven't reached the end of the track
     if (this.currentLocalTick <= lastEventTick + ticksPerSecond) { // Add ~1 second buffer for last note to finish playing
       // Process the sequencer using the calculated ticks
       // This correctly handles tempo changes by advancing the right number of ticks
-      this.sequencer.processSequencer(msecElapsed);
+      console.log("________processing sequencer");
+      this.sequencer.processSequencer(ticksToAdvance);
+    } else {
+      this.recreateSequencer();
+      console.log("________not processing sequencer");
     }
     
     // Update local position based on global tick
@@ -661,5 +634,48 @@ export class SequencerWrapper {
    */
   getBankOffset(): number {
     return this.sfontId * 100;
+  }
+
+    /**
+   * Convert a Midi object to a series of sequencer events
+   */
+  convertMidiToNoteEvents(midi: Midi, channel: number, trackIndex: number = 0): EventInstance[] {
+    const events: EventInstance[] = [];
+    
+    // Use the first track, or specified track
+    const track = midi.tracks[trackIndex] || midi.tracks[0];
+    if (!track) {
+      console.warn('No tracks found in MIDI file');
+      return events;
+    }
+    
+    // Extract PPQ and BPM to calculate ticks per second
+    const ppq = this.ppq; // Default PPQ if not available
+    const bpm = this.currentBpm; // Default BPM if not available
+    const ticksPerSecond = (bpm * ppq) / 60;
+    
+    console.log(`MIDI conversion using: BPM=${bpm}, PPQ=${ppq}, ticksPerSecond=${ticksPerSecond}`);
+    
+    // Process all notes in the track
+    for (const note of track.notes) {
+      // Convert note timing from seconds to ACTUAL ticks, not milliseconds
+      // Uses the correct ticks-per-second calculation based on tempo and PPQ
+      const startTick = Math.round(note.time * ticksPerSecond);
+      const duration = Math.round(note.duration * 1000); // Duration still in ms for event handling
+      
+      // Create note event (single event with duration)
+      events.push({
+        tick: startTick,
+        event: {
+          type: 'note',
+          channel: channel,
+          key: note.midi,
+          vel: Math.round(note.velocity * 127), // Convert 0-1 to 0-127
+          duration: duration
+        }
+      });
+    }
+    
+    return events;
   }
 }

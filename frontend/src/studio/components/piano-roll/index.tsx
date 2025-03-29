@@ -22,6 +22,7 @@ const PianoRollModule: React.FC<PianoRollModuleProps> = ({ children }) => {
 
 // Component to render all open piano roll windows
 export const PianoRollWindows: React.FC = () => {
+  return null;
   const { openedPianoRolls } = usePianoRoll();
   
   console.log('Rendering PianoRollWindows with state:', openedPianoRolls);

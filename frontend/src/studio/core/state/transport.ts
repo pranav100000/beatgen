@@ -264,7 +264,7 @@ export class TransportController implements Transport {
             // Start soundfont player if available
             try {
                 console.log('Starting soundfont player');
-                this.getSoundfontController().play();
+                await this.getSoundfontController().play();
             } catch (error) {
                 console.error('Failed to start soundfont player:', error);
             }
@@ -331,7 +331,7 @@ export class TransportController implements Transport {
         }, TransportController.FADE_TIME * 1000);
     }
 
-    public stop(): void {
+    public async stop(): Promise<void> {
         console.log('Stopping transport and resetting position to 0');
         this.isStarting = false; // Reset starting state
         
@@ -339,10 +339,10 @@ export class TransportController implements Transport {
         this.clearScheduledEvents();
         
         // Stop soundfont player if available
-        if (this.getSoundfontController) {
+        if (this.getSoundfontController()) {
             try {
-                console.log('Stopping soundfont player');
-                this.getSoundfontController().stop();
+                console.log('Stopping soundfont player at position', this.position);
+                await this.getSoundfontController().stop();
             } catch (error) {
                 console.error('Failed to stop soundfont player:', error);
             }
@@ -401,7 +401,7 @@ export class TransportController implements Transport {
         // 3. Seek in soundfont player if available
         try {
             console.log(`Seeking soundfont player to ${position}s`);
-            this.getSoundfontController().seek(position);
+            this.getSoundfontController().seek(position * 1000);
         } catch (error) {
             console.error('Failed to seek soundfont player:', error);
         }
