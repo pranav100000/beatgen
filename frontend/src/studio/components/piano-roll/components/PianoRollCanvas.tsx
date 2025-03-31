@@ -215,9 +215,9 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
     // This ensures the note is dragged from the exact point where the user clicked
     const pointerPos = stageRef.current.getPointerPosition();
     
-    // Calculate grid position of the click
-    const noteX = keyWidth + (note.column * cellWidth);
-    const noteY = actualRowToDisplayRow(note.row) * cellHeight;
+    // Calculate grid position of the click, including scroll position
+    const noteX = keyWidth + (note.column * cellWidth) - scrollPosition.x;
+    const noteY = actualRowToDisplayRow(note.row) * cellHeight - scrollPosition.y;
     
     setDragOffset({
       x: pointerPos.x - noteX, 
@@ -226,7 +226,7 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
     
     // Play the note for auditory feedback
     playPreview(note.row);
-  }, [localNotes, playPreview, keyWidth, cellWidth, cellHeight, actualRowToDisplayRow]);
+  }, [localNotes, playPreview, keyWidth, cellWidth, cellHeight, actualRowToDisplayRow, scrollPosition]);
   
   // Handle start of note resizing
   const handleResizeStart = useCallback((e: any, noteId: number, side: 'left' | 'right') => {

@@ -11,12 +11,14 @@ import {
   TrackVolumeChangeAction,
   TrackPanChangeAction,
   TrackPositionChangeAction,
+  TrackMuteToggleAction,
   BPMChangeAction,
   TimeSignatureChangeAction,
   KeySignatureChangeAction,
   TrackAddAction,
   TrackDeleteAction
 } from '../core/state/history/actions/StudioActions';
+import { AssistantGenerateAction } from '../core/state/history/actions/AssistantActions';
 
 interface StudioState {
   // Audio Engine State
@@ -63,7 +65,7 @@ interface StudioState {
   handleTrackMuteToggle: (trackId: string, muted: boolean) => void;
   handleTrackSoloToggle: (trackId: string, soloed: boolean) => void;
   handleTrackDelete: (trackId: string) => Promise<void>;
-  handleAddTrack: (type: 'audio' | 'midi' | 'drum', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => Promise<void>;
+  handleAddTrack: (type: 'audio' | 'midi' | 'drum', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => Promise<any>;
   handleTrackPositionChange: (trackId: string, newPosition: Position, isDragEnd: boolean) => void;
   uploadAudioFile: (file: File) => Promise<void>;
   handleTrackNameChange: (trackId: string, name: string) => void;
@@ -124,6 +126,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       // Update core engine state
       store.projectManager.setTempo(bpm);
       Tone.Transport.bpm.value = bpm;
+      store.getTransport().setTempo(bpm);
       
       // Create history action
       const action = new BPMChangeAction(
@@ -587,15 +590,45 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const { store, tracks } = get();
     if (!store) return;
     
-    // Update local state
-    const updatedTracks = tracks.map(t => 
-      t.id === trackId ? { ...t, muted } : t
+    // Find the track to get its current mute state
+    const track = tracks.find(t => t.id === trackId);
+    if (!track) {
+      console.error(`Track with ID ${trackId} not found in handleTrackMuteToggle`);
+      return;
+    }
+    
+    const oldMuted = track.muted;
+    
+    // If value hasn't changed, don't do anything
+    if (oldMuted === muted) return;
+    
+    // Create history action with direct mute update
+    const action = new TrackMuteToggleAction(
+      store,
+      trackId,
+      oldMuted,
+      muted,
+      // Direct update function that bypasses history
+      (id, newMuted) => {
+        const { tracks } = get();
+        // Update tracks with the new mute value
+        set({
+          tracks: tracks.map(t => t.id === id ? { ...t, muted: newMuted } : t)
+        });
+        // Update audio engine
+        store.getAudioEngine().setTrackMute(id, newMuted);
+        
+        console.log(`History manager updated track ${id} mute to:`, newMuted);
+      }
     );
     
-    set({ tracks: updatedTracks });
-    
-    // Update audio engine
-    store.getAudioEngine().setTrackMute(trackId, muted);
+    // Execute action and update history state
+    historyManager.executeAction(action).then(() => {
+      set({
+        canUndo: historyManager.canUndo(),
+        canRedo: historyManager.canRedo()
+      });
+    });
   },
   
   handleTrackSoloToggle: (trackId, soloed) => {
@@ -811,6 +844,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       
       // TEMPORARILY COMMENTED OUT TO DEBUG UI ISSUES
       // // Soundfont connection now happens inside the Track Add callback
+      return newTrack;
     } catch (error) {
       console.error(`Failed to create ${type} track:`, error);
     }
@@ -868,7 +902,24 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           
           // Update transport if playing
           if (isPlaying) {
-            store.getTransport().handleTrackPositionChange?.(id, position.x);
+            store.getTransport().handleTrackPositionChange(id, position.x, track.type);
+          }
+
+          if (track.type === 'midi' || track.type === 'drum') {
+            // Convert X position (pixels) to milliseconds
+            const beatDurationMs = (60 / store.getProjectManager().getTempo()) * 1000; // Duration of one beat in ms
+            const gridTimeSignature = store.getProjectManager().getTimeSignature();
+            const beatsPerMeasure = gridTimeSignature[0];
+            const measureWidth = GRID_CONSTANTS.measureWidth;
+            const pixelsPerBeat = measureWidth / beatsPerMeasure;
+            
+            // Calculate offset in milliseconds
+            const offsetBeats = position.x / pixelsPerBeat;
+            const offsetMs = offsetBeats * beatDurationMs;
+            
+            // Apply offset to soundfont player
+            store.getSoundfontController().setTrackOffset(id, offsetMs);
+            console.log(`Set track ${id} offset: ${position.x}px → ${offsetMs}ms (${offsetBeats} beats)`);
           }
           
           console.log(`History manager updated track ${id} position to:`, position);

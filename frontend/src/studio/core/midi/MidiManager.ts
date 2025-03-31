@@ -79,14 +79,15 @@ export class MidiManager implements MidiManagerInterface {
         row: note.row,
         column: note.column,
         length: note.length,
+        trackId: track.id,
         velocity: note.velocity
       }))
     );
   }
 
-  notesToMidi(notes: Note[], bpm: number): MidiData {
+  notesToMidi(trackId: string, notes: Note[], bpm: number): MidiData {
     const track: MidiTrack = {
-      id: uuidv4(),
+      id: trackId,
       instrumentId: 'default',
       notes: notes.map(note => ({
         ...note,
@@ -210,6 +211,8 @@ export class MidiManager implements MidiManagerInterface {
     
     // Store the notes in our internal map
     this.tracks.set(trackId, [...notes]);
+
+    console.log("MidiManager.updateTrack: Track state: updated", this.tracks);
     
     // Notify subscribers
     this.notifyTrackSubscribers(trackId, notes);
@@ -232,6 +235,8 @@ export class MidiManager implements MidiManagerInterface {
     
     // Update the track with the new note
     this.updateTrack(trackId, updatedNotes);
+
+    this.notifyTrackSubscribers(trackId, updatedNotes);
   }
   
   /**
@@ -390,7 +395,7 @@ export class MidiManager implements MidiManagerInterface {
       console.log(`MidiManager: Creating MIDI file for track ${trackId}`);
       
       // Generate an empty MIDI file
-      const midiData = this.notesToMidi([], bpm);
+      const midiData = this.notesToMidi(trackId, [], bpm);
       midiData.timeSignature = timeSignature;
       const midiBlob = this.createMidiFile(midiData);
       
@@ -418,7 +423,7 @@ export class MidiManager implements MidiManagerInterface {
       console.log(`MidiManager: Updating MIDI file for track ${trackId} with ${notes.length} notes`);
       
       // Generate MIDI data and blob
-      const midiData = this.notesToMidi(notes, bpm);
+      const midiData = this.notesToMidi(trackId, notes, bpm);
       midiData.timeSignature = timeSignature;
       const midiBlob = this.createMidiFile(midiData);
       
@@ -450,7 +455,7 @@ export class MidiManager implements MidiManagerInterface {
       const notes = this.getNotesForTrack(trackId);
       if (notes.length > 0) {
         console.log(`MidiManager: Creating MIDI export from ${notes.length} in-memory notes`);
-        const midiData = this.notesToMidi(notes, this.currentBpm);
+        const midiData = this.notesToMidi(trackId, notes, this.currentBpm);
         return this.createMidiFile(midiData);
       }
       

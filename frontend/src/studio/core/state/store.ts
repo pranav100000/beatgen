@@ -424,4 +424,8 @@ export class Store implements StoreInterface {
     // Notify listeners of track changes
     this._notifyListeners();
   }
+
+  public getProjectManager(): ProjectManager {
+    return this.projectManager;
+  }
 }

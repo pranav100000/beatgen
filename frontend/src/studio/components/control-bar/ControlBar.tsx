@@ -13,7 +13,7 @@ import BPMControl from './BPMControl';
 import TimeSignatureDisplay from './TimeSignatureDisplay';
 import { TimeDisplay } from './TimeDisplay';
 import KeySelector from './KeySelector';
-import { ArrowBack, ChatBubbleOutlineRounded, ChatBubbleRounded } from '@mui/icons-material';
+import { ArrowBack, ChatBubbleOutlineRounded, ChatBubbleRounded, SmartToy, SmartToyOutlined, SmartToyRounded } from '@mui/icons-material';
 import { SaveProjectButton } from './SaveProjectButton';
 
 interface StudioControlBarProps {
@@ -234,7 +234,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         sx={{ color: 'white' }} 
                         onClick={onChatToggle}
                     >
-                        {isChatOpen ? <ChatBubbleRounded /> : <ChatBubbleOutlineRounded />}
+                        {isChatOpen ? <SmartToyRounded /> : <SmartToyOutlined />}
                     </IconButton>
                 </Box>
             </Box>

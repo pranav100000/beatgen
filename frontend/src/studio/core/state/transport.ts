@@ -284,7 +284,7 @@ export class TransportController implements Transport {
     private clearScheduledEvents(): void {
         console.log(`Clearing all scheduled events (${this.scheduledEvents.length})`);
         this.scheduledEvents.forEach(id => {
-            Tone.Transport.clear(id);
+            Tone.getTransport().clear(id);
         });
         this.scheduledEvents = [];
     }
@@ -449,8 +449,9 @@ export class TransportController implements Transport {
 
     public setTempo(bpm: number): void {
         // Add bounds checking
-        const validBpm = Math.max(20, Math.min(bpm, 300));
+        const validBpm = Math.max(1, Math.min(bpm, 999));
         Tone.getTransport().bpm.value = validBpm;
+        this.soundfontController.setGlobalBPM(validBpm);
     }
 
     public dispose(): void {
@@ -501,7 +502,7 @@ export class TransportController implements Transport {
      * Handle track position changes during playback
      * This recalculates and adjusts the playback for a specific track that was moved
      */
-    public handleTrackPositionChange(trackId: string, newPositionX: number): void {
+    public handleTrackPositionChange(trackId: string, newPositionX: number, type?: string): void {
         // Only do anything if we're playing
         if (!this.isPlaying) {
             console.log(`Track ${trackId} position changed, but not playing - no action needed`);

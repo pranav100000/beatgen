@@ -148,7 +148,7 @@ export class SequencerWrapper {
     }
     
     // Convert MIDI to note events
-    this.noteEvents = this.convertMidiToNoteEvents(midiData, this.channel, 0);
+    this.noteEvents = this.convertMidiToNoteEvents(midiData, this.channel);
     
     // Set initial volume
     this.setVolume(this.originalVolume);
@@ -226,6 +226,8 @@ export class SequencerWrapper {
         if (event.event.type === 'note' && event.event.duration) {
           lastTick = Math.max(lastTick, event.tick + event.event.duration);
         }
+      } else {
+        console.log("________event.tick", event.tick);
       }
     }
     
@@ -368,8 +370,10 @@ export class SequencerWrapper {
       }
     }
     
-    // console.log(`Scheduled ${scheduledCount} events from tick ${fromTick} ` +
-    //             `(with offset: ${this.startOffset}) on channel ${this.channel}`);
+    console.log(`Scheduled ${scheduledCount} events from tick ${fromTick} ` +
+                `(with offset: ${this.startOffset}) on channel ${this.channel}`);
+
+    console.log("________scheduledEvents", scheduledEvents);
   }
   
   // Silence all active notes and clear events
@@ -638,11 +642,10 @@ export class SequencerWrapper {
    * This optimized method skips MIDI file conversion entirely
    */
   updateWithNotes(notes: Note[]): void {
-    console.log(`SequencerWrapper: Updating with ${notes.length} notes directly`);
+    console.log(`SequencerWrapper: Updating channel ${this.channel} with ${notes.length} notes directly`);
     
     // Convert notes directly to event instances
-    this.noteEvents = this.convertNotesToEvents(notes, this.channel);
-    
+    this.noteEvents = this.convertNotesToEvents(notes);
     // Apply the tempo
     this.applyTempoToTimeScale();
     
@@ -656,7 +659,7 @@ export class SequencerWrapper {
    * Convert Note[] array directly to event instances
    * This avoids the overhead of MIDI file conversion
    */
-  private convertNotesToEvents(notes: Note[], channel: number): EventInstance[] {
+  private convertNotesToEvents(notes: Note[]): EventInstance[] {
     const events: EventInstance[] = [];
     
     // Calculate ticks per second based on current BPM and PPQ
@@ -676,7 +679,7 @@ export class SequencerWrapper {
         tick: startTick,
         event: {
           type: 'note',
-          channel,
+          channel: this.channel,
           key: note.row, // MIDI note number
           vel: note.velocity || 100, // Default to 100 if not specified
           duration

@@ -17,6 +17,7 @@ import { useStudioDBSession } from './hooks/useStudioDBSession';
 
 import StudioControlBar from './components/control-bar/ControlBar';
 import { useGridStore } from './core/state/gridStore';
+import ChatWindow from './components/ai-assistant/ChatWindow';
 
 // Studio Component Props
 interface StudioProps {
@@ -133,14 +134,16 @@ function Studio({ projectId }: StudioProps) {
     setZoomLevel(Math.min(zoomLevel + 0.1, 4));
     // Update measureWidth in gridStore based on zoom level
     const newMeasureWidth = 200 * (Math.min(zoomLevel + 0.1, 4));
-    useGridStore.getState().setMeasureWidth(newMeasureWidth);
+    useGridStore.getState().setMidiMeasureWidth(newMeasureWidth);
+    useGridStore.getState().setAudioMeasureWidth(newMeasureWidth);
   };
 
   const handleZoomOut = () => {
     setZoomLevel(Math.max(zoomLevel - 0.1, 0.3));
     // Update measureWidth in gridStore based on zoom level
     const newMeasureWidth = 200 * (Math.max(zoomLevel - 0.1, 0.3));
-    useGridStore.getState().setMeasureWidth(newMeasureWidth);
+    useGridStore.getState().setMidiMeasureWidth(newMeasureWidth);
+    useGridStore.getState().setAudioMeasureWidth(newMeasureWidth);
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,6 +332,12 @@ function Studio({ projectId }: StudioProps) {
             borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`
           }}
           ref={scrollRef}
+        />
+        
+        {/* AI Assistant Chat Window - slides in from right */}
+        <ChatWindow 
+          isOpen={isChatOpen}
+          onClose={handleChatToggle}
         />
       </Box>
     </Box>

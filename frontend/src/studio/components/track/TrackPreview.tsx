@@ -5,6 +5,8 @@ import { TrackState, Position } from '../../core/types/track';
 import WaveformDisplay from './WaveformDisplay';
 import MidiNotesPreview from '../piano-roll/components/MidiNotesPreview';
 import { useGridStore } from '../../core/state/gridStore';
+import { usePianoRoll } from '../piano-roll/context/PianoRollContext';
+import { calculateAudioTrackWidth, calculateMidiTrackWidth } from '../../utils/trackWidthCalculators';
 
 // Simplified TrackPreview component without complex handlers
 
@@ -36,31 +38,39 @@ const TrackPreview: React.FC<TrackPreviewProps> = ({
   const [startDragMousePosition, setStartDragMousePosition] = React.useState({ x: 0, y: 0 });
   const [startDragTrackPosition, setStartDragTrackPosition] = React.useState({ x: 0, y: 0 });
   const lastMovedPositionRef = React.useRef<Position>(track.position);
-  const measureWidth = useGridStore(state => state.measureWidth);
+  const audioMeasureWidth = useGridStore(state => state.audioMeasureWidth);
+  const midiMeasureWidth = useGridStore(state => state.midiMeasureWidth);
 
-  // Calculate track width based on duration and BPM
+  // Get notes for MIDI tracks from the piano roll context
+  const { notesByTrack } = usePianoRoll();
+  const trackNotes = notesByTrack[track.id] || [];
+
+  // Calculate track width using dedicated calculator functions
   const trackWidth = React.useMemo(() => {
-    const [beatsPerMeasure, beatUnit] = timeSignature;
-    const beatsPerSecond = bpm / 60;
-    const totalBeats = (track.duration || 8) * beatsPerSecond;
-    
-    // Different calculation based on track type
     if (track.type === 'audio') {
-      // Audio tracks: only use BPM
-      return totalBeats * (measureWidth / beatsPerMeasure);
+      return calculateAudioTrackWidth(
+        track.duration || 8, // Default to 8 seconds if no duration specified
+        bpm,
+        audioMeasureWidth
+      );
     } else {
-      // MIDI and drum tracks: use time signature
-      const beatAdjustment = beatUnit / 4;
-      const adjustedBeats = totalBeats * beatAdjustment;
-      const measuresCount = adjustedBeats / beatsPerMeasure;
-      return measuresCount * measureWidth;
+      // For MIDI and drum tracks
+      return calculateMidiTrackWidth(
+        trackNotes,
+        timeSignature,
+        midiMeasureWidth
+      );
     }
   }, [
-    track.duration,
+    // Common dependencies
+    track.id,
     track.type,
-    measureWidth,
-    // Only include relevant dependencies based on track type
-    ...(track.type === 'audio' ? [bpm] : [timeSignature])
+    track.duration,
+    
+    // Type-specific dependencies
+    ...(track.type === 'audio' 
+      ? [bpm, audioMeasureWidth] 
+      : [trackNotes, timeSignature, midiMeasureWidth])
   ]);
 
   // Get track color based on track index
@@ -540,14 +550,6 @@ const TrackPreview: React.FC<TrackPreviewProps> = ({
 export default React.memo(TrackPreview, (prevProps, nextProps) => {
   // Early return if track types don't match (shouldn't happen, but safe)
   if (prevProps.track.type !== nextProps.track.type) {
-    return false;
-  }
-
-  const prevMeasureWidth = useGridStore.getState().measureWidth;
-  const nextMeasureWidth = useGridStore.getState().measureWidth;
-
-  // Always check measureWidth
-  if (prevMeasureWidth !== nextMeasureWidth) {
     return false;
   }
 

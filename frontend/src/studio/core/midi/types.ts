@@ -26,7 +26,7 @@ export interface MidiManagerInterface {
   
   // Note conversion
   midiToNotes(midiData: MidiData): Note[];
-  notesToMidi(notes: Note[], bpm: number): MidiData;
+  notesToMidi(trackId: string, notes: Note[], bpm: number): MidiData;
   
   // Track operations
   createTrack(instrumentId: string, name: string): MidiTrack;

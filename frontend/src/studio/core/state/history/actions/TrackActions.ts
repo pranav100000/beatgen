@@ -1,6 +1,7 @@
 import { Store } from '../../store';
 import { TrackState } from '../../../types/track';
 import { Action } from '../types';
+import { useGridStore } from '../../gridStore';
 
 // Action for adding a track
 export class AddTrackAction implements Action {
@@ -111,6 +112,26 @@ export class MoveTrackAction implements Action {
         // If playback is active, tell the transport controller to adjust this track's playback
         this.store.getTransport().handleTrackPositionChange(this.trackId, this.newPosition.x);
         
+        // Update soundfont offset if it's a MIDI or drum track
+        const track = this.store.getTrackById(this.trackId);
+        if (track && (track.type === 'midi' || track.type === 'drum')) {
+            // Convert X position (pixels) to milliseconds
+            const beatDurationMs = (60 / this.store.projectManager.getTempo()) * 1000;
+            const timeSignature = this.store.getProjectManager().getTimeSignature();
+            const beatsPerMeasure = timeSignature[0];
+            // Get grid constants from the store or use a default value
+            const measureWidth = useGridStore.getState().midiMeasureWidth;
+            const pixelsPerBeat = measureWidth / beatsPerMeasure;
+            
+            // Calculate offset in milliseconds
+            const offsetBeats = this.newPosition.x / pixelsPerBeat;
+            const offsetMs = offsetBeats * beatDurationMs;
+            
+            // Set track offset in milliseconds
+            this.store.getSoundfontController().setTrackOffset(this.trackId, offsetMs);
+            console.log(`Set track ${this.trackId} offset: ${this.newPosition.x}px → ${offsetMs}ms (${offsetBeats} beats)`);
+        }
+        
         console.log('🔄 Execute MoveTrackAction:', { 
             trackId: this.trackId, 
             from: this.oldPosition, 
@@ -135,6 +156,26 @@ export class MoveTrackAction implements Action {
         
         // If playback is active, tell the transport controller to adjust this track's playback
         this.store.getTransport().handleTrackPositionChange(this.trackId, this.oldPosition.x);
+        
+        // Update soundfont offset if it's a MIDI or drum track
+        const track = this.store.getTrackById(this.trackId);
+        if (track && (track.type === 'midi' || track.type === 'drum')) {
+            // Convert X position (pixels) to milliseconds
+            const beatDurationMs = (60 / this.store.getProjectManager().getTempo()) * 1000;
+            const timeSignature = this.store.getProjectManager().getTimeSignature();
+            const beatsPerMeasure = timeSignature[0];
+            // Get grid constants from the store or use a default value
+            const measureWidth = useGridStore.getState().midiMeasureWidth;
+            const pixelsPerBeat = measureWidth / beatsPerMeasure;
+            
+            // Calculate offset in milliseconds
+            const offsetBeats = this.oldPosition.x / pixelsPerBeat;
+            const offsetMs = offsetBeats * beatDurationMs;
+            
+            // Set track offset in milliseconds
+            this.store.getSoundfontController().setTrackOffset(this.trackId, offsetMs);
+            console.log(`Set track ${this.trackId} offset: ${this.oldPosition.x}px → ${offsetMs}ms (${offsetBeats} beats)`);
+        }
         
         console.log('↩️ Undo MoveTrackAction:', { 
             trackId: this.trackId, 

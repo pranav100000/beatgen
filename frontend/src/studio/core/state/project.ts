@@ -126,6 +126,18 @@ export class ProjectManager {
     );
   }
 
+  public getTempo(): number {
+    return this.currentProject.tempo;
+  }
+
+  public getTimeSignature(): [number, number] {
+    return this.currentProject.timeSignature;
+  }
+
+  public getKey(): string {
+    return this.currentProject.key;
+  }
+
   public setTempo(tempo: number): void {
     if (this.currentProject) {
       this.currentProject.tempo = tempo;

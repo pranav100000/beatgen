@@ -55,6 +55,9 @@ export class SoundfontEngineController {
                 // OPTIMIZATION: Get the sequencer directly and update it with notes
                 const existingTrack = this.midiPlayer.getTrack(trackId);
                 if (existingTrack) {
+                    // Add debugging to check the channel
+                    console.log(`Found existing track for ${trackId}, channel: ${existingTrack.getChannel}, updating with ${notes.length} notes`);
+                    
                     // Update directly with notes - no MIDI file conversion needed!
                     existingTrack.updateWithNotes(notes);
                     console.log(`Directly updated sequencer for track ${trackId} with ${notes.length} notes`);
@@ -297,27 +300,12 @@ export class SoundfontEngineController {
                 throw new Error(`No soundfont data found for instrument ${instrumentId}`);
             }
             
-            // // Update the track with the storage key if available
-            // if (this.store && soundfontResult.storage_key) {
-            //     const trackData = this.store.getTrackById(trackId);
-            //     if (trackData && (trackData.type === 'midi' || trackData.type === 'drum')) {
-            //         // Set the storage key on the track
-            //         trackData.instrumentStorageKey = soundfontResult.storage_key;
-            //         console.log(`Set instrumentStorageKey for track ${trackId} to ${soundfontResult.storage_key}`);
-            //     }
-            // }
-            
             // Add to SoundfontPlayer with detailed logging
             console.log(`About to add track ${trackId} to player, current tracks:`, this.midiPlayer.getTrackIds());
             try {
-                // Convert to ArrayBuffer for consistency
-                // const midiArrayBuffer = await midiBlob!.arrayBuffer();
-                // console.log(`MIDI data size: ${midiArrayBuffer.byteLength} bytes`);
-                console.log("________bpm", this.midiPlayer.getGlobalBPM());
                 const notes = midiManager.getNotesForTrack(trackId);
                 const midi = new Midi();
                 midi.addTrack()
-                console.log("________notes", notes);
                 for (const note of notes) {
                     midi.tracks[0].addNote({
                         midi: note.row,

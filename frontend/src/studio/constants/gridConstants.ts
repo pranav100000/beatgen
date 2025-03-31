@@ -1,7 +1,7 @@
 import { useGridStore } from '../core/state/gridStore';
 
 // Create a function to get the current measure width
-export const getMeasureWidth = () => useGridStore.getState().measureWidth;
+export const getMeasureWidth = () => useGridStore.getState().audioMeasureWidth;
 
 export const GRID_CONSTANTS = {
   headerHeight: 28,

@@ -140,7 +140,7 @@ const PlaybackCursor = forwardRef<PlaybackCursorRef, PlaybackCursorProps>(
           // Update last time
           lastTimeRef.current = 0;
           
-          console.log('PlaybackCursor: stop method called - reset to position 0');
+          console.log('PlaybackCursor: stop method called');
         }
       },
       
