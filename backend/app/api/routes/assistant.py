@@ -8,8 +8,11 @@ from app.schemas.assistant import (
     AssistantRequest, AssistantResponse, 
     GenerateRequest, GenerateResponse,
     EditRequest, EditResponse,
-    AssistantAction
+    AssistantAction, TrackData
 )
+from services.music_gen_service.midi import get_clean_track_data
+
+from services.music_gen_service.music_tools import music_tools_service
 
 # Set up logger for this module
 logger = logging.getLogger("beatgen.assistant")
@@ -25,84 +28,90 @@ async def generate_tracks(
     Generate multiple tracks based on the provided prompt
     """
     try:
-        import random
-        from uuid import uuid4
-        
-        # Parse the request
-        num_tracks = request.num_tracks or 1
-        prompt = request.prompt
-        
-        logger.info(f"Generating {num_tracks} tracks with prompt: {prompt}")
-        
-        # Define some instrument options with their storage keys
-        instruments = [
-            {"name": "Strings", "storage_key": "strings/e8775290-b0c7-41ed-bdad-c98eadd1c9b4.sf2"}
-        ]
-        
-        # Generate mock tracks with random notes
-        tracks = []
-        
-        for i in range(num_tracks):
-            # Select a random instrument
-            instrument = random.choice(instruments)
-            
-            # Generate a random number of notes (5-20)
-            num_notes = random.randint(5, 20)
-            notes = []
-            
-            # Middle C is MIDI note 60
-            # Generate notes in a C major scale (C, D, E, F, G, A, B)
-            scale = [60, 62, 64, 65, 67, 69, 71, 72]
-            
-            # Create random notes
-            for j in range(num_notes):
-                # Note starts at a random time between 0 and 4 beats
-                time = round(random.uniform(0, 4), 2)
-                
-                # Duration between 0.25 and 1 beat
-                duration = round(random.uniform(0.25, 1), 2)
-                
-                # Pick a random note from the scale
-                pitch = random.choice(scale)
-                
-                # Velocity between 70 and 100
-                velocity = random.randint(70, 100)
-                
-                notes.append({
-                    "time": time,
-                    "duration": duration,
-                    "pitch": pitch,
-                    "velocity": velocity
-                })
-            
-            # Sort notes by time
-            notes.sort(key=lambda note: note["time"])
-            
-            # Create track data with storage key and notes
-            track_id = str(uuid4())
-            tracks.append({
-                "track_id": track_id,
-                "notes": notes,
-                "instrument": instrument["name"],
-                "name": f"{instrument['name']} {i+1}",
-                "storage_key": instrument["storage_key"]  # Add storage key for the instrument
-            })
-            
-            logger.info(f"Generated track: {instrument['name']} with {len(notes)} notes")
-        
-        # Create a response with the generated tracks
-        return GenerateResponse(
-            response=f"Generated {num_tracks} tracks based on your request: '{prompt}'",
-            tracks=tracks,
-            actions=[
-                AssistantAction(
-                    type="add_tracks",
-                    data={"count": num_tracks}
-                )
-            ]
-        )
-        
+        resp = await music_tools_service.compose_music(request.prompt)
     except Exception as e:
+        logger.error(f"Error generating tracks: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    # try:
+    #     import random
+    #     from uuid import uuid4
+        
+    #     # Parse the request
+    #     num_tracks = request.num_tracks or 1
+    #     prompt = request.prompt
+        
+    #     logger.info(f"Generating {num_tracks} tracks with prompt: {prompt}")
+        
+    #     # Define some instrument options with their storage keys
+    #     instruments = [
+    #         {"name": "Strings", "storage_key": "strings/e8775290-b0c7-41ed-bdad-c98eadd1c9b4.sf2"}
+    #     ]
+        
+    #     # Generate mock tracks with random notes
+    #     tracks = []
+        
+    #     for i in range(num_tracks):
+    #         # Select a random instrument
+    #         instrument = random.choice(instruments)
+            
+    #         # Generate a random number of notes (5-20)
+    #         num_notes = random.randint(5, 20)
+    #         notes = []
+            
+    #         # Middle C is MIDI note 60
+    #         # Generate notes in a C major scale (C, D, E, F, G, A, B)
+    #         scale = [60, 62, 64, 65, 67, 69, 71, 72]
+            
+    #         # Create random notes
+    #         for j in range(num_notes):
+    #             # Note starts at a random time between 0 and 4 beats
+    #             time = round(random.uniform(0, 4), 2)
+                
+    #             # Duration between 0.25 and 1 beat
+    #             duration = round(random.uniform(0.25, 1), 2)
+                
+    #             # Pick a random note from the scale
+    #             pitch = random.choice(scale)
+                
+    #             # Velocity between 70 and 100
+    #             velocity = random.randint(70, 100)
+                
+    #             notes.append({
+    #                 "time": time,
+    #                 "duration": duration,
+    #                 "pitch": pitch,
+    #                 "velocity": velocity
+    #             })
+            
+    #         # Sort notes by time
+    #         notes.sort(key=lambda note: note["time"])
+            
+    #         # Create track data with storage key and notes
+    #         track_id = str(uuid4())
+    #         tracks.append({
+    #             "track_id": track_id,
+    #             "notes": notes,
+    #             "instrument": instrument["name"],
+    #             "name": f"{instrument['name']} {i+1}",
+    #             "storage_key": instrument["storage_key"]  # Add storage key for the instrument
+    #         })
+            
+    #         logger.info(f"Generated track: {instrument['name']} with {len(notes)} notes")
+        
+    #     # Create a response with the generated tracks
+    #     return GenerateResponse(
+    #         response=f"Generated {num_tracks} tracks based on your request: '{prompt}'",
+    #         tracks=tracks,
+    #         actions=[
+    #             AssistantAction(
+    #                 type="add_tracks",
+    #                 data={"count": num_tracks}
+    #             )
+    #         ]
+    #     )
+        
+    # except Exception as e:
         import traceback
         error_traceback = traceback.format_exc()
         
@@ -120,6 +129,77 @@ async def generate_tracks(
                 "num_tracks": request.num_tracks
             }
         )
+        
+    #logger.info(f"RESPONSE: {resp}")
+    logger.info(f"Generated tracks: {resp.get('tracks', [])}")
+    
+    # Clean the track data
+    clean_track_data = get_clean_track_data(resp.get("tracks", []))
+    
+    logger.info(f"CLEANED TRACK DATA: {clean_track_data}")
+    
+    # Construct TrackData objects from cleaned data
+    tracks = []
+    actions = []
+    
+    for track in clean_track_data:
+        # Ensure we have notes (empty list as fallback)
+        notes = track.get("notes", [])
+        if notes is None:
+            notes = []
+            
+        # Ensure we have an instrument name
+        instrument_name = track.get("instrument_name")
+        if not instrument_name and isinstance(track.get("instrument"), dict):
+            instrument_name = track["instrument"].get("name", "Unknown Instrument")
+        
+        # Get storage key for the instrument
+        storage_key = track.get("storage_key")
+        track_id = track.get("track_id")
+        
+        # Create the TrackData object
+        track_data = TrackData(
+            track_id=track_id,
+            notes=notes,
+            instrument_name=instrument_name,
+            storage_key=storage_key
+        )
+        
+        tracks.append(track_data)
+        
+        # Create an action for each track
+        if storage_key:
+            # Extract instrument ID from storage key
+            # Format is typically: 'instruments/name.sf2'
+            try:
+                instrument_parts = storage_key.split('/')
+                instrument_name = track.get("name", f"AI Track {len(tracks)}")
+                
+                # Create add_track action - include the notes directly in the action
+                actions.append(
+                    AssistantAction(
+                        type="add_generated_track",
+                        data={
+                            "trackId": track_id,
+                            "instrumentName": instrument_name,
+                            "storageKey": storage_key,
+                            "hasNotes": len(notes) > 0,
+                            "notes": notes  # Include the actual notes in the action data
+                        }
+                    )
+                )
+                
+                logger.info(f"Created action for track {track_id} with storage key {storage_key}")
+            except Exception as e:
+                logger.error(f"Error creating action for track: {e}")
+        
+    logger.info(f"Created {len(tracks)} TrackData objects with {len(actions)} actions")
+        
+    return GenerateResponse(
+        response=str(resp),
+        tracks=tracks,
+        actions=actions
+    )
 
 @router.post("/edit", response_model=EditResponse)
 async def edit_track(

@@ -1,4 +1,5 @@
-from typing import Dict, List, Any, Optional, Tuple
+import json
+from typing import Dict, List, Any, Optional, Tuple, Union
 import os
 import base64
 import logging
@@ -6,6 +7,68 @@ import mido
 from mido import Message, MidiFile, MidiTrack
 
 logger = logging.getLogger(__name__)
+
+def get_clean_track_data(tracks_data: Union[List, Dict, Any]) -> List[Dict[str, Any]]:
+    """
+    Clean track data by removing None values and ensuring proper formatting.
+    Extracts all notes from patterns and formats according to TrackData schema.
+    
+    Args:
+        tracks_data: List of track data that might contain None values or strings "None"
+        
+    Returns:
+        Cleaned list of track data dictionaries formatted for TrackData schema
+    """
+    # Handle case where tracks_data is a string (e.g., JSON string)
+    if isinstance(tracks_data, str):
+        try:
+            tracks_data = json.loads(tracks_data)
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse tracks_data as JSON: {tracks_data[:100]}...")
+            return []
+    
+    # If it's not a list, return empty list
+    if not isinstance(tracks_data, list):
+        logger.warning(f"tracks_data is not a list: {type(tracks_data)}")
+        return []
+    
+    # Filter out None values, "None" strings, and non-dict values
+    cleaned_tracks = []
+    for track in tracks_data:
+        # Skip explicit None values
+        if track is None:
+            logger.warning(f"Skipping None track: {track}")
+            continue
+        
+        # Skip "None" string values
+        if track == "None" or track == '"None"':
+            logger.warning(f"Skipping None string track: {track}")
+            continue
+            
+        # Ensure track is a dictionary
+        if not isinstance(track, dict):
+            logger.warning(f"Skipping non-dict track: {track}")
+            continue
+            
+        # Extract all notes from patterns
+        all_notes = []
+        if "instrument" in track and "patterns" in track["instrument"]:
+            for pattern in track["instrument"]["patterns"]:
+                if "notes" in pattern:
+                    all_notes.extend(pattern["notes"])
+        
+        # Create cleaned track data in TrackData format
+        cleaned_track = {
+            "notes": all_notes,
+            "instrument_name": track.get("instrument_name") or track.get("instrument", {}).get("name"),
+            "storage_key": track.get("storage_key")
+        }
+        
+        cleaned_tracks.append(cleaned_track)
+        
+    logger.info(f"Cleaned tracks: {len(cleaned_tracks)} valid tracks from {len(tracks_data)} original items")
+    return cleaned_tracks
+
 
 class MIDIGenerator:
     """
@@ -147,7 +210,7 @@ class MIDIGenerator:
             program = instrument.get("program", 0)
             if isinstance(program, str):
                 program = self._get_program_number(program)
-            track.append(Message('program_change', program=program, channel=channel, time=0))
+            track.append(Message('program_change', program=0, channel=channel, time=0))
         
         # Add notes from patterns
         for pattern in instrument.get("patterns", []):

@@ -285,7 +285,6 @@ async def get_sounds(
         logger.info(f"Querying audio_track table for user ID: {current_user['id']}")
         response = supabase.table("audio_track").select("*").eq("user_id", current_user["id"]).execute()
         
-        logger.info(f"Query response: {response}")
         
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error retrieving sounds: {response.error}")
@@ -338,7 +337,6 @@ async def get_sound(
         logger.info(f"Executing query: SELECT * FROM audio_track WHERE id = {sound_id} AND user_id = {current_user['id']}")
         response = supabase.table("audio_track").select("*").eq("id", sound_id).eq("user_id", current_user["id"]).execute()
         
-        logger.info(f"Query response: {response}")
         
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error fetching sound: {response.error}")

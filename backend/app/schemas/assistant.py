@@ -25,10 +25,8 @@ class AssistantResponseBase(BaseModel):
 
 class TrackData(BaseModel):
     """Data for a generated or edited track"""
-    track_id: Optional[str] = None
     notes: List[Dict[str, Any]]
-    instrument: Optional[str] = None
-    name: Optional[str] = None
+    instrument_name: Optional[str] = None
     storage_key: Optional[str] = None  # Key for the instrument soundfont
 
 
@@ -80,7 +78,6 @@ class ProjectContext(BaseModel):
 class GenerateRequest(AssistantRequestBase):
     """Request for generating multiple tracks"""
     style: Optional[str] = None
-    num_tracks: Optional[int] = Field(default=1, ge=1, le=10)
 
 
 class GenerateResponse(AssistantResponseBase):

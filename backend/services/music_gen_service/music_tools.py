@@ -8,23 +8,19 @@ import asyncio
 import logging
 from typing import Dict, List, Any, Optional, Callable, Tuple
 from dotenv import load_dotenv
+from fastapi import Request
+import music21
 
+from services.music_gen_service.music_tool_prompts import get_select_instruments_prompt
+from services.soundfont_service.soundfont_service import soundfont_service
 # Load environment variables from .env file
 load_dotenv()
 
 from anthropic import Anthropic
-from app.services.instruments import (
-    get_all_soundfonts,
-    get_soundfonts_by_type,
-    find_soundfonts,
-    get_instrument_metadata
-)
-from app.services.midi import MIDIGenerator
 
 logger = logging.getLogger(__name__)
 
 # Initialize MIDI generator
-midi_generator = MIDIGenerator(output_dir="output")
 
 # Define specialized music tools
 MUSIC_TOOLS = [
@@ -59,10 +55,6 @@ MUSIC_TOOLS = [
                 "duration_beats": {
                     "type": "integer", 
                     "description": "Length of the melody in beats"
-                },
-                "program": {
-                    "type": "integer",
-                    "description": "MIDI program number (0-127) for the instrument"
                 },
                 "note_names": {
                     "type": "array",
@@ -106,10 +98,6 @@ MUSIC_TOOLS = [
                 "duration_beats": {
                     "type": "integer",
                     "description": "Length of the chord progression in beats"
-                },
-                "program": {
-                    "type": "integer",
-                    "description": "MIDI program number (0-127) for the instrument"
                 },
                 "chord_names": {
                     "type": "array",
@@ -198,10 +186,6 @@ MUSIC_TOOLS = [
                     "type": "integer",
                     "description": "Length of the counter-melody in beats"
                 },
-                "program": {
-                    "type": "integer",
-                    "description": "MIDI program number (0-127) for the instrument"
-                },
                 "note_names": {
                     "type": "array",
                     "description": "REQUIRED: Array of note names like ['G3', 'Bb3', 'D4', 'G4', 'F4', etc.]",
@@ -255,20 +239,6 @@ MUSIC_TOOLS = [
                 }
             },
             "required": ["title", "melody"]
-        }
-    },
-    {
-        "name": "search_soundfonts",
-        "description": "Searches available soundfonts that match a given query.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Search term for soundfonts"
-                }
-            },
-            "required": ["query"]
         }
     }
 ]
@@ -333,6 +303,8 @@ class MusicToolsService:
         self.default_tempo = 120
         self.default_time_signature = [4, 4]
         
+        self.selected_instruments = {}
+        
         # Define tool handlers
         self.tool_handlers = {
             "determine_musical_parameters": self._handle_determine_musical_parameters,
@@ -341,7 +313,8 @@ class MusicToolsService:
             "create_drums": self._handle_create_drums,
             "create_counter_melody": self._handle_create_counter_melody,
             "combine_parts": self._handle_combine_parts,
-            "search_soundfonts": self._handle_search_soundfonts
+            "search_soundfonts": self._handle_search_soundfonts,
+            "select_instruments": self._handle_select_instruments
         }
     
     async def compose_music(self, description: str, tempo: Optional[int] = None, key: Optional[str] = None) -> Dict[str, Any]:
@@ -378,6 +351,22 @@ class MusicToolsService:
         combined_parts = None
         parameters_part = None
         
+        try:
+            soundfonts = await soundfont_service.get_public_soundfonts()
+            soundfont_names = [soundfont.get("name") for soundfont in soundfonts]
+            logger.info(f"Soundfonts: {soundfont_names}")
+        except Exception as e:
+            logger.error(f"Error getting soundfonts: {e}")
+            return {
+                "status": "error",
+                "error": "Error getting soundfonts",
+                "music_description": {
+                    "title": f"Error generating music from: {description[:30]}",
+                    "tempo": tempo or self.default_tempo,
+                    "instruments": []
+                }
+            }
+        
         # Start with initial values
         use_tempo = tempo or self.default_tempo
         use_key = key or self.default_key
@@ -412,15 +401,35 @@ would use a higher tempo."""
         else:
             initial_parameters_message = f"You will create music in {use_key} at {use_tempo} BPM."
             
+        # Create system prompt with proper escaping
+        correct_example = '{"soundfont_names": ["MoogLeads.sf2", "DeepPad.sf2", "Standard Drum Kit"]}'
+        incorrect_example = '{"soundfont_names": ["m", "o", "o", "g"]}'
+        
         system_prompt = f"""You are a music composer creating a piece based on a text description.
 {initial_parameters_message}
 
-Use the specialized music tools to create a complete composition:
-1. First create the main melody - YOU MUST SPECIFY EXACT NOTES as note_names (like ["G3", "Bb3", "D4"]) and note_durations (like ["quarter", "eighth", "half"])
-2. Then create chord progressions - YOU MUST SPECIFY EXACT CHORDS as chord_names (like ["Gmin", "Bb", "D7"]) and chord_durations (like ["whole", "half"])
-3. Add drums if appropriate - YOU MUST SPECIFY EXACT DRUMS as drum_names (like ["kick", "snare", "hi-hat", "kick", "snare"]) and drum_durations (like ["quarter", "quarter", "eighth", "quarter", "quarter"])
-4. Consider adding a counter-melody if it enhances the piece - also specify exact notes
-5. Finally combine all parts
+These are the soundfonts available to you:
+{', '.join(soundfont_names)}
+
+CRITICAL STEPS TO FOLLOW:
+1. FIRST, you MUST use the select_instruments tool to choose your instruments. The tool requires a PROPERLY FORMATTED ARRAY of complete soundfont names (not single letters or characters).
+   CORRECT EXAMPLE: {correct_example}
+   INCORRECT EXAMPLE: {incorrect_example} (don't split names into characters)
+2. For each musical part you create, use ONLY complete soundfont names that you selected with the select_instruments tool
+3. Ensure all data is properly formatted
+
+Follow this workflow for creating a complete composition:
+1. Use the select_instruments tool with a properly formatted array of complete soundfont names that you chose from the list above
+2. Create the main melody - YOU MUST SPECIFY EXACT NOTES as note_names (like ["G3", "Bb3", "D4"]) and note_durations (like ["quarter", "eighth", "half"])
+3. Create chord progressions - YOU MUST SPECIFY EXACT CHORDS as chord_names (like ["Gmin", "Bb", "D7"]) and chord_durations (like ["whole", "half"])
+4. Add drums if appropriate - YOU MUST SPECIFY EXACT DRUMS as drum_names (like ["kick", "snare", "hi-hat"]) and drum_durations (like ["quarter", "quarter", "eighth"])
+5. Consider adding a counter-melody if it enhances the piece - also specify exact notes
+
+CREATE ONLY VALID MUSICAL DATA:
+- Ensure notes field is always a valid list, never None
+- Ensure instrument field is always a string, never a dictionary
+- Never include None values in any lists
+- Only use instruments that you've selected with the select_instruments tool
 
 Create melodies, chords, and drum patterns that truly match the musical style described, being careful to use appropriate notes for the specified key ({use_key})."""
         
@@ -430,8 +439,16 @@ Create melodies, chords, and drum patterns that truly match the musical style de
                 "role": "user",
                 "content": f"""Please compose music based on this description: {description}
 
-Start by creating a melody, then add chords and other elements as appropriate.
-Use the tools to create each part of the composition."""
+IMPORTANT: First use the select_instruments tool to choose the soundfonts you'll use, then create the music.
+For the select_instruments tool:
+- Use COMPLETE instrument names from the soundfont list provided
+- Pass them as a properly formatted array like: {{"soundfont_names": ["Piano.sf2", "Guitar.sf2"]}}
+- DO NOT split names into individual characters or letters
+
+Remember to follow these steps:
+1. First select soundfonts using the select_instruments tool with COMPLETE names
+2. Then create a melody, add chords, and other elements using only the selected instruments
+3. Ensure all data is properly formatted with no None values"""
             }]
             
             # Track conversation to build up the composition in stages
@@ -443,25 +460,67 @@ Use the tools to create each part of the composition."""
                 iterations += 1
                 logger.debug(f"Composition iteration {iterations}")
                 
+                # Log the request to Claude for debugging
+                logger.info("========== SENDING TO CLAUDE ==========")
+                logger.info(f"System Prompt: {system_prompt}")
+                logger.info(f"Messages: {json.dumps(messages, indent=2)}")
+                logger.info(f"Tools: {json.dumps(MUSIC_TOOLS, indent=2)}")
+                logger.info("======================================")
+                
                 # Make API call
                 response = self.client.messages.create(
                     model=self.model,
-                    max_tokens=4000,
+                    max_tokens=4096, 
                     temperature=0.7,
                     system=system_prompt,
                     messages=messages,
-                    tools=MUSIC_TOOLS
+                    tools=MUSIC_TOOLS + [get_select_instruments_prompt(soundfont_names)],
+                    tool_choice={"type": "any"}  # Force Claude to always use a tool
                 )
+                
+                # Simple log of Claude's complete response for debugging
+                logger.info(f"CLAUDE RESPONSE: {response}")
+                
+                # Log the full Claude response for debugging
+                logger.info("========== CLAUDE RESPONSE ==========")
+                logger.info(f"Response object: {response}")
+                
+                # Log individual content blocks
+                for idx, block in enumerate(response.content):
+                    logger.info(f"Content Block {idx+1}:")
+                    logger.info(f"  Type: {block.type if hasattr(block, 'type') else 'unknown'}")
+                    
+                    if hasattr(block, 'type') and block.type == 'text':
+                        logger.info(f"  Text: {block.text[:500]}...")
+                    elif hasattr(block, 'type') and block.type == 'tool_use':
+                        logger.info(f"  Tool: {block.name}")
+                        logger.info(f"  Input: {json.dumps(block.input, indent=2)}")
+                
+                logger.info("=======================================")
                 
                 # Add model's response to conversation
                 content_text = ""
+                has_tool_use_block = False
+                
+                # Check for tool use blocks to determine whether the response contains tools
+                for content_block in response.content:
+                    if hasattr(content_block, 'type') and content_block.type == 'tool_use':
+                        has_tool_use_block = True
+                        break
+                
+                # Extract text content if present
                 for content_block in response.content:
                     if hasattr(content_block, 'type') and content_block.type == 'text':
                         content_text = content_block.text
                         break
                 
-                # Throw error if no content - we want to fail loudly when things go wrong
-                if not content_text:
+                # Handle case where Claude sends only a tool_use block with no text
+                # This is valid - Claude is directly using the tool as instructed
+                if not content_text and has_tool_use_block:
+                    logger.info("Claude sent a tool call without text content - this is ok")
+                    content_text = "Using tool directly without description."
+                # Throw error if no content AND no tool use - that's an actual error
+                elif not content_text:
                     raise ValueError("Received empty content from Claude API. Failing to ensure we fix the underlying issue.")
                 
                 assistant_message = {
@@ -475,6 +534,10 @@ Use the tools to create each part of the composition."""
                 tool_responses = []
                 has_tool_use = False
                 
+                # Count the number of tool_use blocks for logging
+                tool_use_blocks = [block for block in response.content if hasattr(block, 'type') and block.type == 'tool_use']
+                logger.info(f"Found {len(tool_use_blocks)} tool_use blocks in the response")
+                
                 for content_block in response.content:
                     if hasattr(content_block, 'type') and content_block.type == 'tool_use':
                         has_tool_use = True
@@ -482,7 +545,12 @@ Use the tools to create each part of the composition."""
                         tool_args = content_block.input
                         tool_id = content_block.id
                         
-                        logger.debug(f"Processing tool use: {tool_name}")
+                        # Full detailed logging of tool call
+                        logger.info(f"Tool use details:")
+                        logger.info(f"  Tool name: {tool_name}")
+                        logger.info(f"  Tool ID: {tool_id}")
+                        logger.info(f"  Tool args: {json.dumps(tool_args)[:200]}...")
+                        logger.info(f"Processing tool use: {tool_name} with args: {json.dumps(tool_args)[:100]}...")
                         
                         try:
                             # Call appropriate handler
@@ -500,16 +568,41 @@ Use the tools to create each part of the composition."""
                                         use_tempo = result["tempo"]
                                         logger.info(f"Using Claude-determined tempo: {use_tempo} BPM")
                                     
-                                    # Update the system prompt with the new parameters
+                                    # Get notes for this key using music21
+                                    key_notes = self.get_notes_for_key(use_key)
+                                    
+                                    # Create note suggestions string
+                                    notes_str = ", ".join(key_notes.get("suggested_notes", ["C4", "D4", "E4", "F4", "G4", "A4", "B4"]))
+                                    
+                                    # Create chord suggestions string
+                                    chords_str = ", ".join(key_notes.get("suggested_chords", ["C", "Dm", "F", "G"]))
+                                    
+                                    # Get all available notes for reference
+                                    all_notes_str = ", ".join(key_notes.get("all_notes", []))
+                                    
+                                    # Update the system prompt with the new parameters and note suggestions
                                     system_prompt = f"""You are a music composer creating a piece in {use_key} at {use_tempo} BPM.
+
+AVAILABLE NOTES IN THIS KEY:
+- Recommended melody notes: {notes_str}
+- Recommended chords: {chords_str}
+- All available notes in this key: {all_notes_str}
+
 Use the specialized music tools to create a complete composition:
-1. First create the main melody - YOU MUST SPECIFY EXACT NOTES as note_names (like ["G3", "Bb3", "D4"]) and note_durations (like ["quarter", "eighth", "half"])
-2. Then create chord progressions - YOU MUST SPECIFY EXACT CHORDS as chord_names (like ["Gmin", "Bb", "D7"]) and chord_durations (like ["whole", "half"])
-3. Add drums if appropriate - YOU MUST SPECIFY EXACT DRUMS as drum_names (like ["kick", "snare", "hi-hat", "kick", "snare"]) and drum_durations (like ["quarter", "quarter", "eighth", "quarter", "quarter"])
-4. Consider adding a counter-melody if it enhances the piece - also specify exact notes
+1. First create the main melody - YOU MUST USE NOTES FROM THE KEY {use_key} as note_names (use the available notes listed above)
+   Example format: note_names: ["G3", "Bb3", "D4"] and note_durations: ["quarter", "eighth", "half"]
+   
+2. Then create chord progressions - YOU MUST USE CHORDS FROM THE KEY {use_key} as chord_names (use the recommended chords listed above)
+   Example format: chord_names: [{chords_str}] and chord_durations: ["whole", "half"]
+   
+3. Add drums if appropriate - specify exact drums as drum_names
+   Example format: drum_names: ["kick", "snare", "hi-hat"] and drum_durations: ["quarter", "quarter", "eighth"]
+   
+4. Consider adding a counter-melody - also using notes from the key {use_key} (use the available notes listed above)
+
 5. Finally combine all parts
 
-Create melodies, chords, and drum patterns that truly match the musical style described, being careful to use appropriate notes for the specified key ({use_key})."""
+IMPORTANT: Create melodies, chords, and drum patterns that truly match the musical style described, using ONLY the notes and chords appropriate for the key {use_key}."""
                                     
                                 elif tool_name == "create_melody":
                                     melody_part = result
@@ -540,6 +633,8 @@ Create melodies, chords, and drum patterns that truly match the musical style de
                                 })
                         except Exception as e:
                             logger.error(f"Error handling tool {tool_name}: {str(e)}")
+                            logger.error(f"Tool args: {json.dumps(tool_args)}")
+                            logger.error(f"error: {str(e)}")
                             tool_responses.append({
                                 "role": "tool",
                                 "tool_call_id": tool_id,
@@ -580,7 +675,7 @@ Create melodies, chords, and drum patterns that truly match the musical style de
             )
             
             # Generate MIDI files
-            midi_result = await self._generate_midi(music_description)
+            # midi_result = await self._generate_midi(music_description)
             
             # Create a comprehensive output JSON with all data
             output_json = {
@@ -590,12 +685,12 @@ Create melodies, chords, and drum patterns that truly match the musical style de
                 "key": music_description.get("key", "unknown"),
                 "tempo": music_description.get("tempo", 120),
                 "time_signature": music_description.get("time_signature", [4, 4]),
-                "tracks": midi_result["tracks"],
+                "tracks": music_description.get("tracks", []),
                 "instruments": music_description.get("instruments", []),
                 "music_description": music_description,
-                "midi_result": midi_result,
+                "midi_result": [],
                 "claude_parameters": parameters_part,
-                "directory": midi_result.get("directory", ""),
+                "directory": "",
                 "parts": {
                     "melody": melody_part,
                     "chords": chords_part,
@@ -614,6 +709,10 @@ Create melodies, chords, and drum patterns that truly match the musical style de
             # Log the readable output for debugging
             logger.debug(f"Generated comprehensive JSON output with {len(music_description.get('instruments', []))} instruments")
             
+            return {
+                "tracks": [melody_part, chords_part, drums_part, counter_melody_part]
+            }
+            
             return output_json
                 
         except Exception as e:
@@ -624,6 +723,10 @@ Create melodies, chords, and drum patterns that truly match the musical style de
                 "key": use_key,
                 "time_signature": self.default_time_signature,
                 "instruments": []
+            }
+            
+            return {
+                "tracks": [melody_part, chords_part, drums_part, counter_melody_part]
             }
             
             return {
@@ -755,8 +858,6 @@ Create melodies, chords, and drum patterns that truly match the musical style de
                 "download_url": f"/download/{composition_dir}/{os.path.basename(result['file_path'])}",
                 "channel": next((instr.get("channel", 0) for instr in music_description.get("instruments", []) 
                                 if instr["name"] == result["instrument_name"]), 0),
-                "program": next((instr.get("program", 0) for instr in music_description.get("instruments", []) 
-                               if instr["name"] == result["instrument_name"]), 0),
                 "pattern_types": [pattern.get("type", "unknown") for pattern in instrument_patterns],
                 "notes": notes_data
             }
@@ -790,6 +891,153 @@ Create melodies, chords, and drum patterns that truly match the musical style de
             normalized_key = self.default_key
             
         return self.KEY_MAP[normalized_key]
+        
+    def get_notes_for_key(self, key: str) -> Dict[str, Any]:
+        """
+        Get notes and chords for a musical key using music21 library.
+        
+        Args:
+            key: Key name like "C major" or "F# minor"
+            
+        Returns:
+            Dictionary with key information, available notes, and common chords
+        """
+        try:
+            # Handle some common key format variations
+            key = key.replace(' Major', ' major').replace(' Minor', ' minor')
+            
+            # Parse the key into music21 format
+            # Extract the root note and mode
+            parts = key.split()
+            if len(parts) != 2:
+                logger.warning(f"Invalid key format: {key}, using C major")
+                root_str = "C"
+                mode = "major"
+            else:
+                root_str = parts[0]
+                mode = parts[1].lower()
+            
+            # Create a music21 key object
+            if mode == "major":
+                k = music21.key.Key(root_str)
+            elif mode == "minor":
+                k = music21.key.Key(root_str.lower())
+            else:
+                logger.warning(f"Unsupported mode: {mode}, using major")
+                k = music21.key.Key(root_str)
+            
+            # Get the scale
+            scale = k.getScale()
+            scale_notes = scale.getPitches()
+            
+            # Format results
+            result = {
+                "key": key,
+                "root": root_str,
+                "mode": mode,
+                "notes": {}
+            }
+            
+            # Get notes for 3 octaves (3, 4, 5)
+            for octave in [3, 4, 5]:
+                octave_notes = []
+                for scale_note in scale_notes:
+                    # Get note name and adjust octave
+                    note_name = scale_note.name
+                    # Set the octave - music21 uses a different octave system
+                    note_with_octave = f"{note_name}{octave}"
+                    octave_notes.append(note_with_octave)
+                
+                result["notes"][f"octave{octave}"] = octave_notes
+            
+            # Get common chords in the key
+            result["chords"] = self._get_common_chords_for_key(k)
+            
+            # Add a summary of all available notes
+            all_notes = []
+            for octave_notes in result["notes"].values():
+                all_notes.extend(octave_notes)
+            result["all_notes"] = all_notes
+            
+            # Include special chord and note suggestions
+            if mode == "major":
+                result["suggested_notes"] = result["notes"]["octave4"]
+                result["suggested_chords"] = [result["chords"][i] for i in [0, 3, 4, 5]]  # I, IV, V, vi
+            else:  # minor
+                result["suggested_notes"] = result["notes"]["octave4"]
+                result["suggested_chords"] = [result["chords"][i] for i in [0, 2, 3, 4]]  # i, III, iv, v
+            
+            return result
+        
+        except Exception as e:
+            logger.error(f"Error generating notes for key {key}: {e}")
+            # Return a fallback with C major scale
+            return {
+                "key": "C major",
+                "root": "C",
+                "mode": "major",
+                "notes": {
+                    "octave4": ["C4", "D4", "E4", "F4", "G4", "A4", "B4"],
+                },
+                "chords": ["C", "Dm", "Em", "F", "G", "Am", "Bdim"],
+                "suggested_notes": ["C4", "D4", "E4", "F4", "G4", "A4", "B4"],
+                "suggested_chords": ["C", "F", "G", "Am"]
+            }
+    
+    def _get_common_chords_for_key(self, key: music21.key.Key) -> List[str]:
+        """Get common chord symbols for a key."""
+        # Get scale degrees in this key
+        scale = key.getScale()
+        
+        # Roman numeral representations for chords
+        if key.mode == 'major':
+            romans = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°']
+            # Build triad on each scale degree
+            chords = []
+            for i, degree in enumerate([1, 2, 3, 4, 5, 6, 7]):
+                # Get the chord from music21 using the roman numeral
+                rn = music21.roman.RomanNumeral(romans[i], key)
+                
+                # Format the chord symbol
+                root = rn.root().name
+                quality = rn.quality
+                
+                # Format the chord symbol based on quality
+                if quality == 'minor':
+                    chord_symbol = f"{root}m"
+                elif quality == 'diminished':
+                    chord_symbol = f"{root}dim"
+                elif quality == 'major':
+                    chord_symbol = f"{root}"
+                else:
+                    chord_symbol = f"{root}{quality}"
+                
+                chords.append(chord_symbol)
+            return chords
+        else:  # minor key
+            romans = ['i', 'ii°', 'III', 'iv', 'v', 'VI', 'VII']
+            # Build triad on each scale degree
+            chords = []
+            for i, degree in enumerate([1, 2, 3, 4, 5, 6, 7]):
+                # Get the chord from music21 using the roman numeral
+                rn = music21.roman.RomanNumeral(romans[i], key)
+                
+                # Format the chord symbol
+                root = rn.root().name
+                quality = rn.quality
+                
+                # Format the chord symbol based on quality
+                if quality == 'minor':
+                    chord_symbol = f"{root}m"
+                elif quality == 'diminished':
+                    chord_symbol = f"{root}dim"
+                elif quality == 'major':
+                    chord_symbol = f"{root}"
+                else:
+                    chord_symbol = f"{root}{quality}"
+                
+                chords.append(chord_symbol)
+            return chords
     
     def _get_scale_note(self, key: str, scale_degree: int, octave: int = 0) -> int:
         """Get a note from the scale at the given scale degree and octave offset."""
@@ -998,7 +1246,6 @@ Create melodies, chords, and drum patterns that truly match the musical style de
         instrument_name = args.get("instrument_name", "Piano")
         description = args.get("description", "")
         duration_beats = args.get("duration_beats", 16)
-        program = args.get("program", 0)  # Default to acoustic piano
         
         # Log the exact input from Claude for debugging
         logger.info(f"RAW MELODY INPUT: {json.dumps(args)}")
@@ -1067,7 +1314,6 @@ Create melodies, chords, and drum patterns that truly match the musical style de
         instrument = {
             "name": instrument_name,
             "soundfont_name": instrument_name,
-            "program": program,
             "channel": 0,
             "patterns": [
                 {
@@ -1082,7 +1328,8 @@ Create melodies, chords, and drum patterns that truly match the musical style de
             "instrument_name": instrument_name,
             "description": description,
             "duration_beats": duration_beats,
-            "instrument": instrument
+            "instrument": instrument,
+            "storage_key": self.selected_instruments[instrument_name]["storage_key"]
         }
     
     def _parse_chord_name(self, chord_name: str, key: str, octave: int = 3) -> List[int]:
@@ -1174,7 +1421,6 @@ Create melodies, chords, and drum patterns that truly match the musical style de
         instrument_name = args.get("instrument_name", "Piano")
         description = args.get("description", "")
         duration_beats = args.get("duration_beats", 16)
-        program = args.get("program", 0)  # Default to acoustic piano
         
         # Log the exact input from Claude for debugging
         logger.info(f"RAW CHORD INPUT: {json.dumps(args)}")
@@ -1240,7 +1486,6 @@ Create melodies, chords, and drum patterns that truly match the musical style de
         instrument = {
             "name": instrument_name,
             "soundfont_name": instrument_name,
-            "program": program,
             "channel": 1,  # Use channel 1 for chords
             "patterns": [
                 {
@@ -1250,12 +1495,15 @@ Create melodies, chords, and drum patterns that truly match the musical style de
             ]
         }
         
+        logger.info(f"CHORDS INSTRUMENT: {instrument}")
+        
         return {
             "part_type": "chords",
             "instrument_name": instrument_name,
             "description": description,
             "duration_beats": duration_beats,
-            "instrument": instrument
+            "instrument": instrument,
+            "storage_key": self.selected_instruments[instrument_name]["storage_key"]
         }
     
     async def _handle_create_drums(self, args: Dict[str, Any], tempo: int, key: str) -> Dict[str, Any]:
@@ -1321,7 +1569,6 @@ Create melodies, chords, and drum patterns that truly match the musical style de
         instrument = {
             "name": "Drums",
             "soundfont_name": "Standard Drum Kit",
-            "program": "percussion",
             "channel": 9,  # Channel 10 (zero-indexed as 9) for percussion
             "patterns": [
                 {
@@ -1336,15 +1583,14 @@ Create melodies, chords, and drum patterns that truly match the musical style de
             "description": description,
             "duration_beats": duration_beats,
             "intensity": intensity,
-            "instrument": instrument
+            "instrument": instrument,
         }
     
     async def _handle_create_counter_melody(self, args: Dict[str, Any], tempo: int, key: str) -> Dict[str, Any]:
         """Handle create_counter_melody tool."""
-        instrument_name = args.get("instrument_name", "Flute")
+        instrument_name = args.get("instrument_name")
         description = args.get("description", "")
         duration_beats = args.get("duration_beats", 16)
-        program = args.get("program", 73)  # Default to flute
         
         # Log the exact input from Claude for debugging
         logger.info(f"RAW COUNTER-MELODY INPUT: {json.dumps(args)}")
@@ -1406,7 +1652,6 @@ Create melodies, chords, and drum patterns that truly match the musical style de
         instrument = {
             "name": instrument_name,
             "soundfont_name": instrument_name,
-            "program": program,
             "channel": 2,
             "patterns": [
                 {
@@ -1553,7 +1798,73 @@ Consider the following when determining parameters:
         query = args.get("query", "")
         logger.debug(f"Searching soundfonts for: {query}")
         
-        return find_soundfonts(query)
+        return await soundfont_service.get_public_soundfonts(query)
+    
+    async def _handle_select_instruments(self, args: Dict[str, Any], tempo: int, key: str) -> Dict[str, Any]:
+        """
+        Handle select_instruments tool. Selects soundfonts to use in the composition.
+        
+        Args:
+            args: Dictionary with soundfont selection info
+            tempo: Tempo parameter (unused)
+            key: Key parameter (unused)
+            
+        Returns:
+            Dictionary with selection results
+        """
+        
+        soundfont_names = args.get("soundfont_names", [])
+        if not soundfont_names:
+            logger.warning("No soundfont names provided to select_instruments")
+            return {"error": "No soundfont names provided", "selected_soundfonts": []}
+        
+        matching_soundfonts = await soundfont_service.get_public_soundfonts()
+        # Process each soundfont name
+        results = []
+        for soundfont_name in soundfont_names:
+            # Search for this soundfont name
+            found_match = None
+            
+            # Find the first matching soundfont
+            for soundfont in matching_soundfonts:
+                name = soundfont.get("name", "").lower()
+                display_name = soundfont.get("display_name", "").lower()
+                category = soundfont.get("category", "").lower()
+                
+                search_name = soundfont_name.lower()
+                if (search_name in name or 
+                    search_name in display_name or 
+                    search_name in category):
+                    found_match = soundfont
+                    break
+            
+            if found_match:
+                # Store in the selected instruments dictionary
+                storage_key = found_match.get("storage_key")
+                self.selected_instruments[soundfont_name] = {
+                    "storage_key": storage_key,
+                    "id": found_match.get("id")
+                }
+                
+                results.append({
+                    "soundfont_name": soundfont_name,
+                    "storage_key": storage_key,
+                    "status": "found"
+                })
+                logger.info(f"Selected soundfont: {soundfont_name} with storage key: {storage_key}")
+            else:
+                # No match found
+                results.append({
+                    "soundfont_name": soundfont_name,
+                    "status": "not_found"
+                })
+                logger.warning(f"No matching soundfont found for: {soundfont_name}")
+        
+        return {
+            "selected_soundfonts": results,
+            "total_selected": len([r for r in results if r["status"] == "found"]),
+            "total_not_found": len([r for r in results if r["status"] == "not_found"])
+        }
 
 # Create a singleton instance
 music_tools_service = MusicToolsService()

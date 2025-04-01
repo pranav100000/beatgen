@@ -131,13 +131,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
         // Generate mode creates multiple tracks
         result = await generateTracks(prompt);
         
-        // Add assistant response to chat with action if present
-        setMessages(prev => [...prev, { 
-          text: result.response, 
-          isUser: false,
-          action: result.actions?.[0]?.type,
-          actionData: result.actions?.[0]?.data
-        }]);
+        // Add assistant response to chat
+        const responseMessage = {
+          text: result.response,
+          isUser: false
+        };
+        
+        // Add message first without actions
+        setMessages(prev => [...prev, responseMessage]);
+        
+        // Process each action if present
+        if (result.actions && result.actions.length > 0) {
+          console.log('Processing actions:', result.actions);
+          
+          // We'll create action chips for each action
+          result.actions.forEach(action => {
+            setMessages(prev => [
+              ...prev, 
+              { 
+                text: '', 
+                isUser: false,
+                action: action.type,
+                actionData: action.data
+              }
+            ]);
+          });
+        }
         
         // We'll now process the tracks through the action system
         // No need to call addGeneratedTracks directly as it will be
@@ -153,13 +172,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
           // Edit a specific track
           result = await editTrack(prompt, selectedTrack.id);
           
-          // Add assistant response to chat with action if present
-          setMessages(prev => [...prev, { 
-            text: result.response, 
-            isUser: false,
-            action: result.actions?.[0]?.type,
-            actionData: result.actions?.[0]?.data
-          }]);
+          // Add assistant response to chat
+          const responseMessage = {
+            text: result.response,
+            isUser: false
+          };
+          
+          // Add message first without actions
+          setMessages(prev => [...prev, responseMessage]);
+          
+          // Process each action if present
+          if (result.actions && result.actions.length > 0) {
+            console.log('Processing edit actions:', result.actions);
+            
+            // We'll create action chips for each action
+            result.actions.forEach(action => {
+              setMessages(prev => [
+                ...prev, 
+                { 
+                  text: '', 
+                  isUser: false,
+                  action: action.type,
+                  actionData: action.data
+                }
+              ]);
+            });
+          }
           
           // Process edited track (placeholder)
           if (result.track) {
@@ -171,12 +209,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
           result = await editTrack(prompt, "");
           
           // Add assistant response to chat
-          setMessages(prev => [...prev, { 
-            text: result.response, 
-            isUser: false,
-            action: result.actions?.[0]?.type,
-            actionData: result.actions?.[0]?.data
-          }]);
+          const responseMessage = {
+            text: result.response,
+            isUser: false
+          };
+          
+          // Add message first without actions
+          setMessages(prev => [...prev, responseMessage]);
+          
+          // Process each action if present
+          if (result.actions && result.actions.length > 0) {
+            console.log('Processing fallback edit actions:', result.actions);
+            
+            // We'll create action chips for each action
+            result.actions.forEach(action => {
+              setMessages(prev => [
+                ...prev, 
+                { 
+                  text: '', 
+                  isUser: false,
+                  action: action.type,
+                  actionData: action.data
+                }
+              ]);
+            });
+          }
         }
       } 
       // else {
@@ -198,6 +255,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
         console.log('Processing AI assistant actions:', result.actions);
         
         // Handle each action
+        result.actions.forEach(action => {
+          console.log(`Executing action: ${action.type}`);
+          handleAction(action.type, action.data);
+        });
       }
     } catch (error) {
       console.error('Error handling assistant response:', error);
@@ -226,6 +287,120 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             actionData.instrumentId,
             actionData.instrumentName
           );
+        }
+        break;
+      case 'add_generated_track':
+        // New action type for adding an individual generated track with notes
+        if (actionData?.storageKey && store) {
+          try {
+            const trackId = actionData.trackId;
+            const instrumentName = actionData.instrumentName || 'AI Generated Track';
+            const storageKey = actionData.storageKey;
+            const hasNotes = actionData.hasNotes || false;
+            
+            console.log(`Adding generated track: ${instrumentName} with storageKey: ${storageKey}`);
+            
+            // Find the result object that contains the notes
+            const generatedTracks = messages
+              .filter(msg => !msg.isUser && msg.text)
+              .flatMap(msg => {
+                try {
+                  // Try to extract tracks data from response text
+                  const responseObj = JSON.parse(msg.text);
+                  return responseObj.tracks || [];
+                } catch (e) {
+                  return [];
+                }
+              });
+            
+            // Find matching track data
+            const trackData = generatedTracks.find(t => t.track_id === trackId) || 
+                             { notes: [] };
+            
+            // Create a single action for this track
+            const action = {
+              execute: async () => {
+                // Add track with the soundfont
+                console.log(`Adding generated track with storage key: ${storageKey}`);
+                const storageKeyParts = storageKey.split('/');
+                const instrumentId = storageKeyParts[storageKeyParts.length - 2];
+                const newTrack = await handleAddTrack('midi', instrumentId, instrumentName, storageKey);
+                
+                // Get notes directly from the action data if available
+                const notesFromAction = actionData.notes || [];
+                if (newTrack && notesFromAction && notesFromAction.length > 0) {
+                  console.log(`Adding ${notesFromAction.length} notes directly from action data to track ${newTrack.id}`);
+                  
+                  // Get the midiManager from the store
+                  const { store } = useStudioStore.getState();
+                  if (store) {
+                    try {
+                      // Convert notes format as needed
+                      const notes = notesFromAction.map(note => ({
+                        id: Math.floor(Math.random() * 100000), // Use random IDs to avoid conflicts
+                        row: note.pitch,
+                        column: Math.round(note.start),
+                        length: Math.round(note.duration),
+                        velocity: note.velocity || 80 // Default velocity if missing
+                      }));
+                      
+                      console.log('Converting notes with format:', notes[0]);
+                      await store.getMidiManager().updateTrack(newTrack.id, notes);
+                      console.log(`Successfully added ${notes.length} notes to track ${newTrack.id}`);
+                    } catch (error) {
+                      console.error("Failed to add notes to track:", error);
+                    }
+                  }
+                } else if (newTrack && hasNotes && trackData.notes?.length > 0) {
+                  // Fallback to trackData if needed
+                  console.log(`Fallback: Adding ${trackData.notes.length} notes from track data to track ${newTrack.id}`);
+                  
+                  // Get the midiManager from the store
+                  const { store } = useStudioStore.getState();
+                  if (store) {
+                    try {
+                      // Convert notes format as needed
+                      const notes = trackData.notes.map(note => ({
+                        id: Math.floor(Math.random() * 100000),
+                        row: note.pitch,
+                        column: Math.round(note.time * 4),
+                        length: Math.round(note.duration * 4),
+                        velocity: note.velocity || 80
+                      }));
+                      
+                      await store.getMidiManager().updateTrack(newTrack.id, notes);
+                    } catch (error) {
+                      console.warn("Failed to add notes to track using fallback method", error);
+                    }
+                  }
+                } else {
+                  console.warn(`No notes available for track ${newTrack.id}`);
+                }
+              },
+              undo: async () => {
+                // Find track by name
+                const tracks = useStudioStore.getState().tracks;
+                const trackToRemove = tracks.find(t => t.name === instrumentName);
+                if (trackToRemove) {
+                  console.log(`Removing AI-generated track: ${instrumentName}`);
+                  const { handleTrackDelete } = useStudioStore.getState();
+                  await handleTrackDelete(trackToRemove.id);
+                }
+              },
+              type: 'ADD_GENERATED_TRACK'
+            };
+            
+            // Execute the action
+            await historyManager.executeAction(action);
+            
+            // Update history UI state
+            useStudioStore.setState({
+              canUndo: historyManager.canUndo(),
+              canRedo: historyManager.canRedo()
+            });
+          } catch (error) {
+            console.error('Failed to add AI generated track:', error);
+          }
         }
         break;
       case 'add_tracks':
@@ -347,146 +522,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
     }
   };
   
-  // Add AI-generated tracks to the project using a composite action
-  const addGeneratedTracks = async (tracks: TrackData[]) => {
-    console.log('Adding generated tracks:', tracks);
-    const { store } = useStudioStore.getState();
-    if (!store) return;
-    
-    // Skip empty tracks
-    const validTracks = tracks.filter(track => track.notes && track.notes.length > 0);
-    if (validTracks.length === 0) {
-      console.log('No valid tracks to add');
-      return;
-    }
-    
-    // Store the current state of existing tracks (for undo)
-    const existingTracks = useStudioStore.getState().tracks;
-    const previousTrackStates = existingTracks.map(track => ({
-      trackId: track.id,
-      wasMuted: track.muted
-    }));
-    
-    console.log('Creating composite action for AI-generated tracks');
-    
-    try {
-      // Create an array of actions to add all tracks
-      const actions = [];
-      
-      // First, create mute actions for existing tracks
-      for (const track of existingTracks) {
-        if (!track.muted) {
-          // Create a solo action for each new track
-          actions.push({
-            execute: async () => {
-              console.log(`Muting existing track ${track.id}`);
-              store.getAudioEngine().setTrackMute(track.id, true);
-              useStudioStore.setState({
-                tracks: useStudioStore.getState().tracks.map(t => 
-                  t.id === track.id ? { ...t, muted: true } : t
-                )
-              });
-            },
-            undo: async () => {
-              console.log(`Unmuting existing track ${track.id}`);
-              store.getAudioEngine().setTrackMute(track.id, false);
-              useStudioStore.setState({
-                tracks: useStudioStore.getState().tracks.map(t => 
-                  t.id === track.id ? { ...t, muted: false } : t
-                )
-              });
-            },
-            type: 'MUTE_TRACK'
-          });
-        }
-      }
-      
-      // Then, create add track actions
-      for (const track of validTracks) {
-        const trackName = track.name || 'AI Generated Track';
-        const instrumentId = track.instrument || undefined;
-        
-        // Create action that adds a track with notes
-        actions.push({
-          execute: async () => {
-            console.log(`Adding AI-generated track: ${trackName}`);
-            
-            // Get storage key from track data
-            const storageKey = track.storage_key || undefined;
-            
-            // Add the track using the handleAddTrack function
-            console.log(`Adding track with storage key: ${storageKey}`);
-            const pathParts = storageKey.split('/');
-            console.log(`Last element: ${pathParts[pathParts.length - 2]}`);
-            const instrumentId = pathParts[pathParts.length - 2].split('.')[0];
-            const newTrack = await handleAddTrack('midi', instrumentId, trackName, storageKey);
-            
-            // Now we need to add the notes to the track
-            // First find the newly created track by name
-            const currentTracks = useStudioStore.getState().tracks;
-            console.log("currentTracks: ", currentTracks);
-            console.log("trackName: ", trackName);
-
-            console.log("newTrack: ", newTrack);
-            console.log("track.notes: ", track.notes);
-            
-            if (newTrack && track.notes.length > 0) {
-              // We need to add the notes to this track
-              console.log(`*******Adding ${track.notes.length} notes to track ${newTrack.id}`);
-              
-              // Get the midiSoundfontPlayer from the store
-              const { store } = useStudioStore.getState();
-              if (store) {
-                const engine = store.getAudioEngine();
-                
-                try {
-                  // If the engine supports directly adding notes
-                  // The AI generates notes with time and duration in beats
-                  // But sequencerWrapper expects column and length in grid units (multiplied by 4)
-                  const notes = track.notes.map(note => ({
-                    id: 10000, 
-                    row: note.pitch,              // row is for pitch (MIDI note number)
-                    column: Math.round(note.time * 4),        // Convert from beats to grid position (time * 4)
-                    length: Math.round(note.duration * 4),   // Convert from beats to grid units (duration * 4)
-                    velocity: note.velocity
-                  }));
-                  console.log('Converted notes with beat to grid adjustment:', notes);
-                  await store.getMidiManager().updateTrack(newTrack.id, notes);
-                  // await engine.addNotesToTrack(newTrack.id, track.notes);
-                } catch (error) {
-                  // Fallback - log that we can't add notes directly
-                  console.warn("Audio engine doesn't support adding notes directly", error);
-                }
-              }
-            }
-            
-            console.log(`Added track ${trackName} with ${track.notes.length} notes`);
-          },
-          undo: async () => {
-            // Find the track by name (since we don't know the ID yet)
-            const tracks = useStudioStore.getState().tracks;
-            const trackToRemove = tracks.find(t => t.name === trackName);
-            if (trackToRemove) {
-              console.log(`Removing AI-generated track: ${trackName}`);
-              const { handleTrackDelete } = useStudioStore.getState();
-              await handleTrackDelete(trackToRemove.id);
-            }
-          },
-          type: 'ADD_AI_GENERATED_TRACK'
-        });
-      }
-      
-      // Create a composite action with all our operations
-      const compositeAction = new CompositeAction(actions, 'AI Assistant Generate');
-      
-      // Execute the composite action
-      await historyManager.executeAction(compositeAction);
-      
-      console.log(`Added ${validTracks.length} AI-generated tracks with history support`);
-    } catch (error) {
-      console.error('Failed to add AI-generated tracks:', error);
-    }
-  };
+  // We've replaced the addGeneratedTracks function with the action-based approach
+  // that handles one track at a time through handleAction with add_generated_track type
   
   // Update an existing track with AI-edited content
   const updateTrackWithAIEdit = (trackId: string, trackData: any) => {
