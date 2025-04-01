@@ -23,8 +23,8 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
   );
 
   // Get notes from context
-  const { notesByTrack } = usePianoRoll();
-  const notes = notesByTrack[trackId] || [];
+  const { getNotesForTrack } = usePianoRoll();
+  const notes = getNotesForTrack(trackId);
   
   // Find the range of notes for better scaling
   let minNoteRow = 127;

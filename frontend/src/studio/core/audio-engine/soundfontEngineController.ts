@@ -1,5 +1,5 @@
 import { MidiSoundfontPlayer } from './midiSoundfontPlayer/midiSoundfontPlayer';
-import { MidiManager } from '../midi/MidiManager';
+import { MidiManager } from '../midi/MidiManagerNew';
 import { Store } from '../state/store';
 import { Note } from '../types/note';
 import { db } from '../db/dexie-client';
@@ -39,6 +39,12 @@ export class SoundfontEngineController {
     registerTrackSubscription(trackId: string, midiManager: MidiManager): void {
         console.log(`Subscribing to updates for track ${trackId}`);
         
+        // // Ensure the track exists in MidiManager
+        // if (!midiManager.hasTrack(trackId)) {
+        //     console.log(`Creating track ${trackId} in MidiManager for subscription`);
+        //     midiManager.createTrack(trackId, instrumentId);
+        // }
+        
         // Unsubscribe from previous subscription if it exists
         if (this.trackSubscriptions.has(trackId)) {
             console.log(`Removing previous subscription for track ${trackId}`);
@@ -64,50 +70,10 @@ export class SoundfontEngineController {
                     return;
                 }
                 
-                // // If sequencer doesn't exist yet, we need to set it up first (this is rare)
-                // console.log(`No existing sequencer for track ${trackId}, performing full setup`);
+                // Track doesn't exist in sequencer yet - we need to warn about this and let the caller reconnect
+                console.warn(`No existing sequencer for track ${trackId}, client needs to reconnect track to soundfont`);
                 
-                // // Get track data and associated soundfont data
-                // if (!this.store) return;
-                // const trackData = this.store.getTrackById(trackId);
-                // if (!trackData || trackData.type !== 'midi' && trackData.type !== 'drum' || !trackData.instrumentId) {
-                //     console.warn(`Track ${trackId} is not a MIDI/drum track or has no instrumentId, skipping update`);
-                //     return;
-                // }
-                
-                // const soundfontResult = await this.getSoundfontData(trackData.instrumentId);
-                // if (!soundfontResult) {
-                //     console.warn(`No soundfont data found for instrument ${trackData.instrumentId}`);
-                //     return;
-                // }
-                
-                // // Update the track with the storage key if available
-                // if (soundfontResult.storage_key && trackData.instrumentStorageKey !== soundfontResult.storage_key) {
-                //     trackData.instrumentStorageKey = soundfontResult.storage_key;
-                //     console.log(`Updated instrumentStorageKey for track ${trackId} to ${soundfontResult.storage_key}`);
-                // }
-                
-                // // For initial setup only, we still need a MIDI file
-                // const midiBlob = await midiManager.exportMidiFileFromDB(trackId);
-                // if (!midiBlob) {
-                //     console.warn(`No MIDI data found for track ${trackId}`);
-                //     return;
-                // }
-                
-                // // Add the track with soundfont
-                // await this.midiPlayer.addTrack(
-                //     trackId,
-                //     await midiBlob.arrayBuffer(),
-                //     soundfontResult.data
-                // );
-                
-                // // Once track is created, update it with the latest notes
-                // const newTrack = this.midiPlayer.getTrack(trackId);
-                // if (newTrack) {
-                //     newTrack.updateWithNotes(notes);
-                // }
-                
-                console.log(`Created and updated MIDI playback for track ${trackId} with ${notes.length} notes`);
+                console.log(`MIDI playback update completed for track ${trackId} with ${notes.length} notes`);
             } catch (error) {
                 console.error(`Failed to update MIDI playback for track ${trackId}:`, error);
             }
@@ -279,20 +245,11 @@ export class SoundfontEngineController {
                 throw new Error(`Cannot connect track ${trackId} to soundfont: MidiPlayer not initialized. Error: ${initError.message}`);
             }
             
-            // // Get the MIDI data for the track
-            // const midiBlob = await midiManager.exportMidiFileFromDB(trackId);
-            // if (!midiBlob) {
-            //     console.warn(`No MIDI data found for track ${trackId}, creating default MIDI data`);
-            //     // Create default MIDI file if none exists
-            //     const emptyNotes: Note[] = [];
-            //     midiManager.updateTrack(trackId, emptyNotes);
-                
-            //     // Try again
-            //     const newMidiBlob = await midiManager.exportMidiFileFromDB(trackId);
-            //     if (!newMidiBlob) {
-            //         throw new Error(`Failed to create MIDI data for track ${trackId}`);
-            //     }
-            // }
+            // Ensure the track exists in MidiManager
+            if (!midiManager.hasTrack(trackId)) {
+                console.log(`Track ${trackId} not found in MidiManager, creating it now`);
+                midiManager.createTrack(trackId, instrumentId);
+            }
             
             // Get soundfont data
             const soundfontResult = await this.getSoundfontData(instrumentId);
@@ -303,19 +260,24 @@ export class SoundfontEngineController {
             // Add to SoundfontPlayer with detailed logging
             console.log(`About to add track ${trackId} to player, current tracks:`, this.midiPlayer.getTrackIds());
             try {
-                const notes = midiManager.getNotesForTrack(trackId);
+                // Get notes using the getTrackNotes method for better error handling
+                const notes = midiManager.getTrackNotes(trackId) || [];
+                
+                // Create MIDI data from notes
                 const midi = new Midi();
-                midi.addTrack()
+                midi.addTrack();
+                
+                // Add each note to the MIDI track
                 for (const note of notes) {
                     midi.tracks[0].addNote({
                         midi: note.row,
-                        velocity: note.velocity,
+                        velocity: note.velocity, // Use the note's own velocity
                         ticks: note.column * this.midiPlayer.getGlobalBPM() * 2,
                         durationTicks: note.length * this.midiPlayer.getGlobalBPM() * 2
                     });
                 }
 
-                // Add the track
+                // Add the track to the player
                 await this.addTrack(
                     trackId, 
                     midi,

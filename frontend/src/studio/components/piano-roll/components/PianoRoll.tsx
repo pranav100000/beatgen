@@ -9,8 +9,8 @@ interface PianoRollProps {
 
 const PianoRoll: React.FC<PianoRollProps> = ({ trackId }) => {
   // Get notes and actions from context
-  const { notesByTrack, createNote, moveNote, resizeNote, playPreview, stopPreview } = usePianoRoll();
-  const notes = notesByTrack[trackId] || [];
+  const { getNotesForTrack, createNote, moveNote, resizeNote, deleteNote, playPreview, stopPreview } = usePianoRoll();
+  const notes = getNotesForTrack(trackId);
 
   // State for drag and resize operations
   const [draggedNote, setDraggedNote] = useState<number | null>(null);
@@ -103,7 +103,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({ trackId }) => {
         row: actualRow,
         column,
         length: 1,
-        velocity: 100,
+        velocity: 0.8,
         trackId
       };
 
@@ -172,8 +172,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({ trackId }) => {
             : n
         );
         
-        // Update context
-        notesByTrack[trackId] = updatedNotes;
+        // MidiManager will handle the update when we call resizeNote
       } else {
         // Resize from left side (change column and length)
         const originalEnd = note.column + note.length - 1;
@@ -187,8 +186,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({ trackId }) => {
             : n
         );
         
-        // Update context
-        notesByTrack[trackId] = updatedNotes;
+        // MidiManager will handle the update when we call resizeNote
       }
     } else if (draggedNote !== null) {
       // Handle note dragging
@@ -209,8 +207,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({ trackId }) => {
         return note;
       });
       
-      // Update context
-      notesByTrack[trackId] = updatedNotes;
+      // MidiManager will handle the update when we call moveNote
 
       // Play the new note for auditory feedback if row changed
       const oldNote = notes.find(n => n.id === draggedNote);

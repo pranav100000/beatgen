@@ -1,6 +1,6 @@
 import { ProjectManager, Track } from './project';
 import { TransportController } from './transport';
-import { MidiManager } from '../midi/MidiManager';
+import { MidiManager } from '../midi/MidiManagerNew';
 import { InstrumentManager } from '../instruments/InstrumentManager';
 import AudioEngine from '../audio-engine/audioEngine';
 import { TrackState } from '../types/track';
@@ -166,6 +166,7 @@ export class Store implements StoreInterface {
           // Create persisted track directly in MidiManager
           await this.midiManager.createTrackWithPersistence(
             track.id, // Always use the track ID (whether new or existing)
+            track.instrumentId,
             name
           );
           

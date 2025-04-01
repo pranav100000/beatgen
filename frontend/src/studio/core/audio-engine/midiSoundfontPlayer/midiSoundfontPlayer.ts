@@ -529,15 +529,16 @@ export class MidiSoundfontPlayer {
       trackList.map(t => t.getChannel)
     );
     
-    for (let i = 1; i <= 16; i++) {
+    // MIDI channels are 0-15, not 1-16
+    for (let i = 0; i < 16; i++) {
       if (i !== 9 && !usedChannels.has(i)) {
         return i;
       }
     }
     
-    // If all channels are used, reuse channel 0 (or implement more sophisticated logic)
-    console.warn('All non-drum MIDI channels are in use, reusing channel 0');
-    return 0;
+    // If all channels are used, reuse channel 1 (since 0 may have special use)
+    console.warn('All non-drum MIDI channels are in use, reusing channel 1');
+    return 1;
   }
   
   /**

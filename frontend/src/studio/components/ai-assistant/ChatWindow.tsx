@@ -446,8 +446,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                   const notes = track.notes.map(note => ({
                     id: 10000, 
                     row: note.pitch,              // row is for pitch (MIDI note number)
-                    column: note.time * 4,        // Convert from beats to grid position (time * 4)
-                    length: note.duration * 4     // Convert from beats to grid units (duration * 4)
+                    column: Math.round(note.time * 4),        // Convert from beats to grid position (time * 4)
+                    length: Math.round(note.duration * 4),   // Convert from beats to grid units (duration * 4)
+                    velocity: note.velocity
                   }));
                   console.log('Converted notes with beat to grid adjustment:', notes);
                   await store.getMidiManager().updateTrack(newTrack.id, notes);

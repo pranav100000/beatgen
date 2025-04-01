@@ -42,8 +42,8 @@ const TrackPreview: React.FC<TrackPreviewProps> = ({
   const midiMeasureWidth = useGridStore(state => state.midiMeasureWidth);
 
   // Get notes for MIDI tracks from the piano roll context
-  const { notesByTrack } = usePianoRoll();
-  const trackNotes = notesByTrack[track.id] || [];
+  const { getNotesForTrack } = usePianoRoll();
+  const trackNotes = getNotesForTrack(track.id);
 
   // Calculate track width using dedicated calculator functions
   const trackWidth = React.useMemo(() => {

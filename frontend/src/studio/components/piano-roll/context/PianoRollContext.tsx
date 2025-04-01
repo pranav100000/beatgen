@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Note } from '../../../core/types/note';
 import { historyManager } from '../../../core/state/history/HistoryManager';
-import { NoteCreateAction, NoteMoveAction, NoteResizeAction } from '../../../core/state/history/actions/NoteActions';
+import { NoteCreateAction, NoteMoveAction, NoteResizeAction, NoteDeleteAction } from '../../../core/state/history/actions/NoteActions';
 import { useStudioStore } from '../../../stores/useStudioStore';
 
 // Define the types for the context
@@ -9,7 +9,7 @@ interface PianoRollContextType {
   // State
   activePianoRoll: string | null;
   openedPianoRolls: Record<string, boolean>;
-  notesByTrack: Record<string, Note[]>;
+  getNotesForTrack: (trackId: string) => Note[];
   
   // Actions
   openPianoRoll: (trackId: string) => void;
@@ -17,6 +17,7 @@ interface PianoRollContextType {
   createNote: (trackId: string, note: Note) => Promise<void>;
   moveNote: (trackId: string, noteId: number, oldPos: { x: number, y: number }, newPos: { x: number, y: number }) => Promise<void>;
   resizeNote: (trackId: string, noteId: number, oldLength: number, newLength: number, oldColumn?: number, newColumn?: number) => Promise<void>;
+  deleteNote: (trackId: string, noteId: number) => Promise<void>;
   playPreview: (midiNote: number) => void;
   stopPreview: (midiNote: number) => void;
 }
@@ -28,47 +29,57 @@ const PianoRollContext = createContext<PianoRollContextType | null>(null);
 export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activePianoRoll, setActivePianoRoll] = useState<string | null>(null);
   const [openedPianoRolls, setOpenedPianoRolls] = useState<Record<string, boolean>>({});
-  const [notesByTrack, setNotesByTrack] = useState<Record<string, Note[]>>({});
+  
+  // We'll use this to trigger re-renders when notes change
+  const [noteUpdateCounter, setNoteUpdateCounter] = useState<number>(0);
   
   // Get access to store
   const { store } = useStudioStore();
   
-  // Add listener for MIDI notes loaded event
-  React.useEffect(() => {
-    const handleMidiNotesLoaded = (event: Event) => {
-      const customEvent = event as CustomEvent<{trackId: string, notes: Note[]}>;
-      const { trackId, notes } = customEvent.detail;
+  // Subscribe to all MidiManager updates
+  useEffect(() => {
+    if (!store) return;
+    
+    const midiManager = store.getMidiManager();
+    if (!midiManager) return;
+    
+    console.log('PianoRollContext: Subscribing to all MidiManager updates');
+    
+    // Subscribe to all track updates to keep UI in sync
+    const unsubscribe = midiManager.subscribeToAllUpdates((trackId, notes) => {
+      console.log(`PianoRollContext: Received MidiManager update for track ${trackId} with ${notes.length} notes`);
       
-      console.log(`PianoRollContext: Received midi-notes-loaded event for track ${trackId} with ${notes.length} notes`);
+      // Simply increment counter to trigger re-renders
+      setNoteUpdateCounter(prev => prev + 1);
       
-      // Update the notes for this track
-      setNotesByTrack(prev => ({
-        ...prev,
-        [trackId]: notes
-      }));
-      
-      // Ensure the piano roll for this track is initialized
-      if (!openedPianoRolls[trackId]) {
+      // Ensure the piano roll for this track is initialized if it has notes
+      if (notes.length > 0 && !openedPianoRolls[trackId]) {
         setOpenedPianoRolls(prev => ({
           ...prev,
           [trackId]: true
         }));
       }
-    };
-    
-    // Add event listener
-    window.addEventListener('midi-notes-loaded', handleMidiNotesLoaded);
+    });
     
     // Clean up
     return () => {
-      window.removeEventListener('midi-notes-loaded', handleMidiNotesLoaded);
+      console.log('PianoRollContext: Unsubscribing from MidiManager');
+      unsubscribe();
     };
-  }, []); // Empty dependency array to prevent re-rendering loop
-  
-  // IMPORTANT: The above effect uses an empty dependency array despite referencing openedPianoRolls.
-  // This is intentional to prevent a circular dependency that causes excessive re-rendering during playback.
-  // The functional state updates (prev => ...) ensure we always work with current state values.
+  }, [store]); // Only depend on store to avoid re-subscription issues
 
+  // Helper function to get notes from MidiManager
+  const getNotesForTrack = (trackId: string): Note[] => {
+    if (!store) return [];
+    
+    const midiManager = store.getMidiManager();
+    if (!midiManager) return [];
+    
+    // Get notes directly from MidiManager
+    const notes = midiManager.getTrackNotes(trackId);
+    return notes || []; // Return empty array if null
+  };
+  
   // Open a specific track's piano roll
   const openPianoRoll = (trackId: string) => {
     console.log('Opening piano roll for track:', trackId);
@@ -76,17 +87,11 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setActivePianoRoll(trackId);
     setOpenedPianoRolls(prev => ({ ...prev, [trackId]: true }));
     
-    // Initialize notes array for this track if it doesn't exist
-    if (!notesByTrack[trackId]) {
-      console.log('Initializing notes array for track:', trackId);
-      setNotesByTrack(prev => ({ ...prev, [trackId]: [] }));
-    }
-    
     // Log the current state for debugging
     console.log('Piano roll state after opening:', {
       activePianoRoll: trackId,
       openedPianoRolls: { ...openedPianoRolls, [trackId]: true },
-      notesByTrack
+      tracksWithNotes: store?.getMidiManager()?.hasTrack(trackId) || false
     });
   };
 
@@ -102,24 +107,22 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const createNote = async (trackId: string, note: Note) => {
     if (!store) return;
     
-    // Get current notes for this track
-    const trackNotes = notesByTrack[trackId] || [];
+    const midiManager = store.getMidiManager();
+    if (!midiManager) return;
     
-    // Create a note with the trackId embedded
-    const noteWithTrackId = { ...note, trackId };
+    // // Ensure track exists in MidiManager
+    // if (!midiManager.hasTrack(trackId)) {
+    //   console.log(`Creating track ${trackId} in MidiManager`);
+    //   midiManager.createTrack(trackId, instrumentId);
+    // }
+
+    midiManager.addNoteToTrack(trackId, note);
     
-    // Create a history action
+    // Create note with MidiManager-centric action
     const action = new NoteCreateAction(
       store,
-      (newNotes: Note[]) => {
-        setNotesByTrack(prev => {
-          const updated = {...prev};
-          updated[trackId] = newNotes;
-          return updated;
-        });
-      },
-      noteWithTrackId,
-      trackNotes
+      note,
+      trackId
     );
     
     // Execute the action through history manager
@@ -130,23 +133,22 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const moveNote = async (trackId: string, noteId: number, oldPos: { x: number, y: number }, newPos: { x: number, y: number }) => {
     if (!store) return;
     
-    // Get current notes for this track
-    const trackNotes = notesByTrack[trackId] || [];
+    const midiManager = store.getMidiManager();
+    if (!midiManager) return;
     
-    // Create a history action
+    // Ensure track exists in MidiManager
+    if (!midiManager.hasTrack(trackId)) {
+      console.warn(`Cannot move note in non-existent track ${trackId}`);
+      return;
+    }
+    
+    // Create note move action that works directly with MidiManager
     const action = new NoteMoveAction(
       store,
-      (newNotes: Note[]) => {
-        setNotesByTrack(prev => {
-          const updated = {...prev};
-          updated[trackId] = newNotes;
-          return updated;
-        });
-      },
       noteId,
       oldPos,
       newPos,
-      trackNotes
+      trackId
     );
     
     // Execute the action through history manager
@@ -157,25 +159,53 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const resizeNote = async (trackId: string, noteId: number, oldLength: number, newLength: number, oldColumn?: number, newColumn?: number) => {
     if (!store) return;
     
-    // Get current notes for this track
-    const trackNotes = notesByTrack[trackId] || [];
+    const midiManager = store.getMidiManager();
+    if (!midiManager) return;
     
-    // Create a history action
+    // Ensure track exists in MidiManager
+    if (!midiManager.hasTrack(trackId)) {
+      console.warn(`Cannot resize note in non-existent track ${trackId}`);
+      return;
+    }
+    
+    // Create note resize action that works directly with MidiManager
     const action = new NoteResizeAction(
       store,
-      (newNotes: Note[]) => {
-        setNotesByTrack(prev => {
-          const updated = {...prev};
-          updated[trackId] = newNotes;
-          return updated;
-        });
-      },
       noteId,
       oldLength,
       newLength,
-      trackNotes,
+      trackId,
       oldColumn,
       newColumn
+    );
+    
+    // Execute the action through history manager
+    await historyManager.executeAction(action);
+  };
+  
+  // Delete a note with history tracking
+  const deleteNote = async (trackId: string, noteId: number) => {
+    if (!store) return;
+    
+    const midiManager = store.getMidiManager();
+    if (!midiManager) return;
+    
+    // Ensure track exists in MidiManager
+    if (!midiManager.hasTrack(trackId)) {
+      console.warn(`Cannot delete note in non-existent track ${trackId}`);
+      return;
+    }
+    
+    // Find the note for undo purposes
+    const trackNotes = midiManager.getTrackNotes(trackId);
+    const noteToDelete = trackNotes?.find(n => n.id === noteId);
+    
+    // Create note delete action that works directly with MidiManager
+    const action = new NoteDeleteAction(
+      store,
+      noteId,
+      trackId,
+      noteToDelete // Pass the note object for undo
     );
     
     // Execute the action through history manager
@@ -212,12 +242,13 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const contextValue: PianoRollContextType = {
     activePianoRoll,
     openedPianoRolls,
-    notesByTrack,
+    getNotesForTrack, // Provide function to get notes directly from MidiManager
     openPianoRoll,
     closePianoRoll,
     createNote,
     moveNote,
     resizeNote,
+    deleteNote,
     playPreview,
     stopPreview
   };

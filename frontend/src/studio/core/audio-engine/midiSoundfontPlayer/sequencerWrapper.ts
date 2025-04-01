@@ -347,6 +347,8 @@ export class SequencerWrapper {
   
   // Schedule events from current position
   private scheduleEvents(fromTick: number): void {
+
+    console.log("________noteEvents", this.noteEvents);
     // Always clear existing events before scheduling new ones
     // This ensures we don't have duplicate events
     this.sequencer.removeAllEvents();
@@ -681,7 +683,7 @@ export class SequencerWrapper {
           type: 'note',
           channel: this.channel,
           key: note.row, // MIDI note number
-          vel: note.velocity || 100, // Default to 100 if not specified
+          vel: (note.velocity <= 1) ? Math.round(note.velocity * 127) : note.velocity, // Default to 100 if not specified
           duration
         }
       });
@@ -725,7 +727,7 @@ export class SequencerWrapper {
           type: 'note',
           channel: channel,
           key: note.midi,
-          vel: Math.round(note.velocity * 127), // Convert 0-1 to 0-127
+          vel: (note.velocity <= 1) ? Math.round(note.velocity * 127) : note.velocity, // Convert 0-1 to 0-127
           duration: duration
         }
       });

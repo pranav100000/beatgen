@@ -11,8 +11,8 @@ interface PianoRollCanvasProps {
 
 const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => {
   // Get notes and actions from context
-  const { notesByTrack, createNote, moveNote, resizeNote, playPreview, stopPreview } = usePianoRoll();
-  const notes = notesByTrack[trackId] || [];
+  const { getNotesForTrack, createNote, moveNote, resizeNote, deleteNote, playPreview, stopPreview } = usePianoRoll();
+  const notes = getNotesForTrack(trackId);
 
   // State for drag and resize operations
   const [draggedNote, setDraggedNote] = useState<number | null>(null);
@@ -52,10 +52,14 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
   // Removed visibleNotes state - using memoizedVisibleNotes directly
   const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 });
   
-  // Initialize local notes from context
+  // Initialize local notes from context only on mount or when trackId changes
+  // This breaks the circular dependency by not updating when notes change
   useEffect(() => {
-    setLocalNotes(notes);
-  }, [notes]);
+    // Get notes from MidiManager via context
+    const trackNotes = getNotesForTrack(trackId);
+    setLocalNotes(trackNotes);
+    // Deliberately NOT including notes in the dependency array
+  }, [trackId, getNotesForTrack]);
   
   // Helper function to convert display row to actual row (MIDI note number)
   const displayRowToActualRow = (displayRow: number): number => {
@@ -114,14 +118,18 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
   
   // Calculate which notes are visible based on scroll position
   // Using useMemo directly to avoid the need for a separate state variable
+  // Importantly, we get notes directly from MidiManager for rendering
   const memoizedVisibleNotes = useMemo(() => {
     const visibleStartColumn = Math.floor(scrollPosition.x / cellWidth);
     const visibleEndColumn = visibleStartColumn + Math.ceil(dimensions.width / cellWidth);
     const visibleStartRow = Math.floor(scrollPosition.y / cellHeight);
     const visibleEndRow = visibleStartRow + Math.ceil(dimensions.height / cellHeight);
     
+    // Get notes directly from MidiManager (the source of truth) for rendering
+    const currentNotes = getNotesForTrack(trackId);
+    
     // Filter notes to only those visible in the viewport
-    return localNotes.filter(note => {
+    return currentNotes.filter(note => {
       const displayRow = actualRowToDisplayRow(note.row);
       return (
         note.column + note.length >= visibleStartColumn &&
@@ -130,7 +138,7 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
         displayRow <= visibleEndRow
       );
     });
-  }, [localNotes, scrollPosition, dimensions, cellWidth, cellHeight, actualRowToDisplayRow]);
+  }, [scrollPosition, dimensions, cellWidth, cellHeight, actualRowToDisplayRow, getNotesForTrack, trackId]);
   
   // No need for calculateVisibleNotes function or separate effect
   // This way we avoid the circular dependency that was causing the infinite loop
@@ -185,7 +193,7 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
         row: actualRow,
         column,
         length: 1,
-        velocity: 100,
+        velocity: 0.8,
         trackId
       };
       
