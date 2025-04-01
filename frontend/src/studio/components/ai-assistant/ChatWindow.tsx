@@ -139,12 +139,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
           actionData: result.actions?.[0]?.data
         }]);
         
-        // Process generated tracks and add them to the project
+        // We'll now process the tracks through the action system
+        // No need to call addGeneratedTracks directly as it will be
+        // handled through the handleAction function with the actions
         if (result.tracks && result.tracks.length > 0) {
           console.log('Generated tracks:', result.tracks);
-          
-          // Use the addGeneratedTracks function to add these tracks to the project
-          await addGeneratedTracks(result.tracks);
+          // Track data is still in the response, but we'll use actions to add them
         }
       } 
       else if (mode === 'Edit') {
@@ -417,8 +417,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             // Add the track using the handleAddTrack function
             console.log(`Adding track with storage key: ${storageKey}`);
             const pathParts = storageKey.split('/');
-            console.log(`Last element: ${pathParts[pathParts.length - 1]}`);
-            const instrumentId = pathParts[pathParts.length - 1].split('.')[0];
+            console.log(`Last element: ${pathParts[pathParts.length - 2]}`);
+            const instrumentId = pathParts[pathParts.length - 2].split('.')[0];
             const newTrack = await handleAddTrack('midi', instrumentId, trackName, storageKey);
             
             // Now we need to add the notes to the track
@@ -481,12 +481,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
       
       // Execute the composite action
       await historyManager.executeAction(compositeAction);
-      
-      // Update history UI state
-      useStudioStore.setState({
-        canUndo: historyManager.canUndo(),
-        canRedo: historyManager.canRedo()
-      });
       
       console.log(`Added ${validTracks.length} AI-generated tracks with history support`);
     } catch (error) {

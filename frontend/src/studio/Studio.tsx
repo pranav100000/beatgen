@@ -14,6 +14,7 @@ import PianoRollModule, { PianoRollWindows, usePianoRoll } from './components/pi
 
 // Import custom hooks
 import { useStudioDBSession } from './hooks/useStudioDBSession';
+import { useHistorySync } from './hooks/useHistorySync';
 
 import StudioControlBar from './components/control-bar/ControlBar';
 import { useGridStore } from './core/state/gridStore';
@@ -28,6 +29,9 @@ interface StudioProps {
 function Studio({ projectId }: StudioProps) {
   // Initialize DB session management
   useStudioDBSession();
+  
+  // Setup history state sync
+  useHistorySync();
   
   // Get state and actions from Zustand store
   const {

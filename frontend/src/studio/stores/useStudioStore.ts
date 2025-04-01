@@ -18,7 +18,6 @@ import {
   TrackAddAction,
   TrackDeleteAction
 } from '../core/state/history/actions/StudioActions';
-import { AssistantGenerateAction } from '../core/state/history/actions/AssistantActions';
 
 interface StudioState {
   // Audio Engine State
@@ -529,6 +528,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         });
         // Update audio engine
         store.getAudioEngine().setTrackVolume(id, vol);
+        store.getSoundfontController().setTrackVolume(id, vol);
       }
     );
     
@@ -617,6 +617,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         });
         // Update audio engine
         store.getAudioEngine().setTrackMute(id, newMuted);
+        store.getSoundfontController().muteTrack(id, newMuted);
         
         console.log(`History manager updated track ${id} mute to:`, newMuted);
       }
@@ -644,21 +645,33 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     
     // If any track is soloed, mute all other non-soloed tracks
     const hasSoloedTrack = updatedTracks.some(t => t.soloed);
-    
-    if (hasSoloedTrack) {
-      // For each track, it should be muted if it's not soloed
-      updatedTracks.forEach(track => {
-        const shouldBeMuted = !track.soloed;
-        if (track.muted !== shouldBeMuted) {
-          store.getAudioEngine().setTrackMute(track.id, shouldBeMuted);
-        }
-      });
+
+    if (soloed) {
+      for (const track of updatedTracks) {
+        get().handleTrackMuteToggle(track.id, !track.soloed);
+      }
     } else {
-      // If no track is soloed, restore all tracks to their individual mute states
-      updatedTracks.forEach(track => {
-        store.getAudioEngine().setTrackMute(track.id, track.muted);
-      });
+      for (const track of updatedTracks) {
+        get().handleTrackMuteToggle(track.id, track.soloed);
+      }
     }
+    
+    // if (hasSoloedTrack) {
+    //   // For each track, it should be muted if it's not soloed
+    //   updatedTracks.forEach(track => {
+    //     const shouldBeMuted = !track.soloed;
+    //     if (track.muted !== shouldBeMuted) {
+    //       store.getAudioEngine().setTrackMute(track.id, shouldBeMuted);
+    //       store.getSoundfontController().muteTrack(track.id, shouldBeMuted);
+    //     }
+    //   });
+    // } else {
+    //   // If no track is soloed, restore all tracks to their individual mute states
+    //   updatedTracks.forEach(track => {
+    //     store.getAudioEngine().setTrackMute(track.id, track.muted);
+    //     store.getSoundfontController().muteTrack(track.id, track.muted);
+    //   });
+    // }
   },
   
   handleTrackDelete: async (trackId) => {
@@ -1129,7 +1142,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       // Update UI after undo
       set({
         canUndo: historyManager.canUndo(),
-        canRedo: historyManager.canRedo()
+        canRedo: true
       });
     } else {
       console.log('⚠️ No actions to undo');
@@ -1144,7 +1157,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       
       // Update UI after redo
       set({
-        canUndo: historyManager.canUndo(),
+        canUndo: true,
         canRedo: historyManager.canRedo()
       });
     } else {

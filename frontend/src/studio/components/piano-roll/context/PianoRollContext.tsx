@@ -181,6 +181,13 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     
     // Execute the action through history manager
     await historyManager.executeAction(action);
+    
+    // Update the canUndo/canRedo states in the store
+    const studioStore = store.getStudioStore();
+    if (studioStore) {
+      studioStore.setCanUndo(historyManager.canUndo());
+      studioStore.setCanRedo(historyManager.canRedo());
+    }
   };
   
   // Delete a note with history tracking
@@ -210,6 +217,13 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     
     // Execute the action through history manager
     await historyManager.executeAction(action);
+    
+    // Update the canUndo/canRedo states in the store
+    const studioStore = store.getStudioStore();
+    if (studioStore) {
+      studioStore.setCanUndo(historyManager.canUndo());
+      studioStore.setCanRedo(historyManager.canRedo());
+    }
   };
 
   // Play a preview of a note
