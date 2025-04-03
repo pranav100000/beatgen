@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 
 interface WaveformDisplayProps {
@@ -6,26 +6,29 @@ interface WaveformDisplayProps {
   trackColor: string;
   duration: number;
   width: number;
+  startOffset : number;
 }
 
 export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({ 
   audioFile, 
   trackColor,
   duration,
-  width
+  width,
+  startOffset = 0 
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
+  const [startX, setStartX] = React.useState<number>(0); // Left trim ke liye offset
+  const handleTrimLeft = (trimPixels) => {
+    setStartX(prevX => prevX + trimPixels); // Increase start position
+  };
   useEffect(() => {
     if (!audioFile || !canvasRef.current) {
-      console.error("Missing audio file or canvas reference");
       return;
     }
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      console.error("Failed to get canvas context");
       return;
     }
     
@@ -78,7 +81,7 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
           const channelData = audioBuffer.getChannelData(0);
           
           // Draw the waveform
-          drawWaveform(channelData, canvas, ctx, trackColor);
+          drawWaveform(channelData, canvas, ctx, trackColor,startOffset, duration);
         })
         .catch(error => {
           console.error("Error decoding audio data:", error);
@@ -93,7 +96,7 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
     
     // Start reading the file
     reader.readAsArrayBuffer(audioFile);
-  }, [audioFile, trackColor, width]);
+  }, [audioFile, trackColor, width,startOffset,duration]);
   
   return (
     <Box sx={{ 
@@ -124,16 +127,20 @@ function drawWaveform(
   channelData: Float32Array, 
   canvas: HTMLCanvasElement, 
   ctx: CanvasRenderingContext2D, 
-  trackColor: string
+  trackColor: string,
+  startOffset: number,
+  duration: number,
 ) {
   const dpr = window.devicePixelRatio || 1;
   // Get logical dimensions (not the scaled canvas dimensions)
   const width = canvas.width / dpr;
   const height = canvas.height / dpr;
   const middle = height / 2;
+  // const startX = 50
   
   console.log('Drawing waveform with dimensions:', { width, height, middle, dpr })
-  
+  console.log("Draw Waveform Called", { startOffset, duration, width: canvas.width });
+
   // Clear canvas with a transparent background
   ctx.clearRect(0, 0, width, height);
   
@@ -143,23 +150,37 @@ function drawWaveform(
   
   // Calculate how many samples per pixel for optimal resolution
   const totalSamples = channelData.length;
-  const samplesPerPixel = Math.max(1, Math.floor(totalSamples / width));
+  // const samplesPerPixel = Math.max(1, Math.floor(totalSamples / width));
+  const startSampleIndex = Math.floor((startOffset / duration) * totalSamples);
+  const endSampleIndex = Math.floor(((startOffset + (width / dpr) * (duration / width)) / duration) * totalSamples);
+  const safeStart = Math.max(0, startSampleIndex);
+  const safeEnd = Math.min(totalSamples, endSampleIndex);
+
+  console.log("Samples range:", { safeStart, safeEnd });
+
+  const samplesPerPixel = Math.max(1, Math.floor((safeEnd - safeStart) / width));
   
   // Store the waveform points for drawing the outline
-  const topPoints: {x: number, y: number}[] = [];
-  const bottomPoints: {x: number, y: number}[] = [];
-  
+  // const topPoints: {x: number, y: number}[] = [];
+  // const bottomPoints: {x: number, y: number}[] = [];
+  const topPoints = [];
+  const bottomPoints = [];
   // Draw center line for reference
   ctx.fillStyle = 'rgba(255,255,255,0.2)';
   ctx.fillRect(0, middle, width, 1);
   
   // Change this line to use white with 75% opacity instead of the track color
   ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+  // const startSample = Math.floor((startOffset / duration) * totalSamples);
   
+
   // For each pixel column in the canvas
   for (let x = 0; x < width; x++) {
     // Find the starting sample index for this pixel
-    const startSample = Math.floor(x * totalSamples / width);
+    // const startSample = Math.floor(x * totalSamples / width);
+    // const startSample = Math.floor((x + startX) * totalSamples / width);
+    const startSample = safeStart + Math.floor((x / width) * (safeEnd - safeStart));
+
     
     // Find min and max in this sample range for better visualization
     let min = 0;
@@ -168,10 +189,15 @@ function drawWaveform(
     // Analyze all samples for this pixel location
     for (let i = 0; i < samplesPerPixel; i++) {
       const sampleIndex = startSample + i;
-      if (sampleIndex < totalSamples) {
+      // if (sampleIndex < totalSamples) {
+      //   const sample = channelData[sampleIndex];
+      //   if (sample < min) min = sample;
+      //   if (sample > max) max = sample;
+      // }
+      if (sampleIndex < safeEnd) {
         const sample = channelData[sampleIndex];
-        if (sample < min) min = sample;
-        if (sample > max) max = sample;
+        min = Math.min(min, sample);
+        max = Math.max(max, sample);
       }
     }
     

@@ -70,10 +70,10 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
     onChatToggle,
 }) => {
     return (
-        <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            p: 1, 
+        <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            p: 1,
             borderBottom: '1px solid #333',
             gap: 2,
             paddingLeft: 2,
@@ -82,18 +82,18 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
         }}>
             <Box sx={{ display: 'flex', gap: 1 }}>
                 <Tooltip title="Go back to Projects" arrow>
-                    <IconButton 
-                    size="small" 
-                    sx={{ color: 'white' }}
-                    onClick={() => {
-                        window.location.href = '/home';
-                    }}
+                    <IconButton
+                        size="small"
+                        sx={{ color: 'white' }}
+                        onClick={() => {
+                            window.location.href = '/home';
+                        }}
                     >
                         <ArrowBack />
                     </IconButton>
                 </Tooltip>
-                <IconButton 
-                    size="small" 
+                <IconButton
+                    size="small"
                     sx={{ color: canUndo ? 'white' : '#666' }}
                     onClick={onUndo}
                     disabled={!canUndo}
@@ -101,8 +101,8 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                 >
                     <UndoIcon />
                 </IconButton>
-                <IconButton 
-                    size="small" 
+                <IconButton
+                    size="small"
                     sx={{ color: canRedo ? 'white' : '#666' }}
                     onClick={onRedo}
                     disabled={!canRedo}
@@ -112,126 +112,135 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                 </IconButton>
             </Box>
 
-        <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            bgcolor: '#1E1E1E',
-            borderRadius: 1,
-            px: 2,
-            py: 0.5,
-            gap: 1
-        }}>
-            <BPMControl bpm={bpm} onBpmChange={onBpmChange} />
-        </Box>
-
-        <TimeSignatureDisplay 
-            topNumber={timeSignature[0]} 
-            bottomNumber={timeSignature[1]}
-            onTopNumberChange={(value) => onTimeSignatureChange(value, undefined)}
-            onBottomNumberChange={(value) => onTimeSignatureChange(undefined, value)}
-        />
-
-        <KeySelector 
-            selectedKey={keySignature}
-            onKeyChange={onKeySignatureChange}
-        />
-
-        <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton 
-            size="small" 
-            sx={{ color: 'white' }}
-            onClick={onPlayPause}
-            >
-            {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-            </IconButton>
-            <IconButton 
-            size="small" 
-            sx={{ color: 'white' }}
-            onClick={onStop}
-            >
-                <SkipPreviousIcon />
-            </IconButton>
-        </Box>
-
-        <Box sx={{
-            position: 'absolute',
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 1
-        }}>
-            <TextField
-                variant="standard"
-                value={projectTitle}
-                onChange={onTitleChange}
-                sx={{
-                    '& input': {
-                    color: 'white',
-                    textAlign: 'center',
-                    fontSize: '1rem',
-                    fontWeight: 500,
-                    padding: '4px 8px',
-                    '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.05)'
-                    }
-                    },
-                    '& .MuiInput-underline:before': {
-                        borderBottom: 'none'
-                    },
-                    '& .MuiInput-underline:hover:before': {
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
-                    },
-                    '& .MuiInput-underline:after': {
-                        borderBottom: '2px solid white'
-                    }
-                }}
-            />
-        </Box>
-
-        <Box sx={{ 
-            marginLeft: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-            pr: 2
-        }}>
-            <Box sx={{ 
+            <Box sx={{
                 display: 'flex',
                 alignItems: 'center',
+                bgcolor: '#1E1E1E',
+                borderRadius: 1,
+                px: 2,
+                py: 0.5,
                 gap: 1
             }}>
-                <IconButton size="small" sx={{ color: 'white' }} onClick={onZoomIn}>
-                    <ZoomInIcon />
+                <BPMControl bpm={bpm} onBpmChange={onBpmChange} />
+            </Box>
+
+            <TimeSignatureDisplay
+                topNumber={timeSignature[0]}
+                bottomNumber={timeSignature[1]}
+                onTopNumberChange={(value) => onTimeSignatureChange(value, undefined)}
+                onBottomNumberChange={(value) => onTimeSignatureChange(undefined, value)}
+            />
+
+            <KeySelector
+                selectedKey={keySignature}
+                onKeyChange={onKeySignatureChange}
+            />
+
+            <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton
+                    size="small"
+                    sx={{ color: 'white' }}
+                    onClick={onPlayPause}
+                >
+                    {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
                 </IconButton>
-                <Box sx={{ color: "white", fontWeight: "bold", backgroundColor: "#333", minWidth: 40, textAlign: "center", border: "1px solid rgba(255, 255, 255, 0.2)", padding: "4px 4px", borderRadius: "6px" }}>
-                    {zoomLevel.toFixed(1)}x
-                </Box>
-                <IconButton size="small" sx={{ color: 'white' }} onClick={onZoomOut}>
-                    <ZoomOutIcon />
+                <IconButton
+                    size="small"
+                    sx={{ color: 'white' }}
+                    onClick={onStop}
+                >
+                    <SkipPreviousIcon />
                 </IconButton>
-                <TimeDisplay 
-                    currentTime={currentTime}
+            </Box>
+
+            <Box sx={{
+                // position: 'absolute',
+                // left: '50%',
+                // top: '50%',
+                // transform: 'translate(-50%, -50%)',
+                zIndex: 1,
+                flex: "0 1 300px", // Prevents it from growing too much or shrinking too much
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                minWidth: "200px", // Ensures it doesn't disappear
+                maxWidth: "300px", // Keeps it centered without pushing other elements
+                whiteSpace: "nowrap", // Prevents text from breaking
+                overflow: "hidden", // Keeps things clean if text is too long
+
+            }}>
+                <TextField
+                    variant="standard"
+                    value={projectTitle}
+                    onChange={onTitleChange}
+                    sx={{
+                        '& input': {
+                            color: 'white',
+                            textAlign: 'center',
+                            fontSize: '1rem',
+                            fontWeight: 500,
+                            padding: '4px 8px',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        },
+                        '& .MuiInput-underline:before': {
+                            borderBottom: 'none'
+                        },
+                        '& .MuiInput-underline:hover:before': {
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+                        },
+                        '& .MuiInput-underline:after': {
+                            borderBottom: '2px solid white'
+                        }
+                    }}
+                />
+            </Box>
+
+            <Box sx={{
+                marginLeft: 'auto',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                pr: 2
+            }}>
+                <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                }}>
+                    <IconButton size="small" sx={{ color: 'white' }} onClick={onZoomIn}>
+                        <ZoomInIcon />
+                    </IconButton>
+                    <Box sx={{ color: "white", fontWeight: "bold", backgroundColor: "#333", minWidth: 40, textAlign: "center", border: "1px solid rgba(255, 255, 255, 0.2)", padding: "4px 4px", borderRadius: "6px" }}>
+                        {zoomLevel.toFixed(1)}x
+                    </Box>
+                    <IconButton size="small" sx={{ color: 'white' }} onClick={onZoomOut}>
+                        <ZoomOutIcon />
+                    </IconButton>
+                    <TimeDisplay
+                        currentTime={currentTime}
                     />
                     {/* Temporarily disabled SaveProjectButton due to auth context issues */}
-                    {<SaveProjectButton 
-                    projectTitle={projectTitle}
-                    bpm={bpm}
-                    timeSignature={timeSignature}
-                    tracks={tracks}
-                    projectId={existingProjectId || ""}
-                    keySignature={keySignature}
-                    onSaved={(project) => {
-                        console.log('Project saved:', project);
-                        // Update the URL with the project ID
-                        // if (!existingProjectId && project.id) {
-                        //   navigate(`/studio?projectId=${project.id}`, { replace: true });
-                        //   setExistingProjectId(project.id);
-                        // }
-                    }}
-                />}
-                    <IconButton 
-                        size="small" 
-                        sx={{ color: 'white' }} 
+                    {<SaveProjectButton
+                        projectTitle={projectTitle}
+                        bpm={bpm}
+                        timeSignature={timeSignature}
+                        tracks={tracks}
+                        projectId={existingProjectId || ""}
+                        keySignature={keySignature}
+                        onSaved={(project) => {
+                            console.log('Project saved:', project);
+                            // Update the URL with the project ID
+                            // if (!existingProjectId && project.id) {
+                            //   navigate(`/studio?projectId=${project.id}`, { replace: true });
+                            //   setExistingProjectId(project.id);
+                            // }
+                        }}
+                    />}
+                    <IconButton
+                        size="small"
+                        sx={{ color: 'white' }}
                         onClick={onChatToggle}
                     >
                         {isChatOpen ? <ChatBubbleRounded /> : <ChatBubbleOutlineRounded />}
