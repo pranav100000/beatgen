@@ -6,12 +6,15 @@ import os
 import json
 import asyncio
 import logging
+import traceback
 from typing import Dict, List, Any, Optional, Callable, Tuple
 from dotenv import load_dotenv
 from fastapi import Request
 import music21
 
-from services.music_gen_service.music_tool_prompts import get_select_instruments_prompt
+from services.music_gen_service.music_researcher import MusicResearcher
+from services.music_gen_service.music_utils import get_mode_intervals
+from services.music_gen_service.music_tool_prompts import get_create_melody_prompt, get_select_instruments_prompt
 from services.soundfont_service.soundfont_service import soundfont_service
 # Load environment variables from .env file
 load_dotenv()
@@ -26,21 +29,35 @@ logger = logging.getLogger(__name__)
 MUSIC_TOOLS = [
     {
         "name": "determine_musical_parameters",
-        "description": "Determines appropriate musical parameters (key, tempo) for a given music description.",
+        "description": "Uses an AI agent to determine appropriate musical parameters (key, tempo) for a given music description. The agent will also determine the mode of the key. Provide as much detail as possible in the description to help the agent make the best decision.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "description": {
                     "type": "string",
-                    "description": "Description of the music to be composed"
+                    "description": "Detailed description of the music to be composed"
                 }
             },
             "required": ["description"]
         }
     },
     {
-        "name": "create_melody",
-        "description": "Creates a melodic pattern for a specified instrument. YOU MUST specify note_names and note_durations.",
+        "name": "get_chord_progression",
+        "description": "Uses an AI agent to get a chord progression for a given music description.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "description": "Detailed description of the music to be composed"
+                }
+            },
+            "required": ["description"]
+        }
+    },
+    {
+        "name": "create_melody2",
+        "description": "Creates a melodic pattern based on description. Uses AI to generate interval-based melody that's appropriate for the key.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -50,35 +67,34 @@ MUSIC_TOOLS = [
                 },
                 "description": {
                     "type": "string",
-                    "description": "Description of the melody character (e.g., 'cheerful', 'melancholic')"
+                    "description": "Detailed description of the melody's character (e.g., 'uplifting and energetic', 'melancholic with moments of hope')"
+                },
+                "mood": {
+                    "type": "string",
+                    "description": "Emotional quality of the melody (e.g., 'joyful', 'melancholic', 'suspenseful', 'serene')"
+                },
+                "tempo_character": {
+                    "type": "string",
+                    "description": "Speed character (e.g., 'slow', 'moderate', 'fast')"
+                },
+                "rhythm_type": {
+                    "type": "string",
+                    "description": "Type of rhythm (e.g., 'simple 4/4', 'swing', 'waltz 3/4', 'march', 'syncopated')"
+                },
+                "musical_style": {
+                    "type": "string",
+                    "description": "Musical style or genre (e.g., 'classical', 'jazz', 'folk', 'pop')"
+                },
+                "melodic_character": {
+                    "type": "string",
+                    "description": "Character of the melody (e.g., 'flowing', 'staccato', 'legato', 'jumpy', 'smooth')"
                 },
                 "duration_beats": {
-                    "type": "integer", 
+                    "type": "integer",
                     "description": "Length of the melody in beats"
-                },
-                "note_names": {
-                    "type": "array",
-                    "description": "REQUIRED: Array of note names like ['G3', 'Bb3', 'D4', 'G4', 'F4', etc.]",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "note_durations": {
-                    "type": "array",
-                    "description": "REQUIRED: Array of note durations like ['quarter', 'eighth', 'half', etc.] or numeric values in beats",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "note_velocities": {
-                    "type": "array",
-                    "description": "Optional: Array of note velocities (1-127, with 64-100 being typical). Default is 80 if not provided.",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             },
-            "required": ["instrument_name", "description", "duration_beats", "note_names", "note_durations"]
+            "required": ["instrument_name", "description"]
         }
     },
     {
@@ -124,50 +140,50 @@ MUSIC_TOOLS = [
             "required": ["instrument_name", "description", "duration_beats", "chord_names", "chord_durations"]
         }
     },
-    {
-        "name": "create_drums",
-        "description": "Creates a drum pattern for percussion. YOU MUST specify drum_notes and drum_durations.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string",
-                    "description": "Description of the drum pattern (e.g., 'basic beat', 'complex rhythm')"
-                },
-                "duration_beats": {
-                    "type": "integer",
-                    "description": "Length of the drum pattern in beats"
-                },
-                "intensity": {
-                    "type": "string",
-                    "enum": ["light", "medium", "heavy"],
-                    "description": "Intensity level of the drum pattern"
-                },
-                "drum_names": {
-                    "type": "array",
-                    "description": "REQUIRED: Array of drum names like ['kick', 'snare', 'closed hi-hat', 'open hi-hat', etc.]",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "drum_durations": {
-                    "type": "array",
-                    "description": "REQUIRED: Array of note durations like ['quarter', 'eighth', 'half', etc.] or numeric values in beats",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "drum_velocities": {
-                    "type": "array",
-                    "description": "Optional: Array of note velocities (1-127, with 64-100 being typical). Default is 90 if not provided.",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            },
-            "required": ["description", "duration_beats", "drum_names", "drum_durations"]
-        }
-    },
+    # {
+    #     "name": "create_drums",
+    #     "description": "Creates a drum pattern for percussion. YOU MUST specify drum_notes and drum_durations.",
+    #     "input_schema": {
+    #         "type": "object",
+    #         "properties": {
+    #             "description": {
+    #                 "type": "string",
+    #                 "description": "Description of the drum pattern (e.g., 'basic beat', 'complex rhythm')"
+    #             },
+    #             "duration_beats": {
+    #                 "type": "integer",
+    #                 "description": "Length of the drum pattern in beats"
+    #             },
+    #             "intensity": {
+    #                 "type": "string",
+    #                 "enum": ["light", "medium", "heavy"],
+    #                 "description": "Intensity level of the drum pattern"
+    #             },
+    #             "drum_names": {
+    #                 "type": "array",
+    #                 "description": "REQUIRED: Array of drum names like ['kick', 'snare', 'closed hi-hat', 'open hi-hat', etc.]",
+    #                 "items": {
+    #                     "type": "string"
+    #                 }
+    #             },
+    #             "drum_durations": {
+    #                 "type": "array",
+    #                 "description": "REQUIRED: Array of note durations like ['quarter', 'eighth', 'half', etc.] or numeric values in beats",
+    #                 "items": {
+    #                     "type": "string"
+    #                 }
+    #             },
+    #             "drum_velocities": {
+    #                 "type": "array",
+    #                 "description": "Optional: Array of note velocities (1-127, with 64-100 being typical). Default is 90 if not provided.",
+    #                 "items": {
+    #                     "type": "integer"
+    #                 }
+    #             }
+    #         },
+    #         "required": ["description", "duration_beats", "drum_names", "drum_durations"]
+    #     }
+    # },
     {
         "name": "create_counter_melody",
         "description": "Creates a counter-melody that complements the main melody. YOU MUST specify note_names and note_durations.",
@@ -182,65 +198,65 @@ MUSIC_TOOLS = [
                     "type": "string",
                     "description": "Description of the counter-melody's character"
                 },
-                "duration_beats": {
-                    "type": "integer",
-                    "description": "Length of the counter-melody in beats"
-                },
-                "note_names": {
-                    "type": "array",
-                    "description": "REQUIRED: Array of note names like ['G3', 'Bb3', 'D4', 'G4', 'F4', etc.]",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "note_durations": {
-                    "type": "array",
-                    "description": "REQUIRED: Array of note durations like ['quarter', 'eighth', 'half', etc.] or numeric values in beats",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "note_velocities": {
-                    "type": "array",
-                    "description": "Optional: Array of note velocities (1-127, with 64-100 being typical). Default is 75 if not provided.",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
+                # "duration_beats": {
+                #     "type": "integer",
+                #     "description": "Length of the counter-melody in beats"
+                # },
+                # "note_names": {
+                #     "type": "array",
+                #     "description": "REQUIRED: Array of note names like ['G3', 'Bb3', 'D4', 'G4', 'F4', etc.]",
+                #     "items": {
+                #         "type": "string"
+                #     }
+                # },
+                # "note_durations": {
+                #     "type": "array",
+                #     "description": "REQUIRED: Array of note durations like ['quarter', 'eighth', 'half', etc.] or numeric values in beats",
+                #     "items": {
+                #         "type": "string"
+                #     }
+                # },
+                # "note_velocities": {
+                #     "type": "array",
+                #     "description": "Optional: Array of note velocities (1-127, with 64-100 being typical). Default is 75 if not provided.",
+                #     "items": {
+                #         "type": "integer"
+                #     }
+                # }
             },
-            "required": ["instrument_name", "description", "duration_beats", "note_names", "note_durations"]
+            "required": ["instrument_name", "description"]
         }
     },
-    {
-        "name": "combine_parts",
-        "description": "Combines all musical parts into a complete composition.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Title for the composition"
-                },
-                "melody": {
-                    "type": "object",
-                    "description": "The melody part created with create_melody"
-                },
-                "chords": {
-                    "type": "object",
-                    "description": "The chord part created with create_chords"
-                },
-                "drums": {
-                    "type": "object",
-                    "description": "The drum part created with create_drums"
-                },
-                "counter_melody": {
-                    "type": "object",
-                    "description": "The counter-melody part created with create_counter_melody"
-                }
-            },
-            "required": ["title", "melody"]
-        }
-    }
+    # {
+    #     "name": "combine_parts",
+    #     "description": "Combines all musical parts into a complete composition.",
+    #     "input_schema": {
+    #         "type": "object",
+    #         "properties": {
+    #             "title": {
+    #                 "type": "string",
+    #                 "description": "Title for the composition"
+    #             },
+    #             "melody": {
+    #                 "type": "object",
+    #                 "description": "The melody part created with create_melody"
+    #             },
+    #             "chords": {
+    #                 "type": "object",
+    #                 "description": "The chord part created with create_chords"
+    #             },
+    #             "drums": {
+    #                 "type": "object",
+    #                 "description": "The drum part created with create_drums"
+    #             },
+    #             "counter_melody": {
+    #                 "type": "object",
+    #                 "description": "The counter-melody part created with create_counter_melody"
+    #             }
+    #         },
+    #         "required": ["title", "melody"]
+    #     }
+    # }
 ]
 
 class MusicToolsService:
@@ -283,7 +299,7 @@ class MusicToolsService:
         "minor": {"minor": [0, 2, 4], "major": [0, 2, 4]}   # i, iv, V for minor key
     }
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-sonnet-20240229"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-7-sonnet-latest"):
         """
         Initialize the music tools service.
         
@@ -296,19 +312,26 @@ class MusicToolsService:
             logger.warning("No API key provided for LLM service. Set ANTHROPIC_API_KEY in environment.")
         
         self.model = model
+        self.budget_model = "claude-3-5-sonnet-latest"
         self.client = Anthropic(api_key=self.api_key) if self.api_key else None
+        self.researcher = MusicResearcher()
         
         # Fixed values for key musical parameters
-        self.default_key = "C major"
+        self.default_key = "Eb minor"
         self.default_tempo = 120
         self.default_time_signature = [4, 4]
+        self.available_notes = []
         
         self.selected_instruments = {}
+        self.allowed_intervals = []
+        self.chord_progression = ""
         
         # Define tool handlers
         self.tool_handlers = {
             "determine_musical_parameters": self._handle_determine_musical_parameters,
-            "create_melody": self._handle_create_melody,
+            "get_chord_progression": self._handle_get_musical_params,
+            #"create_melody": self._handle_create_melody,
+            "create_melody2": self._handle_create_melody2,
             "create_chords": self._handle_create_chords,
             "create_drums": self._handle_create_drums,
             "create_counter_melody": self._handle_create_counter_melody,
@@ -394,8 +417,8 @@ class MusicToolsService:
         # System prompt focused on using the specialized tools
         initial_parameters_message = ""
         if let_claude_determine:
-            initial_parameters_message = """IMPORTANT: Before creating any musical parts, FIRST use the determine_musical_parameters tool 
-to select the most appropriate key and tempo based on the music description.
+            initial_parameters_message = """IMPORTANT: Before creating any musical parts, FIRST use the determine_musical_parameters, tool 
+to select the most appropriate key and tempo based on the music description. Next, use the get_chord_progression tool to get a chord progression for the key and tempo.
 For example, a sad piece might be in a minor key at a slower tempo, while an energetic dance track
 would use a higher tempo."""
         else:
@@ -412,11 +435,11 @@ These are the soundfonts available to you:
 {', '.join(soundfont_names)}
 
 CRITICAL STEPS TO FOLLOW:
-1. FIRST, you MUST use the select_instruments tool to choose your instruments. The tool requires a PROPERLY FORMATTED ARRAY of complete soundfont names (not single letters or characters).
-   CORRECT EXAMPLE: {correct_example}
-   INCORRECT EXAMPLE: {incorrect_example} (don't split names into characters)
-2. For each musical part you create, use ONLY complete soundfont names that you selected with the select_instruments tool
-3. Ensure all data is properly formatted
+1. FIRST, you MUST use the determine_musical_parameters tool to determine the key and tempo based on the music description.
+2. NEXT, you MUST use the get_chord_progression tool to get a chord progression for the key and tempo.
+3. THEN, you MUST use the select_instruments tool to choose your instruments. The tool requires a PROPERLY FORMATTED ARRAY of complete soundfont names (not single letters or characters).
+4. For each musical part you create, use ONLY complete soundfont names that you selected with the select_instruments tool
+5. Ensure all data is properly formatted
 
 Follow this workflow for creating a complete composition:
 1. Use the select_instruments tool with a properly formatted array of complete soundfont names that you chose from the list above
@@ -460,22 +483,25 @@ Remember to follow these steps:
                 iterations += 1
                 logger.debug(f"Composition iteration {iterations}")
                 
-                # Log the request to Claude for debugging
-                logger.info("========== SENDING TO CLAUDE ==========")
-                logger.info(f"System Prompt: {system_prompt}")
-                logger.info(f"Messages: {json.dumps(messages, indent=2)}")
-                logger.info(f"Tools: {json.dumps(MUSIC_TOOLS, indent=2)}")
-                logger.info("======================================")
+                # # Log the request to Claude for debugging
+                # logger.info("========== SENDING TO CLAUDE ==========")
+                # logger.info(f"System Prompt: {system_prompt}")
+                # logger.info(f"Messages: {json.dumps(messages, indent=2)}")
+                # logger.info(f"Tools: {json.dumps(MUSIC_TOOLS, indent=2)}")
+                # logger.info("======================================")
                 
                 # Make API call
                 response = self.client.messages.create(
                     model=self.model,
-                    max_tokens=4096, 
-                    temperature=0.7,
+                    max_tokens=20000, 
+                    temperature=1,
                     system=system_prompt,
                     messages=messages,
                     tools=MUSIC_TOOLS + [get_select_instruments_prompt(soundfont_names)],
-                    tool_choice={"type": "any"}  # Force Claude to always use a tool
+                    thinking={
+                        "type": "enabled",
+                        "budget_tokens": 16000
+                    },
                 )
                 
                 # Simple log of Claude's complete response for debugging
@@ -604,7 +630,7 @@ Use the specialized music tools to create a complete composition:
 
 IMPORTANT: Create melodies, chords, and drum patterns that truly match the musical style described, using ONLY the notes and chords appropriate for the key {use_key}."""
                                     
-                                elif tool_name == "create_melody":
+                                elif tool_name == "create_melody2":
                                     melody_part = result
                                 elif tool_name == "create_chords":
                                     chords_part = result 
@@ -717,6 +743,7 @@ IMPORTANT: Create melodies, chords, and drum patterns that truly match the music
                 
         except Exception as e:
             logger.error(f"Error in music composition: {str(e)}")
+            logger.error(f"Stack trace: {traceback.format_exc()}")
             error_description = {
                 "title": f"Error generating music from: {description[:30]}",
                 "tempo": use_tempo,
@@ -1087,6 +1114,7 @@ IMPORTANT: Create melodies, chords, and drum patterns that truly match the music
         Returns:
             Tuple of (is_valid, problem_notes)
         """
+        return True, []
         # Get key information
         key_info = self._get_key_info(key)
         key_root = key_info["root"] % 12  # Normalize to 0-11 range
@@ -1122,6 +1150,8 @@ IMPORTANT: Create melodies, chords, and drum patterns that truly match the music
         Returns:
             MIDI pitch value (0-127)
         """
+        
+        note_name = note_name.replace("-", "b")
         # Define base values for C in each octave
         c_values = {-1: 0, 0: 12, 1: 24, 2: 36, 3: 48, 4: 60, 5: 72, 6: 84, 7: 96, 8: 108, 9: 120}
         
@@ -1167,6 +1197,101 @@ IMPORTANT: Create melodies, chords, and drum patterns that truly match the music
             raise ValueError(f"Pitch out of MIDI range (0-127): {pitch}")
             
         return pitch
+    
+    def _transform_bars_to_instrument_format(self, data: Dict[str, Any], instrument_name: str, description: str, duration_beats: int) -> Dict[str, Any]:
+        """
+        Transform the structured bars data from Claude into the expected instrument format.
+        
+        Args:
+            data: Dictionary with bars data from Claude
+            instrument_name: Name of the instrument
+            description: Description of the melody
+            duration_beats: Total duration in beats
+            
+        Returns:
+            Formatted data in the expected output structure
+        """
+        # Extract bars data
+        starting_octave = data.get("starting_octave", 4)
+        bars = data.get("bars", [])
+        
+        # Prepare MIDI notes array
+        midi_notes = []
+        current_time = 0.0
+        
+        # Process each bar and its notes
+        for bar in bars:
+            bar_notes = bar.get("notes", [])
+            
+            for note in bar_notes:
+                # Parse interval and convert to number
+                interval_str = note.get("interval", "0")
+                if isinstance(interval_str, str):
+                    if interval_str.startswith("+"):
+                        interval = int(interval_str[1:])
+                    elif interval_str.startswith("-"):
+                        interval = -int(interval_str[1:])
+                    elif interval_str.startswith("R"):
+                        interval = 0
+                    else:
+                        interval = int(interval_str)
+                else:
+                    interval = int(interval_str)
+                
+                # Get duration and velocity
+                duration_str = note.get("duration")
+                velocity = note.get("velocity")
+                
+                # Convert duration string to beats
+                try:
+                    duration_beats = self._convert_duration_to_beats(duration_str)
+                except ValueError:
+                    logger.warning(f"Invalid duration: {duration_str}, defaulting to quarter note")
+                    duration_beats = 1.0  # Default to quarter note
+                
+                # Create MIDI note
+                midi_note = {
+                    "pitch": 60,  # Placeholder - pitch will be set properly when mapped to scale
+                    "start": current_time,
+                    "duration": duration_beats,
+                    "velocity": velocity
+                }
+                
+                # Add to notes array
+                midi_notes.append(midi_note)
+                
+                # Update current time
+                current_time += duration_beats
+        
+        # Create the instrument structure
+        instrument = {
+            "name": instrument_name,
+            "soundfont_name": instrument_name,
+            "channel": 0,
+            "patterns": [
+                {
+                    "type": "melody",
+                    "notes": midi_notes
+                }
+            ]
+        }
+        
+        # Create the full result structure
+        storage_key = "default_key"
+        if instrument_name in self.selected_instruments:
+            storage_key = self.selected_instruments[instrument_name].get("storage_key", "default_key")
+        
+        result = {
+            "part_type": "melody",
+            "instrument_name": instrument_name,
+            "description": description,
+            "duration_beats": duration_beats,
+            "instrument": instrument,
+            "storage_key": storage_key,
+            "original_data": data  # Include the original data for reference
+        }
+        
+        return result
     
     def _convert_duration_to_beats(self, duration_str, time_signature: List[int] = [4, 4]) -> float:
         """
@@ -1240,8 +1365,268 @@ IMPORTANT: Create melodies, chords, and drum patterns that truly match the music
         
         return duration
     
+    async def _handle_get_musical_params(self, args: Dict[str, Any], tempo: int, key: str) -> Dict[str, Any]:
+        """
+        Handle get_chord_progression tool - Get a chord progression for a given key.
+        """
+        system_prompt = f"""You are a music composer who has specific expertise in chord progressions. You are given a description of a musical style and extensive research about what chord progressions are used in that style. You need to provide a chord progression for that style based on the description and the research.
+
+        Format your response as a JSON object with the following keys:
+        - "chord_progression": The chord progression that best fits the description based on the research.
+        - "key": The key of the chord progression
+
+        - "explanation": A short explanation of why you picked these chords
+        """
+        description = args.get("description", "")
+        research_result = await self.researcher.research_chord_progression(description)
+        logger.info(f"Chord progression research result: {research_result}")
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=20000,
+            temperature=1,
+            system=system_prompt,
+            messages=[{
+                "role": "user",
+                "content": f"Select a chord progression for the following description: {description} based on this research: {research_result}"
+            }],
+            stream=True
+        )
+        for content_chunk in response:
+            if hasattr(content_chunk, "delta") and hasattr(content_chunk.delta, "text"):
+                chunk_text = content_chunk.delta.text
+                print(chunk_text)
+                if chunk_text:
+                    content_text += chunk_text
+                    logger.info(f"Received {len(content_text)} characters so far...")
+                    
+
+        response_json = json.loads(content_text)
+        self.key = response_json.get("key")
+        self.chord_progression = response_json.get("chord_progression")
+        
+        return response_json
+    
+    async def _handle_create_melody2(self, args: Dict[str, Any], tempo: int, key: str) -> Dict[str, Any]:
+        """
+        Handle create_melody2 tool - Melody generation using interval-based approach.
+        Uses Claude to generate intervals and durations based on the provided description.
+        
+        Args:
+            args: Dictionary with instrument and description
+            tempo: Current tempo in BPM
+            key: Current musical key
+            
+        Returns:
+            Dictionary with melody part information
+        """
+        instrument_name = args.get("instrument_name", "")
+        description = args.get("description", "")
+        duration_beats = args.get("duration_beats", 16)
+        duration_bars = args.get("duration_bars", 4)
+        
+        # Get additional musical characteristics
+        mood = args.get("mood", "")
+        tempo_character = args.get("tempo_character", "")
+        rhythm_type = args.get("rhythm_type", "")
+        musical_style = args.get("musical_style", "")
+        melodic_character = args.get("melodic_character", "")
+        
+        self.allowed_intervals = get_mode_intervals("minor")
+        allowed_intervals_string = ", ".join(str(interval) for interval in self.allowed_intervals)
+        
+        # Build a comprehensive musical description
+        detailed_description = description
+        if mood:
+            detailed_description += f", with a {mood} mood"
+        if tempo_character:
+            detailed_description += f", at a {tempo_character} pace"
+        if rhythm_type:
+            detailed_description += f", using a {rhythm_type} rhythm"
+        if musical_style:
+            detailed_description += f", in a {musical_style} style"
+        if melodic_character:
+            detailed_description += f", with a {melodic_character} melodic character"
+        
+        # Log the input for debugging
+        logger.info(f"Creating melody2 for {instrument_name}: {detailed_description[:50]}...")
+        
+        if not self.client:
+            logger.error("Cannot generate melody: No Anthropic API key available")
+            raise ValueError("No Anthropic API key available")
+        
+        try:
+            # Generate intervals and durations based on the description
+            system_prompt = f"""You are a music composer creating a melodic pattern based on a text description.
+The melody you create needs to be {duration_bars} bars long and needs to be in the key of {key} at {tempo} BPM.
+
+Your task is to create a melody using INTERVALS (semitones) from the LAST NOTE (not the root note) rather than absolute pitches. Try to make the melody as catchy as possible by following repeated rhythmic patterns. This melody will be played in a loop, so it should sound good when played repeatedly. It is crucial to follow a structured rhythmic pattern for this reason. Try to follow a similar rhythmic pattern in each bar or pair of bars.
+You will structure your output into {duration_bars} bars, each with their own musical intention.
+
+Musical Considerations:
+- Mood: {mood if mood else "Not specified"}
+- Tempo character: {tempo_character if tempo_character else "Not specified"}
+- Rhythm type: {rhythm_type if rhythm_type else "Not specified"}
+- Musical style: {musical_style if musical_style else "Not specified"}
+- Melodic character: {melodic_character if melodic_character else "Not specified"}
+- Chord progression: {self.chord_progression if self.chord_progression else "Not specified"}
+IMPORTANT:
+- DO NOT try to add contrast to the mood, tempo, rhythm, or melodic character. Just follow the description. Create a melody that follows the description as closely as possible.
+
+Here are some tips to help create a catchy melody:
+- Simplicity - Catchy melodies are usually simple enough to remember but not so simple that they're boring. They often use step-wise motion (moving to adjacent notes) with occasional leaps for interest.
+- Repetition - Effective melodies contain repeated motifs or phrases that help listeners anticipate and remember the tune.
+- Distinctive rhythm - A memorable rhythm pattern can make even a simple melodic line stand out.
+- "Hook" element - Most catchy melodies contain a distinctive musical phrase or "hook" that captures attention and stays in memory.
+- Balance between predictability and surprise - Great melodies follow expected patterns but include unexpected elements like unusual intervals or rhythmic variations that create interest.
+- Emotional resonance - Melodies that evoke strong emotions tend to be more memorable.
+- Singability - If a melody falls within a comfortable vocal range and is easy to sing, people are more likely to remember it.
+- Strategic use of tension and resolution - Building tension through dissonance and then resolving it creates satisfaction for listeners.
+- Effective use of contour - The shape of a melody as it rises and falls can create a sense of movement that pulls listeners along.
+- Alignment with natural speech patterns - Melodies that follow natural speech inflections often feel more intuitive and memorable.
+- DO NOT create a melody with a rhythm that is not repetitive at all. It should have a strong rhythmic pattern.
+- DO NOT create a melody that is meant to be played once. The melody should be designed to be played in a loop. Therefore for the end of the melody, focus on repeatability and cohesiveness with the start of the melody rather than finality or resolution.
+
+INTERVAL GUIDE - Emotional characteristics and usage:
+
+ASCENDING INTERVALS:
+- Unison (0): Stability, reinforcement, emphasis
+- +1 (Minor Second): Tension, dissonance, chromatic movement, anxiety
+- +2 (Major Second): Gentle forward motion, common stepwise movement
+- +3 (Minor Third): Melancholy, sadness, introspection, bluesy feel
+- +4 (Major Third): Brightness, happiness, uplift, triumphant feel
+- +5 (Perfect Fourth): Strong, open sounds, ancient/modal feel
+- +6 (Tritone): Maximum tension, dramatic effect, instability
+- +7 (Perfect Fifth): Strong consonance, stability, power
+- +8 (Minor Sixth): Bittersweet, nostalgic, emotional depth
+- +9 (Major Sixth): Warmth, openness, optimism
+- +10 (Minor Seventh): Bluesy, soulful, jazzy, creates expectation
+- +11 (Major Seventh): Sophisticated, complex, dreamy, contemplative
+- +12 (Octave): Stability, finality, dramatic range expansion
+
+DESCENDING INTERVALS:
+- -1 (Minor Second): Tension resolution, grief, sighing effect
+- -2 (Major Second): Relaxation, conclusion, natural descent
+- -3 (Minor Third): Melancholy, wistfulness, yielding
+- -4 (Major Third): Brightness with conclusion, completeness
+- -5 (Perfect Fourth): Strong cadential movement, grounding
+- -6 (Tritone): Dramatic, unsettling, mysterious
+- -7 (Perfect Fifth): Strong harmonic movement, conclusive
+- -8 (Minor Sixth): Emotional, expressive, longing
+- -9 (Major Sixth): Lyrical, expansive, nobility
+- -10 (Minor Seventh): Bluesy, contemplative, emotional depth
+- -11 (Major Seventh): Unusual, dramatic, complex
+- -12 (Octave): Conclusion, finality, powerful grounding
+
+IMPORTANT:
+- Use only intervals that are appropriate for {key}
+- Keep the total duration at {duration_beats} beats
+- Choose intervals that evoke the requested mood and character
+- Mix smaller intervals (for smooth motion) with larger intervals (for drama)
+- Track the CUMULATIVE SUM of your intervals to ensure the melody stays within a singable range
+- Track the CUMULATIVE SUM of your intervals to ensure it is almost always within these values: {allowed_intervals_string}. If the cumulative sum is not in this range, at any point, that means the note that caused that cumulative sum is out of key. An out of key note is only allowed if it is a passing tone.
+- Don't let the cumulative sum go below -7 or above +7 (relative to starting position)
+- Plan your intervals to create a natural melodic arc with a climax and resolution
+- DO NOT create a melody with a rhythm that is not repetitive at all. It should have a strong rhythmic pattern.
+
+Respond ONLY with a JSON object containing:
+- "starting_octave": The octave to start on (3-5)
+- "bars": Array of dicts with keys "bar_number", "notes"
+    - "bar_number": The bar number associated with this bar of the melody (1-{duration_bars})
+    - "musical_intention": The musical intention for this bar of the melody
+    - "notes": Array of dicts with keys "interval", "duration", "velocity"
+        - "intervals": Array of semitones FROM THE PREVIOUS NOTE (or root note if it's the first note) (e.g., [0, +1, -2, +3]) OR "R" for a rest in STRING FORMAT, where:
+        * "R" means a rest
+        * "0" means stay on same note
+        * "+1" means move up one semitone from the previous note
+        * "-1" means move down one semitone from the previous note
+        * Values like "+2", "+3", "-2", "-3" represent larger jumps from the previous note
+        * IMPORTANT: These are RELATIVE semitone intervals from note to note, not scale degrees
+        - "duration": Array of note durations as strings (e.g., ["sixteenth, "eighth", "quarter", "triplet", "half"])
+        * IMPORTANT: If you use a triplet, make sure the next two notes are also triplets
+        - "velocity": Note velocity or volume (1-127).
+        - "explanation": A short explanation of why you picked these values for this interval
+        - "cumulative_sum": The cumulative sum of the intervals (should be between -7 and +7)
+        - "cumulative_duration": The cumulative duration of the notes' durations. (e.g. cumulative_duration of sixteenth, eighth, eighth is 1/16 + 1/8 + 1/8 = 1/4)
+        - "is_in_key": Whether the cumulative sum is in these cumulative intervals: {allowed_intervals_string}. THIS SHOULD ONLY BE FALSE IF IT IS A PASSING TONE/NOTE.
+"""
+            print("system_prompt", system_prompt)
+            # Make API call to generate the intervals
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=20000,
+                temperature=1,
+                system=system_prompt,
+                messages=[{
+                    "role": "user",
+                    "content": f"Create a melody that is {detailed_description} for {instrument_name} in the key of {key} at {tempo} BPM."
+                }],
+                # Use streaming instead of thinking
+                stream=True
+            )
+            
+            # Handle streaming response
+            content_text = ""
+            logger.info("Processing streaming response...")
+            try:
+                for content_chunk in response:
+                    # Extract text from chunk
+                    if hasattr(content_chunk, "delta") and hasattr(content_chunk.delta, "text"):
+                        chunk_text = content_chunk.delta.text
+                        if chunk_text:
+                            content_text += chunk_text
+                            # Log progress occasionally
+                            #print(chunk_text)
+                            if len(content_text) % 500 == 0:
+                                logger.info(f"Received {len(content_text)} characters so far...")
+                
+                logger.info(f"Streaming complete, received {len(content_text)} characters total")
+            except Exception as e:
+                logger.error(f"Error processing streaming response: {str(e)}")
+                raise ValueError(f"Failed to process streaming response: {str(e)}")
+            
+            # Log the raw response (for debugging)
+            logger.info(f"Received content of length {len(content_text)}")
+            if not content_text:
+                raise ValueError("Received empty content from Claude API")
+            
+            # Extract JSON from the response - look for code blocks first
+            import re
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', content_text, re.DOTALL)
+            
+            if json_match:
+                # Found JSON in code blocks
+                json_content = json_match.group(1)
+                logger.info(f"Extracted JSON from code blocks, length: {len(json_content)}")
+                try:
+                    melody_data = json.loads(json_content)
+                    logger.info(f"Successfully parsed JSON from code block: {json.dumps(melody_data)[:200]}...")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse JSON from code block: {str(e)}")
+                    raise ValueError(f"Failed to parse Claude's response from code block: {str(e)}")
+            else:
+                # Try to parse the raw text as JSON
+                try:
+                    melody_data = json.loads(content_text)
+                    logger.info(f"Generated melody data: {json.dumps(melody_data)[:200]}...")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse Claude's response as JSON: {content_text[:200]}")
+                    raise ValueError("Failed to parse Claude's response")
+            
+            
+            # Create the melody using the generated notes
+            # Transform the notes into instrument format
+            result = self._transform_bars_to_instrument_format(melody_data, instrument_name, description, duration_beats)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in melody generation: {str(e)}")
+            logger.error(f"Stack trace: {traceback.format_exc()}")
+            raise ValueError(f"Failed to generate melody: {str(e)}")
+        
     # Tool handlers
     async def _handle_create_melody(self, args: Dict[str, Any], tempo: int, key: str) -> Dict[str, Any]:
+        return;
         """Handle create_melody tool."""
         instrument_name = args.get("instrument_name", "Piano")
         description = args.get("description", "")
@@ -1418,7 +1803,7 @@ IMPORTANT: Create melodies, chords, and drum patterns that truly match the music
         
     async def _handle_create_chords(self, args: Dict[str, Any], tempo: int, key: str) -> Dict[str, Any]:
         """Handle create_chords tool."""
-        instrument_name = args.get("instrument_name", "Piano")
+        instrument_name = args.get("instrument_name", "")
         description = args.get("description", "")
         duration_beats = args.get("duration_beats", 16)
         
@@ -1666,7 +2051,8 @@ IMPORTANT: Create melodies, chords, and drum patterns that truly match the music
             "instrument_name": instrument_name,
             "description": description,
             "duration_beats": duration_beats,
-            "instrument": instrument
+            "instrument": instrument,
+            "storage_key": self.selected_instruments[instrument_name]["storage_key"]
         }
     
     async def _handle_combine_parts(self, args: Dict[str, Any], tempo: int, key: str) -> Dict[str, Any]:
@@ -1721,7 +2107,8 @@ IMPORTANT: Create melodies, chords, and drum patterns that truly match the music
             system_prompt = """You are a music theory expert. 
 Your task is to determine the most appropriate musical key and tempo (BPM) for a piece of music based on its description.
 Respond in JSON format with the following fields:
-- key: The musical key that would work best (e.g., "C major", "F# minor", etc.)
+- key: The musical key that would work best (e.g., "C", "F#", etc.)
+- mode: The mode of the key. Must be one of these options: ["natural major", "natural minor", "melodic major", "melodic minor", "harmonic major", "harmonic minor"]
 - tempo: The tempo in BPM as an integer between 60 and 200
 - explanation: A brief explanation of your choices
 
@@ -1734,20 +2121,30 @@ Consider the following when determining parameters:
             
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=1000,
-                temperature=0.3,
+                max_tokens=20000,
+                temperature=1,
                 system=system_prompt,
                 messages=[{
                     "role": "user",
                     "content": f"Determine appropriate musical parameters for the following description: {description}"
-                }]
+                }],
+                thinking={
+                    "type": "enabled",
+                    "budget_tokens": 16000
+                },
             )
             
             # Require a valid response and parse it strictly without fallbacks
             if not response.content:
                 raise ValueError("No content received from Claude API")
             
-            content = response.content[0].text
+            content = ""
+            
+            for block in response.content:
+                if block.type == "text":
+                    content = block.text
+                elif block.type == "thinking":
+                    logger.info(f"Thinking: {block.thinking}")
             
             # Try to parse as JSON - throw error on failure
             # Find JSON content (sometimes Claude wraps it in ```json ... ```)
@@ -1769,9 +2166,12 @@ Consider the following when determining parameters:
             if "tempo" not in result:
                 raise ValueError("Claude didn't provide a tempo")
             
+            if "mode" not in result:
+                raise ValueError("Claude didn't provide a mode")
+            
             # Extract and validate key
             determined_key = result["key"]
-            if determined_key not in self.KEY_MAP:
+            if determined_key not in [chr(i) for i in range(ord('A'), ord('G') + 1)]:
                 raise ValueError(f"Claude provided an invalid musical key: {determined_key}")
             
             # Extract and validate tempo
@@ -1779,12 +2179,54 @@ Consider the following when determining parameters:
             if not isinstance(determined_tempo, int) or determined_tempo < 40 or determined_tempo > 220:
                 raise ValueError(f"Claude provided an invalid tempo: {determined_tempo}")
             
-            logger.info(f"Claude determined key={determined_key}, tempo={determined_tempo}")
+            mode = result["mode"]
+            if mode not in ["natural major", "natural minor", "melodic major", "melodic minor", "harmonic major", "harmonic minor", "dorian", "mixolydian", "lydian", "phrygian", "locrian"]:
+                raise ValueError(f"Claude provided an invalid mode: {mode}")
+            match mode:
+                case "natural major":
+                    scale = music21.scale.MajorScale(determined_key)
+                case "natural minor":
+                    scale = music21.scale.MinorScale(determined_key)
+                case "melodic minor":
+                    scale = music21.scale.MelodicMinorScale(determined_key)
+                case "harmonic major":
+                    scale = music21.scale.HarmonicMajorScale(determined_key)
+                case "harmonic minor":
+                    scale = music21.scale.HarmonicMinorScale(determined_key)
+                # case "dorian":
+                #     scale = music21.scale.DorianScale(determined_key)
+                # case "mixolydian":
+                #     scale = music21.scale.MixolydianScale(determined_key)
+                # case "lydian":
+                #     scale = music21.scale.LydianScale(determined_key)
+                # case "phrygian":
+                #     scale = music21.scale.PhrygianScale(determined_key)
+                # case "locrian":
+                #     scale = music21.scale.LocrianScale(determined_key)
+                # case _:
+                #     raise ValueError(f"Claude provided an invalid mode: {mode}")
+            
+            logger.info(f"Claude determined key={determined_key}, mode={mode}, tempo={determined_tempo}")
+            
+            available_notes = scale.getPitches()
+            available_notes_str = [str(note) for note in available_notes]
+            
+            logger.info(f"Available notes: {available_notes_str}")
+            logger.info("explanation: " + result.get("explanation"))
+            
+            self.available_notes = available_notes_str
+            self.default_key = determined_key + " " + mode
+            self.default_tempo = determined_tempo
+            self.default_mode = mode
+            self.default_bars = 8
+            self.allowed_intervals = get_mode_intervals(mode)
             
             return {
                 "key": determined_key,
                 "tempo": determined_tempo,
+                "mode": result["mode"],
                 "time_signature": self.default_time_signature,
+                "available_notes": available_notes_str,
                 "explanation": result.get("explanation", "Parameters determined by musical analysis")
             }
                 

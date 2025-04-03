@@ -33,12 +33,16 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any
     """
     import logging
     logger = logging.getLogger("beatgen.auth")
+    logger.setLevel(logging.DEBUG)
     
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # Log headers for debugging
+    logger.debug("Authentication requested with token")
     
     if not token:
         logger.error("No token provided in request")

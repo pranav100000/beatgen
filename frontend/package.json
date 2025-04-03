@@ -25,6 +25,7 @@
     "@types/node": "^22.13.13",
     "axios": "^1.8.4",
     "dexie": "^4.0.11",
+    "event-source-polyfill": "^1.0.31",
     "js-synthesizer": "^1.10.0",
     "konva": "^9.3.20",
     "primeicons": "^7.0.0",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
+    "@types/event-source-polyfill": "^1.0.5",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",

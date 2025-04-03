@@ -1,6 +1,9 @@
-from fastapi import APIRouter, HTTPException, status, Depends
-from typing import Dict, Any
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
+from fastapi.responses import StreamingResponse
+from typing import Dict, Any, AsyncGenerator, Tuple
 import logging
+import json
+import asyncio
 
 from app.core.security import get_current_user
 from app.schemas.user import UserProfile
@@ -10,9 +13,11 @@ from app.schemas.assistant import (
     EditRequest, EditResponse,
     AssistantAction, TrackData
 )
+from services.music_gen_service.music_gen_service import music_gen_service
 from services.music_gen_service.midi import get_clean_track_data
-
 from services.music_gen_service.music_tools import music_tools_service
+from app.utils.sse import format_sse_message
+import traceback
 
 # Set up logger for this module
 logger = logging.getLogger("beatgen.assistant")
@@ -28,10 +33,41 @@ async def generate_tracks(
     Generate multiple tracks based on the provided prompt
     """
     try:
-        resp = await music_tools_service.compose_music(request.prompt)
+        resp = await music_gen_service.compose_music(request.prompt)
+        print("COMPOSE MUSIC RESPONSE:", resp)
+        tracks = TrackData(
+            notes=resp.get("instruments")[0].get("notes"),
+            instrument_id=resp.get("instruments")[0].get("instrument_id"),
+            instrument_name=resp.get("instruments")[0].get("name"),
+            storage_key=resp.get("instruments")[0].get("storage_key")
+        )
+        action = AssistantAction(
+            type="add_generated_track",
+            data={
+                "instrumentName": resp.get("instruments")[0].get("name"),
+                "instrumentId": resp.get("instruments")[0].get("instrument_id"),
+                "storageKey": resp.get("instruments")[0].get("storage_key"),
+                "hasNotes": True,
+                "notes": resp.get("instruments")[0].get("notes")
+            }
+        )
+        generate_response = GenerateResponse(
+            response=str(resp),
+            tracks=[tracks],
+            actions=[action]
+        )
+        print("GENERATE RESPONSE:", generate_response)
+        return generate_response
+        #resp = await music_tools_service.compose_music(request.prompt)
     except Exception as e:
         logger.error(f"Error generating tracks: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": "Failed to generate music tracks",
+                "error": str(e),
+            }
+        )
     
     # try:
     #     import random
@@ -173,7 +209,7 @@ async def generate_tracks(
             # Format is typically: 'instruments/name.sf2'
             try:
                 instrument_parts = storage_key.split('/')
-                instrument_name = track.get("name", f"AI Track {len(tracks)}")
+                instrument_name = track.get("instrument_name", f"AI Track {len(tracks)}")
                 
                 # Create add_track action - include the notes directly in the action
                 actions.append(
@@ -206,8 +242,101 @@ async def edit_track(
     request: EditRequest,
     user: UserProfile = Depends(get_current_user)
 ):
+    print("EDIT TRACK REQUEST:", request)
+    return
     """
     Edit a specific track based on the provided prompt using Claude API with tool calls
+    """
+    
+@router.get("/edit/stream")
+async def edit_track_stream(
+    request: EditRequest,
+    user: UserProfile = Depends(get_current_user)
+):
+    """
+    Stream the process of editing a track with Server-Sent Events.
+    
+    Provides real-time updates as the AI processes the edit request:
+    - stage: The current stage of processing
+    - status: Status updates from the Claude API
+    - tool_calls: Tools being used by Claude
+    - actions: Actions to be performed on the frontend
+    - complete: Final response with the edited track
+    
+    Client should implement an EventSource to receive these updates.
+    """
+    print("EDIT TRACK STREAM REQUEST:", request)
+    # Create event queue for communication between background task and SSE generator
+    queue = asyncio.Queue()
+    background_tasks = BackgroundTasks()
+    
+    # Start the edit track process in the background
+    background_tasks.add_task(
+        process_track_edit_streaming, 
+        request=request, 
+        queue=queue
+    )
+    
+    # Return a streaming response
+    return StreamingResponse(
+        event_generator(queue),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+async def event_generator(queue: asyncio.Queue) -> AsyncGenerator[str, None]:
+    """
+    Generate SSE events from a queue.
+    
+    Args:
+        queue: Async queue that receives events from the background task
+        
+    Yields:
+        Properly formatted SSE messages
+    """
+    # Send initial connection message
+    yield format_sse_message("connected", {"status": "connected"})
+    
+    try:
+        # Process events from the queue
+        while True:
+            try:
+                # Wait for the next event with a timeout
+                event_type, data = await asyncio.wait_for(queue.get(), timeout=30)
+                
+                # If we received the completion event, break after yielding it
+                if event_type == "complete":
+                    yield format_sse_message(event_type, data)
+                    break
+                
+                # Otherwise, yield the event and continue
+                yield format_sse_message(event_type, data)
+                
+            except asyncio.TimeoutError:
+                # Send a heartbeat to keep the connection alive
+                yield format_sse_message("heartbeat", {"timestamp": asyncio.get_event_loop().time()})
+                
+    except asyncio.CancelledError:
+        # Handle client disconnection
+        logger.info("Client disconnected from SSE stream")
+        yield format_sse_message("cancelled", {"status": "cancelled"})
+        raise
+    except Exception as e:
+        # Log any errors and send an error event
+        logger.error(f"Error in SSE stream: {str(e)}")
+        yield format_sse_message("error", {"status": "error", "message": str(e)})
+        raise
+
+async def process_track_edit_streaming(request: EditRequest, queue: asyncio.Queue):
+    """
+    Process track edit with streaming updates.
+    
+    Args:
+        request: The edit request parameters
+        queue: Async queue to send events to the client
     """
     try:
         import os
@@ -224,37 +353,9 @@ async def edit_track(
         
         load_dotenv()
         
-        logger.info(request.project_id)
-        logger.info(request.track_id)
-        mock_track = Track(
-            id=request.track_id,
-            name="Track 1",
-            type="midi",
-            instrument_name="piano",
-            volume=0.8,
-            pan=0.0,
-            mute=False,
-            x_position=0.0,
-            y_position=0.0,
-            storage_key="track_1_storage_key"
-        )
-        
-        mock_project = Project(
-            id="70335959-33fa-4b35-82ea-8334bc72e365",
-            name="My Project",
-            bpm=120.0,
-            time_signature_numerator=4,
-            time_signature_denominator=4,
-            key_signature="C major",
-            user_id="3f9c55c6-baef-498f-af44-b0989934bc52",
-            tracks=[mock_track],
-            created_at=datetime.now(),
-            updated_at=datetime.now()
-        )
-        
-        # Serialize project for AI context
-        project_context = serialize_project(mock_project)
-        project_context_str = json.dumps(project_context.dict(), indent=2)
+        # # Serialize project for AI context
+        # project_context = serialize_project(request.)
+        # project_context_str = json.dumps(project_context.dict(), indent=2)
         
         # Get tools
         tools = get_all_tools()
@@ -367,7 +468,7 @@ If you need to identify a track by description rather than ID, use the identify_
             # For now, we're returning empty notes
             # Use details from tool calls to update the mock track response
             track_name = "Edited Track"
-            instrument = "piano"
+            instrument = "MOCKPIANO"
             
             # Look for track name in tool calls
             for tool_call in tool_calls:

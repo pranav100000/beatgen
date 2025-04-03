@@ -14,6 +14,12 @@ import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { 
   generateTracks, 
   editTrack,
+  editTrackStream,
+  streamAssistant,
+  interactWithAssistant,
+  cancelAssistantRequest,
+  EditStreamCallbacks,
+  StreamCallbacks,
   TrackData
 } from '../../../platform/api/assistant';
 import { CompositeAction } from '../../core/state/history/actions/AssistantActions';
@@ -39,6 +45,8 @@ interface Message {
   } | null;
   action?: string;
   actionData?: any;
+  isStreaming?: boolean; // Flag to indicate this message is currently streaming
+  messageId?: string; // Unique identifier for the message
 }
 
 interface ChatWindowProps {
@@ -56,6 +64,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
   const [contextAnchorEl, setContextAnchorEl] = useState<null | HTMLElement>(null);
   const [cursorPosition, setCursorPosition] = useState<number>(0);
   const [selectedTrack, setSelectedTrack] = useState<TrackState | null>(null);
+  
+  // Streaming state
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
+  const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
+  const [streamConnection, setStreamConnection] = useState<{ close: () => void } | null>(null);
+  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
   
   // Access the store for executing actions
   const { 
@@ -84,6 +99,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
   
+  // Cleanup resources when component unmounts
+  useEffect(() => {
+    return () => {
+      // Close any active connection
+      if (streamConnection) {
+        streamConnection.close();
+      }
+      
+      // Cancel any active request on the server
+      if (currentRequestId) {
+        cancelAssistantRequest(currentRequestId).catch(err => {
+          console.error('Error cancelling request during cleanup:', err);
+        });
+      }
+    };
+  }, [streamConnection, currentRequestId]);
+  
   // Initialize with welcome message when first opened
   useEffect(() => {
     if (isOpen && messages.length === 0) {
@@ -96,6 +128,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen, messages.length]);
   
+  // Debug log for streaming state changes
+  useEffect(() => {
+    console.log('🔄 STREAMING STATE CHANGED:', { 
+      isStreaming, 
+      streamingText, 
+      currentMessageId,
+      isLoading,
+      messagesCount: messages.length,
+      lastMessage: messages.length > 0 ? messages[messages.length - 1] : null
+    });
+  }, [isStreaming, streamingText, currentMessageId, isLoading, messages]);
+  
   // Scroll to bottom of messages whenever messages change
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -103,10 +147,240 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
     }
   }, [messages]);
   
+  // Set up callbacks for streaming
+  const setupStreamCallbacks = (): StreamCallbacks => {
+    return {
+      onConnected: () => {
+        console.log('Streaming connection established');
+        // Update status but don't add a message yet
+        setIsStreaming(true);
+        setStreamingText('');
+        setCurrentMessageId(null);
+      },
+      
+      onStage: (stage) => {
+        console.log('Stream stage update:', stage);
+        // Could show stage information in the UI if desired
+      },
+      
+      onStatus: (status) => {
+        console.log('Status update:', status);
+        // Could display status updates in the UI if desired
+      },
+      
+      onToolCall: (toolCall) => {
+        console.log('Tool call:', toolCall);
+        // Could display tool calls in the UI if desired
+      },
+      
+      onAction: (action) => {
+        console.log('Action received:', action);
+        // Process the action right away
+        handleAction(action.type, action.data);
+        
+        // Add action message
+        setMessages(prev => [
+          ...prev, 
+          { 
+            text: '', 
+            isUser: false,
+            action: action.type,
+            actionData: action.data
+          }
+        ]);
+      },
+      
+      // New handlers for streaming text
+      onEvent: (eventType, data) => {
+        console.log(`⭐⭐⭐ RECEIVED CUSTOM EVENT: ${eventType}`, data);
+        
+        // Handle response streaming events
+        if (eventType === 'response_start') {
+          console.log('🔴 STREAMING START - Starting response stream', data);
+          
+          // Create a message ID for this streaming session
+          const messageId = data.message_id;
+          setCurrentMessageId(messageId);
+          setIsStreaming(true);
+          
+          // Only add a message if we don't have any assistant messages yet
+          setMessages(prev => {
+            // Check if we already have any non-user messages at the end
+            const lastIndex = prev.length - 1;
+            if (lastIndex >= 0 && !prev[lastIndex].isUser) {
+              // Just update the existing message to be streaming
+              return prev.map((msg, i) => 
+                i === lastIndex ? { ...msg, isStreaming: true, messageId } : msg
+              );
+            }
+            
+            // Add a new message if needed
+            return [
+              ...prev,
+              { 
+                text: '',
+                isUser: false,
+                isStreaming: true,
+                messageId
+              }
+            ];
+          });
+        }
+        else if (eventType === 'response_chunk') {
+          console.log('🟡 STREAMING CHUNK - Received chunk:', { 
+            chunk: data.chunk, 
+            messageId: data.message_id
+          });
+          
+          // Add the new chunk directly to the last streaming message, with more debugging
+          setMessages(prev => {
+            // Copy the messages array to avoid mutation
+            const updatedMessages = [...prev];
+            const lastMessageIndex = updatedMessages.length - 1;
+            
+            console.log('🟡 Current messages state:', { 
+              messagesCount: updatedMessages.length,
+              lastMessage: lastMessageIndex >= 0 ? updatedMessages[lastMessageIndex] : null
+            });
+            
+            // Check if the last message is a streaming message
+            if (lastMessageIndex >= 0 && updatedMessages[lastMessageIndex].isStreaming) {
+              console.log('🟢 Found streaming message at index:', lastMessageIndex);
+              
+              // Add the chunk to the existing text
+              const existingText = updatedMessages[lastMessageIndex].text || '';
+              const newText = existingText + data.chunk;
+              
+              console.log('🟢 Updating text:', { 
+                oldText: existingText, 
+                chunk: data.chunk, 
+                newText 
+              });
+              
+              // Create a new message object to ensure React detects the change
+              updatedMessages[lastMessageIndex] = {
+                ...updatedMessages[lastMessageIndex],
+                text: newText
+              };
+              
+              // Also update streamingText state separately
+              setStreamingText(newText);
+            } else {
+              console.warn('⚠️ No streaming message found to update. Creating one now.');
+              
+              // If no streaming message exists (which shouldn't happen),
+              // create one as a fallback
+              updatedMessages.push({
+                text: data.chunk,
+                isUser: false,
+                isStreaming: true,
+                messageId: data.message_id
+              });
+              
+              setStreamingText(data.chunk);
+              setCurrentMessageId(data.message_id);
+              setIsStreaming(true);
+            }
+            
+            return updatedMessages;
+          });
+        }
+        else if (eventType === 'response_end') {
+          if (data.message_id === currentMessageId) {
+            // Finalize the message
+            setIsStreaming(false);
+            
+            // Update the message to remove the streaming flag
+            setMessages(prev => {
+              const updatedMessages = [...prev];
+              const lastMessageIndex = updatedMessages.length - 1;
+              
+              if (lastMessageIndex >= 0 && updatedMessages[lastMessageIndex].isStreaming) {
+                updatedMessages[lastMessageIndex] = {
+                  ...updatedMessages[lastMessageIndex],
+                  isStreaming: false
+                };
+              }
+              
+              return updatedMessages;
+            });
+            
+            setCurrentMessageId(null);
+          }
+        }
+      },
+      
+      onComplete: (response) => {
+        console.log('Stream complete with response:', response);
+        setIsLoading(false);
+        
+        // Only add the assistant's response if we're not already streaming it
+        if (!isStreaming) {
+          setMessages(prev => [
+            ...prev, 
+            { text: response.response, isUser: false }
+          ]);
+        }
+        
+        // We'll skip processing actions in onComplete because they should
+        // have already been processed by the onAction handler during streaming
+        
+        // Clean up
+        setStreamConnection(null);
+      },
+      
+      onError: (error) => {
+        console.error('Stream error:', error);
+        setIsLoading(false);
+        setIsStreaming(false);
+        
+        // Add error message
+        setMessages(prev => [
+          ...prev, 
+          { 
+            text: `Sorry, I encountered an error: ${error.message || 'Unknown error'}`, 
+            isUser: false 
+          }
+        ]);
+        
+        // Clean up
+        setStreamConnection(null);
+      },
+      
+      onCancelled: () => {
+        console.log('Stream cancelled');
+        setIsLoading(false);
+        setIsStreaming(false);
+        
+        // Clean up
+        setStreamConnection(null);
+      }
+    };
+  };
+  
   // Handle sending message to the AI
   const handleSend = async () => {
     setSelectedTrack(null);
     if (!prompt.trim()) return;
+    
+    // First check if we need to cancel an active stream
+    if (streamConnection) {
+      streamConnection.close();
+      setStreamConnection(null);
+      setIsLoading(false);
+      setIsStreaming(false);
+      
+      // Also cancel the request on the server if we have a request ID
+      if (currentRequestId) {
+        try {
+          await cancelAssistantRequest(currentRequestId);
+          setCurrentRequestId(null);
+        } catch (err) {
+          console.error('Error cancelling request:', err);
+        }
+      }
+      return;
+    }
     
     // Add user message to chat with current mode and selected track
     const userMessage: Message = { 
@@ -122,151 +396,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
     setIsLoading(true);
     
     try {
-      // Get current project ID if available (placeholder for now)
+      // Determine the appropriate mode (lowercase for API)
+      const apiMode = mode.toLowerCase() as 'generate' | 'edit' | 'chat';
       
-      let result;
+      // Get track ID if selected
+      const trackId = selectedTrack ? selectedTrack.id : undefined;
       
-      // Call different API endpoints based on mode
-      if (mode === 'Generate') {
-        // Generate mode creates multiple tracks
-        result = await generateTracks(prompt);
-        
-        // Add assistant response to chat
-        const responseMessage = {
-          text: result.response,
-          isUser: false
-        };
-        
-        // Add message first without actions
-        setMessages(prev => [...prev, responseMessage]);
-        
-        // Process each action if present
-        if (result.actions && result.actions.length > 0) {
-          console.log('Processing actions:', result.actions);
-          
-          // We'll create action chips for each action
-          result.actions.forEach(action => {
-            setMessages(prev => [
-              ...prev, 
-              { 
-                text: '', 
-                isUser: false,
-                action: action.type,
-                actionData: action.data
-              }
-            ]);
-          });
-        }
-        
-        // We'll now process the tracks through the action system
-        // No need to call addGeneratedTracks directly as it will be
-        // handled through the handleAction function with the actions
-        if (result.tracks && result.tracks.length > 0) {
-          console.log('Generated tracks:', result.tracks);
-          // Track data is still in the response, but we'll use actions to add them
-        }
-      } 
-      else if (mode === 'Edit') {
-        // Edit mode requires a track ID
-        if (selectedTrack) {
-          // Edit a specific track
-          result = await editTrack(prompt, selectedTrack.id);
-          
-          // Add assistant response to chat
-          const responseMessage = {
-            text: result.response,
-            isUser: false
-          };
-          
-          // Add message first without actions
-          setMessages(prev => [...prev, responseMessage]);
-          
-          // Process each action if present
-          if (result.actions && result.actions.length > 0) {
-            console.log('Processing edit actions:', result.actions);
-            
-            // We'll create action chips for each action
-            result.actions.forEach(action => {
-              setMessages(prev => [
-                ...prev, 
-                { 
-                  text: '', 
-                  isUser: false,
-                  action: action.type,
-                  actionData: action.data
-                }
-              ]);
-            });
-          }
-          
-          // Process edited track (placeholder)
-          if (result.track) {
-            console.log('Edited track:', result.track);
-            // TODO: Update track in project
-          }
-        } else {
-          // Fallback to chat if no track selected
-          result = await editTrack(prompt, "");
-          
-          // Add assistant response to chat
-          const responseMessage = {
-            text: result.response,
-            isUser: false
-          };
-          
-          // Add message first without actions
-          setMessages(prev => [...prev, responseMessage]);
-          
-          // Process each action if present
-          if (result.actions && result.actions.length > 0) {
-            console.log('Processing fallback edit actions:', result.actions);
-            
-            // We'll create action chips for each action
-            result.actions.forEach(action => {
-              setMessages(prev => [
-                ...prev, 
-                { 
-                  text: '', 
-                  isUser: false,
-                  action: action.type,
-                  actionData: action.data
-                }
-              ]);
-            });
-          }
-        }
-      } 
-      // else {
-      //   // Default to chat for any other mode
-      //   result = await chatWithAssistant(prompt);
-        
-      //   // Add assistant response to chat
-      //   setMessages(prev => [...prev, { 
-      //     text: result.response, 
-      //     isUser: false,
-      //     action: result.actions?.[0]?.type,
-      //     actionData: result.actions?.[0]?.data
-      //   }]);
-      // }
+      // Use the new POST-then-SSE pattern with interactWithAssistant
+      const { requestId, close } = await interactWithAssistant(
+        {
+          prompt,
+          mode: apiMode,
+          track_id: trackId
+        },
+        setupStreamCallbacks()
+      );
       
-      // Process any actions
-      if (result.actions && result.actions.length > 0) {
-        // Log all actions
-        console.log('Processing AI assistant actions:', result.actions);
-        
-        // Handle each action
-        result.actions.forEach(action => {
-          console.log(`Executing action: ${action.type}`);
-          handleAction(action.type, action.data);
-        });
-      }
+      // Store request ID and connection for potential cancellation
+      setCurrentRequestId(requestId);
+      setStreamConnection({ close });
     } catch (error) {
       console.error('Error handling assistant response:', error);
       setMessages(prev => [...prev, { 
         text: "Sorry, I encountered an error processing your request.", 
         isUser: false 
       }]);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -339,8 +493,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                       const notes = notesFromAction.map(note => ({
                         id: Math.floor(Math.random() * 100000), // Use random IDs to avoid conflicts
                         row: note.pitch,
-                        column: Math.round(note.start),
-                        length: Math.round(note.duration),
+                        column: note.start * 2,
+                        length: note.duration * 2,
                         velocity: note.velocity || 80 // Default velocity if missing
                       }));
                       
@@ -448,7 +602,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             
             // Add track creation actions
             for (let i = 0; i < actionData.count; i++) {
-              const trackName = `AI Generated Track ${i+1}`;
+              const trackName = actionData.instrumentName
+                ?.split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
               actions.push({
                 execute: async () => {
                   console.log(`Adding AI track: ${trackName}`);
@@ -704,6 +861,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                 key={index} 
                 text={msg.text}
                 action={msg.action}
+                isStreaming={msg.isStreaming}
                 onActionClick={msg.action && msg.actionData ? 
                   () => handleAction(msg.action!, msg.actionData) : 
                   undefined}
@@ -829,10 +987,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
               }}
             >
               <MenuChip 
-                label="Send"
+                label={isLoading ? "Cancel" : "Send"}
                 onClick={handleSend}
-                disabled={isLoading || !prompt.trim()}
-                color={'primary'}
+                disabled={!prompt.trim() && !isLoading}
+                color={isLoading ? 'secondary' : 'primary'}
               />
             </Box>
           </Box>

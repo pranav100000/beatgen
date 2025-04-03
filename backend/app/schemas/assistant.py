@@ -27,7 +27,7 @@ class TrackData(BaseModel):
     """Data for a generated or edited track"""
     notes: List[Dict[str, Any]]
     instrument_name: Optional[str] = None
-    storage_key: Optional[str] = None  # Key for the instrument soundfont
+    instrument_id: Optional[str] = None  # Key for the instrument soundfont
 
 
 # Tool calling models for Claude API

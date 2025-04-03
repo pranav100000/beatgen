@@ -5,8 +5,257 @@ import base64
 import logging
 import mido
 from mido import Message, MidiFile, MidiTrack
+from music21 import harmony
+
+from services.music_gen_service.music_utils import get_root_note_midi
 
 logger = logging.getLogger(__name__)
+
+def transform_bars_to_instrument_format(data: Dict[str, Any], instrument: dict, key: str) -> Dict[str, Any]:
+    """
+    Transform the structured bars data from Claude into the expected instrument format.
+    
+    Args:
+        data: Dictionary with bars data from Claude
+        instrument_id: ID of the instrument
+        
+    Returns:
+        Formatted data in the expected output structure
+    """
+    
+    print("INSTRUMENT:", instrument)
+    root_note_midi = get_root_note_midi(key)
+    print("ROOT NOTE MIDI:", root_note_midi)
+    # Extract bars data
+    starting_octave = data.get("starting_octave", 4)
+    bars = data.get("bars", [])
+    
+    # Prepare MIDI notes array
+    midi_notes = []
+    current_time = 0.0
+    current_pitch = root_note_midi  # Start at root note
+    
+    # Get the root note from the key and mode
+    
+    # Process each bar and its notes
+    for bar in bars:
+        bar_notes = bar.get("notes", [])
+        
+        for note in bar_notes:
+            # Parse interval and convert to number
+            interval_str = note.get("interval", "0")
+            if isinstance(interval_str, str):
+                if interval_str.startswith("+"):
+                    interval = int(interval_str[1:])
+                elif interval_str.startswith("-"):
+                    interval = -int(interval_str[1:])
+                elif interval_str.startswith("R"):
+                    interval = 0  # Rest - keep same pitch but may have velocity 0
+                else:
+                    interval = int(interval_str)
+            else:
+                interval = int(interval_str)
+            
+            # Get duration and velocity
+            duration_str = note.get("duration")
+            velocity = note.get("velocity", 64)  # Default velocity if not specified
+            
+            # Convert duration string to beats
+            try:
+                note_duration = _convert_duration_to_beats(duration_str)
+            except ValueError:
+                logger.warning(f"Invalid duration: {duration_str}, defaulting to quarter note")
+                note_duration = 1.0  # Default to quarter note
+            
+            # Calculate new pitch based on interval
+            if interval_str.startswith("R"):
+                # For rests, keep the same pitch but set velocity to 0
+                velocity = 0
+            else:
+                current_pitch += interval
+            
+            # Create MIDI note
+            midi_note = {
+                "pitch": current_pitch,
+                "start": current_time,
+                "duration": note_duration,
+                "velocity": velocity
+            }
+            
+            # Add to notes array
+            midi_notes.append(midi_note)
+            
+            # Update current time
+            current_time += note_duration
+    
+    
+    # Create the full result structure
+    
+    print("INSTRUMENT:", instrument)
+    
+    # Map from the instrument object to the correct field names
+    # Handle both possible formats for compatibility
+    result = {
+        "instrument_id": instrument.id,
+        "storage_key": instrument.storage_key,
+        "name": instrument.name,
+        "notes": midi_notes
+    }
+    
+    print("RESULT:", result)
+    
+    return result
+
+def transform_chord_progression_to_instrument_format(chord_progression: str, instrument: Dict[str, Any], key: str) -> Dict[str, Any]:
+    """
+    Transform the structured chord progression data from Claude into the expected instrument format.
+    
+    Args:
+        chord_progression: String of chord names separated by dashes (e.g. "Cm-Aaug-Dm")
+        instrument: Dictionary containing instrument data
+        key: The key to use for the chord progression
+        
+    Returns:
+        Dictionary with formatted instrument data including MIDI notes
+    """
+    print("CHORD PROGRESSION:", chord_progression)
+    print("INSTRUMENT:", instrument)
+    print("KEY:", key)
+    chord_progression_list = chord_progression.split("-")
+    if len(chord_progression_list) == 0:
+        return []
+    
+    # Initialize MIDI notes array
+    midi_notes = []
+    current_time = 0.0
+    
+    # Default duration for each chord (1 bar = 4 beats in 4/4 time)
+    chord_duration = 4.0
+    
+    # Process each chord
+    for chord_name in chord_progression_list:
+        # Parse the chord name into MIDI notes
+        try:
+            chord_notes = _parse_chord_name(chord_name.strip(), key, octave=3)
+            
+            # Add each note in the chord
+            for pitch in chord_notes:
+                midi_note = {
+                    "pitch": pitch,
+                    "start": current_time,
+                    "duration": chord_duration,
+                    "velocity": 70  # Default velocity for chords
+                }
+                midi_notes.append(midi_note)
+            
+            # Move to next chord
+            current_time += chord_duration
+            
+        except ValueError as e:
+            logger.warning(f"Skipping invalid chord {chord_name}: {str(e)}")
+            continue
+    
+    # Create the full result structure
+    # Map from the instrument object to the correct field names
+    # Handle both possible formats for compatibility
+    result = {
+        "instrument_id": instrument.get("instrument_id", instrument.get("id", "unknown")),
+        "storage_key": instrument.get("storage_key", "unknown"),
+        "name": instrument.get("instrument_name", instrument.get("display_name", "Unknown Instrument")),
+        "notes": midi_notes
+    }
+    
+    return result
+
+def _parse_chord_name(chord_name: str, key: str, octave: int = 4) -> List[int]:
+    """
+    Parse a chord name into its MIDI note values.
+    
+    Args:
+        chord_name: String of chord name (e.g. "C", "Cm", "Cmaj7", "C7", "C9", "C13")
+        key: String of key (e.g. "C", "Db", "G#")
+        octave: Integer of octave to use (default is 4)
+        
+    Returns:
+        List of MIDI note values
+    """
+    chord = harmony.chord.Chord(chord_name)
+    return [note.midi for note in chord.pitchedCommonName]
+
+
+
+def _convert_duration_to_beats(duration_str, time_signature: List[int] = [4, 4]) -> float:
+    """
+    Convert a duration string or number ("quarter", "half", 1.0, 2.0, etc.) to beats.
+    
+    Args:
+        duration_str: Duration as string (whole, half, quarter, eighth, etc.) or numeric value in beats
+        time_signature: Time signature as [numerator, denominator]
+        
+    Returns:
+        Duration in beats
+    """
+    # If duration_str is already a number, return it directly
+    if isinstance(duration_str, (int, float)):
+        return float(duration_str)
+        
+    # Standard durations in beats (assuming 4/4 time)
+    duration_map = {
+        "whole": 4.0,
+        "half": 2.0,
+        "quarter": 1.0,
+        "eighth": 0.5,
+        "sixteenth": 0.25,
+        "thirtysecond": 0.125,
+        "sixtyfourth": 0.0625,
+        
+        # Allow numerical fractions too
+        "1": 4.0,
+        "2": 2.0,
+        "4": 1.0,
+        "8": 0.5,
+        "16": 0.25,
+        "32": 0.125,
+        "64": 0.0625,
+        
+        # Dotted durations
+        "dotted whole": 6.0,
+        "dotted half": 3.0,
+        "dotted quarter": 1.5,
+        "dotted eighth": 0.75,
+        "dotted sixteenth": 0.375,
+        
+        # Triplets
+        "triplet": 1/3,
+        "half triplet": 4/3,
+        "quarter triplet": 2/3,
+        "eighth triplet": 1/3,
+        "sixteenth triplet": 1/6
+    }
+    
+    # Try to get the duration from the map
+    duration = duration_map.get(str(duration_str).lower())
+    
+    # Handle dotted notes specified with a dot
+    if not duration and isinstance(duration_str, str) and duration_str.endswith("."):
+        base_dur = duration_map.get(duration_str[:-1].lower())
+        if base_dur:
+            duration = base_dur * 1.5
+    
+    # If not found, try to parse as a float
+    if not duration:
+        try:
+            duration = float(duration_str)
+        except (ValueError, TypeError):
+            raise ValueError(f"Unknown duration: {duration_str}")
+    
+    # Adjust for time signature if not 4/4
+    if time_signature != [4, 4]:
+        # Convert to standard beats
+        beat_value = 4.0 / time_signature[1]
+        duration = duration * beat_value
+    
+    return duration
 
 def get_clean_track_data(tracks_data: Union[List, Dict, Any]) -> List[Dict[str, Any]]:
     """
@@ -289,35 +538,6 @@ class MIDIGenerator:
                 ))
             
             current_time = event["time"]
-    
-    def _get_program_number(self, instrument_id: str) -> int:
-        """
-        Map instrument ID to MIDI program number.
-        
-        Args:
-            instrument_id: ID of the instrument
-            
-        Returns:
-            MIDI program number (0-127)
-        """
-        # This is a simplified mapping; a real implementation would have a more complete map
-        instrument_map = {
-            "piano": 0,  # Acoustic Grand Piano
-            "electric_piano": 4,  # Electric Piano
-            "guitar_acoustic": 24,  # Acoustic Guitar (nylon)
-            "guitar_electric": 27,  # Electric Guitar (clean)
-            "bass": 33,  # Electric Bass (finger)
-            "violin": 40,  # Violin
-            "cello": 42,  # Cello
-            "trumpet": 56,  # Trumpet
-            "saxophone": 66,  # Tenor Sax
-            "flute": 73,  # Flute
-            "synth_lead": 80,  # Lead 1 (square)
-            "synth_pad": 88,  # Pad 1 (new age)
-            "drums": 0  # Special case, will use channel 9 (10 in MIDI)
-        }
-        
-        return instrument_map.get(instrument_id, 0)
     
     def _sanitize_filename(self, filename: str) -> str:
         """

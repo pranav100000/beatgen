@@ -62,10 +62,10 @@ export class ProjectManager {
 
     // Add default instrument properties for MIDI and drum tracks
     if (type === 'midi') {
-      track.instrumentId = 'piano'; // Default to piano
+      track.instrumentId = 'NULLVALUE'; // Default to piano
       track.instrumentName = 'Grand Piano'; // Default name
     } else if (type === 'drum') {
-      track.instrumentId = 'drum'; // Default to drum kit
+      track.instrumentId = 'NULLVALUE'; // Default to drum kit
       track.instrumentName = '808 Kit'; // Default name
     }
 

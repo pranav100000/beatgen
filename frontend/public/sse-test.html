@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE Test for BeatGen</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.5;
+        }
+        .event-log {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+        }
+        .event-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        .event-type {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .event-data {
+            color: #333;
+        }
+        .status-connected {
+            color: green;
+        }
+        .status-disconnected {
+            color: red;
+        }
+        .control-panel {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #eef;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 15px;
+            margin-right: 10px;
+            background-color: #5c6bc0;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3f51b5;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        input, textarea {
+            padding: 8px;
+            margin-right: 10px;
+            width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>SSE Testing for BeatGen</h1>
+    <p>Test the Server-Sent Events implementation for the AI assistant.</p>
+    
+    <div class="control-panel">
+        <h2>Test Controls</h2>
+        <div class="form-group">
+            <label for="prompt">Prompt:</label>
+            <input type="text" id="prompt" value="Increase the volume to 80%" placeholder="Enter your prompt here">
+        </div>
+        
+        <div class="form-group">
+            <label for="track-id">Track ID:</label>
+            <input type="text" id="track-id" value="track-123" placeholder="Enter track ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="endpoint">Endpoint URL:</label>
+            <input type="text" id="endpoint" value="/api/assistant/streaming/edit" placeholder="Endpoint URL">
+            <p style="font-size: 0.8em; color: #666;">(Note: Use the GET endpoint for testing with URL parameters)</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="auth-token">Authentication Token:</label>
+            <input type="text" id="auth-token" placeholder="Enter your JWT token">
+            <p style="font-size: 0.8em; color: #666;">Required for authenticated endpoints (get from localStorage.token after logging in to main app)</p>
+        </div>
+        
+        <div class="actions">
+            <button id="token-from-app-btn">Get Token from App</button>
+            <button id="connect-btn">Connect SSE</button>
+            <button id="disconnect-btn" disabled>Disconnect</button>
+            <button id="clear-btn">Clear Log</button>
+        </div>
+    </div>
+    
+    <div>
+        <h2>Connection Status: <span id="connection-status" class="status-disconnected">Disconnected</span></h2>
+    </div>
+    
+    <div>
+        <h2>Event Log:</h2>
+        <div id="event-log" class="event-log"></div>
+    </div>
+    
+    <script>
+        // DOM elements
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const tokenFromAppBtn = document.getElementById('token-from-app-btn');
+        const promptInput = document.getElementById('prompt');
+        const trackIdInput = document.getElementById('track-id');
+        const endpointInput = document.getElementById('endpoint');
+        const authTokenInput = document.getElementById('auth-token');
+        const eventLog = document.getElementById('event-log');
+        const connectionStatus = document.getElementById('connection-status');
+        
+        // EventSource instance
+        let eventSource = null;
+        
+        // Get token from main app
+        function getTokenFromApp() {
+            try {
+                // Try to access localStorage from main app
+                const token = localStorage.getItem('token');
+                if (token) {
+                    authTokenInput.value = token;
+                    logEvent('system', { message: 'Token retrieved from localStorage' });
+                } else {
+                    logEvent('system', { 
+                        message: 'No token found in localStorage. Make sure you are logged in to the main app.' 
+                    });
+                }
+            } catch (error) {
+                logEvent('error', { 
+                    message: 'Error accessing localStorage', 
+                    error: error.message 
+                });
+            }
+        }
+        
+        // Connect to SSE endpoint
+        function connectSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            
+            const prompt = promptInput.value;
+            const trackId = trackIdInput.value;
+            const endpoint = endpointInput.value;
+            const token = authTokenInput.value;
+            
+            if (!prompt || !trackId || !endpoint) {
+                logEvent('error', { message: 'Please fill out all required fields' });
+                return;
+            }
+            
+            if (!token) {
+                logEvent('warning', { 
+                    message: 'No authentication token provided. This will likely result in a 401 error.' 
+                });
+            }
+            
+            // Build URL with query parameters
+            const url = `http://localhost:8000${endpoint}?prompt=${encodeURIComponent(prompt)}&track_id=${encodeURIComponent(trackId)}`;
+            
+            // Create options object with auth header if token is provided
+            const options = {};
+            if (token) {
+                options.headers = {
+                    'Authorization': `Bearer ${token}`
+                };
+            }
+            
+            try {
+                // Create new EventSource with auth headers if available
+                eventSource = new EventSource(url, options);
+                
+                // Update UI
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                connectionStatus.textContent = 'Connecting...';
+                connectionStatus.className = '';
+                
+                // Set up event listeners
+                eventSource.onopen = () => {
+                    connectionStatus.textContent = 'Connected';
+                    connectionStatus.className = 'status-connected';
+                    logEvent('system', { message: 'Connection established' });
+                };
+                
+                // Listen for all possible event types
+                const eventTypes = [
+                    'connected', 'stage', 'status', 'tool_call',
+                    'action', 'complete', 'error', 'cancelled', 'heartbeat'
+                ];
+                
+                eventTypes.forEach(eventType => {
+                    eventSource.addEventListener(eventType, event => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            logEvent(eventType, data);
+                            
+                            // Handle completion
+                            if (eventType === 'complete') {
+                                disconnectSSE();
+                            }
+                        } catch (error) {
+                            logEvent('error', { 
+                                message: 'Error parsing event data',
+                                error: error.message,
+                                rawData: event.data
+                            });
+                        }
+                    });
+                });
+                
+                // Error handling
+                eventSource.onerror = error => {
+                    logEvent('system', { 
+                        message: 'Connection error',
+                        error: error.message || 'Unknown error'
+                    });
+                    
+                    connectionStatus.textContent = 'Error';
+                    connectionStatus.className = 'status-disconnected';
+                    disconnectSSE();
+                };
+                
+            } catch (error) {
+                logEvent('system', { 
+                    message: 'Failed to create EventSource',
+                    error: error.message
+                });
+                
+                connectionStatus.textContent = 'Failed to connect';
+                connectionStatus.className = 'status-disconnected';
+            }
+        }
+        
+        // Disconnect from SSE endpoint
+        function disconnectSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                
+                // Update UI
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                connectionStatus.textContent = 'Disconnected';
+                connectionStatus.className = 'status-disconnected';
+                
+                logEvent('system', { message: 'Connection closed' });
+            }
+        }
+        
+        // Log event to the UI
+        function logEvent(eventType, data) {
+            const entry = document.createElement('div');
+            entry.className = 'event-entry';
+            
+            const timestamp = new Date().toISOString().substr(11, 12);
+            
+            entry.innerHTML = `
+                <span class="event-timestamp">[${timestamp}]</span>
+                <span class="event-type">${eventType}:</span>
+                <span class="event-data">${JSON.stringify(data, null, 2)}</span>
+            `;
+            
+            eventLog.appendChild(entry);
+            eventLog.scrollTop = eventLog.scrollHeight;
+        }
+        
+        // Clear the event log
+        function clearLog() {
+            eventLog.innerHTML = '';
+            logEvent('system', { message: 'Log cleared' });
+        }
+        
+        // Event listeners
+        connectBtn.addEventListener('click', connectSSE);
+        disconnectBtn.addEventListener('click', disconnectSSE);
+        clearBtn.addEventListener('click', clearLog);
+        
+        // Initial log message
+        logEvent('system', { message: 'SSE test page loaded' });
+    </script>
+</body>
+</html>
