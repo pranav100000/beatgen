@@ -360,6 +360,41 @@ export class TrackAddAction implements Action {
     }
 }
 
+// Action for toggling track mute
+export class TrackMuteToggleAction implements Action {
+    readonly type = 'TRACK_MUTE_TOGGLE';
+
+    constructor(
+        private store: Store,
+        private trackId: string,
+        private oldMuted: boolean,
+        private newMuted: boolean,
+        private updateTrackMute: (trackId: string, muted: boolean) => void
+    ) {}
+
+    async execute(): Promise<void> {
+        // Update state with direct mute update
+        this.updateTrackMute(this.trackId, this.newMuted);
+        
+        console.log('🔄 Execute TrackMuteToggleAction:', { 
+            trackId: this.trackId, 
+            from: this.oldMuted, 
+            to: this.newMuted 
+        });
+    }
+
+    async undo(): Promise<void> {
+        // Update state with direct mute update
+        this.updateTrackMute(this.trackId, this.oldMuted);
+        
+        console.log('↩️ Undo TrackMuteToggleAction:', { 
+            trackId: this.trackId, 
+            from: this.newMuted, 
+            to: this.oldMuted 
+        });
+    }
+}
+
 // Action for track deletion
 export class TrackDeleteAction implements Action {
     readonly type = 'TRACK_DELETE';

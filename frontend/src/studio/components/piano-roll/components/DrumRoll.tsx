@@ -37,8 +37,8 @@ const drumMappings: Record<number, string> = {
 
 const DrumRoll: React.FC<DrumRollProps> = ({ trackId }) => {
   // Get notes and actions from context
-  const { notesByTrack, createNote, moveNote, resizeNote, playPreview, stopPreview } = usePianoRoll();
-  const notes = notesByTrack[trackId] || [];
+  const { getNotesForTrack, createNote, moveNote, resizeNote, deleteNote, playPreview, stopPreview } = usePianoRoll();
+  const notes = getNotesForTrack(trackId);
 
   // State for drag and resize operations
   const [draggedNote, setDraggedNote] = useState<number | null>(null);
@@ -125,7 +125,7 @@ const DrumRoll: React.FC<DrumRollProps> = ({ trackId }) => {
         row: noteNumber,
         column,
         length: 1,
-        velocity: 100,
+        velocity: 0.8,
         trackId
       };
 

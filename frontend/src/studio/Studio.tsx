@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Box, Button } from '@mui/material';
+import { Box, Button, FormControlLabel, Switch } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 
 // Import components
 import TrackControlsSidebar from './components/sidebar/TrackControlsSidebar';
-import { Timeline } from './components/timeline/Timeline';
+import { Timeline, TimelineRef } from './components/timeline/Timeline';
 import AddTrackMenu from './components/sidebar/AddTrackMenu';
 import { GRID_CONSTANTS } from './constants/gridConstants';
 import { useStudioStore } from './stores/useStudioStore';
@@ -14,8 +14,11 @@ import PianoRollModule, { PianoRollWindows, usePianoRoll } from './components/pi
 
 // Import custom hooks
 import { useStudioDBSession } from './hooks/useStudioDBSession';
+import { useHistorySync } from './hooks/useHistorySync';
 
 import StudioControlBar from './components/control-bar/ControlBar';
+import { useGridStore } from './core/state/gridStore';
+import ChatWindow from './components/ai-assistant/ChatWindow';
 
 // Studio Component Props
 interface StudioProps {
@@ -26,6 +29,9 @@ interface StudioProps {
 function Studio({ projectId }: StudioProps) {
   // Initialize DB session management
   useStudioDBSession();
+  
+  // Setup history state sync
+  useHistorySync();
   
   // Get state and actions from Zustand store
   const {
@@ -71,7 +77,7 @@ function Studio({ projectId }: StudioProps) {
     setAddMenuAnchor
   } = useStudioStore();
   
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<TimelineRef>(null);
   const animationFrameRef = useRef<number | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [existingProjectId, setExistingProjectId] = useState<string | null>(projectId || null);
@@ -130,39 +136,46 @@ function Studio({ projectId }: StudioProps) {
 
   const handleZoomIn = () => {
     setZoomLevel(Math.min(zoomLevel + 0.1, 4));
+    // Update measureWidth in gridStore based on zoom level
+    const newMeasureWidth = 200 * (Math.min(zoomLevel + 0.1, 4));
+    useGridStore.getState().setMidiMeasureWidth(newMeasureWidth);
+    useGridStore.getState().setAudioMeasureWidth(newMeasureWidth);
   };
 
   const handleZoomOut = () => {
     setZoomLevel(Math.max(zoomLevel - 0.1, 0.3));
+    // Update measureWidth in gridStore based on zoom level
+    const newMeasureWidth = 200 * (Math.max(zoomLevel - 0.1, 0.3));
+    useGridStore.getState().setMidiMeasureWidth(newMeasureWidth);
+    useGridStore.getState().setAudioMeasureWidth(newMeasureWidth);
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setProjectTitle(event.target.value);
   };
 
-  // Update UI time display based on transport position
+  // Control playback cursor directly when playback state changes
   useEffect(() => {
-    if (!isPlaying || !store) return;
-
-    const updateTime = () => {
-      const transport = store.getTransport();
-      if (transport) {
-        // Get the current position from transport
-        setCurrentTime(transport.position);
-        animationFrameRef.current = requestAnimationFrame(updateTime);
-      }
-    };
-
-    // Start the animation frame loop
-    animationFrameRef.current = requestAnimationFrame(updateTime);
-
-    // Cleanup
+    if (!store || !scrollRef.current?.playbackCursor) return;
+    
+    if (isPlaying) {
+      // Start the cursor animation when playback starts
+      scrollRef.current.playbackCursor.play();
+      console.log('Starting cursor animation via imperative API');
+    } else {
+      // Pause the cursor animation when playback stops
+      scrollRef.current.playbackCursor.pause();
+      console.log('Pausing cursor animation via imperative API');
+    }
+    
+    // Clean up any stray animation frames
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, store, setCurrentTime]);
+  }, [isPlaying, store]);
 
   // Handle infinite scrolling for the timeline
   const handleScroll = React.useCallback(() => {
@@ -226,13 +239,6 @@ function Studio({ projectId }: StudioProps) {
         overflow: 'hidden',
         position: 'relative'
       }}>
-        <Box sx={{
-          position: 'absolute',
-          top: 10,
-          right: 10,
-          zIndex: 9999
-        }}>
-        </Box>
         {/* Left Sidebar */}
         <Box sx={{ 
           width: GRID_CONSTANTS.sidebarWidth,
@@ -313,15 +319,29 @@ function Studio({ projectId }: StudioProps) {
           timeSignature={timeSignature}
           onTrackPositionChange={handleTrackPositionChange}
           onTimeChange={(newTime) => {
+            // Update global state only when user explicitly changes time
             setCurrentTime(newTime);
+            
+            // Update transport position
             if (store && store.getTransport()) {
               store.getTransport().setPosition(newTime);
+            }
+            
+            // Use imperative API to update cursor position
+            if (scrollRef.current?.playbackCursor) {
+              scrollRef.current.playbackCursor.seek(newTime);
             }
           }}
           gridLineStyle={{
             borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`
           }}
           ref={scrollRef}
+        />
+        
+        {/* AI Assistant Chat Window - slides in from right */}
+        <ChatWindow 
+          isOpen={isChatOpen}
+          onClose={handleChatToggle}
         />
       </Box>
     </Box>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Note } from '../../../core/types/note';
 import { usePianoRoll } from '../context/PianoRollContext';
@@ -16,9 +16,15 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
   height,
   trackColor
 }) => {
+  // Memoize the random heights so they don't change on every render
+  const randomHeights = useMemo(() => 
+    Array.from({length: 12}).map(() => Math.random() * 12 + 4),
+    [] // Empty dependency array means this only runs once when component mounts
+  );
+
   // Get notes from context
-  const { notesByTrack } = usePianoRoll();
-  const notes = notesByTrack[trackId] || [];
+  const { getNotesForTrack } = usePianoRoll();
+  const notes = getNotesForTrack(trackId);
   
   // Find the range of notes for better scaling
   let minNoteRow = 127;
@@ -59,7 +65,7 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
   
   // Calculate the columns that should fit within the view width
   // Standard 4-bar section at 16th note resolution = 64 columns (4 * 4 * 4)
-  const standardColumns = 64;
+  const standardColumns = 32;
   
   // Determine actual scaling based on the visible area
   const effectiveMaxColumn = Math.max(standardColumns, maxColumn > 0 ? maxColumn : standardColumns);
@@ -86,7 +92,6 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
         const y = relativePosition * noteHeightScale;
         const w = note.length * noteWidthScale;
         const h = noteHeightScale * 0.9; // Slight gap between notes
-        
         return (
           <Box
             key={note.id}
@@ -117,12 +122,11 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
           fontSize: '10px',
           color: '#fff'
         }}>
-          {/* Placeholder pattern for empty tracks */}
-          {Array.from({length: 12}).map((_, i) => (
+          {randomHeights.map((height, i) => (
             <Box 
               key={i}
               sx={{
-                height: Math.random() * 12 + 4,
+                height: height, // Use memoized height instead of calculating new random value
                 width: 4,
                 mx: 0.5,
                 bgcolor: 'white',

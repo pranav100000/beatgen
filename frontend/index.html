@@ -2,10 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!-- Favicon setup for various browsers and devices -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/beatgen-favicon.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/beatgen-favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/beatgen-favicon.png" />
+    <link rel="shortcut icon" href="/beatgen-favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BeatGen Studio - Vite</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sen:wght@400;500;700&display=swap" />
+    
+    <!-- js-synthesizer libraries - load these BEFORE our application code -->
+    <script src="/js-synthesizer/libfluidsynth-2.3.0.js"></script>
+    <script src="/js-synthesizer/js-synthesizer.js"></script>
+    
     <style>
       html, body, #root {
         height: 100%;

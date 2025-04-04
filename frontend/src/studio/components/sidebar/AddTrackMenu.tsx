@@ -9,7 +9,7 @@ interface AddTrackMenuProps {
   isOpen: boolean;
   anchorEl: HTMLElement | null;
   onClose: () => void;
-  onAddTrack: (type: 'midi' | 'audio' | 'drum', instrumentId?: string, instrumentName?: string) => void;
+  onAddTrack: (type: 'midi' | 'audio' | 'drum', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => void;
   onFileUpload?: (file: File) => void;
 }
 
@@ -95,8 +95,8 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
       <VirtualInstrumentsModal
         open={isVirtualInstrumentModalOpen}
         onClose={() => setIsVirtualInstrumentModalOpen(false)}
-        onSelect={(instrumentId: string, displayName: string) => {
-          onAddTrack('midi', instrumentId, displayName);
+        onSelect={(instrumentId: string, displayName: string, storageKey?: string) => {
+          onAddTrack('midi', instrumentId, displayName, storageKey);
           setIsVirtualInstrumentModalOpen(false);
         }}
       />

@@ -19,20 +19,7 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
   const { tracks } = useStudioStore();
   const track = tracks.find(t => t.id === trackId);
   
-  // Close handler
-  const handleClose = () => {
-    closePianoRoll(trackId);
-  };
-  
-  if (!track) return null;
-  
-  // Determine if this is a drum track or regular MIDI track
-  const isDrumTrack = track.type === 'drum';
-  
-  // Modal title based on track name and type
-  const modalTitle = `${isDrumTrack ? 'Drum Editor' : 'Piano Roll'} - ${track.name}`;
-  
-  // Calculate center position for the modal
+  // Calculate center position for the modal - IMPORTANT: Always call hooks at the top level
   const initialPosition = React.useMemo(() => {
     // Use window dimensions to center the modal
     const windowWidth = window.innerWidth;
@@ -46,6 +33,19 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
     };
   }, []);
   
+  // Close handler
+  const handleClose = () => {
+    closePianoRoll(trackId);
+  };
+  
+  if (!track) return null;
+  
+  // Determine if this is a drum track or regular MIDI track
+  const isDrumTrack = track.type === 'drum';
+  
+  // Modal title based on track name and type
+  const modalTitle = `${isDrumTrack ? 'Drum Editor' : 'Piano Roll'} - ${track.name}`;
+  
   return (
     <DraggableModal
       isOpen={isOpen}
@@ -56,7 +56,7 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
     >
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* Control toolbar */}
-        <Box sx={{ 
+        {/* <Box sx={{ 
           height: '40px', 
           bgcolor: '#222', 
           borderBottom: '1px solid #333',
@@ -67,9 +67,7 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
           <Typography variant="body2" sx={{ color: '#aaa', mr: 2 }}>
             Track: {track.name}
           </Typography>
-          
-          {/* Add toolbar controls here (undo/redo, tools, quantize, etc.) */}
-        </Box>
+        </Box> */}
         
         {/* Editor content - show either PianoRoll or DrumRoll based on track type */}
         <Box sx={{ flex: 1, overflow: 'hidden' }}>
@@ -84,4 +82,8 @@ const PianoRollWindow: React.FC<PianoRollWindowProps> = ({ trackId }) => {
   );
 };
 
-export default PianoRollWindow;
+// Export a memoized version to prevent unnecessary re-renders during playback
+export default React.memo(PianoRollWindow, (prevProps, nextProps) => {
+  // Only re-render if the trackId changes
+  return prevProps.trackId === nextProps.trackId;
+});

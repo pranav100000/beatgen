@@ -92,13 +92,15 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
         }
         
         // For MIDI tracks, get the MIDI file from IndexedDB and prepare for upload
-        if (track.type === 'midi') {
-          console.log('Found MIDI track to save:', track.id);
-          
-          // We'll fetch the MIDI data from IndexedDB and add it to upload list asynchronously
-          // Add this track to the placeholders list and process it separately
-          return null;
-        }
+          // if (track.type === 'midi') {
+          //   console.log('Found MIDI track to save:', track.id);
+            
+          //   // We'll fetch the MIDI data from IndexedDB and add it to upload list asynchronously
+          //   // Add this track to the placeholders list and process it separately
+          //   return null;
+          // }
+
+        console.log('Processing track:', track);
         
         // For other tracks, convert to API format (using flattened structure)
         return {
@@ -113,8 +115,14 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
           y_position: track.position?.y || 0,
           duration: track.duration,
           storage_key: track.storage_key, // Include storage key if available
+          // Add instrument information for MIDI and drum tracks
+          instrument_id: track.type === 'midi' || track.type === 'drum' ? track.instrumentId : undefined,
+          instrument_name: track.type === 'midi' || track.type === 'drum' ? track.instrumentName : undefined,
+          instrument_storage_key: track.type === 'midi' || track.type === 'drum' ? track.instrumentStorageKey : undefined
         };
       }).filter(track => track !== null); // Remove null placeholders
+
+      console.log('Project tracks:', projectTracks);
       
       // Now handle the MIDI tracks - fetch from IndexedDB
       const midiTracks = tracks.filter(track => track.type === 'midi');
@@ -128,6 +136,15 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
           if (midiBlob) {
             console.log(`Found MIDI blob for track ${track.id}, size: ${midiBlob.size} bytes`);
             
+            // Log for debugging
+            console.log(`DEBUG: Track ${track.id} instrument data:`, {
+              instrumentId: track.instrumentId,
+              instrumentName: track.instrumentName,
+              instrumentStorageKey: track.instrumentStorageKey,
+              hasValue: !!track.instrumentStorageKey,
+              allTrackProps: Object.keys(track)
+            });
+            
             // Add to upload list
             midiTracksToUpload.push({
               id: track.id,
@@ -139,7 +156,11 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
               is_muted: track.muted || false,
               name: track.name,
               bpm: bpm,
-              time_signature: timeSignature
+              time_signature: timeSignature,
+              // Add instrument information with snake_case for API
+              instrument_id: track.instrumentId,
+              instrument_name: track.instrumentName,
+              instrument_storage_key: track.instrumentStorageKey
             });
           } else {
             console.log(`No MIDI data found in DB for track ${track.id}, adding to standard tracks`);
@@ -155,7 +176,11 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
               x_position: track.position?.x || 0,
               y_position: track.position?.y || 0,
               duration: track.duration,
-              storage_key: track.storage_key // Include storage key if available
+              storage_key: track.storage_key, // Include storage key if available
+              // Add instrument information
+              instrument_id: track.instrumentId,
+              instrument_name: track.instrumentName,
+              instrument_storage_key: track.instrumentStorageKey
             });
           }
         } catch (error) {

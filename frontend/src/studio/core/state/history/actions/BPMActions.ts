@@ -22,6 +22,8 @@ export class BPMChangeAction implements Action {
         
         // Update state BPM
         this.setBpm(bpm);
+
+        const audioTrackWidthScale = 1;
         
         // Recalculate track widths based on new BPM
         this.setTracks(currentTracks => 

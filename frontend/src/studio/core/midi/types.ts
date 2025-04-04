@@ -26,7 +26,7 @@ export interface MidiManagerInterface {
   
   // Note conversion
   midiToNotes(midiData: MidiData): Note[];
-  notesToMidi(notes: Note[], bpm: number): MidiData;
+  notesToMidi(trackId: string, notes: Note[], bpm: number): MidiData;
   
   // Track operations
   createTrack(instrumentId: string, name: string): MidiTrack;
@@ -37,8 +37,4 @@ export interface MidiManagerInterface {
   addNoteToTrack(trackId: string, note: Note): Promise<void>;
   removeNoteFromTrack(trackId: string, noteId: number): Promise<void>;
   updateNote(trackId: string, updatedNote: Note): Promise<void>;
-  
-  // Playback integration
-  schedulePlayback(track: MidiTrack): void;
-  stopPlayback(trackId: string): void;
 } 

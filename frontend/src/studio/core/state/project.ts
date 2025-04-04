@@ -1,13 +1,14 @@
 export interface Track {
   id: string;
   name: string;
-  type: 'audio' | 'midi' | 'video' | 'drum';
+  type: 'audio' | 'midi' | 'drum';
   volume: number;
   pan: number;
   muted: boolean;
   soloed: boolean;
   instrumentId?: string;    // ID of the instrument (for MIDI/drum tracks)
   instrumentName?: string;  // Display name of the instrument
+  instrumentStorageKey?: string; // Storage key for the instrument
 }
 
 export interface Project {
@@ -61,10 +62,10 @@ export class ProjectManager {
 
     // Add default instrument properties for MIDI and drum tracks
     if (type === 'midi') {
-      track.instrumentId = 'piano'; // Default to piano
+      track.instrumentId = 'NULLVALUE'; // Default to piano
       track.instrumentName = 'Grand Piano'; // Default name
     } else if (type === 'drum') {
-      track.instrumentId = 'drum'; // Default to drum kit
+      track.instrumentId = 'NULLVALUE'; // Default to drum kit
       track.instrumentName = '808 Kit'; // Default name
     }
 
@@ -86,6 +87,7 @@ export class ProjectManager {
     soloed?: boolean;
     instrumentId?: string;
     instrumentName?: string;
+    instrumentStorageKey?: string;
   }): Track {
     if (!this.currentProject) {
       throw new Error('No project loaded');
@@ -105,6 +107,7 @@ export class ProjectManager {
     if ((trackProps.type === 'midi' || trackProps.type === 'drum') && trackProps.instrumentId) {
       track.instrumentId = trackProps.instrumentId;
       track.instrumentName = trackProps.instrumentName || 'Default Instrument';
+      track.instrumentStorageKey = trackProps.instrumentStorageKey;
     }
 
     this.currentProject.tracks.push(track);
@@ -121,6 +124,18 @@ export class ProjectManager {
     this.currentProject.tracks = this.currentProject.tracks.filter(
       track => track.id !== id
     );
+  }
+
+  public getTempo(): number {
+    return this.currentProject.tempo;
+  }
+
+  public getTimeSignature(): [number, number] {
+    return this.currentProject.timeSignature;
+  }
+
+  public getKey(): string {
+    return this.currentProject.key;
   }
 
   public setTempo(tempo: number): void {

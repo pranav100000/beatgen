@@ -8,18 +8,43 @@ export interface Position {
     y: number; // Position in pixels from top (track order)
 }
 
-export interface TrackState extends TrackType, Omit<AudioTrack, 'id'> {
-    audioFile?: File;
+export interface BaseTrackState {
+    id: string;
+    name: string;
+    type: 'audio' | 'midi' | 'drum';
     channel: Tone.Channel;
     volume: number;
     pan: number;
     muted: boolean;
     soloed: boolean;
-    dbId?: string;
     position: Position; // Track's position in the grid
+    dbId?: string;
     duration?: number; // Duration in seconds
     _calculatedWidth?: number; // Width in pixels based on duration and BPM
-    drumPads?: DrumPad[]; // For drum machine tracks
     storage_key?: string; // Storage key for cloud-stored files
     index?: number; // Index of the track in the project
-} 
+    instrumentId?: string; // ID of the instrument
+    instrumentName?: string; // Name of the instrument
+    instrumentStorageKey?: string; // Storage key for the instrument
+    audioFile?: File;
+}
+
+export interface AudioTrackState extends BaseTrackState {
+    type: 'audio';
+    audioFile?: File;
+    player?: Tone.Player;
+}
+
+export interface MidiTrackState extends BaseTrackState {
+    type: 'midi' | 'drum';
+    instrumentId?: string; // ID of the instrument
+    instrumentName?: string; // Name of the instrument
+    instrumentStorageKey?: string; // Storage key for the instrument
+}
+
+export interface DrumTrackState extends MidiTrackState {
+    type: 'drum';
+    drumPads?: DrumPad[]; // For drum machine tracks
+}
+
+export type TrackState = AudioTrackState | MidiTrackState | DrumTrackState;

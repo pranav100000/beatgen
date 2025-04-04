@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect, Line, Group, Text } from 'react-konva';
 import { Box } from '@mui/material';
 import { Note } from '../../../core/types/note';
@@ -11,8 +11,8 @@ interface PianoRollCanvasProps {
 
 const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => {
   // Get notes and actions from context
-  const { notesByTrack, createNote, moveNote, resizeNote, playPreview, stopPreview } = usePianoRoll();
-  const notes = notesByTrack[trackId] || [];
+  const { getNotesForTrack, createNote, moveNote, resizeNote, deleteNote, playPreview, stopPreview } = usePianoRoll();
+  const notes = getNotesForTrack(trackId);
 
   // State for drag and resize operations
   const [draggedNote, setDraggedNote] = useState<number | null>(null);
@@ -49,13 +49,17 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
   
   // Local state for notes being manipulated (for performance)
   const [localNotes, setLocalNotes] = useState<Note[]>([]);
-  const [visibleNotes, setVisibleNotes] = useState<Note[]>([]);
+  // Removed visibleNotes state - using memoizedVisibleNotes directly
   const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 });
   
-  // Initialize local notes from context
+  // Initialize local notes from context only on mount or when trackId changes
+  // This breaks the circular dependency by not updating when notes change
   useEffect(() => {
-    setLocalNotes(notes);
-  }, [notes]);
+    // Get notes from MidiManager via context
+    const trackNotes = getNotesForTrack(trackId);
+    setLocalNotes(trackNotes);
+    // Deliberately NOT including notes in the dependency array
+  }, [trackId, getNotesForTrack]);
   
   // Helper function to convert display row to actual row (MIDI note number)
   const displayRowToActualRow = (displayRow: number): number => {
@@ -113,14 +117,19 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
   }, [gridColumns, cellWidth, minGridColumns, keyWidth]);
   
   // Calculate which notes are visible based on scroll position
-  useEffect(() => {
+  // Using useMemo directly to avoid the need for a separate state variable
+  // Importantly, we get notes directly from MidiManager for rendering
+  const memoizedVisibleNotes = useMemo(() => {
     const visibleStartColumn = Math.floor(scrollPosition.x / cellWidth);
     const visibleEndColumn = visibleStartColumn + Math.ceil(dimensions.width / cellWidth);
     const visibleStartRow = Math.floor(scrollPosition.y / cellHeight);
     const visibleEndRow = visibleStartRow + Math.ceil(dimensions.height / cellHeight);
     
+    // Get notes directly from MidiManager (the source of truth) for rendering
+    const currentNotes = getNotesForTrack(trackId);
+    
     // Filter notes to only those visible in the viewport
-    const visible = localNotes.filter(note => {
+    return currentNotes.filter(note => {
       const displayRow = actualRowToDisplayRow(note.row);
       return (
         note.column + note.length >= visibleStartColumn &&
@@ -129,9 +138,10 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
         displayRow <= visibleEndRow
       );
     });
-    
-    setVisibleNotes(visible);
-  }, [localNotes, scrollPosition, dimensions, cellWidth, cellHeight]);
+  }, [scrollPosition, dimensions, cellWidth, cellHeight, actualRowToDisplayRow, getNotesForTrack, trackId]);
+  
+  // No need for calculateVisibleNotes function or separate effect
+  // This way we avoid the circular dependency that was causing the infinite loop
   
   // Simple scroll handler based on the working implementation
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -183,7 +193,7 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
         row: actualRow,
         column,
         length: 1,
-        velocity: 100,
+        velocity: 0.8,
         trackId
       };
       
@@ -213,9 +223,9 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
     // This ensures the note is dragged from the exact point where the user clicked
     const pointerPos = stageRef.current.getPointerPosition();
     
-    // Calculate grid position of the click
-    const noteX = keyWidth + (note.column * cellWidth);
-    const noteY = actualRowToDisplayRow(note.row) * cellHeight;
+    // Calculate grid position of the click, including scroll position
+    const noteX = keyWidth + (note.column * cellWidth) - scrollPosition.x;
+    const noteY = actualRowToDisplayRow(note.row) * cellHeight - scrollPosition.y;
     
     setDragOffset({
       x: pointerPos.x - noteX, 
@@ -224,7 +234,7 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
     
     // Play the note for auditory feedback
     playPreview(note.row);
-  }, [localNotes, playPreview, keyWidth, cellWidth, cellHeight, actualRowToDisplayRow]);
+  }, [localNotes, playPreview, keyWidth, cellWidth, cellHeight, actualRowToDisplayRow, scrollPosition]);
   
   // Handle start of note resizing
   const handleResizeStart = useCallback((e: any, noteId: number, side: 'left' | 'right') => {
@@ -518,9 +528,10 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
     return keys;
   }, [cellHeight, totalNotes, displayRowToActualRow, playPreview, stopPreview]);
   
-  // Render notes
+  // Render notes - use memoized notes for better performance
   const renderNotes = useCallback(() => {
-    return visibleNotes.map((note) => {
+    // Use memoizedVisibleNotes directly to prevent re-renders during playback
+    return memoizedVisibleNotes.map((note) => {
       const isBeingDragged = draggedNote === note.id;
       const isBeingResized = resizingNote === note.id;
       const isHovered = hoveredNote === note.id;
@@ -594,7 +605,7 @@ const PianoRollCanvas: React.FC<PianoRollCanvasProps> = ({ trackId, color }) => 
         </Group>
       );
     });
-  }, [visibleNotes, cellWidth, cellHeight, draggedNote, resizingNote, handleNoteClick, handleNoteDragStart, handleResizeStart, actualRowToDisplayRow]);
+  }, [memoizedVisibleNotes, cellWidth, cellHeight, draggedNote, resizingNote, hoveredNote, color, handleNoteClick, handleNoteDragStart, handleResizeStart, actualRowToDisplayRow]);
 
   return (
     <Box 

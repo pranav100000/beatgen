@@ -1,11 +1,9 @@
 import React from 'react';
 import { PianoRollProvider, usePianoRoll } from './context/PianoRollContext';
 import PianoRollWindow from './components/PianoRollWindow';
-import MidiNotesPreview from './components/MidiNotesPreview';
 
 // Re-export components and hooks for external use
 export { usePianoRoll } from './context/PianoRollContext';
-export { default as MidiNotesPreview } from './components/MidiNotesPreview';
 
 interface PianoRollModuleProps {
   children: React.ReactNode;
