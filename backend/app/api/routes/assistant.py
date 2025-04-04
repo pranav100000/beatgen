@@ -8,11 +8,11 @@ import asyncio
 from app.core.security import get_current_user
 from app.schemas.user import UserProfile
 from app.schemas.assistant import (
-    AssistantRequest, AssistantResponse, 
     GenerateRequest, GenerateResponse,
     EditRequest, EditResponse,
     AssistantAction, TrackData
 )
+from app.types.assistant_actions import AssistantAction, TrackType
 from services.music_gen_service.music_gen_service import music_gen_service
 from services.music_gen_service.midi import get_clean_track_data
 from services.music_gen_service.music_tools import music_tools_service
@@ -41,16 +41,12 @@ async def generate_tracks(
             instrument_name=resp.get("instruments")[0].get("name"),
             storage_key=resp.get("instruments")[0].get("storage_key")
         )
-        action = AssistantAction(
-            type="add_generated_track",
-            data={
-                "instrumentName": resp.get("instruments")[0].get("name"),
-                "instrumentId": resp.get("instruments")[0].get("instrument_id"),
-                "storageKey": resp.get("instruments")[0].get("storage_key"),
-                "hasNotes": True,
-                "notes": resp.get("instruments")[0].get("notes")
-            }
+        action = AssistantAction.add_track(
+            type=TrackType.MIDI,
+            instrument_id=resp.get("instruments")[0].get("instrument_id"),
+            notes=resp.get("instruments")[0].get("notes")
         )
+
         generate_response = GenerateResponse(
             response=str(resp),
             tracks=[tracks],

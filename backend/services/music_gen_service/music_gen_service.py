@@ -7,10 +7,12 @@ from typing import Any, Dict, List, Optional
 import anthropic
 from dotenv import load_dotenv
 import logging
+from app.utils.sse_queue_manager import SSEQueueManager
+from app.types.assistant_actions import AssistantAction, TrackType
 from services.music_gen_service.chord_progression_analysis import analyze_chord_progression
 from services.soundfont_service.soundfont_service import soundfont_service
 from clients.anthropic_client import AnthropicClient
-from services.music_gen_service.midi import transform_bars_to_instrument_format
+from services.music_gen_service.midi import transform_bars_to_instrument_format, transform_chord_progression_to_instrument_format
 from services.music_gen_service.music_utils import get_mode_intervals
 from services.music_gen_service.music_gen_tools import CREATE_MELODY_TOOL, DETERMINE_MUSICAL_PARAMETERS_TOOL, SELECT_INSTRUMENTS_TOOL
 from services.music_gen_service.prompt_utils import get_ai_composer_agent_initial_system_prompt, get_melody_create_prompt
@@ -66,14 +68,21 @@ class MusicGenService:
         self.musical_params = MusicalParams()
         self.available_soundfonts = []
 
-    async def compose_music(self, prompt: str, queue: asyncio.Queue):
+    async def compose_music(self, prompt: str, queue: SSEQueueManager):
         
-        research_result = "test" #await self.researcher.enhance_description(prompt)
+        await queue.stage("Starting research...", "Doing research online to find the best musical parameters...")
+        # Run research and soundfont fetching concurrently
+        research_result, chord_research_result, self.available_soundfonts = await asyncio.gather(
+            self.researcher.enhance_description(prompt),
+            self.researcher.research_chord_progression(prompt),
+            soundfont_service.get_public_soundfonts()
+        )
+        #research_result, chord_research_result = "", ""
+        #self.available_soundfonts = await soundfont_service.get_public_soundfonts()
+        
+        
         #musical_params = self.get_musical_params(description, research_result)
-        
-        chord_research_result = "test" #await self.researcher.research_chord_progression(prompt)
         #mode = await self.researcher.enhance_research(description)
-        self.available_soundfonts = await soundfont_service.get_public_soundfonts()
         #logger.info(f"Research result: {research_result}")
         #logger.info(f"Chord research result: {chord_research_result}")
         #logger.info(f"Prompt: {prompt}")
@@ -91,21 +100,45 @@ class MusicGenService:
         
         system_prompt = get_ai_composer_agent_initial_system_prompt()
         self.anthropic_client2.set_system_prompt(system_prompt)
-        message = f"What key and mode, BPM, and chord progression would you recommend for the following description: {prompt} Use the determine_musical_parameters tool to set the key, mode, BPM, and chord progression."
+        message = f"""Based on this description: {prompt}
+
+I need you to determine the musical parameters (key, mode, BPM, and chord progression). 
+
+First, explain your reasoning for each parameter:
+1. What key would work best and why?
+2. What mode would complement this and why?
+3. What tempo (BPM) would capture the right feel and why?
+4. What chord progression would support this style and why?
+
+After you've explained your choices, use the determine_musical_parameters tool to set these values.
+
+**IMPORTANT: Explain your reasoning for each parameter before using the tool.**
+
+Here is some research we've done on the description: {research_result} 
+And here is some research we've done on the chord progression: {chord_research_result}"""
         
         # Use async method
+        content_text, tool_use_json = await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[])
+        message = f"""
+        Now use the "determine_musical_parameters" tool to set the musical parameters for the rest of the composition.
+        """
         content_text, tool_use_json = await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[DETERMINE_MUSICAL_PARAMETERS_TOOL])
-        
         self._set_musical_params(tool_use_json.get("key"), tool_use_json.get("mode"), tool_use_json.get("chord_progression"), tool_use_json.get("tempo"))
         print(self.musical_params)
+        
+        #queue.action(AssistantAction.change_key(value=(self.musical_params.key + self.musical_params.mode)))
+        await queue.action(AssistantAction.change_bpm(value=self.musical_params.bpm))
+        
 
         # Select instruments
         soundfont_names = [soundfont["name"] for soundfont in self.available_soundfonts]
         message = f"What kind of instruments fit the beat we are trying to make? Look through this list of available soundfonts and select the ones that you think are the best fit: {soundfont_names} IMPORTANT: Make sure to select instruments that fit well together. DO NOT select instruments that will not fit well together. You should select 2-3 instruments."
         
         # Use async method
-        select_instruments_response, tool_use_json = await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[SELECT_INSTRUMENTS_TOOL])
+        select_instruments_response, tool_use_json = await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[])
         print("SELECT INSTRUMENTS TOOL USE JSON:", json.dumps(tool_use_json, indent=4))
+        message = f"Now select the instruments you just mentioned with the select_instruments tool."
+        select_instruments_response, tool_use_json = await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[SELECT_INSTRUMENTS_TOOL])
         self.select_instruments(tool_use_json, self.available_soundfonts)
         print("MUSICAL PARAMS AFTER SELECT INSTRUMENTS:", self.musical_params)
         #print("TOOL USE JSON:", tool_use_json)
@@ -117,7 +150,13 @@ class MusicGenService:
         # message = f"Create a chord progression that is {self.musical_params.chord_progression} for {self.musical_params.key} {self.musical_params.mode} at {self.musical_params.bpm} BPM."
         # create_chords_response, tool_use_json = self.anthropic_client2.send_message(message, stream=True, tools=[CREATE_CHORDS_TOOL])
         # print("CREATE CHORDS RESPONSE:", create_chords_response)
-        
+        # Generate chord progression
+        try:
+            chords_result = await self._handle_create_chords(queue=queue)
+            logger.info(f"Successfully generated chord progression")
+        except Exception as e:
+            logger.error(f"Error generating chord progression: {str(e)}")
+            chords_result = None
         
         message = f"How would you describe a melody for the following description: {prompt} using these instruments: {soundfont_names}. Also consider the research we've done Describe the melody in these categories: instrument name (instrument that best fits what we are trying to make), description, mood, rhythm_type, musical_style, melodic_character. Use the create_melody tool to create a melody."
         
@@ -126,14 +165,6 @@ class MusicGenService:
         print("CREATE MELODY RESPONSE:", create_melody_response)
         
         await self._handle_create_melody(tool_use_json, queue)
-        
-        # Generate chord progression
-        try:
-            chords_result = await self._handle_create_chords(queue=queue)
-            logger.info(f"Successfully generated chord progression")
-        except Exception as e:
-            logger.error(f"Error generating chord progression: {str(e)}")
-            chords_result = None
         
         # Build the final response
         instruments = []
@@ -169,7 +200,7 @@ class MusicGenService:
                     )
         print("MUSICAL PARAMS INSTRUMENTS:", self.musical_params.instruments)
                 
-    async def _handle_create_chords(self, args: Dict[str, Any] = None, queue: asyncio.Queue = None) -> Dict[str, Any]:
+    async def _handle_create_chords(self, args: Dict[str, Any] = None, queue: SSEQueueManager = None) -> Dict[str, Any]:
         """
         Handle chord generation based on the musical parameters.
         Generate MIDI notes for the chord progression and format for client use.
@@ -188,7 +219,7 @@ class MusicGenService:
         # Find an appropriate instrument for chords
         chord_instrument = None
         for instrument in self.musical_params.instruments:
-            if instrument.get("role") == "chords":
+            if instrument.role == "chords":
                 chord_instrument = instrument
                 break
                 
@@ -204,27 +235,25 @@ class MusicGenService:
         logger.info(f"Generating chord progression: {chord_progression} in {key} {mode}")
         
         try:
-            # Use the transform function from midi module to convert chord progression to MIDI notes
-            from services.music_gen_service.midi import transform_chord_progression_to_instrument_format
-            
-            # Format chord progression properly for processing
             if "-" not in chord_progression:
-                # If not already in dash format, convert spaces or commas to dashes
                 chord_progression = chord_progression.replace(" ", "-").replace(",", "-")
             
-            # Generate the chord data structure
             result = transform_chord_progression_to_instrument_format(
                 chord_progression=chord_progression,
                 instrument=chord_instrument,
                 key=key
             )
             
-            # Store the chord data in musical params
             self.musical_params.chords = result
             
-            # Add additional metadata for client use
             result["part_type"] = "chords"
             result["description"] = f"Chord progression {chord_progression} in {key} {mode}"
+            
+            await queue.action(AssistantAction.add_track(
+                type=TrackType.MIDI,
+                instrument_id=chord_instrument.id,
+                notes=result.get('notes')
+            ))
             
             logger.info(f"Generated chord progression with {len(result.get('notes', []))} notes")
             return result
@@ -234,7 +263,7 @@ class MusicGenService:
             logger.error(f"Stack trace: {traceback.format_exc()}")
             raise ValueError(f"Failed to generate chord progression: {str(e)}")
     
-    async def _handle_create_melody(self, args: Dict[str, Any], queue: asyncio.Queue) -> Dict[str, Any]:
+    async def _handle_create_melody(self, args: Dict[str, Any], queue: SSEQueueManager) -> Dict[str, Any]:
         instrument_name = args.get("instrument_name", "")
         description = args.get("description", "")
         duration_beats = args.get("duration_beats", 16)
@@ -298,7 +327,7 @@ class MusicGenService:
                 chord_progression_list[idx] = chord.replace("b", "-")
             note_probabilities = analyze_chord_progression(chord_progression_list, key)
             note_probabilities_string = json.dumps(note_probabilities, indent=4)
-            message = f"Create a melody that is {detailed_description} for {instrument_name} in the key of {key} {mode} at {tempo} BPM. Follow the chord progression: {chord_progression} as closely as possible. Use this data with note probabilities to create a melody: {note_probabilities_string}. DO NOT create notes that are out of key."
+            message = f"Create a melody that is {detailed_description} for {instrument_name} in the key of {key} {mode} at {tempo} BPM. Follow the chord progression: {chord_progression} as closely as possible. Use this data with note probabilities to create a melody: {note_probabilities_string}. DO NOT create notes that are out of key. IMPORTANT: Make sure the end of your response is the JSON object WITH THE JSON TAG."
             
             # Use the async method instead of the sync one
             
@@ -352,6 +381,11 @@ class MusicGenService:
             result = transform_bars_to_instrument_format(melody_data, melody_instrument, key)
             self.musical_params.melody = result
             print("MUSICAL PARAMS:", self.musical_params)
+            await queue.action(AssistantAction.add_track(
+                type=TrackType.MIDI,
+                instrument_id=melody_instrument.id,
+                notes=result.get('notes')
+            ))
             return result
                 
         except Exception as e:

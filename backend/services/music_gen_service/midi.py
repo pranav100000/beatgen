@@ -106,7 +106,7 @@ def transform_bars_to_instrument_format(data: Dict[str, Any], instrument: dict, 
     
     return result
 
-def transform_chord_progression_to_instrument_format(chord_progression: str, instrument: Dict[str, Any], key: str) -> Dict[str, Any]:
+def transform_chord_progression_to_instrument_format(chord_progression: str, instrument, key: str) -> Dict[str, Any]:
     """
     Transform the structured chord progression data from Claude into the expected instrument format.
     
@@ -159,9 +159,9 @@ def transform_chord_progression_to_instrument_format(chord_progression: str, ins
     # Map from the instrument object to the correct field names
     # Handle both possible formats for compatibility
     result = {
-        "instrument_id": instrument.get("instrument_id", instrument.get("id", "unknown")),
-        "storage_key": instrument.get("storage_key", "unknown"),
-        "name": instrument.get("instrument_name", instrument.get("display_name", "Unknown Instrument")),
+        "instrument_id": instrument.id,
+        "storage_key": instrument.storage_key,
+        "name": instrument.name,
         "notes": midi_notes
     }
     
@@ -179,8 +179,11 @@ def _parse_chord_name(chord_name: str, key: str, octave: int = 4) -> List[int]:
     Returns:
         List of MIDI note values
     """
-    chord = harmony.chord.Chord(chord_name)
-    return [note.midi for note in chord.pitchedCommonName]
+    logger.info(f"Parsing chord name: {chord_name}")
+    # Convert 'b' flats to '-' for music21
+    chord_name = chord_name.replace('b', '-')
+    chord = harmony.ChordSymbol(chord_name)
+    return [note.midi for note in chord.pitches]
 
 
 

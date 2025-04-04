@@ -8,7 +8,7 @@ import sys
 from typing import Dict, Any, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
-
+import asyncio
 # Set up detailed logging with DEBUG level
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -123,7 +123,6 @@ class MusicResearcher:
         
         try:
             # Using asyncio to run the synchronous code in a non-blocking way
-            import asyncio
             print(f"[DIRECT PRINT] Inside _research_music: Setting up async execution for Perplexity API call")
             logger.debug("Setting up async execution for Perplexity API call")
             
@@ -185,7 +184,6 @@ class MusicResearcher:
         
         try:
             # Using asyncio to run the synchronous code in a non-blocking way
-            import asyncio
             print(f"[DIRECT PRINT] Inside _research_chord_progression: Setting up async execution for Perplexity API call")
             logger.debug("Setting up async execution for Perplexity API call")
             

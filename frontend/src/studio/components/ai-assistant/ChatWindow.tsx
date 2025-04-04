@@ -34,6 +34,7 @@ import AssistantChatBubble from './AssistantChatBubble';
 import UserChatBubble from './UserChatBubble';
 import { GRID_CONSTANTS } from '../../constants/gridConstants';
 import { TrackState } from 'src/studio/core/types/track';
+import ReactMarkdown from 'react-markdown'
 
 interface Message {
   text: string;
@@ -434,7 +435,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
           setBpm(actionData.value);
         }
         break;
-      case 'add_track':
+      case 'add_track2':
         if (actionData?.type) {
           handleAddTrack(
             actionData.type,
@@ -443,16 +444,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
           );
         }
         break;
-      case 'add_generated_track':
+      case 'add_track':
+        console.log('🟢 add_track action received:', actionData);
         // New action type for adding an individual generated track with notes
-        if (actionData?.storageKey && store) {
+        if (store) {
           try {
-            const trackId = actionData.trackId;
+            const trackId = actionData.trackId || crypto.randomUUID();
             const instrumentName = actionData.instrumentName || 'AI Generated Track';
+            const instrumentId = actionData.instrument_id;  // Fix: map from snake_case to camelCase
             const storageKey = actionData.storageKey;
             const hasNotes = actionData.hasNotes || false;
             
-            console.log(`Adding generated track: ${instrumentName} with storageKey: ${storageKey}`);
+            console.log(`Adding generated track: ${instrumentName} with instrumentId: ${instrumentId}`);
             
             // Find the result object that contains the notes
             const generatedTracks = messages
@@ -475,9 +478,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             const action = {
               execute: async () => {
                 // Add track with the soundfont
-                console.log(`Adding generated track with storage key: ${storageKey}`);
-                const storageKeyParts = storageKey.split('/');
-                const instrumentId = storageKeyParts[storageKeyParts.length - 2];
+                console.log(`Adding generated track with instrumentId: ${instrumentId}`);
                 const newTrack = await handleAddTrack('midi', instrumentId, instrumentName, storageKey);
                 
                 // Get notes directly from the action data if available

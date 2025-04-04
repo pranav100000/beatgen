@@ -145,9 +145,9 @@ class SSEManager:
                         
                         # Process regular event
                         msg = self.format_event(event_type, data)
-                        logger.debug(f"Sending event ({event_type}): {msg[:50]}...")
+                        #logger.debug(f"Sending event ({event_type}): {msg[:50]}...")
                         yield msg
-                        logger.debug(f"Event sent: {event_type}")
+                        #logger.debug(f"Event sent: {event_type}")
                         
                     else:
                         # Wait for the next event with a timeout
@@ -158,7 +158,7 @@ class SSEManager:
                                 timeout=self.heartbeat_interval
                             )
                             
-                            logger.debug(f"Received event from queue after waiting: {event_type}")
+                            #logger.debug(f"Received event from queue after waiting: {event_type}")
                             
                             # Process the received event
                             if event_type == "complete":
@@ -170,9 +170,9 @@ class SSEManager:
                             
                             # Otherwise yield the event and continue
                             msg = self.format_event(event_type, data)
-                            logger.debug(f"Sending event ({event_type}): {msg[:50]}...")
+                            #logger.debug(f"Sending event ({event_type}): {msg[:50]}...")
                             yield msg
-                            logger.debug(f"Event sent: {event_type}")
+                            #logger.debug(f"Event sent: {event_type}")
                             
                         except asyncio.TimeoutError:
                             # Send a heartbeat on timeout

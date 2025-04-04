@@ -71,7 +71,11 @@ async def simple_ping_stream(queue: asyncio.Queue):
         await queue.put(("complete", {"message": "Ping-pong complete"}))
     except Exception as e:
         logger.error(f"Error in ping stream: {str(e)}")
-        await queue.put(("error", {"message": str(e)}))
+        logger.error(f"Ping stream error traceback: {traceback.format_exc()}")
+        await queue.put(("error", {
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }))
 
 @router.post("/assistant")
 async def streaming_assistant(
@@ -132,14 +136,26 @@ async def edit_track_stream_get(
     user: UserProfile = Depends(get_current_user)
 ):
     """GET version of the streaming endpoint (for testing)."""
-    # Create a request object from query parameters
-    edit_request = EditRequest(
-        prompt=prompt,
-        track_id=track_id,
-        edit_type=edit_type
-    )
-    
-    return await streaming_assistant(edit_request, BackgroundTasks(), user)
+    try:
+        # Create a request object from query parameters
+        edit_request = EditRequest(
+            prompt=prompt,
+            track_id=track_id,
+            edit_type=edit_type
+        )
+        
+        return await streaming_assistant(edit_request, BackgroundTasks(), user)
+    except Exception as e:
+        logger.error(f"Error in edit track stream GET: {str(e)}")
+        logger.error(f"Edit track GET error traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": "Error processing edit track stream request",
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+        )
 
 async def process_assistant_streaming(
     request: Union[EditRequest, GenerateRequest], 
@@ -228,13 +244,14 @@ async def process_assistant_streaming(
         
     except Exception as e:
         logger.error(f"Error in {request_type} streaming: {str(e)}")
-        logger.error(traceback.format_exc())
+        logger.error(f"Streaming error traceback: {traceback.format_exc()}")
         
         # Send error to client
         await queue.put(("error", {
             "message": f"Error processing your request",
             "error": str(e),
-            "track_id": track_id
+            "track_id": track_id,
+            "traceback": traceback.format_exc()
         }))
 
 async def stream_ai_response(
@@ -292,13 +309,16 @@ async def stream_ai_response(
         
     except Exception as e:
         logger.error(f"Error streaming from Anthropic: {str(e)}")
+        logger.error(f"Anthropic streaming error traceback: {traceback.format_exc()}")
         error_message = f"Sorry, I encountered an error: {str(e)}"
         
         # Send the error as a final chunk
         await queue.put(("response_chunk", {
             "message_id": message_id,
             "chunk": error_message,
-            "chunk_index": 9999
+            "chunk_index": 9999,
+            "error": True,
+            "traceback": traceback.format_exc()
         }))
         
         await queue.put(("response_end", {

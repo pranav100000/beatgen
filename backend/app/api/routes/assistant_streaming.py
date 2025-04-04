@@ -14,6 +14,7 @@ import logging
 import time
 import uuid
 from typing import Dict, List, Any, Optional, AsyncGenerator, Literal
+import traceback
 
 from app.core.security import get_current_user
 from app.schemas.user import UserProfile
@@ -25,6 +26,8 @@ from app.schemas.assistant import (
 )
 from app.utils.request_manager import request_manager, RequestStatus
 from app.utils.sse import format_sse_message, SSEManager
+from app.utils.sse_queue_manager import SSEQueueManager
+from app.types.assistant_actions import TrackType
 from services.music_gen_service.music_gen_service import music_gen_service
 from services.music_gen_service.midi import get_clean_track_data
 from pydantic import BaseModel
@@ -198,11 +201,11 @@ async def cancel_assistant_request(
             detail=f"Request ID not found: {request_id}"
         )
     
-    # Get the request queue
-    queue = request_manager.get_queue(request_id)
-    if queue:
+    # Get the SSE queue
+    sse_queue = request_manager.get_sse_queue(request_id)
+    if sse_queue:
         # Send cancelled event
-        await queue.put(("cancelled", {"message": "Request cancelled by user"}))
+        await sse_queue.cancelled()
     
     # Remove request
     if request_manager.remove_request(request_id, RequestStatus.CANCELLED):
@@ -230,36 +233,36 @@ async def process_assistant_request(request_id: str):
         logger.error(f"Request context not found for ID: {request_id}")
         return
     
-    # Get the queue for sending events
-    queue = context.queue
-    if not queue:
-        logger.error(f"Queue not found for request: {request_id}")
+    # Get the SSE queue for sending events
+    sse_queue = context.sse_queue
+    if not sse_queue:
+        logger.error(f"SSE queue not found for request: {request_id}")
         return
     
     try:
         # Log start of processing
         logger.info(f"Processing assistant request: {request_id}, mode: {context.mode}")
         
-        # Send initial events
-        await queue.put(("connected", {"status": "connected"}))
+        # Send initial events using SSEEventQueue helper methods
+        await sse_queue.start_stream()
         
-        await queue.put(("stage", {
-            "name": "initializing", 
-            "description": f"Setting up {context.mode} process"
-        }))
+        await sse_queue.stage(
+            name="initializing", 
+            description=f"Setting up {context.mode} process"
+        )
         
-        await queue.put(("status", {
-            "message": f"Processing your {context.mode} request", 
-            "details": f"Prompt: {context.prompt}"
-        }))
+        await sse_queue.status(
+            message=f"Processing your {context.mode} request", 
+            details=f"Prompt: {context.prompt}"
+        )
         
         # Process based on mode
         if context.mode == "generate":
-            await process_generate_request(request_id, context, queue)
+            await process_generate_request(request_id, context, sse_queue)
         elif context.mode == "edit":
-            await process_edit_request(request_id, context, queue)
+            await process_edit_request(request_id, context, sse_queue)
         else:  # chat
-            await process_chat_request(request_id, context, queue)
+            await process_chat_request(request_id, context, sse_queue)
         
         # Mark request as completed
         request_manager.update_request_status(request_id, RequestStatus.COMPLETED)
@@ -272,15 +275,20 @@ async def process_assistant_request(request_id: str):
     except Exception as e:
         # Log error and send error event
         logger.error(f"Error processing request {request_id}: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         
         # Try to send error to client
         try:
-            await queue.put(("error", {
-                "message": f"Error processing your request: {str(e)}",
-                "error": str(e)
-            }))
-        except Exception:
+            await sse_queue.error(
+                message=f"Error processing your request: {str(e)}",
+                error_data={
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }
+            )
+        except Exception as send_error:
             logger.error(f"Failed to send error event for request: {request_id}")
+            logger.error(f"Send error traceback: {traceback.format_exc()}")
         
         # Mark request as failed
         request_manager.update_request_status(request_id, RequestStatus.FAILED)
@@ -294,95 +302,81 @@ async def delayed_request_cleanup(request_id: str, delay_seconds: int = 10):
     await asyncio.sleep(delay_seconds)
     request_manager.remove_request(request_id)
 
-async def process_generate_request(request_id: str, context, queue: asyncio.Queue):
+async def process_generate_request(request_id: str, context, sse_queue: SSEQueueManager):
     """Process a generate mode request"""
-    # Create message ID for this session
-    message_id = f"msg-{int(time.time())}"
-    
-    # Response streaming setup
-    await queue.put(("response_start", {
-        "message_id": message_id,
-        "request_id": request_id
-    }))
-    
-    # Send processing stage
-    await queue.put(("stage", {
-        "name": "processing", 
-        "description": "Creating your music with AI"
-    }))
-    
     # Stream fake AI response chunks (for now)
     full_response = ""
     chunks = ["Generating music based on your prompt... ", 
              "This will include notes, harmonies, and rhythm patterns... ",
              "Creating musical elements that match your description... "]
     
-    for i, chunk in enumerate(chunks):
-        full_response += chunk
-        await queue.put(("response_chunk", {
-            "message_id": message_id,
-            "chunk": chunk,
-            "chunk_index": i
-        }))
+    # Process the response in stages
+    await sse_queue.stage("processing", "Creating your music with AI")
     
-    # Mark response as complete
-    await queue.put(("response_end", {
-        "message_id": message_id,
-        "is_complete": True
-    }))
+    # Add each chunk with a delay to simulate processing
+    for chunk in chunks:
+        await asyncio.sleep(0.5)  # Simulate processing time
+        await sse_queue.add_chunk(chunk)
+        full_response += chunk
+    
     
     # Generate music with music_gen_service
     try:
-        response = await music_gen_service.compose_music(context.prompt, queue)
+        response = await music_gen_service.compose_music(context.prompt, sse_queue)
         logger.info(f"Music generation complete: {len(response.get('instruments', []))} instruments")
-        
+        logger.info(f"Response: {response}")
         # Extract first instrument
         if response.get('instruments') and len(response['instruments']) > 0:
-            instrument = response['instruments'][0]
+            tracks = []
+            actions = []
+            logger.info(f"Response instruments: {response['instruments']}")
+            for instrument in response['instruments']:
+                if not instrument.get('notes'):
+                    continue
+                logger.info(f"Adding instrument: {instrument}")
             
-            # Create action for the generated track
-            action = AssistantAction(
-                type="add_generated_track",
-                data={
-                    "trackId": f"gen-track-{int(time.time())}", 
-                    "instrumentName": instrument.get('name'),
-                    "instrumentId": instrument.get('instrument_id'),
-                    "storageKey": instrument.get('storage_key'),
-                    "hasNotes": len(instrument.get('notes', [])) > 0,
-                    "notes": instrument.get('notes', [])
-                }
-            )
-            
-            # Send the action to the client
-            await queue.put(("action", action.dict()))
-            
-            # Create track data
-            track_data = TrackData(
-                notes=instrument.get('notes', []),
-                instrument_name=instrument.get('name', 'Piano'),
-                instrument_id=instrument.get('instrument_id', 'piano')
-            )
-            
+                # Create action for the generated track
+                action = AssistantAction.add_track(
+                    type=TrackType.MIDI,
+                    instrument_id=instrument['instrument_id'],
+                    notes=instrument['notes']
+                )
+                actions.append(action)
+                # Send the action to the client
+                # await sse_queue.action(action)
+                
+                # Create track data
+                track_data = TrackData(
+                    notes=instrument['notes'],
+                    instrument_name=instrument.get('name', 'Piano'),
+                    instrument_id=instrument['instrument_id']
+                )
+                tracks.append(track_data)
             # Create final response
             final_response = GenerateResponse(
                 response=full_response,
-                tracks=[track_data],
-                actions=[action]
+                tracks=tracks,
+                actions=actions
             )
             
             # Send complete event
-            await queue.put(("complete", final_response.dict()))
+            await sse_queue.complete(final_response.model_dump())
             logger.info(f"Generate request completed successfully: {request_id}")
         else:
             raise ValueError("No instruments returned from music generation service")
         
     except Exception as gen_error:
-        logger.error(f"Error in music generation: {str(gen_error)}")
-        await queue.put(("error", {
-            "message": f"Error generating music: {str(gen_error)}",
-            "error": str(gen_error)
-        }))
+        logger.error(f"Error in music generation: {gen_error}")
+        logger.error(f"Generation error traceback: {traceback.format_exc()}")
+        await sse_queue.error(
+            message=f"Error generating music: {str(gen_error)}",
+            error_data={
+                "error": str(gen_error),
+                "traceback": traceback.format_exc()
+            }
+        )
         raise
+    
 
 async def process_edit_request(request_id: str, context, queue: asyncio.Queue):
     """Process an edit mode request"""

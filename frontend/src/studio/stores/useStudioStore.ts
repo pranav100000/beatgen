@@ -735,7 +735,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       return;
     }
 
-    console.log(`Adding ${type} track with instrumentId: ${instrumentId} and instrumentName: ${instrumentName}`);
+    console.log('🎹 Adding track with params:', { 
+      type, 
+      instrumentId, 
+      instrumentName, 
+      instrumentStorageKey,
+      rawInstrumentId: instrumentId, // Log the raw value for debugging
+      typeofInstrumentId: typeof instrumentId
+    });
 
     try {
       // Create track name based on type
@@ -751,20 +758,28 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       let newTrack;
       // Create the track
       if (instrumentId) {
-        console.log('asdfasdfjklsahfaklsjdflkasfj;askfj track with instrumentId:', instrumentId);
-        const existingTrackData = 
-          {
-            id: crypto.randomUUID(),
-            volume: 80,
-            pan: 0,
-            muted: false,
-            soloed: false,
-            instrumentId: instrumentId,
-            instrumentName: instrumentName,
-            instrumentStorageKey: instrumentStorageKey
-          }
-        newTrack = await store.createTrack(trackName, type, existingTrackData)
+        console.log('🎹 Creating track with instrument data:', {
+          trackName,
+          type,
+          instrumentId,
+          instrumentName,
+          instrumentStorageKey
+        });
+        const existingTrackData = {
+          id: crypto.randomUUID(),
+          volume: 80,
+          pan: 0,
+          muted: false,
+          soloed: false,
+          instrumentId: instrumentId,
+          instrumentName: instrumentName,
+          instrumentStorageKey: instrumentStorageKey
+        };
+        console.log('🎹 Track data being passed to createTrack:', existingTrackData);
+        newTrack = await store.createTrack(trackName, type, existingTrackData);
+        console.log('🎹 Track created:', newTrack);
       } else {
+        console.log('🎹 Creating track without instrument data');
         newTrack = await store.createTrack(trackName, type);
       }
       console.log('New track from createTrack:', newTrack);

@@ -169,6 +169,8 @@ interface AssistantResponse {
 ### 8.3 Action Types
 - `change_bpm`: Change global tempo
   - Data: `{ value: number }`
+- `change_key`: Change key signature
+  - Data: `{ value: number }`
 - `add_track`: Add a new track
   - Data: `{ type: 'audio' | 'midi' | 'drum', instrumentId?: string }`
 - `adjust_volume`: Change track volume

@@ -23,18 +23,36 @@ def get_mode_intervals(mode_name: str) -> list[str]:
         sc = scale.MelodicMinorScale('C')
     elif mode_name.lower() == 'harmonic major':
         sc = scale.HarmonicMajorScale('C')
+    elif mode_name.lower() == 'mixolydian':
+        sc = scale.MixolydianScale('C')
+    elif mode_name.lower() == 'lydian':
+        sc = scale.LydianScale('C')
+    elif mode_name.lower() == 'phrygian':
+        sc = scale.PhrygianScale('C')
+    elif mode_name.lower() == 'locrian':
+        sc = scale.LocrianScale('C')
+    elif mode_name.lower() == 'aeolian':
+        sc = scale.AeolianScale('C')
+    elif mode_name.lower() == 'dorian':
+        sc = scale.DorianScale('C')
+    elif mode_name.lower() == 'ionian':
+        sc = scale.IonianScale('C')    
     else:
         # For other modes (dorian, phrygian, etc.)
         sc = scale.ConcreteScale(tonic=pitch.Pitch('C'), mode=mode_name)
 
+    print("scale:", sc)
     # Get scale pitches
     scale_pitches = sc.getPitches()
+    if not scale_pitches:
+        return []
 
+    print("scale_pitches:", scale_pitches)
     # Calculate intervals between all scale pitches
     intervals = []
 
     root = scale_pitches[0]
-
+    print("root:", root)
 
     for p1 in scale_pitches:
         # Calculate semitone difference

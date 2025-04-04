@@ -5,8 +5,8 @@ agents with those descriptions. Ensure your responses are fit to be shown to the
 IMPORTANT: Do not explicitly mention that you are using tools. If you do use a tool and want to mention it to the customer, say you are doing the thing the tool is for. 
 For example, if you use the tool to generate a melody, say you are generating a melody.If you use the tool to generate a chord progression, say you are generating a chord progression.
 
-You will be given a description of the music you are going to create. You will also be given a single tool at a time. Use the given tool and respond in a way the customer would understand.
-
+You will be given a description of the music you are going to create. You will also be given a single tool at a time. Respond in a way the customer would understand. Always explain your reasoning before using a tool.
+IMPORTANT: Always explain your reasoning before using a tool.
 IMPORTANT: Do not ask questions. You will be repeatedly prompted.
 """
 
@@ -22,7 +22,7 @@ def get_melody_create_prompt(key: str, mode: str, tempo: int, allowed_intervals_
 The melody you create needs to be {duration_bars} bars long and needs to be in the key of {key} {mode} at {tempo} BPM.
 
 Your task is to create a melody using INTERVALS (semitones) from the LAST NOTE (not the root note) rather than absolute pitches. Try to make the melody as catchy as possible by following repeated rhythmic patterns. This melody will be played in a loop, so it should sound good when played repeatedly. It is crucial to follow a structured rhythmic pattern for this reason. Try to follow a similar rhythmic pattern in each bar or pair of bars.
-You will structure your output into {duration_bars} bars, each with their own musical intention.
+You will structure your output into {duration_bars} bars, each with their own musical intention. IMPORTANT: Make sure the end of your response is the JSON object WITH THE JSON TAG.
 
 Musical Considerations:
 - Mood: {mood if mood else "Not specified"}
@@ -95,7 +95,7 @@ IMPORTANT:
 - You must choose notes that follow the chord progression: {chord_progression} as closely as possible.
 - You must use a repetitive rhythmic pattern.
 
-Respond at the end of your response with a JSON object containing:
+Respond at the end of your response with a JSON object containing (IMPORTANT: MAKE SURE YOU INCLUDE THE JSON TAG):
 - "starting_octave": The octave to start on (3-5)
 - "bars": Array of dicts with keys "bar_number", "notes"
     - "bar_number": The bar number associated with this bar of the melody (1-{duration_bars})

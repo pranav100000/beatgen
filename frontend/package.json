@@ -33,6 +33,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-konva": "^19.0.3",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.4.0",
     "spessasynth_lib": "^3.25.3",
     "styled-components": "^6.1.16",

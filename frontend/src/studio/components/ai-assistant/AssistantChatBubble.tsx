@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
 import AssistantActionChip from './AssistantActionChip';
+import ReactMarkdown from 'react-markdown';
 
 // Add keyframes for cursor blink animation
 const cursorBlinkKeyframes = `
@@ -68,11 +69,55 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
         bgcolor: 'rgba(60, 60, 60, 0.8)',
         boxShadow: 1,
         wordBreak: 'break-word',
-        position: 'relative' // For positioning the cursor
+        position: 'relative', // For positioning the cursor
+        '& code': {
+          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          padding: '2px 4px',
+          borderRadius: '4px',
+          fontFamily: 'monospace',
+          fontSize: '0.9em',
+        },
+        '& pre': {
+          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          padding: '8px',
+          borderRadius: '4px',
+          overflow: 'auto',
+          '& code': {
+            backgroundColor: 'transparent',
+            padding: 0,
+          }
+        },
+        '& p': {
+          margin: '8px 0',
+          '&:first-of-type': {
+            marginTop: 0,
+          },
+          '&:last-child': {
+            marginBottom: 0,
+          }
+        },
+        '& ul, & ol': {
+          marginTop: '8px',
+          marginBottom: '8px',
+          paddingLeft: '20px',
+        },
+        '& blockquote': {
+          borderLeft: '3px solid rgba(255, 255, 255, 0.2)',
+          margin: '8px 0',
+          paddingLeft: '12px',
+          color: 'rgba(255, 255, 255, 0.7)',
+        }
       }}
     >
-      <Typography variant="body2" component="div">
-        {text}
+      <Typography 
+        variant="body2" 
+        component="div"
+        sx={{
+          '& > *:first-child': { mt: 0 },
+          '& > *:last-child': { mb: 0 }
+        }}
+      >
+        <ReactMarkdown>{text}</ReactMarkdown>
         {isStreaming && (
           <Box 
             component="span" 
@@ -82,7 +127,7 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
               animation: 'cursor-blink 1s step-end infinite',
               fontWeight: 'bold',
               fontSize: '20px',
-              color: '#FFFFFF', // Bright red for high visibility
+              color: '#FFFFFF',
             }}
           >
             |

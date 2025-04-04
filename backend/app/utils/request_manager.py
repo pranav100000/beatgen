@@ -9,6 +9,7 @@ import asyncio
 from enum import Enum
 from typing import Dict, Any, Optional, Set
 from pydantic import BaseModel
+from app.utils.sse_queue_manager import SSEQueueManager
 
 # Set up logger
 logger = logging.getLogger("beatgen.request_manager")
@@ -33,7 +34,7 @@ class RequestContext(BaseModel):
     track_id: Optional[str] = None
     context: Optional[Dict[str, Any]] = None
     task_ref: Optional[Any] = None
-    queue: Optional[asyncio.Queue] = None
+    sse_queue: Optional[SSEQueueManager] = None  # Changed from queue to sse_queue
     
     class Config:
         arbitrary_types_allowed = True
@@ -148,8 +149,8 @@ class RequestManager:
         # Generate request ID
         request_id = self.generate_request_id()
         
-        # Create request queue for async communication
-        queue = asyncio.Queue()
+        # Create SSE event queue for this request
+        sse_queue = SSEQueueManager(request_id)
         
         # Create request context
         context = RequestContext(
@@ -161,7 +162,7 @@ class RequestManager:
             prompt=prompt,
             track_id=track_id,
             context=context,
-            queue=queue
+            sse_queue=sse_queue
         )
         
         # Store request
@@ -202,10 +203,18 @@ class RequestManager:
     def get_queue(self, request_id: str) -> Optional[asyncio.Queue]:
         """Get the queue for a request"""
         request = self._requests.get(request_id)
+        if not request or not request.sse_queue:
+            return None
+            
+        return request.sse_queue.get_queue()
+        
+    def get_sse_queue(self, request_id: str) -> Optional[SSEQueueManager]:
+        """Get the SSE event queue for a request"""
+        request = self._requests.get(request_id)
         if not request:
             return None
             
-        return request.queue
+        return request.sse_queue
     
     def remove_request(self, request_id: str, status: RequestStatus = RequestStatus.COMPLETED) -> bool:
         """Remove a request and update its status"""

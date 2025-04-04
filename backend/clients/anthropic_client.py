@@ -5,6 +5,8 @@ import asyncio
 from anthropic import Anthropic, AsyncAnthropic
 import logging
 
+from app.utils.sse_queue_manager import SSEQueueManager
+
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -42,40 +44,14 @@ class AnthropicClient:
     def append_assistant_message(self, message: str):
         self.messages.append({"role": "assistant", "content": message})
         
-    def send_message(self, message: str, stream: bool = True, tools: list[dict] = [], thinking: bool = False) -> tuple[str, dict]:
-        """Synchronous version of send_message - this will block the event loop"""
-        self.append_user_message(message)
         
-        params = {
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "messages": self.messages,
-            "system": self.system_prompt,
-            "stream": stream,
-        }
-
-        if tools:
-            params["tools"] = tools
-            params["tool_choice"] = {"type": "any"}
-
-        if thinking:
-            params["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": 16000
-            }
-
-        response = self.client.messages.create(**params)
-        assistant_response, tool_use_json = self._get_stream_response(response)
-        #self.messages.append({"role": "assistant", "content": assistant_response})
-        return assistant_response, tool_use_json
-        
-    async def send_message_async(self, message: str, queue: asyncio.Queue, stream: bool = True, tools: list[dict] = [], thinking: bool = False) -> tuple[str, dict]:
+    async def send_message_async(self, message: str, queue: SSEQueueManager, stream: bool = True, tools: list[dict] = [], thinking: bool = False) -> tuple[str, dict]:
+        print("CURRENT MESSAGES", self.messages)
         """Asynchronous version of send_message - this will not block the event loop"""
         self.append_user_message(message)
         
         # Log the start of the API call
-        logger.info(f"Starting async API call to Anthropic with model {self.model}")
+        logger.info(f"Starting async API call to Anthropic with model {self.model} and message {message}")
         
         params = {
             "model": self.model,
@@ -102,70 +78,81 @@ class AnthropicClient:
         # Process the streamed response asynchronously
         assistant_response, tool_use_json = await self._get_stream_response_async(response, queue)
         
+        if assistant_response:
+            self.append_assistant_message(assistant_response)
+        
         logger.info(f"Completed async API call to Anthropic")
         
         return assistant_response, tool_use_json
-    
-    def _get_stream_response(self, response, queue) -> tuple[str, dict]:
-        """Synchronous version of stream response processing"""
-        content_text = ""
-        tool_use_started = False
-        tool_use_data = []
-        for data in response:
-            if tool_use_started:
-                tool_use_data.append(data)
-            if hasattr(data, "delta") and hasattr(data.delta, "text"):
-                chunk_text = data.delta.text
-                print(chunk_text)
-                if chunk_text:
-                    content_text += chunk_text
-                    print(content_text)
-                    queue.put(("response_chunk", {
-                        "chunk": chunk_text,
-                        "chunk_index": 0
-                    }))
-            if data.type == "content_block_start":
-                if data.content_block.type == "tool_use":
-                    tool_use_started = True
-                    print(data.content_block)
-            if data.type == "content_block_end":
-                tool_use_started = False
-        #print("TOOL USE DATA:", tool_use_data)
-        tool_use_json = self._parse_tool_use_data(tool_use_data)
-        #print("TOOL USE JSON:", tool_use_json)
-        return content_text, tool_use_json
         
-    async def _get_stream_response_async(self, response, queue) -> tuple[str, dict]:
+    async def _get_stream_response_async(self, response, queue: SSEQueueManager) -> tuple[str, dict]:
         """Asynchronous version of stream response processing"""
         content_text = ""
-        tool_use_started = False
         tool_use_data = []
+        tool_use_started = False
+        
+        # For debugging
+        event_types_seen = set()
+        
+        print("response", response)
         
         # Asynchronously iterate through the stream
         async for data in response:
-            # Periodically yield control back to the event loop
-            await asyncio.sleep(0)
+            print("data", data)
+            logger.info(f"data: {data}")
+            # For debugging - log the type of event
+            if hasattr(data, 'type'):
+                event_types_seen.add(data.type)
+                logger.debug(f"Stream event type: {data.type}")
+            else:
+                logger.debug(f"Unknown data structure: {data}")
+                
+            # Handle all possible ways text might be delivered
+            chunk_text = None
             
+            # Check for the new format (content_block_delta with text_delta)
+            if data.type == "content_block_delta" and hasattr(data, "delta"):
+                if hasattr(data.delta, "type") and data.delta.type == "text_delta" and hasattr(data.delta, "text"):
+                    chunk_text = data.delta.text
+                # Fallback for direct text property
+                elif hasattr(data.delta, "text"):
+                    chunk_text = data.delta.text
+            
+            # Also check the old format for backward compatibility
+            elif hasattr(data, "delta") and hasattr(data.delta, "text"):
+                chunk_text = data.delta.text
+                
+            # Process text chunks from any format
+            if chunk_text:
+                content_text += chunk_text
+                logger.debug(f"Received chunk: {chunk_text[:50]}...")
+                await queue.add_chunk(chunk_text)
+                
+            # Handle tool use tracking
             if tool_use_started:
                 tool_use_data.append(data)
-            if hasattr(data, "delta") and hasattr(data.delta, "text"):
-                chunk_text = data.delta.text
-                if chunk_text:
-                    content_text += chunk_text
-                    logger.debug(f"Received chunk: {chunk_text[:50]}...")
-                    queue.put(("response_chunk", {
-                        "chunk": chunk_text,
-                        "chunk_index": 0
-                    }))
+                
             if data.type == "content_block_start":
-                if data.content_block.type == "tool_use":
+                if hasattr(data, "content_block") and hasattr(data.content_block, "type") and data.content_block.type == "tool_use":
                     tool_use_started = True
                     logger.debug(f"Tool use started: {data.content_block}")
-            if data.type == "content_block_end":
+                    
+            if data.type == "content_block_stop":
                 tool_use_started = False
-                logger.debug("Tool use ended")
+                logger.debug("Content block stopped")
+                
+            if data.type == "thinking_delta":
+                if hasattr(data.delta, "type") and data.delta.type == "thinking_delta" and hasattr(data.delta, "thinking"):
+                    chunk_text = data.delta.thinking
+                # Fallback for direct text property
+                elif hasattr(data.delta, "text"):
+                    chunk_text = data.delta.text
+                await queue.add_chunk(chunk_text)
+                logger.debug(f"Thinking block delta: {data.delta}")
+        # Log the event types seen during this stream processing
+        logger.info(f"Event types seen in this stream: {event_types_seen}")
         
-        # Use the same parsing logic
+        # Parse tool use data
         tool_use_json = self._parse_tool_use_data(tool_use_data)
         
         return content_text, tool_use_json

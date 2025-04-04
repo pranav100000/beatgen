@@ -1,13 +1,9 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, Literal
 from uuid import UUID, uuid4
 from datetime import datetime
 
-
-class AssistantAction(BaseModel):
-    """Data for an action to be performed by the assistant"""
-    type: str
-    data: Dict[str, Any]
+from app.types.assistant_actions import AssistantAction
 
 
 class AssistantRequestBase(BaseModel):
@@ -106,3 +102,26 @@ class AssistantRequest(AssistantRequestBase):
 class AssistantResponse(AssistantResponseBase):
     """Response from the AI assistant (legacy)"""
     track_id: Optional[str] = None
+
+
+class QueueEventData(BaseModel):
+    """Base model for queue event data"""
+    message: Optional[str] = None
+    status: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    message_id: Optional[str] = None
+    chunk: Optional[str] = None
+    chunk_index: Optional[int] = None
+    is_complete: Optional[bool] = None
+    details: Optional[str] = None
+    error: Optional[str] = None
+    track_id: Optional[str] = None
+
+
+class QueueEvent(BaseModel):
+    """Model for events sent through the asyncio.Queue"""
+    type: Literal["connected", "stage", "status", "response_start", "response_chunk", 
+                  "response_end", "action", "complete", "cancelled", "error"]
+    data: Union[QueueEventData, AssistantAction, AssistantResponse, 
+               GenerateResponse, EditResponse]

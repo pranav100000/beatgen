@@ -12,7 +12,7 @@ DETERMINE_MUSICAL_PARAMETERS_TOOL = {
         "properties": {
             "chord_progression": {
                 "type": "string",
-                "description": "The chord progression (e.g. C-G-Am-F, Aaug7-Dm7-G7-Cmaj7)"
+                "description": "The chord progression (e.g. C-G-Am-F, Aaug7-Dm7-G7-Cmaj7) IMPORTANT: Make sure you provide the chord progression with actual notes, not just numbers."
             },
             "key": {
                 "type": "string",
