@@ -1,73 +1,36 @@
+import { useGridStore } from '../../gridStore';
 import { Store } from '../../store';
 import { TrackState } from '../../../types/track';
 import { Action } from '../types';
-import { useGridStore } from '../../gridStore';
+import { BaseTrackAction } from './BaseTrackAction';
 
 // Action for adding a track
-export class AddTrackAction implements Action {
+export class AddTrackAction extends BaseTrackAction {
     type = 'ADD_TRACK';
-    private trackData: TrackState;
-    private store: Store;
-    private setTracks: React.Dispatch<React.SetStateAction<TrackState[]>>;
-
-    constructor(
-        store: Store,
-        trackData: TrackState,
-        setTracks: React.Dispatch<React.SetStateAction<TrackState[]>>
-    ) {
-        this.store = store;
-        this.trackData = trackData;
-        this.setTracks = setTracks;
-    }
 
     async execute(): Promise<void> {
-        if (this.trackData.audioFile) {
-            await this.store.getAudioEngine().createTrack(this.trackData.id, this.trackData.name, this.trackData.audioFile);
-        } else {
-            await this.store.getAudioEngine().createTrack(this.trackData.id, this.trackData.name);
-        }
-        this.setTracks(prev => [...prev, this.trackData]);
-        console.log('🔄 Execute AddTrackAction:', { trackId: this.trackData.id });
+        await this.addTrack();
+        this.log('Execute', 'AddTrackAction');
     }
 
     async undo(): Promise<void> {
-        this.store.removeTrack(this.trackData.id);
-        this.setTracks(prev => prev.filter(track => track.id !== this.trackData.id));
-        console.log('↩️ Undo AddTrackAction:', { trackId: this.trackData.id });
+        this.removeTrack();
+        this.log('Undo', 'AddTrackAction');
     }
 }
 
 // Action for deleting a track
-export class DeleteTrackAction implements Action {
+export class DeleteTrackAction extends BaseTrackAction {
     type = 'DELETE_TRACK';
-    private trackData: TrackState;
-    private store: Store;
-    private setTracks: React.Dispatch<React.SetStateAction<TrackState[]>>;
-
-    constructor(
-        store: Store,
-        trackData: TrackState,
-        setTracks: React.Dispatch<React.SetStateAction<TrackState[]>>
-    ) {
-        this.store = store;
-        this.trackData = trackData;
-        this.setTracks = setTracks;
-    }
 
     async execute(): Promise<void> {
-        this.store.removeTrack(this.trackData.id);
-        this.setTracks(prev => prev.filter(track => track.id !== this.trackData.id));
-        console.log('🔄 Execute DeleteTrackAction:', { trackId: this.trackData.id });
+        this.removeTrack();
+        this.log('Execute', 'DeleteTrackAction');
     }
 
     async undo(): Promise<void> {
-        if (this.trackData.audioFile) {
-            await this.store.getAudioEngine().createTrack(this.trackData.id, this.trackData.name, this.trackData.audioFile);
-        } else {
-            await this.store.getAudioEngine().createTrack(this.trackData.id, this.trackData.name);
-        }
-        this.setTracks(prev => [...prev, this.trackData]);
-        console.log('↩️ Undo DeleteTrackAction:', { trackId: this.trackData.id });
+        await this.addTrack();
+        this.log('Undo', 'DeleteTrackAction');
     }
 }
 
@@ -93,69 +56,24 @@ export class MoveTrackAction implements Action {
         this.oldPosition = oldPosition;
         this.newPosition = newPosition;
     }
-
-    async execute(): Promise<void> {
+    
+    private updateTrackPosition(position: { x: number; y: number }): void {
         // Update UI state
         this.setTracks(prev => prev.map(track => 
             track.id === this.trackId 
-                ? { ...track, position: this.newPosition }
+                ? { ...track, position }
                 : track
         ));
         
         // Update AudioEngine state to affect playback
         this.store.getAudioEngine().setTrackPosition(
             this.trackId, 
-            this.newPosition.x, 
-            this.newPosition.y
+            position.x, 
+            position.y
         );
         
         // If playback is active, tell the transport controller to adjust this track's playback
-        this.store.getTransport().handleTrackPositionChange(this.trackId, this.newPosition.x);
-        
-        // Update soundfont offset if it's a MIDI or drum track
-        const track = this.store.getTrackById(this.trackId);
-        if (track && (track.type === 'midi' || track.type === 'drum')) {
-            // Convert X position (pixels) to milliseconds
-            const beatDurationMs = (60 / this.store.projectManager.getTempo()) * 1000;
-            const timeSignature = this.store.getProjectManager().getTimeSignature();
-            const beatsPerMeasure = timeSignature[0];
-            // Get grid constants from the store or use a default value
-            const measureWidth = useGridStore.getState().midiMeasureWidth;
-            const pixelsPerBeat = measureWidth / beatsPerMeasure;
-            
-            // Calculate offset in milliseconds
-            const offsetBeats = this.newPosition.x / pixelsPerBeat;
-            const offsetMs = offsetBeats * beatDurationMs;
-            
-            // Set track offset in milliseconds
-            this.store.getSoundfontController().setTrackOffset(this.trackId, offsetMs);
-            console.log(`Set track ${this.trackId} offset: ${this.newPosition.x}px → ${offsetMs}ms (${offsetBeats} beats)`);
-        }
-        
-        console.log('🔄 Execute MoveTrackAction:', { 
-            trackId: this.trackId, 
-            from: this.oldPosition, 
-            to: this.newPosition 
-        });
-    }
-
-    async undo(): Promise<void> {
-        // Update UI state
-        this.setTracks(prev => prev.map(track => 
-            track.id === this.trackId 
-                ? { ...track, position: this.oldPosition }
-                : track
-        ));
-        
-        // Update AudioEngine state to affect playback
-        this.store.getAudioEngine().setTrackPosition(
-            this.trackId, 
-            this.oldPosition.x, 
-            this.oldPosition.y
-        );
-        
-        // If playback is active, tell the transport controller to adjust this track's playback
-        this.store.getTransport().handleTrackPositionChange(this.trackId, this.oldPosition.x);
+        this.store.getTransport().handleTrackPositionChange(this.trackId, position.x);
         
         // Update soundfont offset if it's a MIDI or drum track
         const track = this.store.getTrackById(this.trackId);
@@ -169,14 +87,26 @@ export class MoveTrackAction implements Action {
             const pixelsPerBeat = measureWidth / beatsPerMeasure;
             
             // Calculate offset in milliseconds
-            const offsetBeats = this.oldPosition.x / pixelsPerBeat;
+            const offsetBeats = position.x / pixelsPerBeat;
             const offsetMs = offsetBeats * beatDurationMs;
             
             // Set track offset in milliseconds
             this.store.getSoundfontController().setTrackOffset(this.trackId, offsetMs);
-            console.log(`Set track ${this.trackId} offset: ${this.oldPosition.x}px → ${offsetMs}ms (${offsetBeats} beats)`);
+            console.log(`Set track ${this.trackId} offset: ${position.x}px → ${offsetMs}ms (${offsetBeats} beats)`);
         }
-        
+    }
+
+    async execute(): Promise<void> {
+        this.updateTrackPosition(this.newPosition);
+        console.log('🔄 Execute MoveTrackAction:', { 
+            trackId: this.trackId, 
+            from: this.oldPosition, 
+            to: this.newPosition 
+        });
+    }
+
+    async undo(): Promise<void> {
+        this.updateTrackPosition(this.oldPosition);
         console.log('↩️ Undo MoveTrackAction:', { 
             trackId: this.trackId, 
             from: this.newPosition, 
