@@ -1,255 +1,290 @@
-import { Action } from '../types';
-import { StoreInterface } from '../../store';
+import { Store } from '../../store';
 import { Note } from '../../../types/note';
+import { NoteAction } from './BaseAction';
 
-export class NoteCreateAction implements Action {
-  type = 'NOTE_CREATE';
+/**
+ * Action for adding a note without callbacks
+ */
+export class AddNoteAction extends NoteAction {
+    readonly type = 'NOTE_ADD';
+    private note: Note;
 
-  constructor(
-    private store: StoreInterface,
-    private newNote: Note,
-    private trackId: string
-  ) {}
-
-  async execute(): Promise<void> {
-    const midiManager = this.store.getMidiManager();
-    if (!midiManager) {
-      console.error('NoteCreateAction: MidiManager not available');
-      return;
+    constructor(
+        store: Store,
+        trackId: string,
+        noteId: string,
+        note: Note
+    ) {
+        super(store, trackId, noteId);
+        this.note = note;
     }
-    
-    // Ensure the note has a trackId
-    const noteWithTrackId = { ...this.newNote, trackId: this.trackId };
-    
-    // Use MidiManager directly - it's our single source of truth
-    await midiManager.addNoteToTrack(this.trackId, noteWithTrackId);
-    
-    console.log(`NoteCreateAction: Created note ${noteWithTrackId.id} in track ${this.trackId}`);
-  }
 
-  async undo(): Promise<void> {
-    const midiManager = this.store.getMidiManager();
-    if (!midiManager) {
-      console.error('NoteCreateAction: MidiManager not available for undo');
-      return;
+    async execute(): Promise<void> {
+        // Get the MIDI manager
+        const midiManager = this.store.getMidiManager();
+        if (!midiManager) {
+            console.error(`${this.type}: MidiManager not available`);
+            return;
+        }
+
+        try {
+            // Ensure the note has trackId and correct id
+            const noteWithId = {
+                ...this.note,
+                id: parseInt(this.noteId),
+                trackId: this.trackId
+            };
+            
+            // Add note using MidiManager - central source of truth
+            await midiManager.addNoteToTrack(this.trackId, noteWithId);
+            
+            this.log('Execute', {
+                trackId: this.trackId,
+                noteId: this.noteId,
+                row: this.note.row,
+                column: this.note.column,
+                length: this.note.length
+            });
+        } catch (error) {
+            console.error(`Error adding note to track ${this.trackId}:`, error);
+        }
     }
-    
-    // Remove the note using MidiManager
-    await midiManager.removeNoteFromTrack(this.trackId, this.newNote.id);
-    
-    console.log(`NoteCreateAction: Undone creation of note ${this.newNote.id} in track ${this.trackId}`);
-  }
+
+    async undo(): Promise<void> {
+        // Get the MIDI manager
+        const midiManager = this.store.getMidiManager();
+        if (!midiManager) {
+            console.error(`${this.type}: MidiManager not available`);
+            return;
+        }
+
+        try {
+            // Remove the note by ID
+            await midiManager.removeNoteFromTrack(this.trackId, parseInt(this.noteId));
+            
+            this.log('Undo', {
+                trackId: this.trackId,
+                noteId: this.noteId
+            });
+        } catch (error) {
+            console.error(`Error removing note ${this.noteId} from track ${this.trackId}:`, error);
+        }
+    }
 }
 
-export class NoteMoveAction implements Action {
-  type = 'NOTE_MOVE';
+/**
+ * Action for removing a note without callbacks
+ */
+export class DeleteNoteAction extends NoteAction {
+    readonly type = 'NOTE_DELETE';
+    private note: Note;
 
-  constructor(
-    private store: StoreInterface,
-    private noteId: number,
-    private oldPosition: { x: number; y: number },
-    private newPosition: { x: number; y: number },
-    private trackId: string
-  ) {}
+    constructor(
+        store: Store,
+        trackId: string,
+        noteId: string,
+        note: Note
+    ) {
+        super(store, trackId, noteId);
+        this.note = { ...note }; // Store a copy for undo
+    }
 
-  async execute(): Promise<void> {
-    const midiManager = this.store.getMidiManager();
-    if (!midiManager) {
-      console.error('NoteMoveAction: MidiManager not available');
-      return;
-    }
-    
-    // Get current notes for the track
-    const trackNotes = midiManager.getTrackNotes(this.trackId);
-    if (!trackNotes) {
-      console.error(`NoteMoveAction: No notes found for track ${this.trackId}`);
-      return;
-    }
-    
-    // Find the note to update
-    const noteToUpdate = trackNotes.find(n => n.id === this.noteId);
-    if (!noteToUpdate) {
-      console.error(`NoteMoveAction: Note ${this.noteId} not found in track ${this.trackId}`);
-      return;
-    }
-    
-    // Create updated note
-    const updatedNote = { 
-      ...noteToUpdate, 
-      row: this.newPosition.y, 
-      column: this.newPosition.x 
-    };
-    
-    // Update the note through MidiManager
-    await midiManager.updateNote(this.trackId, updatedNote);
-    
-    console.log(`NoteMoveAction: Moved note ${this.noteId} in track ${this.trackId}`);
-  }
+    async execute(): Promise<void> {
+        // Get the MIDI manager
+        const midiManager = this.store.getMidiManager();
+        if (!midiManager) {
+            console.error(`${this.type}: MidiManager not available`);
+            return;
+        }
 
-  async undo(): Promise<void> {
-    const midiManager = this.store.getMidiManager();
-    if (!midiManager) {
-      console.error('NoteMoveAction: MidiManager not available for undo');
-      return;
+        try {
+            // Remove the note by ID
+            await midiManager.removeNoteFromTrack(this.trackId, parseInt(this.noteId));
+            
+            this.log('Execute', {
+                trackId: this.trackId,
+                noteId: this.noteId
+            });
+        } catch (error) {
+            console.error(`Error removing note ${this.noteId} from track ${this.trackId}:`, error);
+        }
     }
-    
-    // Get current notes for the track
-    const trackNotes = midiManager.getTrackNotes(this.trackId);
-    if (!trackNotes) {
-      console.error(`NoteMoveAction: No notes found for track ${this.trackId} during undo`);
-      return;
+
+    async undo(): Promise<void> {
+        // Get the MIDI manager
+        const midiManager = this.store.getMidiManager();
+        if (!midiManager) {
+            console.error(`${this.type}: MidiManager not available`);
+            return;
+        }
+
+        try {
+            // Restore the note
+            await midiManager.addNoteToTrack(this.trackId, this.note);
+            
+            this.log('Undo', {
+                trackId: this.trackId,
+                noteId: this.noteId,
+                row: this.note.row,
+                column: this.note.column,
+                length: this.note.length
+            });
+        } catch (error) {
+            console.error(`Error restoring note ${this.noteId} to track ${this.trackId}:`, error);
+        }
     }
-    
-    // Find the note to update
-    const noteToUpdate = trackNotes.find(n => n.id === this.noteId);
-    if (!noteToUpdate) {
-      console.error(`NoteMoveAction: Note ${this.noteId} not found in track ${this.trackId} during undo`);
-      return;
-    }
-    
-    // Create updated note with original position
-    const updatedNote = { 
-      ...noteToUpdate, 
-      row: this.oldPosition.y, 
-      column: this.oldPosition.x 
-    };
-    
-    // Update the note through MidiManager
-    await midiManager.updateNote(this.trackId, updatedNote);
-    
-    console.log(`NoteMoveAction: Undone move of note ${this.noteId} in track ${this.trackId}`);
-  }
 }
 
-export class NoteResizeAction implements Action {
-  type = 'NOTE_RESIZE';
+/**
+ * Action for moving a note without callbacks
+ */
+export class MoveNoteAction extends NoteAction {
+    readonly type = 'NOTE_MOVE';
+    private oldPosition: { column: number, row: number };
+    private newPosition: { column: number, row: number };
+    private noteData: Note;
 
-  constructor(
-    private store: StoreInterface,
-    private noteId: number,
-    private oldLength: number,
-    private newLength: number,
-    private trackId: string,
-    private oldColumn?: number,
-    private newColumn?: number
-  ) {}
+    constructor(
+        store: Store,
+        trackId: string,
+        noteId: string,
+        oldPosition: { column: number, row: number },
+        newPosition: { column: number, row: number },
+        noteData: Note
+    ) {
+        super(store, trackId, noteId);
+        this.oldPosition = oldPosition;
+        this.newPosition = newPosition;
+        this.noteData = { ...noteData }; // Save a copy of the original note
+    }
 
-  async execute(): Promise<void> {
-    const midiManager = this.store.getMidiManager();
-    if (!midiManager) {
-      console.error('NoteResizeAction: MidiManager not available');
-      return;
-    }
-    
-    // Get current notes for the track
-    const trackNotes = midiManager.getTrackNotes(this.trackId);
-    if (!trackNotes) {
-      console.error(`NoteResizeAction: No notes found for track ${this.trackId}`);
-      return;
-    }
-    
-    // Find the note to resize
-    const noteToResize = trackNotes.find(n => n.id === this.noteId);
-    if (!noteToResize) {
-      console.error(`NoteResizeAction: Note ${this.noteId} not found in track ${this.trackId}`);
-      return;
-    }
-    
-    // Create resized note
-    const resizedNote = { 
-      ...noteToResize, 
-      length: this.newLength,
-      ...(this.newColumn !== undefined && { column: this.newColumn })
-    };
-    
-    // Update the note through MidiManager
-    await midiManager.updateNote(this.trackId, resizedNote);
-    
-    console.log(`NoteResizeAction: Resized note ${this.noteId} in track ${this.trackId}`);
-  }
+    private async updateNotePosition(position: { column: number, row: number }): Promise<void> {
+        // Get the MIDI manager
+        const midiManager = this.store.getMidiManager();
+        if (!midiManager) {
+            console.error(`${this.type}: MidiManager not available`);
+            return;
+        }
 
-  async undo(): Promise<void> {
-    const midiManager = this.store.getMidiManager();
-    if (!midiManager) {
-      console.error('NoteResizeAction: MidiManager not available for undo');
-      return;
+        try {
+            // Create updated note with new position
+            const updatedNote: Note = {
+                ...this.noteData,
+                id: parseInt(this.noteId),
+                row: position.row,
+                column: position.column,
+                trackId: this.trackId
+            };
+            
+            // Update the note through MidiManager
+            await midiManager.updateNote(this.trackId, updatedNote);
+        } catch (error) {
+            console.error(`Error updating position of note ${this.noteId} in track ${this.trackId}:`, error);
+        }
     }
-    
-    // Get current notes for the track
-    const trackNotes = midiManager.getTrackNotes(this.trackId);
-    if (!trackNotes) {
-      console.error(`NoteResizeAction: No notes found for track ${this.trackId} during undo`);
-      return;
+
+    async execute(): Promise<void> {
+        await this.updateNotePosition(this.newPosition);
+        this.log('Execute', {
+            trackId: this.trackId,
+            noteId: this.noteId,
+            from: this.oldPosition,
+            to: this.newPosition
+        });
     }
-    
-    // Find the note to resize
-    const noteToResize = trackNotes.find(n => n.id === this.noteId);
-    if (!noteToResize) {
-      console.error(`NoteResizeAction: Note ${this.noteId} not found in track ${this.trackId} during undo`);
-      return;
+
+    async undo(): Promise<void> {
+        await this.updateNotePosition(this.oldPosition);
+        this.log('Undo', {
+            trackId: this.trackId,
+            noteId: this.noteId,
+            from: this.newPosition,
+            to: this.oldPosition
+        });
     }
-    
-    // Create restored note with original length and column
-    const restoredNote = { 
-      ...noteToResize,
-      length: this.oldLength,
-      ...(this.oldColumn !== undefined && { column: this.oldColumn })
-    };
-    
-    // Update the note through MidiManager
-    await midiManager.updateNote(this.trackId, restoredNote);
-    
-    console.log(`NoteResizeAction: Undone resize of note ${this.noteId} in track ${this.trackId}`);
-  }
 }
 
-export class NoteDeleteAction implements Action {
-  type = 'NOTE_DELETE';
+/**
+ * Action for resizing a note without callbacks
+ */
+export class ResizeNoteAction extends NoteAction {
+    readonly type = 'NOTE_RESIZE';
+    private oldLength: number;
+    private newLength: number;
+    private noteData: Note;
+    private oldColumn?: number;
+    private newColumn?: number;
 
-  constructor(
-    private store: StoreInterface,
-    private noteId: number,
-    private trackId: string,
-    private deletedNote?: Note // Optional: store the deleted note for undo
-  ) {}
+    constructor(
+        store: Store,
+        trackId: string,
+        noteId: string,
+        oldLength: number,
+        newLength: number,
+        noteData: Note,
+        oldColumn?: number,
+        newColumn?: number
+    ) {
+        super(store, trackId, noteId);
+        this.oldLength = oldLength;
+        this.newLength = newLength;
+        this.noteData = { ...noteData }; // Save a copy of the original note
+        this.oldColumn = oldColumn;
+        this.newColumn = newColumn;
+    }
 
-  async execute(): Promise<void> {
-    const midiManager = this.store.getMidiManager();
-    if (!midiManager) {
-      console.error('NoteDeleteAction: MidiManager not available');
-      return;
-    }
-    
-    // Get current notes for the track to store the note being deleted (for undo)
-    if (!this.deletedNote) {
-      const trackNotes = midiManager.getTrackNotes(this.trackId);
-      if (trackNotes) {
-        this.deletedNote = trackNotes.find(n => n.id === this.noteId);
-      }
-    }
-    
-    // Remove the note using MidiManager
-    await midiManager.removeNoteFromTrack(this.trackId, this.noteId);
-    
-    console.log(`NoteDeleteAction: Deleted note ${this.noteId} from track ${this.trackId}`);
-  }
+    private async updateNoteSize(length: number, column?: number): Promise<void> {
+        // Get the MIDI manager
+        const midiManager = this.store.getMidiManager();
+        if (!midiManager) {
+            console.error(`${this.type}: MidiManager not available`);
+            return;
+        }
 
-  async undo(): Promise<void> {
-    const midiManager = this.store.getMidiManager();
-    if (!midiManager) {
-      console.error('NoteDeleteAction: MidiManager not available for undo');
-      return;
+        try {
+            // Create updated note with new length and possibly new column
+            const updatedNote: Note = {
+                ...this.noteData,
+                id: parseInt(this.noteId),
+                length,
+                trackId: this.trackId,
+                ...(column !== undefined && { column })
+            };
+            
+            // Update the note through MidiManager
+            await midiManager.updateNote(this.trackId, updatedNote);
+        } catch (error) {
+            console.error(`Error resizing note ${this.noteId} in track ${this.trackId}:`, error);
+        }
     }
-    
-    // We need the original note to restore it
-    if (!this.deletedNote) {
-      console.error(`NoteDeleteAction: Cannot undo, note ${this.noteId} data not available`);
-      return;
+
+    async execute(): Promise<void> {
+        await this.updateNoteSize(this.newLength, this.newColumn);
+        this.log('Execute', {
+            trackId: this.trackId,
+            noteId: this.noteId,
+            from: { length: this.oldLength, column: this.oldColumn },
+            to: { length: this.newLength, column: this.newColumn }
+        });
     }
-    
-    // Add the note back using MidiManager
-    await midiManager.addNoteToTrack(this.trackId, this.deletedNote);
-    
-    console.log(`NoteDeleteAction: Undone deletion of note ${this.noteId} in track ${this.trackId}`);
-  }
+
+    async undo(): Promise<void> {
+        await this.updateNoteSize(this.oldLength, this.oldColumn);
+        this.log('Undo', {
+            trackId: this.trackId,
+            noteId: this.noteId,
+            from: { length: this.newLength, column: this.newColumn },
+            to: { length: this.oldLength, column: this.oldColumn }
+        });
+    }
 }
+
+/**
+ * Export all note actions
+ */
+export const NoteActions = {
+    AddNote: AddNoteAction,
+    DeleteNote: DeleteNoteAction,
+    MoveNote: MoveNoteAction,
+    ResizeNote: ResizeNoteAction
+};
