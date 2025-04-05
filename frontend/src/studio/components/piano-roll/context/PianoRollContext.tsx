@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Note } from '../../../core/types/note';
 import { historyManager } from '../../../core/state/history/HistoryManager';
-import { NoteCreateAction, NoteMoveAction, NoteResizeAction, NoteDeleteAction } from '../../../core/state/history/actions/NoteActions';
 import { useStudioStore } from '../../../stores/useStudioStore';
+import { Actions } from '../../../core/state/history/actions';
 
 // Define the types for the context
 interface PianoRollContextType {
@@ -110,19 +110,15 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const midiManager = store.getMidiManager();
     if (!midiManager) return;
     
-    // // Ensure track exists in MidiManager
-    // if (!midiManager.hasTrack(trackId)) {
-    //   console.log(`Creating track ${trackId} in MidiManager`);
-    //   midiManager.createTrack(trackId, instrumentId);
-    // }
-
-    midiManager.addNoteToTrack(trackId, note);
+    // Generate a noteId if not present
+    const noteId = note.id?.toString() || Math.floor(Math.random() * 100000).toString();
     
-    // Create note with MidiManager-centric action
-    const action = new NoteCreateAction(
+    // Create note with direct action
+    const action = new Actions.AddNote(
       store,
-      note,
-      trackId
+      trackId,
+      noteId,
+      note
     );
     
     // Execute the action through history manager
@@ -142,13 +138,27 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     }
     
-    // Create note move action that works directly with MidiManager
-    const action = new NoteMoveAction(
+    // Get original note data (needed for the action)
+    const trackNotes = midiManager.getTrackNotes(trackId);
+    const noteData = trackNotes?.find(n => n.id === noteId);
+    
+    if (!noteData) {
+      console.warn(`Cannot find note ${noteId} in track ${trackId}`);
+      return;
+    }
+    
+    // Convert UI coordinates to MIDI data format
+    const oldPosition = { column: oldPos.x, row: oldPos.y };
+    const newPosition = { column: newPos.x, row: newPos.y };
+    
+    // Create direct note move action
+    const action = new Actions.MoveNote(
       store,
-      noteId,
-      oldPos,
-      newPos,
-      trackId
+      trackId,
+      noteId.toString(),
+      oldPosition,
+      newPosition,
+      noteData
     );
     
     // Execute the action through history manager
@@ -168,26 +178,29 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     }
     
-    // Create note resize action that works directly with MidiManager
-    const action = new NoteResizeAction(
+    // Get original note data (needed for the action)
+    const trackNotes = midiManager.getTrackNotes(trackId);
+    const noteData = trackNotes?.find(n => n.id === noteId);
+    
+    if (!noteData) {
+      console.warn(`Cannot find note ${noteId} in track ${trackId}`);
+      return;
+    }
+    
+    // Create direct note resize action
+    const action = new Actions.ResizeNote(
       store,
-      noteId,
+      trackId,
+      noteId.toString(),
       oldLength,
       newLength,
-      trackId,
+      noteData,
       oldColumn,
       newColumn
     );
     
     // Execute the action through history manager
     await historyManager.executeAction(action);
-    
-    // Update the canUndo/canRedo states in the store
-    const studioStore = store.getStudioStore();
-    if (studioStore) {
-      studioStore.setCanUndo(historyManager.canUndo());
-      studioStore.setCanRedo(historyManager.canRedo());
-    }
   };
   
   // Delete a note with history tracking
@@ -207,23 +220,21 @@ export const PianoRollProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const trackNotes = midiManager.getTrackNotes(trackId);
     const noteToDelete = trackNotes?.find(n => n.id === noteId);
     
-    // Create note delete action that works directly with MidiManager
-    const action = new NoteDeleteAction(
+    if (!noteToDelete) {
+      console.warn(`Cannot find note ${noteId} in track ${trackId}`);
+      return;
+    }
+    
+    // Create direct note delete action
+    const action = new Actions.DeleteNote(
       store,
-      noteId,
       trackId,
-      noteToDelete // Pass the note object for undo
+      noteId.toString(),
+      noteToDelete
     );
     
     // Execute the action through history manager
     await historyManager.executeAction(action);
-    
-    // Update the canUndo/canRedo states in the store
-    const studioStore = store.getStudioStore();
-    if (studioStore) {
-      studioStore.setCanUndo(historyManager.canUndo());
-      studioStore.setCanRedo(historyManager.canRedo());
-    }
   };
 
   // Play a preview of a note

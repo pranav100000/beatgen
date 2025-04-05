@@ -22,7 +22,6 @@ import {
   StreamCallbacks,
   TrackData
 } from '../../../platform/api/assistant';
-import { CompositeAction } from '../../core/state/history/actions/AssistantActions';
 import { historyManager } from '../../core/state/history/HistoryManager';
 import { TrackAddAction } from '../../core/state/history/actions/StudioActions';
 import { useStudioStore } from '../../stores/useStudioStore';
