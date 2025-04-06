@@ -98,8 +98,6 @@ class AnthropicClient:
         
         # Asynchronously iterate through the stream
         async for data in response:
-            print("data", data)
-            logger.info(f"data: {data}")
             # For debugging - log the type of event
             if hasattr(data, 'type'):
                 event_types_seen.add(data.type)
