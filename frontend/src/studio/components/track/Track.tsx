@@ -1,10 +1,14 @@
 import React from 'react';
 import { Box } from '@mui/material';
 import { Position } from '../../core/types/track';
-import TrackPreview from './TrackPreview';
 import { useStudioStore } from '../../stores/useStudioStore';
 import { usePianoRoll } from '../piano-roll';
+import TrackFactory from './TrackFactory';
 
+/**
+ * Track component serves as the main entry point for rendering tracks in the timeline.
+ * It handles high-level track state management and events, delegating rendering to specialized components.
+ */
 interface TrackProps {
   name: string;
   index: number;
@@ -68,36 +72,15 @@ function Track(props: TrackProps) {
 
   // Handle piano roll opening when track is clicked
   const handleTrackClick = (e: React.MouseEvent) => {
-    console.log('Track clicked', {
-      target: e.target,
-      trackId: id,
-      type,
-      eventType: e.type
-    });
-    
     // For MIDI and drum tracks, directly open the piano roll
     if (type === 'midi' || type === 'drum') {
       e.stopPropagation();
-      console.log('Opening piano roll for track:', {
-        trackId: id,
-        type
-      });
       openPianoRoll(id);
-    } else {
-      console.log('Not opening piano roll - track type is not midi or drum:', type);
     }
   };
 
-  // Add console log to debug position changes
+  // Handle position changes
   const handlePositionChange = (trackId: string, newPosition: Position, isDragEnd: boolean) => {
-    console.log("Track: Position change called", {
-      trackId,
-      newPosition,
-      oldPosition: position,
-      isDragEnd
-    });
-    
-    // Call the callback properly
     onPositionChange(newPosition, isDragEnd);
   };
 
@@ -111,7 +94,7 @@ function Track(props: TrackProps) {
       data-track-id={id}
       data-track-type={type}
     >
-      <TrackPreview
+      <TrackFactory
         track={trackState}
         isPlaying={isPlaying}
         currentTime={currentTime}
@@ -120,7 +103,7 @@ function Track(props: TrackProps) {
         onPositionChange={handlePositionChange}
         bpm={bpm}
         timeSignature={timeSignature}
-        trackIndex={index} // Pass the track index for color determination
+        trackIndex={index}
       />
     </Box>
   );

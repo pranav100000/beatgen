@@ -131,12 +131,12 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                     <BPMControl bpm={bpm} onBpmChange={onBpmChange} />
                 </Box>
 
-                <TimeSignatureDisplay
+                {/* <TimeSignatureDisplay
                     topNumber={timeSignature[0]}
                     bottomNumber={timeSignature[1]}
                     onTopNumberChange={(value) => onTimeSignatureChange(value, undefined)}
                     onBottomNumberChange={(value) => onTimeSignatureChange(undefined, value)}
-                />
+                /> */}
 
                 <KeySelector
                     selectedKey={keySignature}

@@ -25,16 +25,6 @@ export function calculateAudioTrackWidth(
   // Calculate final width
   const width = measuresCount * audioMeasureWidth;
   
-  console.log('Audio track width calculation:', {
-    durationInSeconds,
-    bpm,
-    beatsPerSecond,
-    totalBeats,
-    measuresCount,
-    audioMeasureWidth,
-    finalWidth: width
-  });
-  
   return width;
 }
 
@@ -66,14 +56,6 @@ export function calculateMidiTrackWidth(
   
   // Calculate final width
   const width = columnsPerMeasure * midiMeasureWidth * columnsPerBeat;
-  
-  console.log('MIDI track width calculation:', {
-    notesCount: notes.length,
-    timeSignature,
-    columnsPerMeasure,
-    midiMeasureWidth,
-    finalWidth: width
-  });
   
   return width;
 }

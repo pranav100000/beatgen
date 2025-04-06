@@ -7,17 +7,8 @@ import { historyManager } from '../core/state/history/HistoryManager';
 import { getProject, Project } from '../../platform/api/projects';
 import { downloadFile } from '../../platform/api/sounds';
 import { db } from '../core/db/dexie-client';
-import { 
-  TrackVolumeChangeAction,
-  TrackPanChangeAction,
-  TrackPositionChangeAction,
-  TrackMuteToggleAction,
-  BPMChangeAction,
-  TimeSignatureChangeAction,
-  KeySignatureChangeAction,
-  TrackAddAction,
-  TrackDeleteAction
-} from '../core/state/history/actions/StudioActions';
+// Import actions
+import { Actions } from '../core/state/history/actions';
 
 interface StudioState {
   // Audio Engine State
@@ -127,13 +118,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       Tone.Transport.bpm.value = bpm;
       store.getTransport().setTempo(bpm);
       
-      // Create history action
-      const action = new BPMChangeAction(
+      // Create direct action (no callbacks)
+      const action = new Actions.BPMChange(
         store,
         oldBpm,
         bpm,
-        (newBpm) => set({ bpm: newBpm }),
-        (updateFn) => set((state) => ({ tracks: updateFn(state.tracks) })),
         timeSignature
       );
       
@@ -164,13 +153,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       store.projectManager.setTimeSignature(numerator, denominator);
       Tone.Transport.timeSignature = newTimeSignature;
       
-      // Create history action
-      const action = new TimeSignatureChangeAction(
+      // Create direct action with no callbacks
+      const action = new Actions.TimeSignature(
         store,
         oldTimeSignature,
         newTimeSignature,
-        (num, denom) => set({ timeSignature: [num, denom] }),
-        (updateFn) => set((state) => ({ tracks: updateFn(state.tracks) })),
         bpm
       );
       
@@ -196,12 +183,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // Get store and other required values
     const { store } = get();
     if (store) {
-      // Create history action
-      const action = new KeySignatureChangeAction(
+      // Create direct action with no callbacks
+      const action = new Actions.KeySignature(
         store,
         oldKeySignature,
-        keySignature,
-        (newKeySignature) => set({ keySignature: newKeySignature })
+        keySignature
       );
       
       // Execute action and update history state
@@ -513,23 +499,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // If value hasn't changed, don't do anything
     if (oldVolume === volume) return;
     
-    // Create history action using direct update
-    const action = new TrackVolumeChangeAction(
+    // Create direct action (no callbacks)
+    const action = new Actions.ParameterChange(
       store,
       trackId,
+      'volume',
       oldVolume,
-      volume,
-      // Direct update function that bypasses history
-      (id, vol) => {
-        const { tracks } = get();
-        // Update tracks with the new volume
-        set({
-          tracks: tracks.map(t => t.id === id ? { ...t, volume: vol } : t)
-        });
-        // Update audio engine
-        store.getAudioEngine().setTrackVolume(id, vol);
-        store.getSoundfontController().setTrackVolume(id, vol);
-      }
+      volume
     );
     
     // Execute action and update history state
@@ -557,24 +533,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // If value hasn't changed, don't do anything
     if (oldPan === pan) return;
     
-    // Create history action with direct pan update
-    const action = new TrackPanChangeAction(
+    // Create direct action (no callbacks)
+    const action = new Actions.ParameterChange(
       store,
       trackId,
+      'pan',
       oldPan,
-      pan,
-      // Direct update function that bypasses history
-      (id, newPan) => {
-        const { tracks } = get();
-        // Update tracks with the new pan value
-        set({
-          tracks: tracks.map(t => t.id === id ? { ...t, pan: newPan } : t)
-        });
-        // Update audio engine
-        store.getAudioEngine().setTrackPan(id, newPan);
-        
-        console.log(`History manager updated track ${id} pan to:`, newPan);
-      }
+      pan
     );
     
     // Execute action and update history state
@@ -602,25 +567,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // If value hasn't changed, don't do anything
     if (oldMuted === muted) return;
     
-    // Create history action with direct mute update
-    const action = new TrackMuteToggleAction(
+    // Create direct action (no callbacks)
+    const action = new Actions.ParameterChange(
       store,
       trackId,
-      oldMuted,
-      muted,
-      // Direct update function that bypasses history
-      (id, newMuted) => {
-        const { tracks } = get();
-        // Update tracks with the new mute value
-        set({
-          tracks: tracks.map(t => t.id === id ? { ...t, muted: newMuted } : t)
-        });
-        // Update audio engine
-        store.getAudioEngine().setTrackMute(id, newMuted);
-        store.getSoundfontController().muteTrack(id, newMuted);
-        
-        console.log(`History manager updated track ${id} mute to:`, newMuted);
-      }
+      'muted',
+      oldMuted ? 1 : 0,  // Convert boolean to number
+      muted ? 1 : 0      // Convert boolean to number
     );
     
     // Execute action and update history state
@@ -690,27 +643,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       // This ensures we have all data needed for undo
       const trackDataForHistory = { ...trackToDelete };
       
-      // Create a delete action for history
-      const action = new TrackDeleteAction(
+      // Create direct delete action (no callbacks)
+      const action = new Actions.DeleteTrack(
         store,
-        trackDataForHistory,
-        // Add track callback
-        (track) => {
-          console.log('History: Re-adding deleted track:', track.id);
-          set(state => ({ tracks: [...state.tracks, track] }));
-        },
-        // Remove track callback
-        (id) => {
-          console.log('History: Removing track:', id);
-          
-          // First update the UI state
-          set(state => ({ tracks: state.tracks.filter(t => t.id !== id) }));
-          
-          // Also tell the audio engine to clean up
-          store.getAudioEngine().removeTrack(id);
-          
-          // We don't actually delete from DB here - just visual and audio state
-        }
+        trackDataForHistory
       );
       
       // Execute the action through history manager
@@ -825,38 +761,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         initialPosition.y
       );
 
-      // Create an add track action for history
-      const action = new TrackAddAction(
+      // Create direct add track action (no callbacks)
+      const action = new Actions.AddTrack(
         store,
-        trackData,
-        // Add track callback
-        async (track) => {
-          console.log('History: Adding track:', track.id);
-          
-          // First add the track to the UI
-          set(state => ({ tracks: [...state.tracks, track] }));
-          
-          // Connect track to soundfont if needed
-          if ((track.type === 'midi' || track.type === 'drum') && track.instrumentId) {
-            try {
-              console.log(`Connecting new track ${track.id} to soundfont ${track.instrumentId}`);
-              await store.connectTrackToSoundfont(track.id, track.instrumentId);
-              console.log(`Successfully connected track ${track.id} to soundfont ${track.instrumentId}`);
-            } catch (error) {
-              console.error(`Failed to connect track ${track.id} to soundfont:`, error);
-            }
-          }
-        },
-        // Remove track callback
-        (id) => {
-          console.log('History: Removing track:', id);
-          
-          // First update the UI state
-          set(state => ({ tracks: state.tracks.filter(t => t.id !== id) }));
-          
-          // Also tell the audio engine to clean up
-          store.getAudioEngine().removeTrack(id);
-        }
+        trackData
       );
       
       // Execute the action through history manager
@@ -912,47 +820,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       // Keep track of the old position for undo operation
       const oldPosition = { ...track.position };
       
-      // Create a history action with direct position update
-      const action = new TrackPositionChangeAction(
+      // Create direct action (no callbacks)
+      const action = new Actions.TrackPosition(
         store,
         trackId,
         oldPosition,
-        newPosition,
-        // Direct update function that bypasses history
-        (id, position) => {
-          const { tracks } = get();
-          // Update tracks with the new position
-          set({
-            tracks: tracks.map(t => t.id === id ? { ...t, position } : t)
-          });
-          // Update audio engine
-          store.getAudioEngine().setTrackPosition(id, position.x, position.y);
-          
-          // Update transport if playing
-          if (isPlaying) {
-            store.getTransport().handleTrackPositionChange(id, position.x, track.type);
-          }
-
-          if (track.type === 'midi' || track.type === 'drum') {
-            // Convert X position (pixels) to milliseconds
-            const beatDurationMs = (60 / store.getProjectManager().getTempo()) * 1000; // Duration of one beat in ms
-            const gridTimeSignature = store.getProjectManager().getTimeSignature();
-            const beatsPerMeasure = gridTimeSignature[0];
-            const measureWidth = GRID_CONSTANTS.measureWidth;
-            const pixelsPerBeat = measureWidth / beatsPerMeasure;
-            
-            // Calculate offset in milliseconds
-            const offsetBeats = position.x / pixelsPerBeat;
-            const offsetMs = offsetBeats * beatDurationMs;
-            
-            // Apply offset to soundfont player
-            store.getSoundfontController().setTrackOffset(id, offsetMs);
-            console.log(`Set track ${id} offset: ${position.x}px → ${offsetMs}ms (${offsetBeats} beats)`);
-          }
-          
-          console.log(`History manager updated track ${id} position to:`, position);
-        },
-        isPlaying
+        newPosition
       );
       
       // Execute action and update history state
@@ -1012,32 +885,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         trackData.position.y
       );
       
-      // Create an add track action for history
-      const action = new TrackAddAction(
+      // Create direct add track action without callbacks
+      const action = new Actions.AddTrack(
         store,
-        trackData,
-        // Add track callback
-        (track) => {
-          console.log('History: Adding audio file track:', track.id);
-          set(state => ({ tracks: [...state.tracks, track] }));
-          
-          // For audio tracks, we need to ensure the audio buffer is loaded
-          if (track.audioFile) {
-            store.loadAudioFile(track.id, track.audioFile).catch(err => {
-              console.error('Failed to reload audio file during redo:', err);
-            });
-          }
-        },
-        // Remove track callback
-        (id) => {
-          console.log('History: Removing audio file track:', id);
-          
-          // First update the UI state
-          set(state => ({ tracks: state.tracks.filter(t => t.id !== id) }));
-          
-          // Also tell the audio engine to clean up
-          store.getAudioEngine().removeTrack(id);
-        }
+        trackData
       );
       
       // Execute the action through history manager

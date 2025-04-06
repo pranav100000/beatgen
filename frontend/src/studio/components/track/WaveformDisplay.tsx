@@ -29,15 +29,7 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
       return;
     }
     
-    // Debug canvas dimensions
-    console.log('Canvas initial dimensions:', {
-      clientWidth: canvas.clientWidth,
-      clientHeight: canvas.clientHeight,
-      offsetWidth: canvas.offsetWidth,
-      offsetHeight: canvas.offsetHeight,
-      parentWidth: canvas.parentElement?.clientWidth,
-      parentHeight: canvas.parentElement?.clientHeight
-    });
+    // Set up canvas dimensions based on parent element
     
     // Set up high-DPI canvas for sharper rendering
     const dpr = window.devicePixelRatio || 1;
@@ -132,7 +124,7 @@ function drawWaveform(
   const height = canvas.height / dpr;
   const middle = height / 2;
   
-  console.log('Drawing waveform with dimensions:', { width, height, middle, dpr })
+  // Draw waveform with calculated dimensions
   
   // Clear canvas with a transparent background
   ctx.clearRect(0, 0, width, height);
