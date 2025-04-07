@@ -50,8 +50,11 @@ export class Store implements StoreInterface {
   private initialized: boolean = false;
   private midiManager: MidiManager;
   private instrumentManager: InstrumentManager;
-  private _tracks: TrackState[] = []; // Array of tracks
-  private _listeners: Function[] = []; // Track change listeners
+  // Removed _tracks array
+  // Removed _listeners array
+
+  // Map to store runtime data associated with track IDs
+  private runtimeTrackData: Map<string, { channel: Tone.Channel; player?: Tone.Player; /* Add other runtime-specific state here if needed */ }> = new Map();
 
   constructor() {
     this.projectManager = new ProjectManager();
@@ -97,9 +100,11 @@ export class Store implements StoreInterface {
       });
 
       this.getSoundfontController().initialize(audioContext);
-      
+
       this.initialized = true;
-      this.syncTracksFromProjectManager();
+      // Removed syncTracksFromProjectManager call
+      // Initialize runtime data for existing tracks if a project is loaded
+      this.initializeRuntimeTrackData();
     } catch (error) {
       console.error('Store: Audio initialization failed:', error);
       throw error;
@@ -107,19 +112,20 @@ export class Store implements StoreInterface {
   }
 
   /**
-   * Synchronize tracks from ProjectManager to our internal tracks array
+   * Initialize runtime data (like Tone.Channel) for tracks already present
+   * in the ProjectManager when the store initializes.
    */
-  private syncTracksFromProjectManager(): void {
+  private initializeRuntimeTrackData(): void {
     const project = this.projectManager.getCurrentProject();
     if (!project) return;
-    
-    console.log('Synchronizing tracks from ProjectManager...');
-    
+
+    console.log('Initializing runtime data for existing tracks...');
     project.tracks.forEach(track => {
-      this.addTrackToInternalState(track);
+      if (!this.runtimeTrackData.has(track.id)) {
+        this.createRuntimeTrackData(track.id);
+      }
     });
-    
-    console.log(`Total tracks after sync: ${this._tracks.length}`);
+    console.log(`Runtime data initialized for ${this.runtimeTrackData.size} tracks.`);
   }
 
   public getTransport(): TransportController {
@@ -198,54 +204,42 @@ export class Store implements StoreInterface {
         // Continue even if persistence fails
       }
     }
-    
-    // Add track to our internal _tracks array
-    this.addTrackToInternalState(track);
-    
+
+    // Create runtime data (channel, etc.) for the new track
+    this.createRuntimeTrackData(track.id);
+
+    // Note: No need to notify listeners here, UI should react to ProjectManager changes
+
     return track;
   }
 
-  /**
-   * Add a track to the internal _tracks array
+   * Creates the runtime data entry for a track (e.g., Tone.Channel).
+   * Should be called when a track is added or loaded.
+   * @param trackId The ID of the track.
    */
-  private addTrackToInternalState(track: Track): void {
-    // Skip if this track is already in our internal array
-    if (this._tracks.some(t => t.id === track.id)) {
+  private createRuntimeTrackData(trackId: string): void {
+    if (this.runtimeTrackData.has(trackId)) {
+      console.warn(`Store: Runtime data already exists for track ${trackId}`);
       return;
     }
-    
+
     // Create a channel for the track
     const channel = new Tone.Channel().toDestination();
-    
-    // Create the track state object with required properties
-    const trackState: TrackState = {
-      id: track.id,
-      name: track.name,
-      type: track.type,
-      muted: track.muted,
-      soloed: track.soloed,
-      volume: track.volume,
-      pan: track.pan,
-      channel: channel,
-      position: { x: 0, y: this._tracks.length * 40 }, // Default position
-      drumPads: track.type === 'drum' ? [] : undefined
-    };
-    
-    // Preserve instrument properties if present for MIDI or drum tracks
-    if ((track.type === 'midi' || track.type === 'drum') && track.instrumentId) {
-      trackState.instrumentId = track.instrumentId;
-      trackState.instrumentName = track.instrumentName;
-      trackState.instrumentStorageKey = track.instrumentStorageKey;
+
+    // Set initial volume/pan/mute from ProjectManager's track data
+    const trackData = this.projectManager.getTrackById(trackId);
+    if (trackData) {
+      channel.volume.value = Tone.gainToDb(trackData.volume / 100); // Assuming volume is 0-100
+      channel.pan.value = trackData.pan / 100; // Assuming pan is -100 to 100
+      channel.mute = trackData.muted;
+      // Solo logic needs coordination across tracks, often handled in AudioEngine/Transport
+      // We don't set solo here, as it depends on other tracks' states.
     }
-    
-    // Add to our internal tracks array
-    this._tracks.push(trackState);
-    
-    console.log(`Added track ${track.id} of type ${track.type} to internal state`);
-    
-    // Notify listeners of new track
-    this._notifyListeners();
+
+    this.runtimeTrackData.set(trackId, { channel });
+    console.log(`Store: Created runtime data for track ${trackId}`);
   }
+
 
   public async loadAudioFile(trackId: string, file: File, position?: { x: number, y: number }): Promise<void> {
     // Pass the position directly to the transport controller
@@ -283,25 +277,38 @@ export class Store implements StoreInterface {
     }
   }
 
-  public async removeTrack(id: string): Promise<void> {
-    // Clean up MIDI resources if it's a MIDI or drum track
-    // IMPORTANT: Do this BEFORE removing the track from _tracks
-    const track = this._tracks.find(t => t.id === id);
-    if (track && (track.type === 'midi' || track.type === 'drum')) {
-      await this.midiManager.deleteTrackWithPersistence(id);
+  public async removeTrack(trackId: string): Promise<void> {
+    // Get track type from ProjectManager *before* removing it
+    const track = this.projectManager.getTrackById(trackId);
+    const trackType = track?.type;
+
+    // Clean up MIDI resources if it's a MIDI, drum or sampler track
+    if (trackType === 'midi' || trackType === 'drum' || trackType === 'sampler') {
+      // Ensure MidiManager has the track before attempting deletion
+      if (this.midiManager.hasTrack(trackId)) {
+        await this.midiManager.deleteTrackWithPersistence(trackId);
+      } else {
+        console.warn(`Store.removeTrack: Track ${trackId} not found in MidiManager during cleanup.`);
+      }
     }
-    
-    // Remove track from project manager
-    this.projectManager.removeTrack(id);
-    
-    // Also remove from our internal tracks array
-    this._tracks = this._tracks.filter(t => t.id !== id);
-    
-    // Remove from audio engine
-    this.getAudioEngine().removeTrack(id);
-    
-    // Notify listeners of track changes
-    this._notifyListeners();
+
+    // Remove track from project manager (this should be the source of truth)
+    this.projectManager.removeTrack(trackId);
+
+    // Clean up runtime data (channel, player etc.)
+    const runtimeData = this.runtimeTrackData.get(trackId);
+    if (runtimeData) {
+      runtimeData.channel.dispose(); // Dispose Tone.js resources
+      runtimeData.player?.dispose();
+      this.runtimeTrackData.delete(trackId);
+      console.log(`Store: Cleaned up runtime data for track ${trackId}`);
+    }
+
+    // Remove from audio engine (AudioEngine might need refactoring to not rely on Store._tracks)
+    // Assuming AudioEngine uses trackId
+    this.getAudioEngine().removeTrack(trackId);
+
+    // Note: No need to notify listeners here, UI should react to ProjectManager changes
   }
 
   public getAudioEngine(): AudioEngine {
@@ -393,35 +400,20 @@ export class Store implements StoreInterface {
     }
   }
 
+  // Removed addListener, removeListener, _notifyListeners
+
   /**
-   * Add a listener for track changes
+   * Gets the persistent track data with the specified ID from ProjectManager.
    */
-  public addListener(listener: Function): void {
-    this._listeners.push(listener);
+  public getTrackDataById(trackId: string): Track | undefined {
+    return this.projectManager.getTrackById(trackId);
   }
 
   /**
-   * Remove a listener
+   * Gets the runtime data (e.g., Tone.Channel) for the specified track ID.
    */
-  public removeListener(listener: Function): void {
-    const index = this._listeners.indexOf(listener);
-    if (index !== -1) {
-      this._listeners.splice(index, 1);
-    }
-  }
-
-  /**
-   * Notify all listeners of changes
-   */
-  private _notifyListeners(): void {
-    this._listeners.forEach(listener => listener());
-  }
-
-  /**
-   * Gets the track with the specified ID
-   */
-  public getTrackById(trackId: string): TrackState | undefined {
-    return this._tracks.find(t => t.id === trackId);
+  public getRuntimeTrackDataById(trackId: string): { channel: Tone.Channel; player?: Tone.Player; } | undefined {
+    return this.runtimeTrackData.get(trackId);
   }
 
   /**
