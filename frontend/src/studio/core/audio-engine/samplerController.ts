@@ -10,7 +10,7 @@ import * as Tone from 'tone';
 export class SamplerController {
     private samplers: Map<string, MidiSampler> = new Map();
     private trackSubscriptions: Map<string, () => void> = new Map();
-    private scheduledEvents: Map<string, number[]> = new Map(); // Track ID -> event IDs
+    // Removed scheduledEvents map
     private readonly DEFAULT_GRAIN_SIZE = 0.1; // 100ms
     private readonly DEFAULT_OVERLAP = 0.1;    // 10% overlap
     private readonly DEFAULT_BASE_NOTE = 60;   // Middle C (C4)
@@ -130,114 +130,9 @@ export class SamplerController {
         
         sampler.playNote(midiNote, duration, velocity);
     }
-    
-    /**
-     * Prepare all sampler tracks for playback
-     * @param startTime The transport time to start from
-     * @param bpm Current BPM for timing calculations
-     */
-    preparePlayback(startTime: number = 0, bpm: number = 120): void {
-        // Get all active sampler tracks
-        const samplerTracks = this.getActiveSamplerIds();
-        if (samplerTracks.length === 0) {
-            console.log('No active sampler tracks to prepare for playback');
-            return;
-        }
-        
-        console.log(`Preparing ${samplerTracks.length} sampler tracks for playback from ${startTime}s`);
-        
-        // Clear any previously scheduled events
-        this.clearScheduledEvents();
-        
-        // For each sampler track, schedule it for playback
-        for (const trackId of samplerTracks) {
-            const sampler = this.samplers.get(trackId);
-            if (sampler) {
-                // Each sampler already has its notes from the MidiManager subscription
-                const notes = sampler.getNotes();
-                
-                if (notes && notes.length > 0) {
-                    console.log(`Starting playback for sampler track ${trackId} with ${notes.length} notes`);
-                    
-                    // Play the sampler with the current BPM and start time
-                    sampler.playMidi(bpm, startTime);
-                } else {
-                    console.log(`No notes found for sampler track ${trackId}`);
-                }
-            }
-        }
-    }
-    
-    /**
-     * Play notes from a specific point in time (for transport playback)
-     * Following the SoundfontEngineController pattern
-     * @param trackId The track ID
-     * @param notes Array of notes to play
-     * @param startTime The transport time to start from
-     */
-    playNotes(trackId: string, notes: Note[], startTime: number = 0): void {
-        const sampler = this.samplers.get(trackId);
-        if (!sampler) {
-            console.warn(`No sampler found for track ${trackId}, cannot play notes`);
-            return;
-        }
-        
-        console.log(`SamplerController: Setting up ${notes.length} notes for track ${trackId} starting at ${startTime}`);
-        
-        // Store scheduled event IDs so we can cancel them later if needed
-        const scheduledEvents: number[] = [];
-        
-        // Calculate timing constants once
-        const secPerBeat = 60 / Tone.Transport.bpm.value;
-        const gridUnitTime = secPerBeat / 4; // Assuming 16th note grid
-        
-        // Group notes by their start time for more efficient scheduling
-        const notesByStartTime: Map<number, Note[]> = new Map();
-        
-        // Process notes first, organizing them by start time
-        notes.forEach(note => {
-            const noteTimeInSeconds = note.column * gridUnitTime;
-            
-            // Only schedule notes that should play after the start time
-            if (noteTimeInSeconds >= startTime) {
-                // Store notes by their start times for more efficient scheduling
-                if (!notesByStartTime.has(noteTimeInSeconds)) {
-                    notesByStartTime.set(noteTimeInSeconds, []);
-                }
-                notesByStartTime.get(noteTimeInSeconds)!.push(note);
-            }
-        });
-        
-        // Schedule notes by their start time - more efficient than scheduling each note separately
-        for (const [noteTimeInSeconds, notesAtTime] of notesByStartTime.entries()) {
-            const offsetFromNow = noteTimeInSeconds - startTime;
-            
-            // Schedule a single event for all notes starting at this time
-            const eventId = Tone.getTransport().schedule((time) => {
-                for (const note of notesAtTime) {
-                    // Calculate note duration
-                    const noteDuration = note.length * gridUnitTime;
-                    
-                    // Use a velocity between 0-1 
-                    const velocity = note.velocity ? note.velocity / 127 : 0.8;
-                    
-                    // Play the note at the scheduled time
-                    this.playNote(trackId, note.row, noteDuration, velocity);
-                    
-                    console.log(`Playing sampler note: pitch=${note.row}, duration=${noteDuration}, time=${time}`);
-                }
-            }, offsetFromNow);
-            
-            // Store the event ID for later cleanup
-            scheduledEvents.push(eventId);
-        }
-        
-        // Store the scheduled events for this track
-        this.scheduledEvents.set(trackId, scheduledEvents);
-        
-        console.log(`Scheduled ${notes.length} sampler notes for playback in ${notesByStartTime.size} time slots`);
-    }
-    
+
+    // Removed playNotes method as it duplicates logic better handled within MidiSampler
+
     /**
      * Update the base MIDI note for a track
      * @param trackId The track ID
@@ -249,11 +144,14 @@ export class SamplerController {
             console.warn(`No sampler found for track ${trackId}, cannot set base MIDI note`);
             return;
         }
-        
-        // The MidiSampler class has a private baseNote property
-        // We would need to add a setter for this
-        // sampler.setBaseNote(baseMidiNote);
-        console.log(`Set base MIDI note for track ${trackId} to ${baseMidiNote}`);
+
+        try {
+            // Assuming MidiSampler has a setBaseNote method
+            sampler.setBaseNote(baseMidiNote);
+            console.log(`SamplerController: Set base MIDI note for track ${trackId} to ${baseMidiNote}`);
+        } catch (error) {
+             console.error(`SamplerController: Error setting base MIDI note for track ${trackId}:`, error);
+        }
     }
     
     /**
@@ -311,38 +209,16 @@ export class SamplerController {
     getActiveSamplerIds(): string[] {
         return Array.from(this.samplers.keys());
     }
-    
-    /**
-     * Clear scheduled events for a track
-     * @param trackId The track ID to clear events for, or undefined to clear all
-     */
-    clearScheduledEvents(trackId?: string): void {
-        if (trackId) {
-            // Clear scheduled events for a specific track
-            const events = this.scheduledEvents.get(trackId);
-            if (events && events.length > 0) {
-                console.log(`Clearing ${events.length} scheduled events for track ${trackId}`);
-                events.forEach(id => Tone.Transport.clear(id));
-                this.scheduledEvents.delete(trackId);
-            }
-        } else {
-            // Clear all scheduled events
-            for (const [id, events] of this.scheduledEvents.entries()) {
-                console.log(`Clearing ${events.length} scheduled events for track ${id}`);
-                events.forEach(eventId => Tone.Transport.clear(eventId));
-            }
-            this.scheduledEvents.clear();
-        }
-    }
-    
+
+    // Removed clearScheduledEvents method as scheduling is delegated to MidiSampler
+
     /**
      * Remove a sampler by track ID
      * @param trackId The track ID
      */
     removeSampler(trackId: string): void {
-        // Clear any scheduled events
-        this.clearScheduledEvents(trackId);
-        
+        // Removed call to clearScheduledEvents
+
         // Unsubscribe from MIDI updates
         if (this.trackSubscriptions.has(trackId)) {
             const unsubscribe = this.trackSubscriptions.get(trackId);
@@ -455,69 +331,80 @@ export class SamplerController {
      */
     
     /**
-     * Start or resume playback
-     * @param startTime The transport time to start from
-     * @param bpm Current BPM for timing calculations
+     * Start or resume playback for all active samplers.
+     * Delegates actual scheduling and playback to individual MidiSampler instances.
+     * @param startTime The transport time to start from (in seconds).
+     * @param bpm Current BPM for timing calculations.
      */
     async play(startTime: number = 0, bpm: number = 120): Promise<void> {
-        console.log('SamplerController: Starting playback');
-        
-        // Prepare all samplers for playback
-        this.preparePlayback(startTime, bpm);
+        console.log(`SamplerController: Starting playback for all samplers from ${startTime}s`);
+        const samplerTracks = this.getActiveSamplerIds();
+
+        for (const trackId of samplerTracks) {
+            const sampler = this.samplers.get(trackId);
+            if (sampler) {
+                try {
+                    // Ensure sampler has latest notes (it should via subscription)
+                    // const notes = sampler.getNotes(); // Optional: log note count
+                    // console.log(`Starting playback for sampler track ${trackId} with ${notes?.length ?? 0} notes`);
+                    sampler.playMidi(bpm, startTime); // Delegate playback to the sampler
+                } catch (error) {
+                    console.error(`SamplerController: Error starting playback for track ${trackId}:`, error);
+                }
+            }
+        }
     }
-    
+
     /**
-     * Pause playback
+     * Pause playback.
+     * Note: This relies on Tone.Transport.pause() affecting the underlying samplers.
+     * Individual samplers might need explicit pause handling if they don't use Tone.Transport events directly.
+     * For now, we assume pausing the transport is sufficient, but also stop individual samplers for safety.
      */
     pause(): void {
-        console.log('SamplerController: Pausing playback');
-        // Clear all scheduled events to stop future playback
-        this.clearScheduledEvents();
+        console.log('SamplerController: Pausing playback for all samplers');
+        // Pausing the main transport should pause scheduled events.
+        // Additionally, explicitly stop samplers to release any active voices/nodes immediately.
+        const samplerTracks = this.getActiveSamplerIds();
+        for (const trackId of samplerTracks) {
+            const sampler = this.samplers.get(trackId);
+            sampler?.stopPlayback(); // Use stopPlayback for immediate halt and cleanup
+        }
     }
-    
+
     /**
-     * Stop playback and reset position
+     * Stop playback for all active samplers and reset their state.
      */
     async stop(): Promise<void> {
-        console.log('SamplerController: Stopping playback');
-        // Clear all scheduled events
-        this.clearScheduledEvents();
-        
-        // For each active sampler, stop any currently playing notes
+        console.log('SamplerController: Stopping playback for all samplers');
         const samplerTracks = this.getActiveSamplerIds();
         for (const trackId of samplerTracks) {
             const sampler = this.samplers.get(trackId);
             if (sampler) {
-                sampler.stopPlayback();
+                try {
+                    sampler.stopPlayback(); // Delegate stopping to the sampler
+                } catch (error) {
+                    console.error(`SamplerController: Error stopping playback for track ${trackId}:`, error);
+                }
             }
         }
     }
-    
+
     /**
-     * Seek to a specific position - clears and reschedules events
-     * @param position Position in seconds
-     * @param bpm Current BPM for timing calculations
+     * Seek to a specific position. Stops current playback and restarts from the new position.
+     * @param position Position in seconds.
+     * @param bpm Current BPM for timing calculations.
      */
     async seek(position: number, bpm: number = 120): Promise<void> {
-        console.log(`SamplerController: Seeking to ${position}`);
-        
-        // CRITICAL FIX: First stop ALL active sampler playback
-        // This ensures any playing GrainPlayers are disposed of properly
-        const samplerTracks = this.getActiveSamplerIds();
-        for (const trackId of samplerTracks) {
-            const sampler = this.samplers.get(trackId);
-            if (sampler) {
-                // Call stopPlayback which handles Tone.Transport.cancel() internally
-                sampler.stopPlayback();
-                console.log(`Stopped playback for sampler ${trackId} during seek`);
-            }
-        }
-        
-        // Then clear all scheduled events we've been tracking
-        this.clearScheduledEvents();
-        
-        // Finally, reschedule notes from the new position
-        this.preparePlayback(position, bpm);
+        console.log(`SamplerController: Seeking to ${position}s`);
+
+        // 1. Stop all current playback immediately
+        await this.stop();
+
+        // 2. Restart playback from the new position
+        // Note: A small delay might be needed if stop() is asynchronous and needs time to fully release resources
+        // await new Promise(resolve => setTimeout(resolve, 10)); // Optional small delay
+        await this.play(position, bpm);
     }
     
     /**
@@ -529,9 +416,8 @@ export class SamplerController {
             // Clean up specific track
             this.removeSampler(trackId);
         } else {
-            // Clear all scheduled events first
-            this.clearScheduledEvents();
-            
+            // Removed call to clearScheduledEvents
+
             // Clean up all tracks
             for (const trackId of this.samplers.keys()) {
                 this.removeSampler(trackId);
