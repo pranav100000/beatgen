@@ -7,6 +7,9 @@ import { TrackState } from '../types/track';
 import * as Tone from 'tone';
 import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
 import { SamplerController } from '../audio-engine/samplerController';
+import { Note } from '../types/note'; // Added for Note type
+import { NoteActions } from './history/actions/NoteActions'; // Added for NoteActions
+import { historyManager } from './history/HistoryManager'; // Added for historyManager
 
 /**
  * Interface for a drum pad in the drum machine grid
@@ -422,65 +425,94 @@ export class Store implements StoreInterface {
   }
 
   /**
-   * Gets the drum pads for a track
+   * Gets the current drum pad state for a track by querying MidiManager.
    */
   public getDrumPads(trackId: string): DrumPad[] {
-    const track = this._tracks.find(t => t.id === trackId);
+    const track = this.projectManager.getTrackById(trackId);
     if (!track || track.type !== 'drum') {
+      // console.warn(`Cannot get drum pads: Track ${trackId} not found or not a drum track`);
       return [];
     }
-    
-    // Initialize drumPads if it doesn't exist
-    if (!track.drumPads) {
-      track.drumPads = [];
+
+    const notes = this.midiManager.getTrackNotes(trackId);
+    if (!notes) {
+      // Track might exist in ProjectManager but not yet fully initialized in MidiManager
+      // Or an error occurred fetching notes. MidiManager logs errors internally.
+      return [];
     }
-    
-    return track.drumPads;
+
+    // Map MIDI notes to DrumPad objects
+    // Assuming row = pitch, column = time position
+    return notes.map(note => ({
+      row: note.row,
+      column: note.column,
+      velocity: note.velocity ?? 100 // Use note velocity or default
+    }));
   }
 
   /**
-   * Toggles a drum pad on/off
+   * Toggles a drum pad on/off by adding or removing the corresponding MIDI note
+   * via the MidiManager and HistoryManager.
    */
-  public toggleDrumPad(trackId: string, column: number, row: number): void {
+  public async toggleDrumPad(trackId: string, column: number, row: number): Promise<void> {
     console.log(`Store.toggleDrumPad called for track ${trackId}, column ${column}, row ${row}`);
-    
-    // Find the track directly
-    const track = this.getTrackById(trackId);
-    
+
+    const track = this.projectManager.getTrackById(trackId);
     if (!track || track.type !== 'drum') {
       console.warn(`Cannot toggle drum pad: Track ${trackId} not found or not a drum track`);
       return;
     }
-    
-    // Initialize drumPads if it doesn't exist
-    if (!track.drumPads) {
-      track.drumPads = [];
+
+    // Get current notes for the track from the source of truth
+    const notes = this.midiManager.getTrackNotes(trackId);
+    if (notes === null) {
+      console.error(`Cannot toggle drum pad: Failed to get notes for track ${trackId}`);
+      return;
     }
-    
-    // Check if pad already exists at this position
-    const existingPadIndex = track.drumPads.findIndex(
-      p => p.column === column && p.row === row
-    );
-    
-    if (existingPadIndex >= 0) {
-      // Remove the pad if it exists
-      track.drumPads.splice(existingPadIndex, 1);
-      console.log(`Removed drum pad at column ${column}, row ${row} for track ${trackId}`);
+
+    // Find if a note already exists at this position (row = pitch, column = time)
+    const existingNote = notes.find(note => note.column === column && note.row === row);
+
+    // Import necessary action classes and history manager instance
+    const { AddNoteAction, DeleteNoteAction } = NoteActions;
+    // const { historyManager } = await import('./history/HistoryManager'); // Use direct import now added at top
+
+    if (existingNote) {
+      // Note exists - create and execute a DeleteNoteAction
+      console.log(`Drum pad exists at [${column}, ${row}], removing note ID: ${existingNote.id}`);
+      const deleteAction = new DeleteNoteAction(
+        this, // Pass the store instance
+        trackId,
+        String(existingNote.id), // Action expects string ID
+        existingNote // Pass the full note object for undo
+      );
+      await historyManager.executeAction(deleteAction);
+
     } else {
-      // Add new pad
-      track.drumPads.push({
-        row,
-        column,
-        velocity: 100 // Default velocity
-      });
-      console.log(`Added drum pad at column ${column}, row ${row} for track ${trackId}`);
+      // Note does not exist - create and execute an AddNoteAction
+      console.log(`Drum pad does not exist at [${column}, ${row}], adding note.`);
+
+      // Create a new note object
+      // WARNING: Using Date.now() for ID is not robust for rapid clicks.
+      // Consider a more reliable ID generation strategy if needed.
+      const newNoteId = Date.now();
+      const newNote: Note = {
+        id: newNoteId,
+        row: row,         // Pitch
+        column: column,   // Time position
+        length: 1,        // Default length (e.g., 1 grid unit for drums)
+        velocity: 100,    // Default velocity
+        trackId: trackId
+      };
+
+      const addAction = new AddNoteAction(
+        this, // Pass the store instance
+        trackId,
+        String(newNoteId), // Action expects string ID
+        newNote
+      );
+      await historyManager.executeAction(addAction);
     }
-    
-    // Log current state
-    console.log(`Drum pads for track ${trackId}: ${track.drumPads.length}`);
-    
-    // Notify listeners of track changes
-    this._notifyListeners();
   }
 
   public getProjectManager(): ProjectManager {
