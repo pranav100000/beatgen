@@ -353,8 +353,8 @@ export class SamplerController {
         // Clean up sampler resources
         const sampler = this.samplers.get(trackId);
         if (sampler) {
-            // Stop any playback
-            sampler.stopPlayback();
+            // Properly dispose of all resources
+            sampler.dispose();
             // Remove from map
             this.samplers.delete(trackId);
         }
@@ -415,6 +415,38 @@ export class SamplerController {
             sampler.setOffset(offsetMs);
         } else {
             console.warn(`Cannot set offset: no sampler found for track ${trackId}`);
+        }
+    }
+    
+    /**
+     * Set volume for a sampler track
+     * @param trackId The track ID
+     * @param volume Volume level (0-100)
+     */
+    setTrackVolume(trackId: string, volume: number): void {
+        console.log(`SamplerController: Setting track ${trackId} volume to ${volume}`);
+        
+        const sampler = this.samplers.get(trackId);
+        if (sampler) {
+            sampler.setVolume(volume);
+        } else {
+            console.warn(`Cannot set volume: no sampler found for track ${trackId}`);
+        }
+    }
+    
+    /**
+     * Set mute state for a sampler track
+     * @param trackId The track ID
+     * @param muted Whether the track should be muted
+     */
+    muteTrack(trackId: string, muted: boolean): void {
+        console.log(`SamplerController: ${muted ? 'Muting' : 'Unmuting'} track ${trackId}`);
+        
+        const sampler = this.samplers.get(trackId);
+        if (sampler) {
+            sampler.setMute(muted);
+        } else {
+            console.warn(`Cannot set mute: no sampler found for track ${trackId}`);
         }
     }
     
