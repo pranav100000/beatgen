@@ -213,10 +213,10 @@ export class Store implements StoreInterface {
     return track;
   }
 
-   * Creates the runtime data entry for a track (e.g., Tone.Channel).
-   * Should be called when a track is added or loaded.
-   * @param trackId The ID of the track.
-   */
+  //  * Creates the runtime data entry for a track (e.g., Tone.Channel).
+  //  * Should be called when a track is added or loaded.
+  //  * @param trackId The ID of the track.
+  //  */
   private createRuntimeTrackData(trackId: string): void {
     if (this.runtimeTrackData.has(trackId)) {
       console.warn(`Store: Runtime data already exists for track ${trackId}`);

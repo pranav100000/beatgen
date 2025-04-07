@@ -497,6 +497,12 @@ export class TransportController implements Transport {
         const validBpm = Math.max(1, Math.min(bpm, 999));
         Tone.getTransport().bpm.value = validBpm;
         this.soundfontController.setGlobalBPM(validBpm);
+        
+        // Update BPM for sampler tracks if they are playing
+        if (this.isPlaying) {
+            const currentPosition = this.position;
+            this.samplerController.seek(currentPosition, validBpm);
+        }
     }
 
     public dispose(): void {

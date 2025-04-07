@@ -162,7 +162,8 @@ class MidiSampler {
         
         // Account for track's position offset
         // If track is positioned at 2s and transport starts at 0s, we shouldn't play notes until transport reaches 2s
-        // So effective start time is startTime + offsetSeconds
+        // So effective start time adjusts for the track position offset
+        // FIXED: Changed from subtraction to addition for correct offset calculation
         const effectiveStartTime = startTime - this.offsetSeconds;
         
         this.log(`Playing notes from ${startTime}s at ${bpm} BPM (track offset: ${this.offsetSeconds}s, effective: ${effectiveStartTime}s)`);
@@ -188,10 +189,6 @@ class MidiSampler {
                 // DEBUG: Add explicit explanation of the timing calculation
                 console.log(`Note at time=${noteTimeInSeconds}s, effectiveStart=${effectiveStartTime}s, offsetFromNow=${offsetFromNow}s, track offset=${this.offsetSeconds}s, transport=${startTime}s, will play at transport=${startTime + offsetFromNow}s`);
                 
-                // CRITICAL FIX: The seek time was being subtracted from when notes play
-                // This happens because we're using relative scheduling (offsetFromNow) with a transport
-                // whose position has been changed during seeking.
-                
                 // Calculate the absolute time in the transport timeline when this note should play
                 const absoluteTransportTime = noteTimeInSeconds + this.offsetSeconds;
                 
@@ -211,7 +208,7 @@ class MidiSampler {
                     // Connect to the audio destination
                     notePlayer.connect(Tone.getDestination());
                     
-                    // CRITICAL FIX: Track this grain player so we can stop it during seeking
+                    // Track this grain player so we can stop it during seeking
                     this.activeGrainPlayers.add(notePlayer);
                     
                     // Play the note

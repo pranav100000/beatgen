@@ -52,11 +52,11 @@ class MusicalParams:
     duration_beats: int = 16
     duration_bars: int = 4
     time_signature: List[int] = field(default_factory=list)
-    instruments: List[Instrument] = field(default_factory=list)
     melody: Optional[Any] = None
     counter_melody: Optional[Any] = None
     chords: Optional[Any] = None
-    
+    melody_instrument: Optional[Instrument] = None
+    chords_instrument: Optional[Instrument] = None
 class MusicGenService:
     def __init__(self):
         self.researcher = MusicResearcher()
@@ -102,13 +102,15 @@ class MusicGenService:
         self.anthropic_client2.set_system_prompt(system_prompt)
         message = f"""Based on this description: {prompt}
 
-I need you to determine the musical parameters (key, mode, BPM, and chord progression). 
+I need you to determine the musical parameters (key, mode, BPM, melody instrument, chords instrument, and chord progression). 
 
 First, explain your reasoning for each parameter:
 1. What key would work best and why?
 2. What mode would complement this and why?
 3. What tempo (BPM) would capture the right feel and why?
 4. What chord progression would support this style and why?
+5. What melody instrument would work best and why?
+6. What chords instrument would work best and why?
 
 After you've explained your choices, use the determine_musical_parameters tool to set these values.
 
@@ -327,14 +329,17 @@ And here is some research we've done on the chord progression: {chord_research_r
                 chord_progression_list[idx] = chord.replace("b", "-")
             note_probabilities = analyze_chord_progression(chord_progression_list, key)
             note_probabilities_string = json.dumps(note_probabilities, indent=4)
-            message = f"Create a melody that is {detailed_description} for {instrument_name} in the key of {key} {mode} at {tempo} BPM. Follow the chord progression: {chord_progression} as closely as possible. Use this data with note probabilities to create a melody: {note_probabilities_string}. DO NOT create notes that are out of key. IMPORTANT: Make sure the end of your response is the JSON object WITH THE JSON TAG."
+            message = f"Create a melody that is {detailed_description} for {instrument_name} in the key of {key} {mode} at {tempo} BPM. Follow the chord progression: {chord_progression} as closely as possible. Use this data with note probabilities to create a melody: {note_probabilities_string}. DO NOT create notes that are out of key. IMPORTANT: Return ONLY the JSON object in your response with no text or comments before or after it. The JSON should be properly formatted and contain no comments."
             
             # Use the async method instead of the sync one
-            
             content_text, tool_use_json = await self.melody_composer.send_message_async(message, queue, stream=True, thinking=True)
+            
+            # Log the raw response for debugging
+            logger.debug(f"Raw melody response (first 500 chars): {content_text[:500]}")
             
             # Extract JSON from the response - look for code blocks first
             import re
+            # First try to find JSON in code blocks
             json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', content_text, re.DOTALL)
             
             if json_match:
@@ -342,19 +347,72 @@ And here is some research we've done on the chord progression: {chord_research_r
                 json_content = json_match.group(1)
                 logger.info(f"Extracted JSON from code blocks, length: {len(json_content)}")
                 try:
+                    # Remove any comments or non-JSON content that might exist in the code block
+                    # First strip any lines starting with # (comments)
+                    json_content = re.sub(r'(?m)^#.*$', '', json_content)
+                    # Strip any text before the first {
+                    json_content = re.sub(r'^[^{]*', '', json_content)
+                    # Strip any text after the last }
+                    json_content = re.sub(r'}[^}]*$', '}', json_content)
+                    
+                    logger.debug(f"Processed JSON content (first 500 chars): {json_content[:500]}")
                     melody_data = json.loads(json_content)
                     logger.info(f"Successfully parsed JSON from code block: {json.dumps(melody_data)[:200]}...")
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse JSON from code block: {str(e)}")
-                    raise ValueError(f"Failed to parse Claude's response from code block: {str(e)}")
+                    # Try more aggressive JSON extraction before giving up
+                    try:
+                        json_content = re.search(r'({.*})', json_content, re.DOTALL)
+                        if json_content:
+                            melody_data = json.loads(json_content.group(1))
+                            logger.info(f"Successfully parsed JSON with fallback method")
+                        else:
+                            raise ValueError("No JSON object found in response")
+                    except (json.JSONDecodeError, AttributeError) as e2:
+                        logger.error(f"Failed in second attempt to parse JSON: {str(e2)}")
+                        raise ValueError(f"Failed to parse Claude's response from code block: {str(e)}")
             else:
                 # Try to parse the raw text as JSON
                 try:
-                    melody_data = json.loads(content_text)
+                    # First try to extract just the JSON portion
+                    # Look for a JSON object with {} brackets
+                    json_match = re.search(r'({[\s\S]*?})(?:\s*$|\s*[^{])', content_text)
+                    if json_match:
+                        json_content = json_match.group(1)
+                        logger.debug(f"Found JSON object with regex: {json_content[:100]}...")
+                    else:
+                        # Strip any text before the first {
+                        json_content = re.sub(r'^[^{]*', '', content_text)
+                        # Strip any text after the last }
+                        json_content = re.sub(r'}[^}]*$', '}', json_content)
+                    
+                    # Remove any lines starting with # (comments)
+                    json_content = re.sub(r'(?m)^#.*$', '', json_content)
+                    
+                    logger.debug(f"Processed JSON content (first 500 chars): {json_content[:500]}")
+                    melody_data = json.loads(json_content)
                     logger.info(f"Generated melody data: {json.dumps(melody_data)[:200]}...")
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse Claude's response as JSON: {content_text[:200]}")
-                    raise ValueError("Failed to parse Claude's response")
+                    logger.error(f"JSON error: {str(e)}")
+                    
+                    # Try one more approach - find any JSON-like structure
+                    try:
+                        # More aggressive pattern matching
+                        potential_json = re.search(r'({[\s\S]*})(?:\s*$|\s*[^{])', content_text)
+                        if potential_json:
+                            json_content = potential_json.group(1)
+                            # Clean it up further
+                            json_content = re.sub(r'#.*?[\r\n]', '', json_content)  # Remove # comments
+                            json_content = re.sub(r'//.*?[\r\n]', '', json_content) # Remove // comments
+                            logger.debug(f"Last attempt JSON extraction: {json_content[:100]}...")
+                            melody_data = json.loads(json_content)
+                            logger.info("Successfully extracted JSON with last-resort method")
+                        else:
+                            raise ValueError("No valid JSON structure found in the response")
+                    except Exception as e2:
+                        logger.error(f"All JSON extraction attempts failed: {str(e2)}")
+                        raise ValueError(f"Failed to parse Claude's response: {str(e)}")
             
             print("MELODY DATA:", melody_data)
             # Create the melody using the generated notes
@@ -394,12 +452,14 @@ And here is some research we've done on the chord progression: {chord_research_r
             raise ValueError(f"Failed to generate melody: {str(e)}")
         
     
-    def _set_musical_params(self, key, mode, chord_progression, bpm):
+    def _set_musical_params(self, key, mode, chord_progression, bpm, melody_instrument, chords_instrument):
         self.musical_params.key = key
         self.musical_params.chord_progression = chord_progression
         self.musical_params.mode = mode
         self.musical_params.bpm = bpm
         self.musical_params.allowed_intervals = get_mode_intervals(mode)
+        self.musical_params.melody_instrument = melody_instrument
+        self.musical_params.chords_instrument = chords_instrument
 
     @staticmethod   
     def _get_stream_response(response) -> tuple[str, dict]:
