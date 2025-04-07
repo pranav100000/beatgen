@@ -51,7 +51,7 @@ export class TrackPositionAction extends TrackAction {
         
         // Update soundfont offset if it's a MIDI or drum track
         const track = this.store.getTrackById(this.trackId);
-        if (track && (track.type === 'midi' || track.type === 'drum')) {
+        if (track && (track.type === 'midi' || track.type === 'drum' || track.type === 'sampler')) {
             // Convert X position (pixels) to milliseconds
             const beatDurationMs = (60 / this.store.getProjectManager().getTempo()) * 1000;
             const timeSignature = this.store.getProjectManager().getTimeSignature();
@@ -66,6 +66,7 @@ export class TrackPositionAction extends TrackAction {
             
             // Set track offset in milliseconds
             this.store.getSoundfontController().setTrackOffset(this.trackId, offsetMs);
+            this.store.getSamplerController().setTrackOffset(this.trackId, offsetMs);
             console.log(`Set track ${this.trackId} offset: ${position.x}px → ${offsetMs}ms (${offsetBeats} beats)`);
         }
     }

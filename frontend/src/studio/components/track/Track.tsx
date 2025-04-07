@@ -73,7 +73,7 @@ function Track(props: TrackProps) {
   // Handle piano roll opening when track is clicked
   const handleTrackClick = (e: React.MouseEvent) => {
     // For MIDI and drum tracks, directly open the piano roll
-    if (type === 'midi' || type === 'drum') {
+    if (type === 'midi' || type === 'drum' || type === 'sampler') {
       e.stopPropagation();
       openPianoRoll(id);
     }

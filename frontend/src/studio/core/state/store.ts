@@ -6,6 +6,7 @@ import AudioEngine from '../audio-engine/audioEngine';
 import { TrackState } from '../types/track';
 import * as Tone from 'tone';
 import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
+import { SamplerController } from '../audio-engine/samplerController';
 
 /**
  * Interface for a drum pad in the drum machine grid
@@ -22,18 +23,22 @@ export interface StoreInterface {
   initializeAudio(): Promise<void>;
   createTrack(
     name: string, 
-    type: 'audio' | 'midi' | 'drum', 
+    type: 'audio' | 'midi' | 'drum' | 'sampler', 
     existingTrackData?: {
       id: string;
       volume?: number;
       pan?: number;
       muted?: boolean;
       soloed?: boolean;
+      instrumentId?: string;
+      instrumentName?: string;
+      instrumentStorageKey?: string;
     }
   ): Promise<Track>;
   getInstrumentManager(): InstrumentManager;
   getMidiManager(): MidiManager;
   connectTrackToSoundfont(trackId: string, instrumentId: string): Promise<void>;
+  connectTrackToSampler(trackId: string, file: File, baseMidiNote?: number, grainSize?: number, overlap?: number): Promise<void>;
 }
 
 export class Store implements StoreInterface {
@@ -47,9 +52,11 @@ export class Store implements StoreInterface {
 
   constructor() {
     this.projectManager = new ProjectManager();
-    this.transportController = new TransportController();
     this.midiManager = new MidiManager();
     this.instrumentManager = new InstrumentManager();
+    
+    // Create TransportController
+    this.transportController = new TransportController();
     
     // Initialize with project defaults
     const project = this.projectManager.getCurrentProject();
@@ -118,7 +125,7 @@ export class Store implements StoreInterface {
 
   public async createTrack(
     name: string, 
-    type: 'audio' | 'midi' | 'drum',
+    type: 'audio' | 'midi' | 'drum' | 'sampler',
     existingTrackData?: {
       id: string;
       volume?: number;
@@ -128,6 +135,10 @@ export class Store implements StoreInterface {
       instrumentId?: string;
       instrumentName?: string;
       instrumentStorageKey?: string;
+      baseMidiNote?: number;
+      grainSize?: number;
+      overlap?: number;
+      sampleFile?: File;
     }
   ): Promise<Track> {
     if (!this.initialized) {
@@ -154,8 +165,8 @@ export class Store implements StoreInterface {
     
     console.log(`Store: Track created through ProjectManager:`, track);
     
-    // For MIDI and drum tracks, handle persistence
-    if (type === 'midi' || type === 'drum') {
+    // For MIDI, drum, and sampler tracks, handle persistence
+    if (type === 'midi' || type === 'drum' || type === 'sampler') {
       try {
         // Use MIDI persistence
         const project = this.projectManager.getCurrentProject();
@@ -163,10 +174,13 @@ export class Store implements StoreInterface {
           // Ensure BPM is set
           this.midiManager.setBpm(project.tempo);
           
+          // For sampler, we need a default instrumentId since MidiManager requires one
+          const effectiveInstrumentId = track.instrumentId || 'sampler';
+          
           // Create persisted track directly in MidiManager
           await this.midiManager.createTrackWithPersistence(
             track.id, // Always use the track ID (whether new or existing)
-            track.instrumentId,
+            effectiveInstrumentId,
             name
           );
           
@@ -302,6 +316,10 @@ export class Store implements StoreInterface {
   public getSoundfontController(): SoundfontEngineController {
     return this.getTransport().getSoundfontController();
   }
+
+  public getSamplerController(): SamplerController {
+    return this.getTransport().getSamplerController();
+  }
   
   /**
    * Connect a MIDI track to a soundfont instrument
@@ -329,6 +347,45 @@ export class Store implements StoreInterface {
       console.log(`Store: Successfully connected track ${trackId} to soundfont ${instrumentId}`);
     } catch (error) {
       console.error(`Store: Failed to connect track ${trackId} to soundfont ${instrumentId}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Connect a track to a sampler
+   * This initializes the sampler and sets up MidiManager subscription
+   * @param trackId The track ID to connect
+   * @param file The audio file to use as the sample source
+   * @param baseMidiNote The MIDI note that represents the sample's original pitch
+   * @param grainSize Granular synthesis grain size (seconds)
+   * @param overlap Granular synthesis overlap amount (0-1)
+   */
+  public async connectTrackToSampler(
+    trackId: string,
+    file: File,
+    baseMidiNote?: number,
+    grainSize?: number,
+    overlap?: number
+  ): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('Store must be initialized before connecting tracks to samplers');
+    }
+    
+    try {
+      console.log(`Store: Connecting track ${trackId} to sampler with file ${file.name}`);
+      
+      await this.getTransport().getSamplerController().connectTrackToSampler(
+        trackId,
+        file,
+        this.midiManager,
+        baseMidiNote,
+        grainSize,
+        overlap
+      );
+      
+      console.log(`Store: Successfully connected track ${trackId} to sampler`);
+    } catch (error) {
+      console.error(`Store: Failed to connect track ${trackId} to sampler:`, error);
       throw error;
     }
   }
