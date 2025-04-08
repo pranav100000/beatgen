@@ -46,7 +46,7 @@ class AnthropicClient:
         
         
     async def send_message_async(self, message: str, queue: SSEQueueManager, stream: bool = True, tools: list[dict] = [], thinking: bool = False) -> tuple[str, dict]:
-        print("CURRENT MESSAGES", self.messages)
+        #print("CURRENT MESSAGES", self.messages)
         """Asynchronous version of send_message - this will not block the event loop"""
         self.append_user_message(message)
         

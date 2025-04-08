@@ -42,3 +42,4 @@ __pycache__/
 *.m4a
 *.aac
 *.flac
+.aider*

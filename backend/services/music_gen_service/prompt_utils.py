@@ -101,7 +101,7 @@ Respond at the end of your response with a JSON object containing (IMPORTANT: MA
     - "bar_number": The bar number associated with this bar of the melody (1-{duration_bars})
     - "musical_intention": The musical intention for this bar of the melody
     - "notes": Array of dicts with keys "interval", "duration", "velocity"
-        - "intervals": Array of semitones FROM THE PREVIOUS NOTE (or root note if it's the first note) (e.g., [0, +1, -2, +3]) OR "R" for a rest in STRING FORMAT, where:
+        - "interval": The semitone difference FROM THE PREVIOUS NOTE (or root note if it's the first note) (e.g., [0, +1, -2, +3]) OR "R" for a rest in STRING FORMAT, where:
         * "R" means a rest
         * "0" means stay on same note
         * "+1" means move up one semitone from the previous note

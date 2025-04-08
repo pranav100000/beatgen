@@ -1,7 +1,7 @@
 export interface Track {
   id: string;
   name: string;
-  type: 'audio' | 'midi' | 'drum';
+  type: 'audio' | 'midi' | 'drum' | 'sampler';
   volume: number;
   pan: number;
   muted: boolean;
@@ -9,6 +9,10 @@ export interface Track {
   instrumentId?: string;    // ID of the instrument (for MIDI/drum tracks)
   instrumentName?: string;  // Display name of the instrument
   instrumentStorageKey?: string; // Storage key for the instrument
+  baseMidiNote?: number;    // Base MIDI note for samplers (the note at which sample plays at original pitch)
+  grainSize?: number;       // Grain size for samplers (in seconds)
+  overlap?: number;         // Overlap amount for samplers (0-1)
+  sampleFile?: File;        // Sample file for samplers
 }
 
 export interface Project {
@@ -88,6 +92,10 @@ export class ProjectManager {
     instrumentId?: string;
     instrumentName?: string;
     instrumentStorageKey?: string;
+    baseMidiNote?: number;
+    grainSize?: number;
+    overlap?: number;
+    sampleFile?: File;
   }): Track {
     if (!this.currentProject) {
       throw new Error('No project loaded');
@@ -108,6 +116,14 @@ export class ProjectManager {
       track.instrumentId = trackProps.instrumentId;
       track.instrumentName = trackProps.instrumentName || 'Default Instrument';
       track.instrumentStorageKey = trackProps.instrumentStorageKey;
+    }
+    
+    // Add sampler properties if this is a sampler track
+    if (trackProps.type === 'sampler') {
+      track.baseMidiNote = trackProps.baseMidiNote || 60; // Default to middle C
+      track.grainSize = trackProps.grainSize || 0.3;      // Default to 100ms
+      track.overlap = trackProps.overlap || 0.3;          // Default to 10% overlap
+      track.sampleFile = trackProps.sampleFile;           // Sample file
     }
 
     this.currentProject.tracks.push(track);

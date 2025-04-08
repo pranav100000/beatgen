@@ -26,9 +26,17 @@ DETERMINE_MUSICAL_PARAMETERS_TOOL = {
             "tempo": {
                 "type": "integer",
                 "description": "The tempo in BPM (e.g. 120, 140, 160)"
+            },
+            "melody_instrument": {
+                "type": "string",
+                "description": "The instrument that will play the melody (e.g. 'Piano', 'Violin') IMPORTANT: The instrument you select must be out of the list of available instruments."
+            },
+            "chords_instrument": {
+                "type": "string",
+                "description": "The instrument that will play the chords (e.g. 'Piano', 'Violin') IMPORTANT: The instrument you select must be out of the list of available instruments.    "
             }
         },
-        "required": ["chord_progression", "key", "mode", "tempo"]
+        "required": ["chord_progression", "key", "mode", "tempo", "melody_instrument", "chords_instrument"]
     }
 }
 

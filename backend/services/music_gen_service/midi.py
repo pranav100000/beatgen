@@ -31,7 +31,7 @@ def transform_bars_to_instrument_format(data: Dict[str, Any], instrument: dict, 
     bars = data.get("bars", [])
     
     # Prepare MIDI notes array
-    midi_notes = []
+    midi_notes = [] 
     current_time = 0.0
     current_pitch = root_note_midi  # Start at root note
     

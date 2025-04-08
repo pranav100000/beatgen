@@ -664,7 +664,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
   },
   
-  handleAddTrack: async (type: 'audio' | 'midi' | 'drum', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => {
+  handleAddTrack: async (type: 'audio' | 'midi' | 'drum' | 'sampler', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => {
     const { store, isInitialized, tracks, timeSignature, bpm } = get();
     if (!store || !isInitialized) {
       console.warn('Store not initialized');
@@ -687,6 +687,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         trackName = `MIDI Track ${tracks.length + 1}`;
       } else if (type === 'drum') {
         trackName = "Drum Machine";
+      } else if (type === 'sampler') {
+        trackName = `Sampler ${tracks.length + 1}`;
       } else {
         trackName = `Audio Track ${tracks.length + 1}`;
       }
@@ -845,54 +847,130 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
   },
   
-  uploadAudioFile: async (file) => {
+  uploadAudioFile: async (file, isSampler = false) => {
     const { store, tracks, bpm, timeSignature } = get();
     if (!store || !get().isInitialized) return;
     
     try {
       // First create a track with default name from file
       const trackName = file.name.split('.')[0];
-      const newTrack = await store.createTrack(trackName, 'audio');
+      const trackType = isSampler ? 'sampler' : 'audio';
       
-      // Load the file into the audio engine
-      await store.loadAudioFile(newTrack.id, file);
+      // Create the track with the appropriate type
+      const newTrack = await store.createTrack(trackName, trackType);
       
-      // Get the updated track from audio engine (including duration)
-      const audioTrack = store.getAudioEngine().getAllTracks().find(t => t.id === newTrack.id);
-      if (!audioTrack) throw new Error("Failed to get created audio track");
-      
-      // Calculate track width based on file duration
-      const audioFileDuration = audioTrack.player?.buffer?.duration || 0;
-      
-      // Create track data with position and calculated width
-      const trackData: TrackState = {
-        ...newTrack,
-        ...audioTrack,
-        position: { 
-          x: 0, 
-          y: tracks.length * GRID_CONSTANTS.trackHeight // Use the proper track height from constants
-        },
-        duration: audioFileDuration,
-        audioFile: file,
-        type: 'audio',
-        _calculatedWidth: calculateTrackWidth(audioFileDuration, bpm, timeSignature)
-      };
-      
-      // Update track position in audio engine
-      store.getAudioEngine().setTrackPosition(
-        trackData.id,
-        trackData.position.x,
-        trackData.position.y
-      );
-      
-      // Create direct add track action without callbacks
-      const action = new Actions.AddTrack(
-        store,
-        trackData
-      );
-      
-      // Execute the action through history manager
-      await historyManager.executeAction(action);
+      // For sampler tracks, proceed differently
+      if (isSampler) {
+        console.log(`Creating sampler track for ${trackName}`);
+        
+        // Default values for a sampler track
+        const defaultGrainSize = 0.1; // 100ms
+        const defaultOverlap = 0.1;   // 10% overlap
+        const defaultBaseNote = 60;   // Middle C (C4)
+        
+        // Create a channel for the track
+        const channel = new Tone.Channel().toDestination();
+        
+        // Default duration for sampler tracks (8 bars at current time signature)
+        const beatsPerBar = timeSignature[0];
+        const defaultBars = 8;
+        const totalBeats = defaultBars * beatsPerBar;
+        const defaultDuration = (totalBeats * 60) / bpm;
+        
+        // Create track data with position and calculated width
+        const trackData: TrackState = {
+          ...newTrack,
+          channel,
+          position: { 
+            x: 0, 
+            y: tracks.length * GRID_CONSTANTS.trackHeight
+          },
+          volume: 80,
+          pan: 0, 
+          muted: false,
+          soloed: false,
+          duration: defaultDuration,
+          sampleFile: file,
+          baseMidiNote: defaultBaseNote,
+          grainSize: defaultGrainSize,
+          overlap: defaultOverlap,
+          type: 'sampler',
+          _calculatedWidth: calculateTrackWidth(defaultDuration, bpm, timeSignature)
+        };
+        
+        // Create direct add track action
+        const action = new Actions.AddTrack(
+          store,
+          trackData
+        );
+        
+        // Execute the action through history manager
+        await historyManager.executeAction(action);
+        
+        // Initialize sampler controller
+        try {
+          const samplerController = store.getTransport().getSamplerController();
+          await samplerController.initializeSampler(
+            newTrack.id,
+            file,
+            defaultBaseNote,
+            defaultGrainSize,
+            defaultOverlap
+          );
+          
+          // Connect to MidiManager for note data
+          samplerController.registerTrackSubscription(
+            newTrack.id,
+            store.getMidiManager()
+          );
+          
+          console.log(`Sampler initialized for track ${newTrack.id}`);
+        } catch (error) {
+          console.error(`Failed to initialize sampler for track ${newTrack.id}:`, error);
+          // Continue even if sampler init fails - track will still be created
+        }
+      } else {
+        // Regular audio track processing
+        // Load the file into the audio engine
+        await store.loadAudioFile(newTrack.id, file);
+        
+        // Get the updated track from audio engine (including duration)
+        const audioTrack = store.getAudioEngine().getAllTracks().find(t => t.id === newTrack.id);
+        if (!audioTrack) throw new Error("Failed to get created audio track");
+        
+        // Calculate track width based on file duration
+        const audioFileDuration = audioTrack.player?.buffer?.duration || 0;
+        
+        // Create track data with position and calculated width
+        const trackData: TrackState = {
+          ...newTrack,
+          ...audioTrack,
+          position: { 
+            x: 0, 
+            y: tracks.length * GRID_CONSTANTS.trackHeight
+          },
+          duration: audioFileDuration,
+          audioFile: file,
+          type: 'audio',
+          _calculatedWidth: calculateTrackWidth(audioFileDuration, bpm, timeSignature)
+        };
+        
+        // Update track position in audio engine
+        store.getAudioEngine().setTrackPosition(
+          trackData.id,
+          trackData.position.x,
+          trackData.position.y
+        );
+        
+        // Create direct add track action without callbacks
+        const action = new Actions.AddTrack(
+          store,
+          trackData
+        );
+        
+        // Execute the action through history manager
+        await historyManager.executeAction(action);
+      }
       
       // Update history state buttons
       set({
@@ -900,9 +978,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         canRedo: historyManager.canRedo()
       });
       
-      console.log(`Added audio track from file (with history support):`, trackData);
+      console.log(`Added ${isSampler ? 'sampler' : 'audio'} track from file:`, file.name);
     } catch (error) {
-      console.error("Failed to upload audio file:", error);
+      console.error(`Failed to upload ${isSampler ? 'sampler' : 'audio'} file:`, error);
     }
   },
   

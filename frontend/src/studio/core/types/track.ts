@@ -11,7 +11,7 @@ export interface Position {
 export interface BaseTrackState {
     id: string;
     name: string;
-    type: 'audio' | 'midi' | 'drum';
+    type: 'audio' | 'midi' | 'drum' | 'sampler';
     channel: Tone.Channel;
     volume: number;
     pan: number;
@@ -47,4 +47,13 @@ export interface DrumTrackState extends MidiTrackState {
     drumPads?: DrumPad[]; // For drum machine tracks
 }
 
-export type TrackState = AudioTrackState | MidiTrackState | DrumTrackState;
+export interface SamplerTrackState extends BaseTrackState {
+    type: 'sampler';
+    sampleFile?: File;
+    baseMidiNote?: number; // The MIDI note number that represents the sample's original pitch (default: 60/C4)
+    grainSize?: number;    // Granular synthesis grain size (seconds)
+    overlap?: number;      // Granular synthesis overlap amount
+    sampleBuffer?: AudioBuffer; // Optional cached buffer for faster loading
+}
+
+export type TrackState = AudioTrackState | MidiTrackState | DrumTrackState | SamplerTrackState;

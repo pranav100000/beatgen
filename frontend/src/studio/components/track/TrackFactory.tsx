@@ -23,6 +23,8 @@ export const TrackFactory: React.FC<TrackPreviewProps> = (props) => {
       return <AudioTrackPreview {...props} trackColor={trackColor} />;
     case 'midi':
       return <MidiTrackPreview {...props} trackColor={trackColor} />;
+    case 'sampler':
+      return <MidiTrackPreview {...props} trackColor={trackColor} />;
     case 'drum':
       return <DrumTrackPreview {...props} trackColor={trackColor} />;
     default:

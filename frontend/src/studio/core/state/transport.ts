@@ -3,6 +3,7 @@ import AudioEngine from '../audio-engine/audioEngine';
 import { convertVolumeToDecibels } from '../../utils/audioProcessing';
 import { calculatePositionTime } from '../../constants/gridConstants';
 import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
+import { SamplerController } from '../audio-engine/samplerController';
 
 export interface Transport {
     position: number;        // Current playback position
@@ -19,6 +20,7 @@ export interface Transport {
 export class TransportController implements Transport {
     private audioEngine: AudioEngine;
     private soundfontController: SoundfontEngineController;
+    private samplerController: SamplerController;
     private isStarting: boolean = false;
     private maxPosition: number = 3600;  // Default to 1 hour (3600 seconds) as safety
     private static FADE_TIME = 0.01; // 10ms fade
@@ -27,6 +29,7 @@ export class TransportController implements Transport {
         this.audioEngine = AudioEngine.getInstance();
         Tone.getTransport().bpm.value = 120;
         this.soundfontController = new SoundfontEngineController();
+        this.samplerController = new SamplerController();
         
         // We'll initialize the soundfont controller later when the audio context is available
         // This happens in the Store's initializeAudio method via initializeSoundfont
@@ -46,6 +49,10 @@ export class TransportController implements Transport {
 
     getSoundfontController(): SoundfontEngineController {
         return this.soundfontController;
+    }
+    
+    getSamplerController(): SamplerController {
+        return this.samplerController;
     }
 
     getAudioEngine(): AudioEngine {
@@ -269,6 +276,15 @@ export class TransportController implements Transport {
                 console.error('Failed to start soundfont player:', error);
             }
             
+            // Start sampler tracks
+            try {
+                console.log('Starting sampler tracks');
+                const bpm = Tone.Transport.bpm.value; // Get current BPM
+                await this.getSamplerController().play(transportPosition, bpm);
+            } catch (error) {
+                console.error('Failed to start sampler tracks:', error);
+            }
+            
             // Start transport with a clean slate
             Tone.getTransport().start();
             console.log('Transport started, state:', Tone.getTransport().state);
@@ -301,6 +317,14 @@ export class TransportController implements Transport {
             this.getSoundfontController().pause();
         } catch (error) {
             console.error('Failed to pause soundfont player:', error);
+        }
+        
+        // Pause sampler tracks
+        try {
+            console.log('Pausing sampler tracks');
+            this.getSamplerController().pause();
+        } catch (error) {
+            console.error('Failed to pause sampler tracks:', error);
         }
         
         // Fade out before stopping
@@ -346,6 +370,14 @@ export class TransportController implements Transport {
             } catch (error) {
                 console.error('Failed to stop soundfont player:', error);
             }
+        }
+        
+        // Stop sampler tracks
+        try {
+            console.log('Stopping sampler tracks at position', this.position);
+            await this.getSamplerController().stop();
+        } catch (error) {
+            console.error('Failed to stop sampler tracks:', error);
         }
         
         // Stop players first with fade out
@@ -406,6 +438,19 @@ export class TransportController implements Transport {
             console.error('Failed to seek soundfont player:', error);
         }
         
+        // 3b. Handle seeking sampler tracks
+        try {
+            console.log(`Seeking sampler tracks to ${position}s`);
+            
+            // Get current BPM for timing calculations
+            const bpm = Tone.Transport.bpm.value;
+            
+            // Seek the sampler controller
+            this.getSamplerController().seek(position, bpm);
+        } catch (error) {
+            console.error('Failed to seek sampler tracks:', error);
+        }
+        
         // 4. Completely reset all players
         this.audioEngine.getAllTracks().forEach(track => {
             if (track.player) {
@@ -452,6 +497,12 @@ export class TransportController implements Transport {
         const validBpm = Math.max(1, Math.min(bpm, 999));
         Tone.getTransport().bpm.value = validBpm;
         this.soundfontController.setGlobalBPM(validBpm);
+        
+        // Update BPM for sampler tracks if they are playing
+        if (this.isPlaying) {
+            const currentPosition = this.position;
+            this.samplerController.seek(currentPosition, validBpm);
+        }
     }
 
     public dispose(): void {
@@ -484,6 +535,14 @@ export class TransportController implements Transport {
     }
 
     public removeTrack(trackId: string): void {
+        // Clean up sampler if this is a sampler track
+        try {
+            console.log(`Cleaning up any sampler resources for track ${trackId}`);
+            this.samplerController.removeSampler(trackId);
+        } catch (error) {
+            console.error(`Error cleaning up sampler for track ${trackId}:`, error);
+        }
+        
         // Recalculate maxPosition when a track is removed
         this.maxPosition = Math.max(
             0,
