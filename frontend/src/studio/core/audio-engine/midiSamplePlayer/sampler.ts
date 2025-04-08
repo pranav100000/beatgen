@@ -18,6 +18,11 @@ class MidiSampler {
     // Single pool of players for both direct playback and scheduled notes
     private playerPool: Tone.GrainPlayer[] = [];
     private readonly POOL_SIZE = 300; // Larger pool to handle more simultaneous notes
+    
+    // Master gain node for volume control
+    private gainNode: Tone.Gain;
+    private currentVolume: number = 100; // Store current volume (0-100)
+    private isMuted: boolean = false;
 
     constructor(
         onLog: LogCallback,
@@ -25,6 +30,9 @@ class MidiSampler {
     ) {
         this.onLog = onLog;
         this.onPlaybackStatusChange = onPlaybackStatusChange;
+        
+        // Initialize gain node
+        this.gainNode = new Tone.Gain(1).toDestination();
     }
 
     // Initialize audio context
@@ -67,7 +75,8 @@ class MidiSampler {
                         this.log(`Error loading audio: ${error}`);
                         reject(error);
                     },
-                }).toDestination();
+                }).connect(this.gainNode); // Connect to gain node instead of destination
+                URL.revokeObjectURL(objectUrl);
             });
         } catch (error: any) {
             this.log(`Error setting up audio: ${error.message}`);
@@ -103,8 +112,8 @@ class MidiSampler {
                     player.grainSize = this.player.grainSize;
                     player.overlap = this.player.overlap;
                     
-                    // Connect to destination but keep silent
-                    player.toDestination();
+                    // Connect to gain node instead of destination
+                    player.connect(this.gainNode);
                     player.volume.value = -Infinity;
                     
                     this.playerPool.push(player);
@@ -310,6 +319,10 @@ class MidiSampler {
      */
     public dispose(): void {
         this.cleanupResources(true);
+        
+        // Also dispose the gain node
+        this.gainNode.dispose();
+        
         this.log('All resources disposed');
     }
 
@@ -394,13 +407,17 @@ class MidiSampler {
      * @param volume Volume level (0-100)
      */
     public setVolume(volume: number): void {
+        // Store the current volume
+        this.currentVolume = volume;
+        
+        // If muted, don't actually change the gain
+        if (this.isMuted) return;
+        
         // Convert from linear volume to decibels
         const dbValue = Tone.gainToDb(volume / 100);
         
-        // Apply to main player
-        if (this.player) {
-            this.player.volume.value = dbValue;
-        }
+        // Apply to the gain node
+        this.gainNode.gain.value = Tone.dbToGain(dbValue);
         
         this.log(`Volume set to ${volume}% (${dbValue}dB)`);
     }
@@ -410,11 +427,16 @@ class MidiSampler {
      * @param muted Whether the sampler should be muted
      */
     public setMute(muted: boolean): void {
-        // Apply to main player
-        if (this.player) {
-            this.player.mute = muted;
-        }
+        this.isMuted = muted;
         
+        // Set gain based on mute state
+        if (muted) {
+            this.gainNode.gain.value = 0;
+        } else {
+            // Restore previous volume
+            const dbValue = Tone.gainToDb(this.currentVolume / 100);
+            this.gainNode.gain.value = Tone.dbToGain(dbValue);
+        }
         
         this.log(`Mute set to ${muted}`);
     }

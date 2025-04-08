@@ -537,11 +537,8 @@ export class TransportController implements Transport {
     public removeTrack(trackId: string): void {
         // Clean up sampler if this is a sampler track
         try {
-            // Just try to remove the sampler - it's a no-op if no sampler exists for this track
-            if (this.samplerController) {
-                console.log(`Cleaning up any sampler resources for track ${trackId}`);
-                this.samplerController.removeSampler(trackId);
-            }
+            console.log(`Cleaning up any sampler resources for track ${trackId}`);
+            this.samplerController.removeSampler(trackId);
         } catch (error) {
             console.error(`Error cleaning up sampler for track ${trackId}:`, error);
         }
