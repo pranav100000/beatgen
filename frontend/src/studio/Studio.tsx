@@ -10,7 +10,8 @@ import { GRID_CONSTANTS } from './constants/gridConstants';
 import { useStudioStore } from './stores/useStudioStore';
 
 // Import piano roll components
-import PianoRollModule, { PianoRollWindows, usePianoRoll } from './components/piano-roll';
+import PianoRollModule, { PianoRollWindows as OldPianoRollWindows, usePianoRoll } from './components/piano-roll';
+import PianoRollWindows from './components/piano-roll-new/PianoRollWindows';
 
 // Import custom hooks
 import { useStudioDBSession } from './hooks/useStudioDBSession';
@@ -198,6 +199,9 @@ function Studio({ projectId }: StudioProps) {
     return () => scrollContainer.removeEventListener("scroll", debounceScroll);
   }, [handleScroll]);
 
+  // Get the feature flag from the store
+  const useNewPianoRoll = useStudioStore(state => state.useNewPianoRoll);
+
   return (
     <Box sx={{ 
       height: '100vh', 
@@ -343,17 +347,28 @@ function Studio({ projectId }: StudioProps) {
           isOpen={isChatOpen}
           onClose={handleChatToggle}
         />
+        
+        {/* Render the new piano roll windows directly in Studio */}
+        {useNewPianoRoll && <PianoRollWindows />}
       </Box>
     </Box>
   );
 }
 
-// Wrap with Piano Roll Module to provide context
-const StudioWithPianoRoll = (props: StudioProps) => (
-  <PianoRollModule>
-    <Studio {...props} />
-    <PianoRollWindows />
-  </PianoRollModule>
-);
+// Always wrap with PianoRollModule for backward compatibility
+const StudioWithPianoRoll = (props: StudioProps) => {
+  const useNewPianoRoll = useStudioStore(state => state.useNewPianoRoll);
+  
+  console.log('StudioWithPianoRoll - useNewPianoRoll:', useNewPianoRoll);
+  
+  // Always wrap with PianoRollModule since Track components still depend on it
+  // But only render OldPianoRollWindows if not using the new implementation
+  return (
+    <PianoRollModule>
+      <Studio {...props} />
+      {!useNewPianoRoll && <OldPianoRollWindows />}
+    </PianoRollModule>
+  );
+};
 
 export default StudioWithPianoRoll;

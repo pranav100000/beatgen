@@ -2,7 +2,7 @@ import React from 'react';
 import { Box } from '@mui/material';
 import { Position } from '../../core/types/track';
 import { useStudioStore } from '../../stores/useStudioStore';
-import { usePianoRoll } from '../piano-roll';
+import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import TrackFactory from './TrackFactory';
 
 /**
@@ -49,9 +49,10 @@ function Track(props: TrackProps) {
   // Get the store from Zustand
   const store = useStudioStore(state => state.store);
   const fullTrack = store?.getTrackById?.(id);
+  const useNewPianoRoll = useStudioStore(state => state.useNewPianoRoll);
   
-  // Get piano roll context
-  const { openPianoRoll } = usePianoRoll();
+  // Get piano roll store or context based on which implementation we're using
+  const { openPianoRoll } = usePianoRollStore();
   
   // Convert the props to the format expected by TrackPreview
   const trackState = {
@@ -75,7 +76,9 @@ function Track(props: TrackProps) {
     // For MIDI and drum tracks, directly open the piano roll
     if (type === 'midi' || type === 'drum' || type === 'sampler') {
       e.stopPropagation();
+      console.log('Track clicked - opening piano roll for:', id);
       openPianoRoll(id);
+      console.log('usePianoRollStore state after opening:', usePianoRollStore.getState());
     }
   };
 

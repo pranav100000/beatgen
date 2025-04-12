@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, IconButton, Button, Typography, TextField, Menu, MenuItem, Tooltip } from '@mui/material';
+import { Box, IconButton, Button, Typography, TextField, Menu, MenuItem, Tooltip, Switch, FormControlLabel } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
@@ -15,6 +15,7 @@ import { TimeDisplay } from './TimeDisplay';
 import KeySelector from './KeySelector';
 import { ArrowBack, ChatBubbleOutlineRounded, ChatBubbleRounded } from '@mui/icons-material';
 import { SaveProjectButton } from './SaveProjectButton';
+import { useStudioStore } from '../../stores/useStudioStore';
 
 interface StudioControlBarProps {
     canUndo: boolean;
@@ -43,6 +44,7 @@ interface StudioControlBarProps {
     onZoomOut: () => void;
     onChatToggle: () => void;
 }
+
 
 const StudioControlBar: React.FC<StudioControlBarProps> = ({
     canUndo,
@@ -246,6 +248,28 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                     >
                         {isChatOpen ? <ChatBubbleRounded /> : <ChatBubbleOutlineRounded />}
                     </IconButton>
+                    
+                    {/* Temporary toggle for piano roll implementation */}
+                    {process.env.NODE_ENV === 'development' && (
+                        <Box sx={{ ml: 1 }}>
+                            <FormControlLabel
+                                control={
+                                    <Switch 
+                                        size="small"
+                                        checked={useStudioStore(state => state.useNewPianoRoll)}
+                                        onChange={useStudioStore(state => state.togglePianoRollImplementation)}
+                                        sx={{ '& .MuiSwitch-thumb': { backgroundColor: '#fff' } }}
+                                    />
+                                }
+                                label={
+                                    <Typography variant="caption" sx={{ color: 'white', fontSize: '0.7rem' }}>
+                                        New Piano Roll
+                                    </Typography>
+                                }
+                                sx={{ mr: 0 }}
+                            />
+                        </Box>
+                    )}
                 </Box>
             </Box>
         </Box>
