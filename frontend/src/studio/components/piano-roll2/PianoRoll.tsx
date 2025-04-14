@@ -1182,6 +1182,10 @@ const PianoRoll: React.FC<PianoRollProps> = ({
   const keyHeight = 25;
   const contentHeight = totalKeys * keyHeight;
   const measureSize = 4 * effectiveGridSize; // Size of measure lines in pixels (every 4 grid cells)
+  
+  // Calculate common factors for scrollbar calculations
+  const contentAreaWidth = dimensions.width - keyboardWidth;
+  const contentAreaHeight = dimensions.height - 28 - 16; // Minus header and horizontal scrollbar
 
   // Handle scroll event with requestAnimationFrame for better performance
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -1198,12 +1202,27 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     });
   };
 
+  // Set initial scroll position to 50% of vertical height on mount
+  useEffect(() => {
+    if (viewportRef.current) {
+      // Calculate 50% of the scrollable height (accounting for viewport size)
+      const middleScrollPosition = (contentHeight - contentAreaHeight) / 2;
+      
+      // Set the scroll position
+      viewportRef.current.scrollTop = middleScrollPosition;
+      
+      // Also update the state
+      setScrollY(middleScrollPosition);
+      
+      // Sync keyboard scroll
+      if (keyboardRef.current) {
+        keyboardRef.current.scrollTop = middleScrollPosition;
+      }
+    }
+  }, [contentHeight, contentAreaHeight, zoomLevel]);
+
   // Calculate scaled content width based on zoom
   const contentWidth = initialContentWidth * zoomLevel;
-
-  // Calculate common factors for scrollbar calculations
-  const contentAreaWidth = dimensions.width - keyboardWidth;
-  const contentAreaHeight = dimensions.height - 28 - 16; // Minus header and horizontal scrollbar
 
   const availableContentWidth = contentWidth - contentAreaWidth;
   const availableContentHeight = contentHeight - contentAreaHeight;
@@ -1526,11 +1545,16 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     }));
   };
 
-  // Update parent component when notes change
+  // Update parent component when notes change due to user interactions
   useEffect(() => {
     if (onNotesChange) {
       // Check if the notes have actually changed to prevent infinite loops
-      const notesChanged = notes.length !== lastProcessedNotesRef.current.length ||
+      const notesChanged = 
+        // First check if the internal reference has been updated by user interactions
+        // rather than by the initialNotes update effect
+        lastProcessedNotesRef.current !== notes &&
+        // Then check if there's an actual difference in the notes
+        (notes.length !== lastProcessedNotesRef.current.length ||
         notes.some((note, index) => {
           const prevNote = lastProcessedNotesRef.current[index];
           return !prevNote || 
@@ -1538,7 +1562,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
             prevNote.start !== note.start ||
             prevNote.top !== note.top ||
             prevNote.width !== note.width;
-        });
+        }));
         
       if (notesChanged) {
         const noteStates = convertNotesToState(notes);
@@ -1547,7 +1571,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
         onNotesChange(noteStates);
       }
     }
-  }, [notes, onNotesChange]);
+  }, [notes, onNotesChange, zoomLevel, keyHeight, totalKeys]);
   
   // Modify the handleStageMouseDown function
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -2223,11 +2247,40 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       console.log(`Finished resizing note`);
     }
   };
-  // Initialize notes from props when component mounts
+
+  // Helper function to check if initialNotes have changed
+  const haveInitialNotesChanged = (currentNotes: NoteState[], prevNotes: Note[]): boolean => {
+    // Convert previous visual notes back to NoteState format for comparison
+    const prevNoteStates = convertNotesToState(prevNotes);
+    
+    // Check if the arrays are different lengths
+    if (currentNotes.length !== prevNoteStates.length) return true;
+    
+    // Deep compare the notes
+    return currentNotes.some((note, index) => {
+      const prevNote = prevNoteStates[index];
+      return !prevNote || 
+        prevNote.id !== note.id ||
+        prevNote.length !== note.length ||
+        prevNote.row !== note.row ||
+        prevNote.column !== note.column;
+    });
+  };
+
+  // Initialize notes from props when component mounts or when initialNotes changes
   useEffect(() => {
-    // Only initialize from props if we don't already have notes
-    // This prevents overwriting existing notes when rerendering
-    if (initialNotes.length > 0 && notes.length === 0) {
+    // Skip if no initialNotes are provided
+
+    // Check if there's a meaningful change to initialNotes that requires updating
+    // or if this is the first load (notes array is empty)
+    const shouldUpdateNotes = 
+      notes.length === 0 || // First render
+      (lastProcessedNotesRef.current.length > 0 && 
+       haveInitialNotesChanged(initialNotes, lastProcessedNotesRef.current));
+    
+    if (shouldUpdateNotes) {
+      console.log('Updating notes from initialNotes due to external change');
+      
       // Convert the normalized note states to visual notes
       const visualNotes: Note[] = initialNotes.map((noteState, index) => ({
         id: noteState.id || index + 1, // Use provided id or generate one
@@ -2244,8 +2297,11 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       // Set the next note ID to be higher than any existing note ID
       const maxId = Math.max(...visualNotes.map(note => note.id), 0);
       setNextNoteId(maxId + 1);
+
+      // Store the current notes reference for deep comparison
+      lastProcessedNotesRef.current = [...visualNotes];
     }
-  }, [initialNotes, zoomLevel, keyHeight, notes.length]);
+  }, [initialNotes, zoomLevel, keyHeight, totalKeys, notes]);
 
   // Import necessary hooks
   const [hoveredNote, setHoveredNote] = useState<string | null>(null);

@@ -248,28 +248,6 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                     >
                         {isChatOpen ? <ChatBubbleRounded /> : <ChatBubbleOutlineRounded />}
                     </IconButton>
-                    
-                    {/* Temporary toggle for piano roll implementation */}
-                    {process.env.NODE_ENV === 'development' && (
-                        <Box sx={{ ml: 1 }}>
-                            <FormControlLabel
-                                control={
-                                    <Switch 
-                                        size="small"
-                                        checked={useStudioStore(state => state.useNewPianoRoll)}
-                                        onChange={useStudioStore(state => state.togglePianoRollImplementation)}
-                                        sx={{ '& .MuiSwitch-thumb': { backgroundColor: '#fff' } }}
-                                    />
-                                }
-                                label={
-                                    <Typography variant="caption" sx={{ color: 'white', fontSize: '0.7rem' }}>
-                                        New Piano Roll
-                                    </Typography>
-                                }
-                                sx={{ mr: 0 }}
-                            />
-                        </Box>
-                    )}
                 </Box>
             </Box>
         </Box>
