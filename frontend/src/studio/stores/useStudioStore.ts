@@ -73,6 +73,9 @@ interface StudioState {
   // History Actions
   undo: () => Promise<void>;
   redo: () => Promise<void>;
+  
+  // Function to update track indices based on current order in the array
+  updateTrackIndices: () => void;
 }
 
 export const useStudioStore = create<StudioState>((set, get) => ({
@@ -206,7 +209,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       });
     }
   },
-  setTracks: (tracks) => set({ tracks }),
+  setTracks: (tracks) => {
+    // First set the tracks as provided
+    set({ tracks });
+    
+    // Then update the indices to match the new order
+    get().updateTrackIndices();
+  },
   setZoomLevel: (zoomLevel) => set({ zoomLevel }),
   setMeasureCount: (measureCount) => set({ measureCount }),
   setCanUndo: (canUndo) => set({ canUndo }),
@@ -298,6 +307,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         const newTrack = await store.createTrack(
           apiTrack.name, 
           apiTrack.type as "audio" | "midi" | "drum",
+          index,
           {
             id: apiTrack.id || crypto.randomUUID(),
             volume: apiTrack.volume,
@@ -306,7 +316,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             soloed: false,
             instrumentId: apiTrack.instrument_id, // Map API names to internal names
             instrumentName: apiTrack.instrument_name,
-            instrumentStorageKey: apiTrack.instrument_storage_key
+            instrumentStorageKey: apiTrack.instrument_storage_key,
           }
         );
         
@@ -460,6 +470,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       // Wait for all tracks to be processed
       const trackStates = await Promise.all(tracksPromises);
       set({ tracks: trackStates });
+      
+      // Update track indices to ensure they match array positions
+      get().updateTrackIndices();
       
       console.log(`Successfully loaded project with ${trackStates.length} tracks`);
       
@@ -660,6 +673,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       // Execute the action through history manager
       await historyManager.executeAction(action);
       
+      // Update track indices after deletion
+      get().updateTrackIndices();
+      
       // We also need to update the history state buttons
       set({
         canUndo: historyManager.canUndo(),
@@ -722,11 +738,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           instrumentStorageKey: instrumentStorageKey
         };
         console.log('🎹 Track data being passed to createTrack:', existingTrackData);
-        newTrack = await store.createTrack(trackName, type, existingTrackData);
+        newTrack = await store.createTrack(trackName, type, tracks.length, existingTrackData);
         console.log('🎹 Track created:', newTrack);
       } else {
         console.log('🎹 Creating track without instrument data');
-        newTrack = await store.createTrack(trackName, type);
+        newTrack = await store.createTrack(trackName, type, tracks.length);
       }
       console.log('New track from createTrack:', newTrack);
       
@@ -779,6 +795,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       
       // Execute the action through history manager
       await historyManager.executeAction(action);
+      
+      // Update track indices after addition
+      get().updateTrackIndices();
       
       // Update history state buttons
       set({
@@ -865,7 +884,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       const trackType = isSampler ? 'sampler' : 'audio';
       
       // Create the track with the appropriate type
-      const newTrack = await store.createTrack(trackName, trackType);
+      const newTrack = await store.createTrack(trackName, trackType, tracks.length);
       
       // For sampler tracks, proceed differently
       if (isSampler) {
@@ -986,6 +1005,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         canRedo: historyManager.canRedo()
       });
       
+      // Update track indices
+      get().updateTrackIndices();
+      
       console.log(`Added ${isSampler ? 'sampler' : 'audio'} track from file:`, file.name);
     } catch (error) {
       console.error(`Failed to upload ${isSampler ? 'sampler' : 'audio'} file:`, error);
@@ -1026,7 +1048,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       console.log(`Successfully connected track ${trackId} to soundfont ${instrumentId}`);
       
       // CRITICAL FIX: Get the updated track with storage_key from the Store
-      const updatedTrackData = store.getTrackById(trackId);
+      const updatedTrackData = store.getTrackDataById(trackId);
       if (updatedTrackData && (updatedTrackData.type === 'midi' || updatedTrackData.type === 'drum') && updatedTrackData.instrumentStorageKey) {
         // Update Zustand state with the storage key that was set in connectTrackToSoundfont
         const tracksWithStorageKey = tracks.map(t => 
@@ -1115,5 +1137,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     } else {
       console.log('⚠️ No actions to redo');
     }
+  },
+  
+  // Function to update track indices based on current order in the array
+  updateTrackIndices: () => {
+    const { tracks } = get();
+    const updatedTracks = tracks.map((track, index) => ({
+      ...track,
+      index
+    }));
+    set({ tracks: updatedTracks });
   }
 }));

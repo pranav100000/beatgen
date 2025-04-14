@@ -10,6 +10,7 @@ import {
   moveNoteWithHistory,
   resizeNoteWithHistory
 } from '../../utils/noteActions';
+import { getTrackColor } from '../../constants/gridConstants';
 
 /**
  * Component that renders all open piano roll windows
@@ -173,6 +174,7 @@ const PianoRollWindows: React.FC = () => {
               <PianoRoll
                 key={`piano-roll-${trackId}`}
                 title={`Piano Roll - ${track?.name || 'Unknown Track'}`}
+                color={track?.index !== undefined ? getTrackColor(track.index) : getTrackColor(Math.abs(trackId.charCodeAt(0) % 9))}
                 initialNotes={pianoRollNotes}
                 onNotesChange={(newNotes) => handleNotesChange(trackId, newNotes)}
                 // Position in the center of the screen

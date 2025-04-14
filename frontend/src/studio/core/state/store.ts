@@ -27,6 +27,7 @@ export interface StoreInterface {
   createTrack(
     name: string, 
     type: 'audio' | 'midi' | 'drum' | 'sampler', 
+    index: number,
     existingTrackData?: {
       id: string;
       volume?: number;
@@ -135,6 +136,7 @@ export class Store implements StoreInterface {
   public async createTrack(
     name: string, 
     type: 'audio' | 'midi' | 'drum' | 'sampler',
+    index: number,
     existingTrackData?: {
       id: string;
       volume?: number;

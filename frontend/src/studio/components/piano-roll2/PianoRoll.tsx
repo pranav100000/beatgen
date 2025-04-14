@@ -129,6 +129,7 @@ interface NotesLayerProps {
   snapEnabled: boolean;
   zoomLevel: number;
   selectedTool: 'select' | 'pen' | 'highlighter' | 'eraser';
+  noteColor: string; // Add note color prop
 }
 
 interface PlayheadLayerProps {
@@ -138,6 +139,7 @@ interface PlayheadLayerProps {
 }
 
 interface PianoRollProps {
+  color?: string;
   initialWidth?: number;
   initialHeight?: number;
   initialX?: number;
@@ -457,7 +459,8 @@ const NoteWithDrag: React.FC<{
   selectedTool: 'select' | 'pen' | 'highlighter' | 'eraser',
   isGhost?: boolean,
   draggedNoteId: number | null | undefined,
-  dragOffset?: {x: number, y: number} | null
+  dragOffset?: {x: number, y: number} | null,
+  noteColor?: string // Add noteColor prop
 }> = ({ 
   note, 
   scrollX, 
@@ -477,7 +480,8 @@ const NoteWithDrag: React.FC<{
   selectedTool,
   isGhost = false,
   draggedNoteId = null,
-  dragOffset = null
+  dragOffset = null,
+  noteColor
 }) => {
   // Reference to the Konva rectangle
   const rectRef = useRef<Konva.Rect>(null);
@@ -533,7 +537,8 @@ const NoteWithDrag: React.FC<{
     if (isSelected) {
       return "#5a97f5"; // Lighter blue for selected notes
     }
-    return note.color;
+    // Use provided noteColor if available, otherwise fallback to note's color property
+    return noteColor || note.color;
   };
 
   // Calculate the visual position for the note
@@ -775,7 +780,8 @@ const NotesLayer = React.memo<NotesLayerProps>(
     gridSize,
     snapEnabled,
     zoomLevel,
-    selectedTool
+    selectedTool,
+    noteColor
   }) => {
     // Memoize visible notes calculation
     const visibleNotes = React.useMemo(() => {
@@ -900,6 +906,7 @@ const NotesLayer = React.memo<NotesLayerProps>(
             selectedTool={selectedTool}
             draggedNoteId={draggedNoteId}
             dragOffset={dragOffset}
+            noteColor={noteColor} // Pass note color to NoteWithDrag
           />
         ))}
         
@@ -926,6 +933,7 @@ const NotesLayer = React.memo<NotesLayerProps>(
             isGhost={true}
             draggedNoteId={draggedNoteId}
             dragOffset={null}
+            noteColor={noteColor} // Pass note color to NoteWithDrag
           />
         ))}
       </Layer>
@@ -1033,6 +1041,7 @@ const SelectionRectangle: React.FC<{
 };
 
 const PianoRoll: React.FC<PianoRollProps> = ({
+  color = DARK_THEME.noteColor, // Use default from theme if not provided
   initialWidth = 600,
   initialHeight = 400,
   initialX = 100,
@@ -1513,7 +1522,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       start: startPos,
       top: topPos,
       width: newNoteWidth,
-      color: noteColor,
+      color: noteColor, // Use the color prop from component
     };
     
     // Always increment the ID after creating a note
@@ -1522,8 +1531,8 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     return newNote;
   };
   
-  // Colors for new notes (cycle through these)
-  const noteColor = DARK_THEME.noteColor;
+  // Use the color prop instead of hardcoded theme color
+  const noteColor = color;
 
   // Add state to track the most recently used note width
   // Default to one beat (quarter note) at default zoom
@@ -2288,7 +2297,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
         // Invert the row calculation for flipped keyboard
         top: (totalKeys - 1 - noteState.row) * keyHeight, // Convert row to pixels
         width: noteState.length * PIXELS_PER_TICK * zoomLevel, // Convert ticks to pixels
-        color: noteColor, // Assign color based on index
+        color: noteColor, // Use the color prop from component
       }));
       
       // Set the notes
@@ -2301,7 +2310,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       // Store the current notes reference for deep comparison
       lastProcessedNotesRef.current = [...visualNotes];
     }
-  }, [initialNotes, zoomLevel, keyHeight, totalKeys, notes]);
+  }, [initialNotes, zoomLevel, keyHeight, totalKeys, notes, noteColor]);
 
   // Import necessary hooks
   const [hoveredNote, setHoveredNote] = useState<string | null>(null);
@@ -3179,6 +3188,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
                       snapEnabled={gridSnapEnabled && gridSnapSize !== 0}
                       zoomLevel={zoomLevel}
                       selectedTool={selectedTool}
+                      noteColor={noteColor} // Pass note color to NotesLayer
                     />
 
                     {/* Selection rectangle */}
