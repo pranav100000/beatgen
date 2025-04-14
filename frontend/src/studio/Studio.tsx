@@ -10,7 +10,6 @@ import { GRID_CONSTANTS } from './constants/gridConstants';
 import { useStudioStore } from './stores/useStudioStore';
 
 // Import piano roll components
-import PianoRollModule, { PianoRollWindows as OldPianoRollWindows, usePianoRoll } from './components/piano-roll';
 import PianoRollWindows from './components/piano-roll-new/PianoRollWindows';
 
 // Import custom hooks
@@ -364,10 +363,7 @@ const StudioWithPianoRoll = (props: StudioProps) => {
   // Always wrap with PianoRollModule since Track components still depend on it
   // But only render OldPianoRollWindows if not using the new implementation
   return (
-    <PianoRollModule>
       <Studio {...props} />
-      {!useNewPianoRoll && <OldPianoRollWindows />}
-    </PianoRollModule>
   );
 };
 

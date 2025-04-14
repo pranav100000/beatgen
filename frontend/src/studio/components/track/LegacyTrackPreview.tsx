@@ -10,7 +10,6 @@ import { TrackState, Position } from '../../core/types/track';
 import WaveformDisplay from './WaveformDisplay';
 import MidiNotesPreview from '../piano-roll/components/MidiNotesPreview';
 import { useGridStore } from '../../core/state/gridStore';
-import { usePianoRoll } from '../piano-roll/context/PianoRollContext';
 import { calculateAudioTrackWidth, calculateMidiTrackWidth } from '../../utils/trackWidthCalculators';
 
 // Simplified TrackPreview component without complex handlers
