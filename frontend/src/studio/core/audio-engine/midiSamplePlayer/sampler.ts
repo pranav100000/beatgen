@@ -205,6 +205,18 @@ class MidiSampler {
      * @param startTime Position to start playback from (in seconds)
      */
     public playMidi(bpm: number = 120, startTime: number = 0): void {
+        console.log("playMidi", bpm, startTime);
+        console.log("this.player", this.player);
+        console.log("this.notes", this.notes);
+        console.log("this.offsetSeconds", this.offsetSeconds);
+        console.log("this.isPlaying", this.isPlaying);
+        console.log("this.onPlaybackStatusChange", this.onPlaybackStatusChange);
+        console.log("this.cutSelfOff", this.cutSelfOff);
+        console.log("this.baseNote", this.baseNote);
+        console.log("this.currentVolume", this.currentVolume);
+        console.log("this.isMuted", this.isMuted);
+        console.log("grainPlayers", this.playerPool);
+        
         if (!this.player?.buffer) {
             this.log("Cannot play: audio not ready");
             return;

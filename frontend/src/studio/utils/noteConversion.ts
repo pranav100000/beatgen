@@ -41,7 +41,5 @@ export const convertFromNoteState = (note: NoteState, trackId: string): Note => 
 });
 
 export const scaleToPreview = (dimension: number): number => {
-  console.log('scaleToPreview', dimension, TICKS_PER_STEP);
-  console.log('scaleToPreview', Math.round(dimension / TICKS_PER_STEP));
   return Math.round(dimension / TICKS_PER_STEP);
 };

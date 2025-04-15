@@ -58,6 +58,9 @@ export class MidiManager {
   private currentBpm: number = 120;
   private currentTimeSignature: [number, number] = [4, 4];
   
+  // Internal counter for generating unique note IDs
+  private nextNoteIdCounter: number = 1;
+  
   // Debouncing for persistence operations
   private pendingUpdates: Map<string, NodeJS.Timeout> = new Map();
   private debounceTime: number = 500; // 500ms debounce time
@@ -135,6 +138,7 @@ export class MidiManager {
 
   /**
    * Add a single note to a track
+   * Assigns a unique ID if the incoming note ID is invalid (-1).
    * @param trackId The track ID
    * @param note The note to add
    * @throws Error if the track doesn't exist
@@ -148,8 +152,20 @@ export class MidiManager {
       throw new Error(`Cannot add note to track ${trackId}: track does not exist`);
     }
     
-    // Add the new note (create a copy to avoid mutation)
-    const updatedNotes = [...notes, {...note}];
+    let noteToAdd = { ...note }; // Create a copy to potentially modify
+
+    // Check if the incoming ID needs to be replaced
+    if (noteToAdd.id === -1 || noteToAdd.id === undefined || noteToAdd.id === null) {
+      const newId = this.nextNoteIdCounter++; // Get next ID and increment counter
+      console.log(`MidiManager: Assigning new ID ${newId} to incoming note (original ID: ${note.id})`);
+      noteToAdd.id = newId; 
+    } else {
+      // Ensure the counter is always ahead of any explicitly provided IDs
+      this.nextNoteIdCounter = Math.max(this.nextNoteIdCounter, noteToAdd.id + 1);
+    }
+    
+    // Add the note with the correct ID
+    const updatedNotes = [...notes, noteToAdd]; 
     
     // Update the track with the new note - this will notify subscribers too
     this.updateTrack(trackId, updatedNotes);
@@ -162,6 +178,7 @@ export class MidiManager {
    * @throws Error if the track doesn't exist
    */
   async removeNoteFromTrack(trackId: string, noteId: number): Promise<void> {
+    console.log("MidiManager: current notes:", this.getTrackNotes(trackId));
     console.log(`MidiManager: Removing note ${noteId} from track ${trackId}`);
     
     // Get existing notes - will throw if track doesn't exist
@@ -175,6 +192,7 @@ export class MidiManager {
     
     // Update the track without the removed note - this will notify subscribers too
     this.updateTrack(trackId, updatedNotes);
+    console.log("MidiManager: updated notes:", this.getTrackNotes(trackId));
   }
 
   /**

@@ -7,14 +7,15 @@ import {
   Tooltip, 
   TextField,
   Select, 
-  MenuItem
+  MenuItem,
+  ButtonBase
 } from '@mui/material';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PanToolIcon from '@mui/icons-material/PanTool';
-import { TrackState } from '../../core/types/track';
+import { TrackState, AudioTrackState, SamplerTrackState } from '../../core/types/track';
 import { getTrackColor, GRID_CONSTANTS } from '../../constants/gridConstants';
 import ControlKnob from './track-sidebar-controls/ControlKnob';
 
@@ -28,6 +29,7 @@ interface TrackControlsSidebarProps {
   onTrackDelete: (trackId: string) => void;
   onTrackNameChange?: (trackId: string, name: string) => void;
   onInstrumentChange?: (trackId: string, instrumentId: string, instrumentName: string, instrumentStorageKey?: string) => void;
+  onLoadAudioFile?: (trackId: string) => void;
 }
 
 const TrackControlsSidebar: React.FC<TrackControlsSidebarProps> = ({
@@ -38,7 +40,8 @@ const TrackControlsSidebar: React.FC<TrackControlsSidebarProps> = ({
   onSoloToggle,
   onTrackDelete,
   onTrackNameChange,
-  onInstrumentChange
+  onInstrumentChange,
+  onLoadAudioFile
 }) => {
   if (tracks.length === 0) {
     return (
@@ -80,6 +83,7 @@ const TrackControlsSidebar: React.FC<TrackControlsSidebarProps> = ({
           onTrackDelete={onTrackDelete}
           onTrackNameChange={onTrackNameChange}
           onInstrumentChange={onInstrumentChange}
+          onLoadAudioFile={onLoadAudioFile}
         />
       ))}
     </Box>
@@ -96,6 +100,7 @@ interface TrackControlsProps {
   onTrackDelete: (trackId: string) => void;
   onTrackNameChange?: (trackId: string, name: string) => void;
   onInstrumentChange?: (trackId: string, instrumentId: string, instrumentName: string) => void;
+  onLoadAudioFile?: (trackId: string) => void;
 }
 
 const TrackControls: React.FC<TrackControlsProps> = ({
@@ -107,7 +112,8 @@ const TrackControls: React.FC<TrackControlsProps> = ({
   onSoloToggle,
   onTrackDelete,
   onTrackNameChange,
-  onInstrumentChange
+  onInstrumentChange,
+  onLoadAudioFile
 }) => {
   const trackColor = getTrackColor(index);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -178,6 +184,12 @@ const TrackControls: React.FC<TrackControlsProps> = ({
     }
   }, [isEditingName]);
   
+  const handleLoadFileClick = () => {
+    if (onLoadAudioFile) {
+        onLoadAudioFile(track.id);
+    }
+  }
+  
   // Render type-specific controls based on track type
   const renderTypeSpecificControls = () => {
     switch(track.type) {
@@ -240,6 +252,16 @@ const TrackControls: React.FC<TrackControlsProps> = ({
         );
         
       case 'audio':
+      case 'sampler':
+        // Explicitly cast track to the correct type to satisfy TypeScript
+        const audioTrack = track as AudioTrackState;
+        const samplerTrack = track as SamplerTrackState;
+        const fileName = track.type === 'audio'
+            ? audioTrack.audioFile?.name
+            : track.type === 'sampler'
+              ? samplerTrack.sampleFile?.name || 'No file loaded'
+              : 'No file loaded';
+
         return (
           <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center' }}>
             <Typography variant="caption" sx={{ 
@@ -251,19 +273,32 @@ const TrackControls: React.FC<TrackControlsProps> = ({
             }}>
               File:
             </Typography>
-            <Box sx={{ 
-              fontSize: '10px',
-              color: 'rgba(255,255,255,0.8)',
-              bgcolor: 'rgba(0,0,0,0.2)',
-              p: 0.5,
-              borderRadius: 1,
-              flexGrow: 1,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
-              {track.audioFile?.name || 'No file loaded'}
-            </Box>
+            <Tooltip title="Click to load audio file">
+              <ButtonBase
+                onClick={handleLoadFileClick}
+                sx={{
+                  fontSize: '10px',
+                  color: 'rgba(255,255,255,0.8)',
+                  bgcolor: 'rgba(0,0,0,0.2)',
+                  p: 0.5,
+                  borderRadius: 1,
+                  flexGrow: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start',
+                  width: '100%',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    bgcolor: 'rgba(0,0,0,0.4)',
+                  }
+                }}
+                disabled={!onLoadAudioFile}
+              >
+                  {fileName}
+              </ButtonBase>
+            </Tooltip>
           </Box>
         );
         

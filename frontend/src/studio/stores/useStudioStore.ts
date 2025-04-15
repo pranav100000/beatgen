@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as Tone from 'tone';
 import { Store } from '../core/state/store';
-import { TrackState, Position, AudioTrackState, DrumTrackState, SamplerTrackState } from '../core/types/track';
+import { TrackState, Position, AudioTrackState, DrumTrackState, SamplerTrackState, MidiTrackState, BaseTrackState } from '../core/types/track';
 import { calculateTrackWidth, getTrackColor, GRID_CONSTANTS } from '../constants/gridConstants';
 import { historyManager } from '../core/state/history/HistoryManager';
 import { getProject, Project } from '../../platform/api/projects';
@@ -88,6 +88,9 @@ interface StudioState {
   updateMidiNote: (trackId: string, note: NoteState) => void;
   
   getTrackNotes: (trackId: string) => Note[] | null;
+
+  // New action to replace the audio file for an existing track
+  replaceTrackAudioFile: (trackId: string, file: File) => Promise<void>;
 }
 
 export const useStudioStore = create<StudioState>((set, get) => {
@@ -1056,6 +1059,134 @@ export const useStudioStore = create<StudioState>((set, get) => {
       }
     } catch (error) {
       console.error(`Failed to connect track ${trackId} to soundfont:`, error);
+    }
+  },
+  
+  // New action to replace the audio file for an existing track
+  replaceTrackAudioFile: async (trackId: string, file: File) => {
+    const { store, tracks, bpm, timeSignature } = get();
+    if (!store || !get().isInitialized) {
+      console.warn('Store not initialized, cannot replace audio file.');
+      return;
+    }
+
+    const trackIndex = tracks.findIndex(t => t.id === trackId);
+    if (trackIndex === -1) {
+      console.error(`Track with ID ${trackId} not found in store.`);
+      return;
+    }
+
+    const originalTrack = tracks[trackIndex];
+    if (originalTrack.type !== 'audio' && originalTrack.type !== 'sampler') {
+      console.error(`Cannot replace audio file for track type: ${originalTrack.type}`);
+      return;
+    }
+
+    try {
+      console.log(`Replacing audio file for track ${trackId} with ${file.name}`);
+      
+      // Stop playback for this specific sampler before reloading
+      const samplerController = store.getTransport().getSamplerController();
+      const sampler = samplerController.getSampler(trackId);
+      if (sampler) {
+        console.log(`Stopping playback for sampler ${trackId} before file replacement.`);
+        sampler.stopPlayback(); 
+      } else {
+        console.warn(`Sampler ${trackId} not found, cannot stop playback before replacement.`);
+      }
+
+      // Load the new file into the audio engine. This replaces the old player/buffer.
+      await store.loadAudioFile(trackId, file);
+
+      // Get the updated track info from the audio engine (especially duration)
+      const engineTrack = store.getAudioEngine().getAllTracks().find(t => t.id === trackId);
+      if (!engineTrack) {
+        throw new Error(`Failed to get updated engine track data for ${trackId} after file load.`);
+      }
+
+      const newDuration = engineTrack.player?.buffer?.duration || 0;
+      const newCalculatedWidth = calculateTrackWidth(newDuration, bpm, timeSignature);
+
+      // Update the track state in Zustand
+      const updatedTracks = [...tracks]; // Create a mutable copy
+      
+      // Use a more specific type for the update object initially
+      const commonUpdateData: Partial<BaseTrackState> & { duration: number, _calculatedWidth: number } = {
+        duration: newDuration,
+        _calculatedWidth: newCalculatedWidth,
+      };
+
+      if (originalTrack.type === 'audio') {
+        // Now we know it's an AudioTrackState
+        const audioUpdateData: Partial<AudioTrackState> = {
+          ...commonUpdateData,
+          type: 'audio',
+          audioFile: file,
+        };
+        updatedTracks[trackIndex] = {
+          ...originalTrack,
+          ...audioUpdateData
+        };
+      } else if (originalTrack.type === 'sampler') {
+        // Now we know it's a SamplerTrackState
+        const samplerUpdateData: Partial<SamplerTrackState> = {
+          ...commonUpdateData,
+          type: 'sampler',
+          sampleFile: file,
+          baseMidiNote: originalTrack.baseMidiNote,
+          grainSize: originalTrack.grainSize,
+          overlap: originalTrack.overlap,
+        };
+
+        // Re-initialize sampler controller
+        try {
+          const samplerController = store.getTransport().getSamplerController();
+          await samplerController.initializeSampler(
+            trackId,
+            file,
+            originalTrack.baseMidiNote,
+            originalTrack.grainSize,
+            originalTrack.overlap
+          );
+          console.log(`Sampler re-initialized for track ${trackId}`);
+
+          // Immediately repopulate notes after re-initialization
+          const midiManager = store.getMidiManager();
+          if (midiManager) {
+            const notes = midiManager.getTrackNotes(trackId);
+            const sampler = samplerController.getSampler(trackId);
+            if (sampler && notes) {
+              sampler.setNotes(notes);
+              console.log(`Immediately repopulated sampler ${trackId} with ${notes.length} notes.`);
+            } else {
+              console.warn(`Could not repopulate notes for sampler ${trackId}: Sampler found=${!!sampler}, Notes found=${!!notes}`);
+            }
+          } else {
+            console.warn(`MidiManager not available, cannot repopulate notes for sampler ${trackId}`);
+          }
+
+        } catch (error) {
+          console.error(`Failed to re-initialize sampler for track ${trackId}:`, error);
+        }
+
+        updatedTracks[trackIndex] = {
+          ...originalTrack,
+          ...samplerUpdateData
+        };
+      }
+
+      set({ tracks: updatedTracks });
+
+      console.log(`Successfully replaced audio file for track ${trackId}. New duration: ${newDuration}`);
+
+      // Optional: Consider adding this change to the history manager
+      // const action = new Actions.UpdateTrack(store, originalTrack, updatedTracks[trackIndex]);
+      // await historyManager.executeAction(action);
+      // set({ canUndo: historyManager.canUndo(), canRedo: historyManager.canRedo() });
+
+    } catch (error) {
+      console.error(`Failed to replace audio file for track ${trackId}:`, error);
+      // Optional: Revert state or show error to user
     }
   },
   

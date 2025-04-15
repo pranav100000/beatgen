@@ -305,7 +305,7 @@ interface DrumMachineProps {
 
 // Constants from PianoRoll to maintain consistency
 const TICKS_PER_BEAT = 960; // Standard MIDI ticks per beat (quarter note)
-const TICKS_PER_STEP = TICKS_PER_BEAT / 4; // 4 steps per beat, 240 ticks per step
+const TICKS_PER_STEP = TICKS_PER_BEAT / 16; // 4 steps per beat, 240 ticks per step
 
 // Modify the component definition to use forwardRef
 const DrumMachine = forwardRef<DrumMachineHandle, DrumMachineProps>(({ 
@@ -477,7 +477,7 @@ const DrumMachine = forwardRef<DrumMachineHandle, DrumMachineProps>(({
   // Function to create a note for a grid cell - Reverted to generate ID
   const createNoteFromCell = (drumIndex: number, columnIndex: number): NoteState => {
     const noteValue = 60; // Fixed MIDI Note 60
-    const noteLength = TICKS_PER_STEP / 2; // Fixed 32nd note length
+    const noteLength = TICKS_PER_STEP; // Fixed 32nd note length
 
     const currentId = nextNoteId;
     setNextNoteId(prevId => prevId + 1); // Increment ID state
@@ -637,8 +637,9 @@ const DrumMachine = forwardRef<DrumMachineHandle, DrumMachineProps>(({
        // Restore original removal logic (assuming it worked before ID changes)
        const internalNotesRow = drumNotes[row] || [];
        const noteToRemove = internalNotesRow.find(note => 
-         Math.abs(note.column - tickPosition) < TICKS_PER_STEP / 2
+        note.column === col * TICKS_PER_STEP
        );
+       console.log("searched for note at col", col * TICKS_PER_STEP, "and found", noteToRemove);
        if (noteToRemove) {
            setDrumNotes(prev => {
                const updated = [...prev];
