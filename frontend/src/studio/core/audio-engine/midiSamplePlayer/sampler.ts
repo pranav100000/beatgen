@@ -231,12 +231,12 @@ class MidiSampler {
         // Schedule all notes
         for (const note of this.notes) {
             // Calculate note time based on grid position
-            const noteTimeInSeconds = note.column * gridUnitTime;
+            const noteTimeInSeconds = note.column / (bpm * 4);
             
             // Only schedule notes that should play after the effective start time
             if (noteTimeInSeconds >= effectiveStartTime) {
                 // Calculate note duration
-                const noteDuration = note.length * gridUnitTime;
+                const noteDuration = note.length / secPerBeat;
                 
                 // Calculate the absolute time in the transport timeline when this note should play
                 // Apply lookahead to schedule earlier to compensate for transport delay

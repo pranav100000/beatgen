@@ -87,11 +87,11 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
       {/* Notes rendering */}
       {notes.map(note => {
         // Calculate position and dimensions
-        const x = scaleToPreview(note.column) * noteWidthScale;
+        const x = scaleToPreview(note.column * noteWidthScale);
         // Calculate relative position in our range and invert Y (high notes at top)
         const relativePosition = maxNoteRow - note.row;
         const y = relativePosition * noteHeightScale;
-        const w = scaleToPreview(note.length) * noteWidthScale;
+        const w = scaleToPreview(note.length * noteWidthScale);
         const h = noteHeightScale * 0.9; // Slight gap between notes
         return (
           <Box

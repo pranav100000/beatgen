@@ -45,7 +45,7 @@ export class SequencerWrapper {
   private originalVolume: number;
   private savedVolume: number | null = null;
   private _isPlaying: boolean = false;
-  private ppq: number = 960; // Default MIDI Pulses Per Quarter Note
+  private ppq: number = 480; // Default MIDI Pulses Per Quarter Note
   private currentBpm: number = 120; // Default tempo
 
   constructor(
@@ -400,8 +400,6 @@ export class SequencerWrapper {
    * @param globalTick The current global timeline position
    */
   async play(globalTick: number): Promise<void> {
-    console.log(")))))))))globalTick", globalTick);
-
     // console.log("______currentbpm", this.currentBpm);
     // console.log("______currentppq", this.ppq);
     // console.log("______currentstartoffset", this.startOffset);
@@ -669,11 +667,11 @@ export class SequencerWrapper {
     
     for (const note of notes) {
       // Convert grid position to time (in seconds), then to ticks
-      const timeInSeconds = note.column; // Convert grid position to time in seconds
+      const timeInSeconds = note.column * 2; // Convert grid position to time in seconds
       const startTick = Math.round(timeInSeconds);
       
       // Convert grid length to duration (in ms)
-      const durationInSeconds = note.length; // Convert grid length to duration in seconds
+      const durationInSeconds = note.length * 2; // Convert grid length to duration in seconds
       const duration = Math.round(durationInSeconds); // Convert to ms
       
       // Create note event
@@ -718,8 +716,8 @@ export class SequencerWrapper {
     for (const note of track.notes) {
       // Convert note timing from seconds to ACTUAL ticks, not milliseconds
       // Uses the correct ticks-per-second calculation based on tempo and PPQ
-      const startTick = Math.round(note.time);
-      const duration = Math.round(note.duration); // Duration still in ms for event handling
+      const startTick = Math.round(note.time * 2);
+      const duration = Math.round(note.duration * 2); // Duration still in ms for event handling
       
       console.log(`MIDI conversion: startTick=${startTick}, duration=${duration}`);
       // Create note event (single event with duration)

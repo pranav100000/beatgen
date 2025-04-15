@@ -12,7 +12,7 @@ export interface NoteState {
 /**
  * MIDI timing constants
  */
-export const TICKS_PER_BEAT = 960; // Standard MIDI ticks per beat
+export const TICKS_PER_BEAT = 480; // Standard MIDI ticks per beat
 export const TICKS_PER_STEP = TICKS_PER_BEAT / 4; // 240 ticks per step (16th note)
 
 /**
