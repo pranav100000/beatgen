@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, ReactElement, useMemo } from "react";
+import React, { useState, useRef, useEffect, ReactElement, useMemo, FC } from "react";
 import { Rnd } from "react-rnd";
 import { Stage, Layer, Line, Rect } from "react-konva";
 import Konva from "konva";
@@ -1085,7 +1085,7 @@ const ResizePreview: React.FC<{
         
         return (
           <Rect
-            key={`preview-note-${note.id}`}
+            key={`preview-note-${note.id}-${previewNote.start}-${previewNote.top}`}
             x={previewNote.start - scrollX + 1}
             y={previewNote.top - scrollY + 1}
             width={previewNote.width - 2}
@@ -1110,7 +1110,7 @@ const ResizePreview: React.FC<{
   );
 };
 
-const PianoRoll: React.FC<PianoRollProps> = ({
+export const PianoRoll: FC<PianoRollProps> = ({
   color = DARK_THEME.noteColor, // Use default from theme if not provided
   initialWidth = 600,
   initialHeight = 400,
@@ -1159,6 +1159,9 @@ const PianoRoll: React.FC<PianoRollProps> = ({
   const [selectionRect, setSelectionRect] = useState<{startX: number, startY: number, width: number, height: number} | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<number[]>([]);
+  
+  // NEW: Store notes in tick-based format (this is our source of truth)
+  const [normalizedNotes, setNormalizedNotes] = useState<NoteState[]>(initialNotes);
   
   // Handle tool selection with note deselection
   const handleToolSelect = (tool: 'select' | 'pen' | 'highlighter' | 'eraser') => {
@@ -1584,13 +1587,13 @@ const PianoRoll: React.FC<PianoRollProps> = ({
   // Use the color prop instead of hardcoded theme color
   const noteColor = color;
 
-  // Add state to track the most recently used note width
-  // Default to one beat (quarter note) at default zoom
-  const [lastNoteWidth, setLastNoteWidth] = useState(TICKS_PER_BEAT * PIXELS_PER_TICK);
+  // Add state to track the most recently used note width in ticks (not pixels)
+  // Default to one beat (quarter note)
+  const [lastNoteWidth, setLastNoteWidth] = useState(TICKS_PER_BEAT);
 
   // Convert NoteState objects to visual Note objects
   const visualNotes = useMemo(() => {
-    return initialNotes.map((noteState) => ({
+    return normalizedNotes.map((noteState) => ({
       id: noteState.id,
       start: noteState.column * PIXELS_PER_TICK * zoomLevel, // Convert ticks to pixels
       // Invert the row calculation for flipped keyboard
@@ -1598,7 +1601,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       width: noteState.length * PIXELS_PER_TICK * zoomLevel, // Convert ticks to pixels
       color: noteColor, // Use the color prop from component
     }));
-  }, [initialNotes, zoomLevel, keyHeight, totalKeys, noteColor]);
+  }, [normalizedNotes, zoomLevel, keyHeight, totalKeys, noteColor]);
 
   // Convert visual notes to normalized note states
   const convertNotesToState = (notes: Note[]): NoteState[] => {
@@ -1617,7 +1620,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
   const createNewNote = (startPos: number, topPos: number): Note | null => {
     const currentTime = Date.now();
     
-    // Check if we're creating notes too rapidly - increased debounce time for better performance
+    // Check if we're creating notes too rapidly
     if (currentTime - lastNoteCreationTime.current < DEBOUNCE_TIME) {
       return null; // Debounce - don't create a note if one was created very recently
     }
@@ -1625,32 +1628,29 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     // Update the last creation time
     lastNoteCreationTime.current = currentTime;
     
-    // Create the new note
-    const newNoteWidth = lastNoteWidth * zoomLevel;
+    // Calculate note properties in ticks
+    const columnInTicks = Math.round(startPos / (PIXELS_PER_TICK * zoomLevel));
+    const rowIndex = totalKeys - 1 - Math.floor(topPos / keyHeight);
     
     // Use the current nextNoteId value and increment it immediately to avoid duplicates
     const currentId = nextNoteId;
-    
-    // Increment ID directly to avoid React state batching issues
-    // This ensures each note gets a unique ID even with rapid creation
     setNextNoteId(currentId + 1);
     
-    const newNote: Note = {
+    // Create the new visual note for rendering
+    // lastNoteWidth is in ticks, convert to pixels
+    return {
       id: currentId,
       start: startPos,
       top: topPos,
-      width: newNoteWidth,
-      color: noteColor, // Use the color prop from component
+      width: lastNoteWidth * PIXELS_PER_TICK * zoomLevel, // Convert ticks to pixels with current zoom
+      color: noteColor,
     };
-    
-    return newNote;
   };
 
-  // Update the parent when notes change
-  const updateNotes = (updatedNotes: Note[]) => {
+  // Update the parent when normalized notes change
+  const updateParentNotes = () => {
     if (onNotesChange) {
-      const noteStates = convertNotesToState(updatedNotes);
-      onNotesChange(noteStates);
+      onNotesChange(normalizedNotes);
     }
   };
 
@@ -1673,22 +1673,39 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     );
   };
 
-  // Handle adding a note - optimized to use functional state updates
-  const handleAddNote = (newNote: Note) => {
-    // Use the current visualNotes with the new note added
-    const updatedNotes = [...visualNotes, newNote];
-    updateNotes(updatedNotes);
+  // Handle adding a note - convert to normalized form and update state
+  const handleAddNote = (newVisualNote: Note) => {
+    // Convert the visual note to a normalized note
+    const newNormalizedNote = convertNotesToState([newVisualNote])[0];
+    
+    // Update normalized notes state
+    const updatedNormalizedNotes = [...normalizedNotes, newNormalizedNote];
+    setNormalizedNotes(updatedNormalizedNotes);
+    
+    // Notify parent of change
+    updateParentNotes();
   };
 
   // Handle removing a note
   const handleRemoveNote = (noteId: number) => {
-    const updatedNotes = visualNotes.filter(n => n.id !== noteId);
-    updateNotes(updatedNotes);
+    // Remove note from normalized notes
+    const updatedNormalizedNotes = normalizedNotes.filter(n => n.id !== noteId);
+    setNormalizedNotes(updatedNormalizedNotes);
+    
+    // Notify parent of change
+    updateParentNotes();
   };
 
-  // Handle updating multiple notes (e.g., during drag operations)
-  const handleUpdateNotes = (updatedNotes: Note[]) => {
-    updateNotes(updatedNotes);
+  // Handle updating multiple notes
+  const handleUpdateNotes = (updatedVisualNotes: Note[]) => {
+    // Convert visual notes to normalized notes
+    const updatedNormalizedNotes = convertNotesToState(updatedVisualNotes);
+    
+    // Update normalized notes state
+    setNormalizedNotes(updatedNormalizedNotes);
+    
+    // Notify parent of change
+    updateParentNotes();
   };
 
   // Modify the handleStageMouseDown function
@@ -2028,7 +2045,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       const resizedNote = updatedNotes.find(n => n.id === resizingNoteId);
       if (resizedNote) {
         // Update the last note width for future notes (normalize by zoom level)
-        setLastNoteWidth(resizedNote.width / zoomLevel);
+           setLastNoteWidth(resizedNote.width / (PIXELS_PER_TICK * zoomLevel));
       }
       
       // Clean up the resize data
@@ -2133,29 +2150,13 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     };
   }, [isResizingNote, resizingNoteId, resizeDirection, resizeStartPos, noteInitialState, selectedNotesInitialState, selectedNoteIds, visualNotes]);
 
-  // Update notes when zoom level changes
+  // Update zoom level without modifying note data
   useEffect(() => {
-    if (visualNotes.length > 0) {
-      // Scale all note positions and widths according to the new zoom level
-      const updatedNotes = visualNotes.map(note => {
-        // Calculate base values (without zoom)
-        const baseStart = note.start / prevZoomLevel;
-        const baseWidth = note.width / prevZoomLevel;
-        
-        // Apply new zoom level
-        return {
-          ...note,
-          start: baseStart * zoomLevel,
-          width: baseWidth * zoomLevel
-        };
-      });
-      
-      // Update via callback
-      handleUpdateNotes(updatedNotes);
-    }
-    // Store current zoom level for next comparison
+    // We only need to update the previous zoom level for future calculations
+    // The actual visual scaling happens in the visualNotes useMemo
+    // which derives from normalizedNotes and the current zoomLevel
     setPrevZoomLevel(zoomLevel);
-  }, [zoomLevel, visualNotes.length, prevZoomLevel]);
+  }, [zoomLevel]);
 
   // Handler for starting note resize
   const handleNoteResizeStart = (noteId: number, direction: 'left' | 'right', e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -2373,7 +2374,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       }));
       
       // Set the notes
-      updateNotes(visualNotes);
+      handleUpdateNotes(visualNotes);
       
       // Set the next note ID to be higher than any existing note ID
       const maxId = Math.max(...visualNotes.map(note => note.id), 0);
@@ -3362,7 +3363,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
                         scrollX={scrollX}
                         scrollY={scrollY}
                         keyHeight={keyHeight}
-                        noteWidth={lastNoteWidth * zoomLevel}
+                        noteWidth={lastNoteWidth * PIXELS_PER_TICK * zoomLevel}
                         noteColor={noteColor}
                       />
                     )}
