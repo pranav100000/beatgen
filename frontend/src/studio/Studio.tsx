@@ -198,9 +198,6 @@ function Studio({ projectId }: StudioProps) {
     return () => scrollContainer.removeEventListener("scroll", debounceScroll);
   }, [handleScroll]);
 
-  // Get the feature flag from the store
-  const useNewPianoRoll = useStudioStore(state => state.useNewPianoRoll);
-
   return (
     <Box sx={{ 
       height: '100vh', 
@@ -348,7 +345,7 @@ function Studio({ projectId }: StudioProps) {
         />
         
         {/* Render the new piano roll windows directly in Studio */}
-        {useNewPianoRoll && <PianoRollWindows />}
+        {<PianoRollWindows />}
       </Box>
     </Box>
   );
@@ -356,12 +353,6 @@ function Studio({ projectId }: StudioProps) {
 
 // Always wrap with PianoRollModule for backward compatibility
 const StudioWithPianoRoll = (props: StudioProps) => {
-  const useNewPianoRoll = useStudioStore(state => state.useNewPianoRoll);
-  
-  console.log('StudioWithPianoRoll - useNewPianoRoll:', useNewPianoRoll);
-  
-  // Always wrap with PianoRollModule since Track components still depend on it
-  // But only render OldPianoRollWindows if not using the new implementation
   return (
       <Studio {...props} />
   );

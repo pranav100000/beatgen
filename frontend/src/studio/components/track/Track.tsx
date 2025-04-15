@@ -48,8 +48,7 @@ function Track(props: TrackProps) {
 
   // Get the store from Zustand
   const store = useStudioStore(state => state.store);
-  const fullTrack = store?.getTrackById?.(id);
-  const useNewPianoRoll = useStudioStore(state => state.useNewPianoRoll);
+  const fullTrack = store?.getTrackDataById?.(id);
   
   // Get piano roll store or context based on which implementation we're using
   const { openPianoRoll } = usePianoRollStore();

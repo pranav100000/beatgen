@@ -24,10 +24,6 @@ interface StudioState {
   keySignature: string; // Added key signature
   tracks: TrackState[];
   
-  // Piano Roll Feature Flag
-  useNewPianoRoll: boolean;
-  togglePianoRollImplementation: () => void;
-  
   // UI State
   zoomLevel: number;
   measureCount: number;
@@ -90,8 +86,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   keySignature: "C major", // Default key signature is C major
   tracks: [],
   
-  // Piano Roll Feature Flag - Default to true to use new implementation
-  useNewPianoRoll: true,
   zoomLevel: 1,
   measureCount: 40, // Initial number of measures
   canUndo: false,
@@ -221,7 +215,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setCanUndo: (canUndo) => set({ canUndo }),
   setCanRedo: (canRedo) => set({ canRedo }),
   setAddMenuAnchor: (addMenuAnchor) => set({ addMenuAnchor }),
-  togglePianoRollImplementation: () => set((state) => ({ useNewPianoRoll: !state.useNewPianoRoll })),
   
   // Core initialization
   initializeAudio: async () => {
