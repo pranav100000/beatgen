@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Note } from '../../../core/types/note';
-import { usePianoRoll } from '../context/PianoRollContext';
+import { useStudioStore } from '../../../stores/useStudioStore';
 
 interface MidiNotesPreviewProps {
   trackId: string;
@@ -22,9 +22,9 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
     [] // Empty dependency array means this only runs once when component mounts
   );
 
-  // Get notes from context
-  const { getNotesForTrack } = usePianoRoll();
-  const notes = getNotesForTrack(trackId);
+  // Get notes from the MidiManager through store
+  const { store } = useStudioStore();
+  const notes = store?.getMidiManager().getTrackNotes(trackId) || [];
   
   // Find the range of notes for better scaling
   let minNoteRow = 127;

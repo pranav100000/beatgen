@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { useGridStore } from '../../../core/state/gridStore';
 import { GRID_CONSTANTS, getTrackColor } from '../../../constants/gridConstants';
 import { calculateMidiTrackWidth } from '../../../utils/trackWidthCalculators';
-import { usePianoRoll } from '../../piano-roll/context/PianoRollContext';
+import { useStudioStore } from '../../../stores/useStudioStore';
 import MidiNotesPreview from '../../piano-roll/components/MidiNotesPreview';
 import BaseTrackPreview from '../base/BaseTrackPreview';
 import { TrackPreviewProps } from '../types';
@@ -27,9 +27,10 @@ export const MidiTrackPreview: React.FC<TrackPreviewProps> = (props) => {
   const midiMeasureWidth = useGridStore(state => state.midiMeasureWidth);
   const trackColor = providedTrackColor || getTrackColor(trackIndex);
   
-  // Get notes from PianoRoll context
-  const { getNotesForTrack } = usePianoRoll();
-  const trackNotes = getNotesForTrack(track.id);
+  // Get notes directly from MidiManager
+  const { store } = useStudioStore();
+  const midiManager = store?.getMidiManager();
+  const trackNotes = midiManager?.getTrackNotes(track.id) || [];
   
   // Calculate MIDI track width
   const trackWidth = useMemo(() => calculateMidiTrackWidth(

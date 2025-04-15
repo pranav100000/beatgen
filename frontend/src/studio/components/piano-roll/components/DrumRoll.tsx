@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Box } from '@mui/material';
 import { Note } from '../../../core/types/note';
-import { usePianoRoll } from '../context/PianoRollContext';
 
 interface DrumRollProps {
   trackId: string;

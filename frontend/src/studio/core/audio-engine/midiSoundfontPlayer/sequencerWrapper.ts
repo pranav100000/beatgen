@@ -45,7 +45,7 @@ export class SequencerWrapper {
   private originalVolume: number;
   private savedVolume: number | null = null;
   private _isPlaying: boolean = false;
-  private ppq: number = 480; // Default MIDI Pulses Per Quarter Note
+  private ppq: number = 960; // Default MIDI Pulses Per Quarter Note
   private currentBpm: number = 120; // Default tempo
 
   constructor(

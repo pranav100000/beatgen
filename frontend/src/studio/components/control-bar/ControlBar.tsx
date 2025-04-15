@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, IconButton, Button, Typography, TextField, Menu, MenuItem, Tooltip } from '@mui/material';
+import { Box, IconButton, Button, Typography, TextField, Menu, MenuItem, Tooltip, Switch, FormControlLabel } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
@@ -15,6 +15,7 @@ import { TimeDisplay } from './TimeDisplay';
 import KeySelector from './KeySelector';
 import { ArrowBack, ChatBubbleOutlineRounded, ChatBubbleRounded } from '@mui/icons-material';
 import { SaveProjectButton } from './SaveProjectButton';
+import { useStudioStore } from '../../stores/useStudioStore';
 
 interface StudioControlBarProps {
     canUndo: boolean;
@@ -43,6 +44,7 @@ interface StudioControlBarProps {
     onZoomOut: () => void;
     onChatToggle: () => void;
 }
+
 
 const StudioControlBar: React.FC<StudioControlBarProps> = ({
     canUndo,
