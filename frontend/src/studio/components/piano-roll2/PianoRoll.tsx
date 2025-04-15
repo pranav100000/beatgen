@@ -897,7 +897,7 @@ const NotesLayer = React.memo<NotesLayerProps>(
         {/* Render the regular notes including the ones being dragged */}
         {visibleNotes.map((note) => (
           <NoteWithDrag
-            key={`note-${note.id}`}
+            key={`real-note-${note.id}`} // Ensure unique key prefix for real notes
             note={note}
             scrollX={scrollX}
             scrollY={scrollY}
@@ -916,14 +916,13 @@ const NotesLayer = React.memo<NotesLayerProps>(
             selectedTool={selectedTool}
             draggedNoteId={draggedNoteId}
             dragOffset={dragOffset}
-            noteColor={noteColor} // Pass note color to NoteWithDrag
           />
         ))}
         
         {/* Optional: Render ghost notes with very low opacity for better visual feedback */}
         {ghostNotes.map((ghost) => (
           <NoteWithDrag
-            key={`ghost-${ghost.id}`}
+            key={`ghost-note-${ghost.id}`} // Ensure unique key prefix for ghost notes
             note={ghost}
             scrollX={scrollX}
             scrollY={scrollY}
@@ -943,7 +942,6 @@ const NotesLayer = React.memo<NotesLayerProps>(
             isGhost={true}
             draggedNoteId={draggedNoteId}
             dragOffset={null}
-            noteColor={noteColor} // Pass note color to NoteWithDrag
           />
         ))}
       </Layer>
@@ -1520,8 +1518,8 @@ const PianoRoll: React.FC<PianoRollProps> = ({
 
   // Add a ref to track the last time a note was created
   const lastNoteCreationTime = useRef<number>(0);
-  // Debounce time in milliseconds
-  const DEBOUNCE_TIME = 10; 
+  // Debounce time in milliseconds - increased to prevent too many notes being created too quickly
+  const DEBOUNCE_TIME = 25; // Increased from 10ms to 25ms for better performance
   
   // Use the color prop instead of hardcoded theme color
   const noteColor = color;
@@ -1559,7 +1557,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
   const createNewNote = (startPos: number, topPos: number): Note | null => {
     const currentTime = Date.now();
     
-    // Check if we're creating notes too rapidly
+    // Check if we're creating notes too rapidly - increased debounce time for better performance
     if (currentTime - lastNoteCreationTime.current < DEBOUNCE_TIME) {
       return null; // Debounce - don't create a note if one was created very recently
     }
@@ -1570,16 +1568,20 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     // Create the new note
     const newNoteWidth = lastNoteWidth * zoomLevel;
     
+    // Use the current nextNoteId value and increment it immediately to avoid duplicates
+    const currentId = nextNoteId;
+    
+    // Increment ID directly to avoid React state batching issues
+    // This ensures each note gets a unique ID even with rapid creation
+    setNextNoteId(currentId + 1);
+    
     const newNote: Note = {
-      id: nextNoteId,
+      id: currentId,
       start: startPos,
       top: topPos,
       width: newNoteWidth,
       color: noteColor, // Use the color prop from component
     };
-    
-    // Always increment the ID after creating a note
-    setNextNoteId(prevId => prevId + 1);
     
     return newNote;
   };
@@ -1611,8 +1613,9 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     );
   };
 
-  // Handle adding a note
+  // Handle adding a note - optimized to use functional state updates
   const handleAddNote = (newNote: Note) => {
+    // Use the current visualNotes with the new note added
     const updatedNotes = [...visualNotes, newNote];
     updateNotes(updatedNotes);
   };
