@@ -1648,9 +1648,9 @@ export const PianoRoll: FC<PianoRollProps> = ({
   };
 
   // Update the parent when normalized notes change
-  const updateParentNotes = () => {
+  const updateParentNotes = (notesToUpdate: NoteState[]) => {
     if (onNotesChange) {
-      onNotesChange(normalizedNotes);
+      onNotesChange(notesToUpdate);
     }
   };
 
@@ -1683,7 +1683,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
     setNormalizedNotes(updatedNormalizedNotes);
     
     // Notify parent of change
-    updateParentNotes();
+    updateParentNotes(updatedNormalizedNotes);
   };
 
   // Handle removing a note
@@ -1693,7 +1693,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
     setNormalizedNotes(updatedNormalizedNotes);
     
     // Notify parent of change
-    updateParentNotes();
+    updateParentNotes(updatedNormalizedNotes);
   };
 
   // Handle updating multiple notes
@@ -1705,7 +1705,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
     setNormalizedNotes(updatedNormalizedNotes);
     
     // Notify parent of change
-    updateParentNotes();
+    updateParentNotes(updatedNormalizedNotes);
   };
 
   // Modify the handleStageMouseDown function
@@ -2252,21 +2252,9 @@ export const PianoRoll: FC<PianoRollProps> = ({
           
           // Store new dimensions
           updatedNotesData[n.id] = { width: thisNoteNewWidth };
-          
-          // Update DOM directly for visual feedback
-          const noteElement = document.querySelector(`[data-note-id="${n.id}"]`);
-          if (noteElement instanceof HTMLElement) {
-            noteElement.style.width = `${thisNoteNewWidth - 2}px`; // -2 for the gap
-          }
         } else if (n.id === resizingNoteId) {
           // Just update the resizing note
           updatedNotesData[n.id] = { width: newWidth };
-          
-          // Update DOM directly for visual feedback
-          const noteElement = document.querySelector(`[data-note-id="${n.id}"]`);
-          if (noteElement instanceof HTMLElement) {
-            noteElement.style.width = `${newWidth - 2}px`; // -2 for the gap
-          }
         }
       });
       
@@ -2321,23 +2309,9 @@ export const PianoRoll: FC<PianoRollProps> = ({
             start: thisNoteNewStart,
             width: thisNoteNewWidth
           };
-          
-          // Update DOM directly for visual feedback
-          const noteElement = document.querySelector(`[data-note-id="${n.id}"]`);
-          if (noteElement instanceof HTMLElement) {
-            noteElement.style.width = `${thisNoteNewWidth - 2}px`; // -2 for the gap
-            noteElement.style.left = `${thisNoteNewStart - scrollX + 1}px`; // +1 for the gap
-          }
         } else if (n.id === resizingNoteId) {
           // Just update the resizing note
           updatedNotesData[n.id] = { start: newStart, width: newWidth };
-          
-          // Update DOM directly for visual feedback
-          const noteElement = document.querySelector(`[data-note-id="${n.id}"]`);
-          if (noteElement instanceof HTMLElement) {
-            noteElement.style.width = `${newWidth - 2}px`; // -2 for the gap
-            noteElement.style.left = `${newStart - scrollX + 1}px`; // +1 for the gap
-          }
         }
       });
     }
@@ -2354,34 +2328,12 @@ export const PianoRoll: FC<PianoRollProps> = ({
 
   // Initialize notes from props when component mounts or when initialNotes changes
   useEffect(() => {
-    // Skip if no initialNotes are provided
-
-    // Check if there's a meaningful change to initialNotes that requires updating
-    // or if this is the first load (notes array is empty)
-    const shouldUpdateNotes = 
-      visualNotes.length === 0 // First render
-      ;
-    
-    if (shouldUpdateNotes) {
-      // Convert the normalized note states to visual notes
-      const visualNotes: Note[] = initialNotes.map((noteState, index) => ({
-        id: noteState.id || index + 1, // Use provided id or generate one
-        start: noteState.column * PIXELS_PER_TICK * zoomLevel, // Convert ticks to pixels
-        // Invert the row calculation for flipped keyboard
-        top: (totalKeys - 1 - noteState.row) * keyHeight, // Convert row to pixels
-        width: noteState.length * PIXELS_PER_TICK * zoomLevel, // Convert ticks to pixels
-        color: noteColor, // Use the color prop from component
-      }));
-      
-      // Set the notes
-      handleUpdateNotes(visualNotes);
-      
-      // Set the next note ID to be higher than any existing note ID
-      const maxId = Math.max(...visualNotes.map(note => note.id), 0);
+    // Update the next note ID to be higher than any existing note ID
+    if (initialNotes.length > 0) {
+      const maxId = Math.max(...initialNotes.map(note => note.id));
       setNextNoteId(maxId + 1);
-
     }
-  }, [initialNotes, zoomLevel, keyHeight, totalKeys, visualNotes, noteColor]);
+  }, [initialNotes]);
 
   // Import necessary hooks
   const [hoveredNote, setHoveredNote] = useState<string | null>(null);
@@ -2510,33 +2462,6 @@ export const PianoRoll: FC<PianoRollProps> = ({
     });
   };
 
-  // Custom styles for tool icons
-  const iconHoverStyle = (e: React.MouseEvent<HTMLSpanElement>) => {
-    e.currentTarget.style.opacity = "1";
-    e.currentTarget.style.transform = "scale(1.1)";
-  };
-
-  const iconLeaveStyle = (e: React.MouseEvent<HTMLSpanElement>) => {
-    e.currentTarget.style.opacity = "0.8";
-    e.currentTarget.style.transform = "scale(1)";
-  };
-
-  // In the top section, add headerRef declaration
-  const headerRef = useRef<HTMLDivElement>(null);
-
-  // Add isMultiResize state variable (near other resize state variables)
-  const [isMultiResize, setIsMultiResize] = useState(false);
-
-  // Replace the initialNotes effect with a simplified version
-  // Initialize notes from props when component mounts or when initialNotes changes
-  useEffect(() => {
-    // Update the next note ID to be higher than any existing note ID
-    if (initialNotes.length > 0) {
-      const maxId = Math.max(...initialNotes.map(note => note.id));
-      setNextNoteId(maxId + 1);
-    }
-  }, [initialNotes]);
-
   // Add the handleNoteDragMove function
   // Handler for note dragging
   const handleNoteDragMove = (noteId: number, e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -2558,6 +2483,23 @@ export const PianoRoll: FC<PianoRollProps> = ({
       y: node.y() + scrollY
     };
   };
+
+  // Custom styles for tool icons
+  const iconHoverStyle = (e: React.MouseEvent<HTMLSpanElement>) => {
+    e.currentTarget.style.opacity = "1";
+    e.currentTarget.style.transform = "scale(1.1)";
+  };
+
+  const iconLeaveStyle = (e: React.MouseEvent<HTMLSpanElement>) => {
+    e.currentTarget.style.opacity = "0.8";
+    e.currentTarget.style.transform = "scale(1)";
+  };
+
+  // In the top section, add headerRef declaration
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Add isMultiResize state variable (near other resize state variables)
+  const [isMultiResize, setIsMultiResize] = useState(false);
 
   // Add a flag to track if we just finished resizing
   const [justFinishedResize, setJustFinishedResize] = useState(false);
