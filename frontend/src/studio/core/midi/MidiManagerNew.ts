@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Note } from '../types/note';
 import { db } from '../db/dexie-client';
 
+const TICKS_PER_BEAT = 960; // Standard MIDI ticks per beat
+
 /**
  * Interface for track data
  */
@@ -106,9 +108,9 @@ export class MidiManager {
    * @throws Error if the track doesn't exist
    */
   updateTrack(trackId: string, notes: Note[]): void {
-    console.log(`MidiManager: Updating track ${trackId} with ${notes.length} notes`);
+    // Log notes being set
+    console.log(`MidiManager.updateTrack [${trackId}]: Setting notes:`, JSON.stringify(notes.slice(0, 5))); // Log first few
     
-    // Fail if the track doesn't exist
     if (!this.tracks.has(trackId)) {
       throw new Error(`Cannot update track ${trackId}: track does not exist`);
     }
@@ -138,9 +140,9 @@ export class MidiManager {
    * @throws Error if the track doesn't exist
    */
   async addNoteToTrack(trackId: string, note: Note): Promise<void> {
-    console.log(`MidiManager: Adding note to track ${trackId}`, note);
+    // Log received note
+    console.log(`MidiManager.addNoteToTrack [${trackId}]: Received note:`, JSON.stringify(note));
     
-    // Get existing notes - will throw if track doesn't exist
     const notes = this.getTrackNotes(trackId);
     if (notes === null) {
       throw new Error(`Cannot add note to track ${trackId}: track does not exist`);
@@ -543,13 +545,19 @@ export class MidiManager {
   notesToMidi(trackId: string, notes: Note[], bpm: number): MidiData {
     const track: MidiTrack = {
       id: trackId,
-      instrumentId: 'default', // This will be overridden if known
-      notes: notes.map(note => ({
+      instrumentId: 'default', 
+      notes: notes.map(note => {
+        // Log note being converted
+        console.log(`MidiManager.notesToMidi [${trackId}]: Converting note:`, JSON.stringify(note)); 
+        const convertedNote = {
         ...note,
         velocity: note.velocity || 100,
-        duration: note.length / 4, // Convert grid units to seconds
-        time: note.column / 4 // Convert grid units to seconds
-      }))
+          duration: note.length / TICKS_PER_BEAT, // Convert ticks to seconds based on TICKS_PER_BEAT
+          time: note.column / TICKS_PER_BEAT // Convert ticks to seconds based on TICKS_PER_BEAT
+        };
+        console.log(`MidiManager.notesToMidi [${trackId}]: Converted note result:`, JSON.stringify(convertedNote));
+        return convertedNote;
+      })
     };
 
     return {

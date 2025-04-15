@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Box } from '@mui/material';
-import { Position } from '../../core/types/track';
+import { TrackState, Position, DrumTrackState, SamplerTrackState } from '../../core/types/track';
 import { useStudioStore } from '../../stores/useStudioStore';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import TrackFactory from './TrackFactory';
@@ -46,66 +46,59 @@ function Track(props: TrackProps) {
     timeSignature = [4, 4]
   } = props;
 
-  // Get the store from Zustand
-  const store = useStudioStore(state => state.store);
-  const fullTrack = store?.getTrackDataById?.(id);
-  
-  // Get piano roll store or context based on which implementation we're using
+  // Get the necessary actions from stores
+  const track = useStudioStore(useCallback(state => state.tracks.find(t => t.id === id), [id]));
+  const openDrumMachine = useStudioStore(state => state.openDrumMachine); // <-- Get drum machine opener
   const { openPianoRoll } = usePianoRollStore();
-  
-  // Convert the props to the format expected by TrackPreview
-  const trackState = {
-    name,
-    id,
-    type: type as 'audio' | 'midi' | 'drum',
-    audioFile,
-    position,
-    duration,
-    _calculatedWidth,
-    // Get actual values from the store if available, otherwise use defaults
-    muted: fullTrack?.muted ?? false,
-    soloed: fullTrack?.soloed ?? false,
-    volume: fullTrack?.volume ?? 80,
-    pan: fullTrack?.pan ?? 0,
-    channel: fullTrack?.channel ?? ({} as any)
-  };
 
-  // Handle piano roll opening when track is clicked
+  // Log the selected track data, especially the drumPattern
+  console.log(`Track ${id}: Selected track data from store:`, track); 
+  
+  // Handle track click based on type
   const handleTrackClick = (e: React.MouseEvent) => {
-    // For MIDI and drum tracks, directly open the piano roll
-    if (type === 'midi' || type === 'drum' || type === 'sampler') {
-      e.stopPropagation();
-      console.log('Track clicked - opening piano roll for:', id);
-      openPianoRoll(id);
-      console.log('usePianoRollStore state after opening:', usePianoRollStore.getState());
+    e.stopPropagation(); // Prevent event bubbling
+    
+    if (type === 'drum') {
+      console.log('Drum track clicked - opening Drum Machine for:', id);
+      openDrumMachine(id); // <-- Call drum machine opener
+    } else if (type === 'midi' || type === 'sampler') {
+      console.log('MIDI/Sampler track clicked - opening Piano Roll for:', id);
+      openPianoRoll(id); // <-- Call piano roll opener
     }
+    // Audio tracks currently do nothing on click
   };
 
   // Handle position changes
   const handlePositionChange = (trackId: string, newPosition: Position, isDragEnd: boolean) => {
-    onPositionChange(newPosition, isDragEnd);
+    props.onPositionChange(newPosition, isDragEnd);
   };
+  
+  // If trackState couldn't be constructed, don't render
+  if (!track) {
+      console.warn(`Track component: Could not find track data in store for id: ${id}`);
+      return null; 
+  }
 
   return (
     <Box 
       onClick={handleTrackClick} 
-      sx={{ 
-        position: 'relative',
-        cursor: 'pointer'
-      }}
+      sx={{ position: 'relative', cursor: 'pointer' }}
       data-track-id={id}
       data-track-type={type}
     >
       <TrackFactory
-        track={trackState}
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        measureCount={measureCount}
-        gridLineStyle={gridLineStyle}
-        onPositionChange={handlePositionChange}
-        bpm={bpm}
-        timeSignature={timeSignature}
-        trackIndex={index}
+        // Pass down props expected by TrackFactory/BaseTrackPreview
+        track={track}
+        isPlaying={props.isPlaying}
+        currentTime={props.currentTime}
+        measureCount={props.measureCount}
+        gridLineStyle={props.gridLineStyle}
+        onPositionChange={handlePositionChange} // Ensure this uses the correct signature if needed by BaseTrackPreview
+        bpm={props.bpm}
+        timeSignature={props.timeSignature}
+        trackIndex={props.index}
+        trackWidth={track._calculatedWidth ?? 0} // <-- Pass trackWidth separately
+        // BaseTrackPreview requires trackColor which is handled by TrackFactory
       />
     </Box>
   );

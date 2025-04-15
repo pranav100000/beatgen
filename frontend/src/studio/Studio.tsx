@@ -12,6 +12,9 @@ import { useStudioStore } from './stores/useStudioStore';
 // Import piano roll components
 import PianoRollWindows from './components/piano-roll-new/PianoRollWindows';
 
+// Import Drum Machine
+import DrumMachine from './components/drum-machine/DrumMachine';
+
 // Import custom hooks
 import { useStudioDBSession } from './hooks/useStudioDBSession';
 import { useHistorySync } from './hooks/useHistorySync';
@@ -74,7 +77,14 @@ function Studio({ projectId }: StudioProps) {
     handleInstrumentChange,
     uploadAudioFile,
     setBpm,
-    setAddMenuAnchor
+    setAddMenuAnchor,
+    openDrumMachines,
+    closeDrumMachine,
+    setDrumPattern,
+    // Fetch MIDI actions
+    addMidiNote,
+    removeMidiNote,
+    updateMidiNote,
   } = useStudioStore();
   
   const scrollRef = useRef<TimelineRef>(null);
@@ -346,6 +356,23 @@ function Studio({ projectId }: StudioProps) {
         
         {/* Render the new piano roll windows directly in Studio */}
         {<PianoRollWindows />}
+        
+        {/* Render open Drum Machine instances */}
+        {Object.entries(openDrumMachines || {})
+          .filter(([, isOpen]) => isOpen) 
+          .map(([trackId]) => ( 
+            <DrumMachine 
+              key={trackId} 
+              trackId={trackId} 
+              onClose={() => closeDrumMachine(trackId)} 
+              onPatternChange={setDrumPattern} 
+              // Pass MIDI actions
+              onAddNote={addMidiNote}
+              onRemoveNote={removeMidiNote}
+              onUpdateNote={updateMidiNote}
+            />
+        ))}
+
       </Box>
     </Box>
   );

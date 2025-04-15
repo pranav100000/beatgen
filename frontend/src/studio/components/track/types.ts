@@ -34,4 +34,7 @@ export interface TrackPreviewProps {
   
   /** Optional color override for track visualization */
   trackColor?: string;
+  
+  /** Calculated width for the track preview in pixels */
+  trackWidth: number;
 }

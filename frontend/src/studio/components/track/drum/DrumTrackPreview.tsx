@@ -7,6 +7,8 @@ import { useStudioStore } from '../../../stores/useStudioStore';
 import MidiNotesPreview from '../../piano-roll/components/MidiNotesPreview';
 import BaseTrackPreview from '../base/BaseTrackPreview';
 import { TrackPreviewProps } from '../types';
+import DrumGridPreview from './DrumGridPreview';
+import { DrumTrackState } from '../../../core/types/track';
 
 /**
  * DrumTrackPreview is a specialized track component for drum tracks.
@@ -27,53 +29,66 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
   const midiMeasureWidth = useGridStore(state => state.midiMeasureWidth);
   const trackColor = providedTrackColor || getTrackColor(trackIndex);
   
-  // Get notes directly from MidiManager
-  const { store } = useStudioStore();
-  const midiManager = store?.getMidiManager();
-  const trackNotes = midiManager?.getTrackNotes(track.id) || [];
+  // Type guard to ensure this is a drum track
+  if (track.type !== 'drum') {
+    console.error('DrumTrackPreview received non-drum track:', track);
+    return null; // Or render a placeholder error
+  }
   
-  // Calculate drum track width (use same function as MIDI)
-  const trackWidth = useMemo(() => calculateMidiTrackWidth(
-    trackNotes,
-    timeSignature,
-    midiMeasureWidth
-  ), [trackNotes, timeSignature, midiMeasureWidth]);
+  // Explicitly cast track to DrumTrackState after the guard
+  const drumTrack = track as DrumTrackState;
+  
+  // Get the drum pattern directly from the casted track state
+  const drumPattern = drumTrack.drumPattern;
+  
+  // Calculate drum track width - revert to 4 measures wide for the container
+  const trackWidth = useMemo(() => {
+    // Calculate width equivalent to 4 measures
+    const measures = 4;
+    const beatsPerMeasure = timeSignature[0];
+    const beatWidth = midiMeasureWidth / beatsPerMeasure;
+    return measures * beatsPerMeasure * beatWidth;
+    
+    // REMOVE: Previous calculation for 4 beats
+    /*
+    // Calculate width for the number of steps shown in the preview (PREVIEW_COLS = 16)
+    const beatsToShow = 16 / 4; 
+    const beatWidth = midiMeasureWidth / beatsPerMeasure;
+    return beatsToShow * beatWidth;
+    */
+  }, [timeSignature, midiMeasureWidth]);
   
   // Drum-specific track content rendering
-  const renderTrackContent = () => (
-    <>
-      <Box
-        className="piano-roll-trigger"
-        data-testid="piano-roll-trigger"
-        data-track-id={track.id}
-        data-track-type={track.type}
-        sx={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          cursor: 'pointer',
-          zIndex: 10,
-          opacity: 0.1,
-          '&:hover': {
-            bgcolor: 'rgba(255,255,255,0.15)'
-          }
-        }}
-      />
-      <MidiNotesPreview 
-        trackId={track.id}
-        width={trackWidth}
+  const renderTrackContent = () => {
+    // REMOVE: Calculation for 1-measure width
+    /*
+    const gridPreviewWidth = useMemo(() => {
+        const beatsToShow = 16 / 4; 
+        const beatsPerMeasure = timeSignature[0];
+        const beatWidth = midiMeasureWidth / beatsPerMeasure;
+        return beatsToShow * beatWidth; 
+    }, [timeSignature, midiMeasureWidth]);
+    */
+    
+    return (
+      <>
+        <DrumGridPreview 
+          pattern={drumPattern}
+          // width={gridPreviewWidth}
+          width={trackWidth} // <-- Pass the full 4-measure trackWidth
         height={GRID_CONSTANTS.trackHeight - 6}
         trackColor={trackColor}
       />
     </>
   );
+  }
+  
+  console.log(`DrumTrackPreview: Rendering for track ${track.id}, pattern:`, drumPattern);
   
   return (
     <BaseTrackPreview
       {...restProps}
-      track={track}
+      track={drumTrack}
       trackWidth={trackWidth}
       trackColor={trackColor}
       timeSignature={timeSignature}
@@ -83,4 +98,4 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
   );
 };
 
-export default React.memo(DrumTrackPreview);
+export default DrumTrackPreview;

@@ -125,7 +125,14 @@ And here is some research we've done on the chord progression: {chord_research_r
         Now use the "determine_musical_parameters" tool to set the musical parameters for the rest of the composition.
         """
         content_text, tool_use_json = await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[DETERMINE_MUSICAL_PARAMETERS_TOOL])
-        self._set_musical_params(tool_use_json.get("key"), tool_use_json.get("mode"), tool_use_json.get("chord_progression"), tool_use_json.get("tempo"))
+        self._set_musical_params(
+            tool_use_json.get("key"), 
+            tool_use_json.get("mode"), 
+            tool_use_json.get("chord_progression"), 
+            tool_use_json.get("tempo"),
+            tool_use_json.get("melody_instrument"),
+            tool_use_json.get("chords_instrument")
+        )
         print(self.musical_params)
         
         #queue.action(AssistantAction.change_key(value=(self.musical_params.key + self.musical_params.mode)))

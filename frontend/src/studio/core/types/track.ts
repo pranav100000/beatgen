@@ -44,7 +44,9 @@ export interface MidiTrackState extends BaseTrackState {
 
 export interface DrumTrackState extends MidiTrackState {
     type: 'drum';
-    drumPads?: DrumPad[]; // For drum machine tracks
+    drumPads?: DrumPad[]; // For drum machine tracks - Keep for now
+    drumPattern?: boolean[][] | null; // Add field to store the grid pattern
+    samplerTrackIds?: string[]; // <-- Add array to store associated sampler track IDs
 }
 
 export interface SamplerTrackState extends BaseTrackState {
