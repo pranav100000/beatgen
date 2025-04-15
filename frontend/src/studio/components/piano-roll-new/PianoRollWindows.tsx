@@ -134,6 +134,8 @@ const PianoRollWindows: React.FC = () => {
         
         const pianoRollNotes = notes.map(convertToNoteState);
         console.log('Converted notes:', pianoRollNotes.length);
+
+        console.log('converted notes:', pianoRollNotes);
         
         // Initialize notes tracking if not already set
         if (!prevNotesByTrack[trackId]) {

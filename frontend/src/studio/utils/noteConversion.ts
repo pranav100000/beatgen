@@ -22,8 +22,8 @@ export const TICKS_PER_STEP = TICKS_PER_BEAT / 4; // 240 ticks per step (16th no
 export const convertToNoteState = (note: Note): NoteState => ({
   id: note.id,
   row: note.row,
-  column: note.column * TICKS_PER_STEP, // Convert grid units to ticks
-  length: note.length * TICKS_PER_STEP, // Convert grid units to ticks
+  column: note.column, // Convert grid units to ticks
+  length: note.length, // Convert grid units to ticks
   velocity: note.velocity,
 });
 
@@ -34,8 +34,14 @@ export const convertToNoteState = (note: Note): NoteState => ({
 export const convertFromNoteState = (note: NoteState, trackId: string): Note => ({
   id: note.id,
   row: note.row,
-  column: Math.round(note.column / TICKS_PER_STEP), // Convert ticks to grid units
-  length: Math.round(note.length / TICKS_PER_STEP), // Convert ticks to grid units
+  column: Math.round(note.column), // Convert ticks to grid units
+  length: Math.round(note.length), // Convert ticks to grid units
   trackId,
   velocity: note.velocity ?? 0.8, // Default velocity if not provided
 });
+
+export const scaleToPreview = (dimension: number): number => {
+  console.log('scaleToPreview', dimension, TICKS_PER_STEP);
+  console.log('scaleToPreview', Math.round(dimension / TICKS_PER_STEP));
+  return Math.round(dimension / TICKS_PER_STEP);
+};

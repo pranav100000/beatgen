@@ -469,8 +469,8 @@ export class MidiManager {
       notes: track.notes.map(note => ({
         id: Date.now(),
         row: note.midi,  // MIDI note number
-        column: Math.floor(note.time * 4), // Convert time to grid columns (assuming quarter notes)
-        length: Math.floor(note.duration * 4), // Convert duration to grid units
+        column: Math.floor(note.time), // Convert time to grid columns (assuming quarter notes)
+        length: Math.floor(note.duration), // Convert duration to grid units
         velocity: note.velocity, // Keep in Tone.js 0-1 scale
         duration: note.duration,
         time: note.time
@@ -506,8 +506,8 @@ export class MidiManager {
       track.notes.forEach(note => {
         midiTrack.addNote({
           midi: note.row,
-          time: note.time || note.column / 4, // Convert grid position to time if not provided
-          duration: note.duration || note.length / 4, // Convert grid length to duration if not provided
+          time: note.time,
+          duration: note.duration,
           velocity: note.velocity // Use velocity as-is (already in 0-1 scale)
         });
       });
@@ -552,8 +552,8 @@ export class MidiManager {
         const convertedNote = {
         ...note,
         velocity: note.velocity || 100,
-          duration: note.length / TICKS_PER_BEAT, // Convert ticks to seconds based on TICKS_PER_BEAT
-          time: note.column / TICKS_PER_BEAT // Convert ticks to seconds based on TICKS_PER_BEAT
+          duration: note.length, // Convert ticks to seconds based on TICKS_PER_BEAT
+          time: note.column // Convert ticks to seconds based on TICKS_PER_BEAT
         };
         console.log(`MidiManager.notesToMidi [${trackId}]: Converted note result:`, JSON.stringify(convertedNote));
         return convertedNote;
