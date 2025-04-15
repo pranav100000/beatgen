@@ -534,11 +534,16 @@ const NoteWithDrag: React.FC<{
   
   // Determine the fill color based on selection state
   const getFillColor = () => {
-    if (isSelected) {
-      return "#5a97f5"; // Lighter blue for selected notes
-    }
     // Use provided noteColor if available, otherwise fallback to note's color property
-    return noteColor || note.color;
+    const baseColor = noteColor || note.color;
+    
+    if (isSelected) {
+      // For selected notes, brighten the color but keep its hue
+      // We'll just provide a subtle white overlay effect by using stroke and opacity instead
+      return baseColor;
+    }
+    
+    return baseColor;
   };
 
   // Calculate the visual position for the note
@@ -585,7 +590,12 @@ const NoteWithDrag: React.FC<{
       cornerRadius={3}
       opacity={opacity}
       stroke={(isDragged || isResizing || isSelected) ? "#fff" : undefined}
-      strokeWidth={(isDragged || isResizing) ? 1 : (isSelected ? 1 : 0)}
+      strokeWidth={(isDragged || isResizing) ? 1 : (isSelected ? 2 : 0)}
+      shadowEnabled={isSelected}
+      shadowColor="rgba(255, 255, 255, 0.3)"
+      shadowBlur={4}
+      shadowOffset={{ x: 0, y: 0 }}
+      shadowOpacity={0.5}
       draggable={!isGhost && selectedTool !== 'eraser' && hoveredEdge === null} // Ghost notes aren't draggable
       listening={!isGhost} // Ghost notes shouldn't listen for events
       onDragStart={(e) => {
@@ -978,6 +988,7 @@ interface NotePreviewProps {
   scrollY: number;
   keyHeight: number;
   noteWidth: number;
+  noteColor?: string; // Add noteColor prop
 }
 
 const NotePreview: React.FC<NotePreviewProps> = ({ 
@@ -985,9 +996,14 @@ const NotePreview: React.FC<NotePreviewProps> = ({
   scrollX, 
   scrollY, 
   keyHeight,
-  noteWidth
+  noteWidth,
+  noteColor = DARK_THEME.noteColor // Default to theme color if not provided
 }) => {
   if (!position) return null;
+  
+  // Create semi-transparent versions of the note color
+  const fillColor = `${noteColor}4D`; // 30% opacity (4D in hex)
+  const strokeColor = `${noteColor}B3`; // 70% opacity (B3 in hex)
   
   return (
     <Layer listening={false}>
@@ -996,8 +1012,8 @@ const NotePreview: React.FC<NotePreviewProps> = ({
         y={position.y - scrollY + 1}
         width={noteWidth - 2}
         height={keyHeight - 2} // Leave a small gap between rows
-        fill={DARK_THEME.notePreviewFill}
-        stroke={DARK_THEME.notePreviewStroke}
+        fill={fillColor}
+        stroke={strokeColor}
         strokeWidth={1}
         cornerRadius={3}
         dash={[5, 2]} // Dashed outline for preview
@@ -1146,9 +1162,10 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     }
   };
   
-  // Handle grid snap menu open
-  const handleGridSnapClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setGridSnapAnchorEl(event.currentTarget);
+  // Handle grid snap menu open - modify to accept any element's mouse event
+  const handleGridIconClick = (event: React.MouseEvent<Element>) => {
+    // Explicitly cast the current target to HTMLElement
+    setGridSnapAnchorEl(event.currentTarget as HTMLElement);
   };
 
   // Handle grid snap menu close
@@ -1493,14 +1510,50 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     };
   }, []);
 
-  // State for managing notes
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [nextNoteId, setNextNoteId] = useState(1);
-  
+  // Next ID for new notes
+  const [nextNoteId, setNextNoteId] = useState(() => {
+    // Initialize with a value higher than any existing note ID
+    return initialNotes.length > 0 
+      ? Math.max(...initialNotes.map(note => note.id)) + 1 
+      : 1;
+  });
+
   // Add a ref to track the last time a note was created
   const lastNoteCreationTime = useRef<number>(0);
   // Debounce time in milliseconds
   const DEBOUNCE_TIME = 10; 
+  
+  // Use the color prop instead of hardcoded theme color
+  const noteColor = color;
+
+  // Add state to track the most recently used note width
+  // Default to one beat (quarter note) at default zoom
+  const [lastNoteWidth, setLastNoteWidth] = useState(TICKS_PER_BEAT * PIXELS_PER_TICK);
+
+  // Convert NoteState objects to visual Note objects
+  const visualNotes = useMemo(() => {
+    return initialNotes.map((noteState) => ({
+      id: noteState.id,
+      start: noteState.column * PIXELS_PER_TICK * zoomLevel, // Convert ticks to pixels
+      // Invert the row calculation for flipped keyboard
+      top: (totalKeys - 1 - noteState.row) * keyHeight, // Convert row to pixels
+      width: noteState.length * PIXELS_PER_TICK * zoomLevel, // Convert ticks to pixels
+      color: noteColor, // Use the color prop from component
+    }));
+  }, [initialNotes, zoomLevel, keyHeight, totalKeys, noteColor]);
+
+  // Convert visual notes to normalized note states
+  const convertNotesToState = (notes: Note[]): NoteState[] => {
+    return notes.map(note => ({
+      id: note.id,
+      // Convert pixel values to ticks, independent of zoom
+      // Each beat is 960 ticks, and at zoom 1.0 each beat is 4*GRID_SIZE pixels wide
+      length: Math.round(note.width / (PIXELS_PER_TICK * zoomLevel)),
+      // The row is now inverted - convert from pixel position to note index
+      row: totalKeys - 1 - Math.floor(note.top / keyHeight),
+      column: Math.round(note.start / (PIXELS_PER_TICK * zoomLevel)),
+    }));
+  };
 
   // Helper function for creating a new note with debouncing
   const createNewNote = (startPos: number, topPos: number): Note | null => {
@@ -1530,58 +1583,51 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     
     return newNote;
   };
-  
-  // Use the color prop instead of hardcoded theme color
-  const noteColor = color;
 
-  // Add state to track the most recently used note width
-  // Default to one beat (quarter note) at default zoom
-  const [lastNoteWidth, setLastNoteWidth] = useState(TICKS_PER_BEAT * PIXELS_PER_TICK);
-
-  // Create a ref to hold the last processed notes state to prevent infinite loops
-  const lastProcessedNotesRef = useRef<Note[]>([]);
-
-  // Convert visual notes to normalized note states
-  const convertNotesToState = (notes: Note[], currentZoomLevel = zoomLevel): NoteState[] => {
-    return notes.map(note => ({
-      id: note.id,
-      // Convert pixel values to ticks, independent of zoom
-      // Each beat is 960 ticks, and at zoom 1.0 each beat is 4*GRID_SIZE pixels wide
-      length: Math.round(note.width / (PIXELS_PER_TICK * currentZoomLevel)),
-      // The row is now inverted - convert from pixel position to note index
-      row: totalKeys - 1 - Math.floor(note.top / keyHeight),
-      column: Math.round(note.start / (PIXELS_PER_TICK * currentZoomLevel)),
-    }));
+  // Update the parent when notes change
+  const updateNotes = (updatedNotes: Note[]) => {
+    if (onNotesChange) {
+      const noteStates = convertNotesToState(updatedNotes);
+      onNotesChange(noteStates);
+    }
   };
 
-  // Update parent component when notes change due to user interactions
-  useEffect(() => {
-    if (onNotesChange) {
-      // Check if the notes have actually changed to prevent infinite loops
-      const notesChanged = 
-        // First check if the internal reference has been updated by user interactions
-        // rather than by the initialNotes update effect
-        lastProcessedNotesRef.current !== notes &&
-        // Then check if there's an actual difference in the notes
-        (notes.length !== lastProcessedNotesRef.current.length ||
-        notes.some((note, index) => {
-          const prevNote = lastProcessedNotesRef.current[index];
-          return !prevNote || 
-            prevNote.id !== note.id ||
-            prevNote.start !== note.start ||
-            prevNote.top !== note.top ||
-            prevNote.width !== note.width;
-        }));
-        
-      if (notesChanged) {
-        const noteStates = convertNotesToState(notes);
-        // Store current notes to compare against next time
-        lastProcessedNotesRef.current = [...notes];
-        onNotesChange(noteStates);
-      }
-    }
-  }, [notes, onNotesChange, zoomLevel, keyHeight, totalKeys]);
-  
+  // Helper function to find a note at a specific position
+  const findNoteAtPosition = (x: number, y: number): Note | undefined => {
+    return visualNotes.find(note => 
+      x >= note.start && 
+      x <= note.start + note.width && 
+      y >= note.top && 
+      y <= note.top + keyHeight
+    );
+  };
+
+  // Helper function to check if a note exists at a specific grid cell
+  const findNoteAtCell = (cellX: number, cellY: number): Note | undefined => {
+    // Get the exact start of the cell
+    return visualNotes.find(note => 
+      Math.abs(note.start - cellX) == 0 && // Compare with a small epsilon for floating point comparison
+      Math.abs(note.top - cellY) == 0      // Compare with a small epsilon for floating point comparison
+    );
+  };
+
+  // Handle adding a note
+  const handleAddNote = (newNote: Note) => {
+    const updatedNotes = [...visualNotes, newNote];
+    updateNotes(updatedNotes);
+  };
+
+  // Handle removing a note
+  const handleRemoveNote = (noteId: number) => {
+    const updatedNotes = visualNotes.filter(n => n.id !== noteId);
+    updateNotes(updatedNotes);
+  };
+
+  // Handle updating multiple notes (e.g., during drag operations)
+  const handleUpdateNotes = (updatedNotes: Note[]) => {
+    updateNotes(updatedNotes);
+  };
+
   // Modify the handleStageMouseDown function
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     // If the target is the stage itself (not a note), create a new note or start selection
@@ -1631,8 +1677,6 @@ const PianoRoll: React.FC<PianoRollProps> = ({
         snappedY = Math.floor(y / keyHeight) * keyHeight;
         
         // Check if there's already a note at this cell position using the appropriate check
-        // For pen tool: check if there's a note at the position (can't place notes on top of existing ones)
-        // For highlighter tool: check if there's a note starting at this exact cell (allows notes adjacent to others)
         const existingNote = findNoteAtCell(snappedX, snappedY);
         
         // Only create a note if there isn't already one at this position
@@ -1642,7 +1686,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
 
           // Add the note immediately if not debounced
           if (newNote) {
-            setNotes(prevNotes => [...prevNotes, newNote]);
+            handleAddNote(newNote);
           }
         }
       } else if (selectedTool === 'eraser') {
@@ -1650,7 +1694,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
         const noteUnderCursor = findNoteAtPosition(x, y);
         if (noteUnderCursor) {
           // Remove the note that was clicked
-          setNotes(prevNotes => prevNotes.filter(n => n.id !== noteUnderCursor.id));
+          handleRemoveNote(noteUnderCursor.id);
         }
       }
     }
@@ -1678,7 +1722,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       const noteUnderCursor = findNoteAtPosition(x, y);
       if (noteUnderCursor) {
         // Remove the note under the cursor
-        setNotes(prevNotes => prevNotes.filter(n => n.id !== noteUnderCursor.id));
+        handleRemoveNote(noteUnderCursor.id);
       }
       return;
     }
@@ -1716,7 +1760,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
 
         // Add the note immediately if not debounced
         if (newNote) {
-          setNotes(prevNotes => [...prevNotes, newNote]);
+          handleAddNote(newNote);
         }
       }
       
@@ -1762,6 +1806,201 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     }
   };
 
+  // Handler for note dragging start
+  const handleNoteDragStart = (noteId: number, e: Konva.KonvaEventObject<MouseEvent>) => {
+    e.cancelBubble = true; // Prevent event bubbling
+
+    // Find the note
+    const note = visualNotes.find(n => n.id === noteId);
+    if (!note) return;
+
+    // Store the starting positions
+    setDraggedNoteId(noteId);
+    setDragStartPos({ 
+      x: e.evt.clientX, 
+      y: e.evt.clientY 
+    });
+    setNoteStartPos({ 
+      x: note.start, 
+      y: note.top 
+    });
+    
+    // Only handle selection if the select tool is active
+    if (selectedTool === 'select') {
+      // If this note is part of a selection, store the starting position of all selected notes
+      if (selectedNoteIds.includes(noteId)) {
+        const startPositions: {[id: number]: {x: number, y: number}} = {};
+        
+        // Record initial positions for all selected notes
+        visualNotes.forEach(n => {
+          if (selectedNoteIds.includes(n.id)) {
+            startPositions[n.id] = { x: n.start, y: n.top };
+          }
+        });
+        
+        setSelectedNotesStartPos(startPositions);
+      } else {
+        // If the dragged note is not part of the selection, clear the selection and select just this note
+        setSelectedNoteIds([noteId]);
+        setSelectedNotesStartPos({ [noteId]: { x: note.start, y: note.top } });
+      }
+    } else {
+      // For other tools, don't modify selection state
+      // Just store the start position for the dragged note
+      setSelectedNotesStartPos({ [noteId]: { x: note.start, y: note.top } });
+    }
+
+    // Log to verify drag start
+    console.log(`Started dragging note ${noteId}`);
+  };
+
+  // Handler for clicking on an existing note
+  const handleNoteClick = (noteId: number) => {
+    // If we just finished a resize operation, ignore the click
+    if (justFinishedResize) {
+      console.log("Ignoring click after resize operation");
+      return;
+    }
+    
+    // If we're dragging, don't process clicks
+    if (draggedNoteId !== null) return;
+    
+    // If eraser tool is selected, delete the note
+    if (selectedTool === 'eraser') {
+      console.log(`Erasing note: ${noteId}`);
+      handleRemoveNote(noteId);
+      return;
+    }
+    
+    // Only allow selection when in select mode
+    if (selectedTool === 'select') {
+      setSelectedNoteIds(prevSelected => {
+        if (prevSelected.includes(noteId)) {
+          return prevSelected.filter(id => id !== noteId);
+        } else {
+          return [...prevSelected, noteId];
+        }
+      });
+    } else {
+      // For other tools, just log the click but don't change selection
+      console.log(`Clicked on note: ${noteId} with ${selectedTool} tool`);
+    }
+  };
+
+  // Handler for note drag end - optimized for performance
+  const handleNoteDragEnd = (noteId: number) => {
+    if (draggedNoteId !== noteId) return;
+
+    // Find the dragged note
+    const draggedNote = visualNotes.find(n => n.id === noteId);
+    if (!draggedNote) {
+      // Reset drag state
+      setDraggedNoteId(null);
+      setSelectedNotesStartPos({});
+      return;
+    }
+    
+    // Get the calculated position from mouseOffsetRef
+    const newX = mouseOffsetRef.current.x;
+    const newY = mouseOffsetRef.current.y;
+    
+    // Calculate the delta from the original position
+    const deltaX = newX - noteStartPos.x;
+    const deltaY = newY - noteStartPos.y;
+    
+    // Create a new updated notes array
+    const updatedNotes = visualNotes.map(note => {
+      // If using select tool and this is a selected note
+      if (selectedTool === 'select' && selectedNoteIds.includes(note.id)) {
+        // Get this note's initial position
+        const startPos = selectedNotesStartPos[note.id];
+        if (startPos) {
+          // Apply the same delta to each note
+          return { 
+            ...note, 
+            start: startPos.x + deltaX,
+            top: startPos.y + deltaY 
+          };
+        }
+      } 
+      // If this is the dragged note but not part of a selection
+      else if (note.id === noteId) {
+        return { 
+          ...note, 
+          start: newX,
+          top: newY
+        };
+      }
+      // Otherwise leave the note unchanged
+      return note;
+    });
+    
+    // Update via callback
+    handleUpdateNotes(updatedNotes);
+    
+    // Reset drag state
+    setDraggedNoteId(null);
+    setSelectedNotesStartPos({});
+
+    // Log to verify drag end
+    console.log(`Finished dragging note ${noteId}`);
+  };
+
+  // Handler for note resizing - update on resize end
+  const handleNoteResizeEnd = () => {
+    if (isResizingNote && resizingNoteId !== null) {
+      // Create the updated notes array
+      const updatedNotes = visualNotes.map(note => {
+        if (isMultiResize && selectedNoteIds.includes(note.id)) {
+          // Get this note's initial state
+          const initialState = selectedNotesInitialState[note.id];
+          if (!initialState) return note;
+          
+          // Calculate new values using stored resize data
+          // ... resize calculation logic ...
+          // This should match your existing resize calculation logic but
+          // operate on a copy of the notes array instead of state updates
+          
+          // For now, just return the note unchanged
+          return note;
+        } else if (note.id === resizingNoteId) {
+          // Update just the resizing note with new dimensions based on resize state
+          // ... resize calculation logic ...
+          return note;
+        }
+        return note;
+      });
+      
+      // Update via callback
+      handleUpdateNotes(updatedNotes);
+      
+      // Find the resized note to get its final width
+      const resizedNote = visualNotes.find(n => n.id === resizingNoteId);
+      if (resizedNote) {
+        // Update the last note width for future notes (normalize by zoom level)
+        setLastNoteWidth(resizedNote.width / zoomLevel);
+        console.log(`Remembered new width: ${resizedNote.width / zoomLevel}px (unzoomed) for future notes`);
+      }
+      
+      // Set the flag to indicate we just finished resizing
+      setJustFinishedResize(true);
+      
+      // Reset the flag after a short delay - long enough to prevent the click event
+      setTimeout(() => {
+        setJustFinishedResize(false);
+      }, 10); // 10ms is enough to prevent the click that follows a mouseup
+      
+      // Reset resize state
+      setIsResizingNote(false);
+      setResizingNoteId(null);
+      setResizeDirection(null);
+      setSelectedNotesInitialState({});
+      
+      // Log for debugging
+      console.log(`Finished resizing note`);
+    }
+  };
+
   // Modify mouse up to reset highlighting state
   const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (isSelecting && selectionRect) {
@@ -1775,7 +2014,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       const height = Math.abs(selectionRect.height);
       
       // Find notes that start within the selection rectangle
-      const selectedIds = notes
+      const selectedIds = visualNotes
         .filter(note => 
           note.start >= x && 
           note.start <= x + width && 
@@ -1806,39 +2045,6 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     }
   };
 
-  // Handler for clicking on an existing note
-  const handleNoteClick = (noteId: number) => {
-    // If we just finished a resize operation, ignore the click
-    if (justFinishedResize) {
-      console.log("Ignoring click after resize operation");
-      return;
-    }
-    
-    // If we're dragging, don't process clicks
-    if (draggedNoteId !== null) return;
-    
-    // If eraser tool is selected, delete the note
-    if (selectedTool === 'eraser') {
-      console.log(`Erasing note: ${noteId}`);
-      setNotes(prevNotes => prevNotes.filter(n => n.id !== noteId));
-      return;
-    }
-    
-    // Only allow selection when in select mode
-    if (selectedTool === 'select') {
-      setSelectedNoteIds(prevSelected => {
-        if (prevSelected.includes(noteId)) {
-          return prevSelected.filter(id => id !== noteId);
-        } else {
-          return [...prevSelected, noteId];
-        }
-      });
-    } else {
-      // For other tools, just log the click but don't change selection
-      console.log(`Clicked on note: ${noteId} with ${selectedTool} tool`);
-    }
-  };
-
   // State for tracking dragged note
   const [draggedNoteId, setDraggedNoteId] = useState<number | null>(null);
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
@@ -1846,165 +2052,6 @@ const PianoRoll: React.FC<PianoRollProps> = ({
   
   // Track initial positions of all selected notes during drag operations
   const [selectedNotesStartPos, setSelectedNotesStartPos] = useState<{[id: number]: {x: number, y: number}}>({});
-
-  // Helper function to find a note at a specific position
-  const findNoteAtPosition = (x: number, y: number): Note | undefined => {
-    return notes.find(note => 
-      x >= note.start && 
-      x <= note.start + note.width && 
-      y >= note.top && 
-      y <= note.top + keyHeight
-    );
-  };
-
-  // Helper function to check if a note exists at a specific grid cell
-  const findNoteAtCell = (cellX: number, cellY: number): Note | undefined => {
-    // Get the exact start of the cell
-    return notes.find(note => 
-      Math.abs(note.start - cellX) == 0 && // Compare with a small epsilon for floating point comparison
-      Math.abs(note.top - cellY) == 0      // Compare with a small epsilon for floating point comparison
-    );
-  };
-
-  // Handler for note dragging start
-  const handleNoteDragStart = (noteId: number, e: Konva.KonvaEventObject<MouseEvent>) => {
-    e.cancelBubble = true; // Prevent event bubbling
-
-    // Find the note
-    const note = notes.find(n => n.id === noteId);
-    if (!note) return;
-
-    // Store the starting positions
-    setDraggedNoteId(noteId);
-    setDragStartPos({ 
-      x: e.evt.clientX, 
-      y: e.evt.clientY 
-    });
-    setNoteStartPos({ 
-      x: note.start, 
-      y: note.top 
-    });
-    
-    // Only handle selection if the select tool is active
-    if (selectedTool === 'select') {
-      // If this note is part of a selection, store the starting position of all selected notes
-      if (selectedNoteIds.includes(noteId)) {
-        const startPositions: {[id: number]: {x: number, y: number}} = {};
-        
-        // Record initial positions for all selected notes
-        notes.forEach(n => {
-          if (selectedNoteIds.includes(n.id)) {
-            startPositions[n.id] = { x: n.start, y: n.top };
-          }
-        });
-        
-        setSelectedNotesStartPos(startPositions);
-      } else {
-        // If the dragged note is not part of the selection, clear the selection and select just this note
-        setSelectedNoteIds([noteId]);
-        setSelectedNotesStartPos({ [noteId]: { x: note.start, y: note.top } });
-      }
-    } else {
-      // For other tools, don't modify selection state
-      // Just store the start position for the dragged note
-      setSelectedNotesStartPos({ [noteId]: { x: note.start, y: note.top } });
-    }
-
-    // Log to verify drag start
-    console.log(`Started dragging note ${noteId}`);
-  };
-
-  // Handler for note dragging
-  const handleNoteDragMove = (noteId: number, e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (draggedNoteId !== noteId) return;
-    
-    // Get stage and mouse position
-    const stage = e.target.getStage();
-    if (!stage) return;
-    
-    const mousePos = stage.getPointerPosition();
-    if (!mousePos) return;
-    
-    // Get the node being dragged
-    const node = e.target;
-    
-    // Only store the position for update on drag end
-    // Visual updates are handled by Konva's drag mechanism
-    // This significantly reduces state updates during dragging
-    
-    // Store the current position for use when drag ends
-    mouseOffsetRef.current = {
-      x: node.x() + scrollX,
-      y: node.y() + scrollY
-    };
-  };
-
-  // Handler for note drag end - optimized for performance
-  const handleNoteDragEnd = (noteId: number) => {
-    if (draggedNoteId !== noteId) return;
-
-    // Find the dragged note
-    const draggedNote = notes.find(n => n.id === noteId);
-    if (!draggedNote) {
-      // Reset drag state
-      setDraggedNoteId(null);
-      setSelectedNotesStartPos({});
-      return;
-    }
-    
-    // Get the calculated position from mouseOffsetRef
-    const newX = mouseOffsetRef.current.x;
-    const newY = mouseOffsetRef.current.y;
-    
-    // Calculate the delta from the original position
-    const deltaX = newX - noteStartPos.x;
-    const deltaY = newY - noteStartPos.y;
-    
-    // Update notes with a single state update for better performance
-    requestAnimationFrame(() => {
-      setNotes(prevNotes => {
-        // Create a new array
-        return prevNotes.map(note => {
-          // If using select tool and this is a selected note
-          if (selectedTool === 'select' && selectedNoteIds.includes(note.id)) {
-            // Get this note's initial position
-            const startPos = selectedNotesStartPos[note.id];
-            if (startPos) {
-              // Apply the same delta to each note
-              return { 
-                ...note, 
-                start: startPos.x + deltaX,
-                top: startPos.y + deltaY 
-              };
-            }
-          } 
-          // If this is the dragged note but not part of a selection
-          else if (note.id === noteId) {
-            return { 
-              ...note, 
-              start: newX,
-              top: newY
-            };
-          }
-          // Otherwise leave the note unchanged
-          return note;
-        });
-      });
-      
-      // Reset drag state after animation frame
-      setDraggedNoteId(null);
-      setSelectedNotesStartPos({});
-    });
-
-    // Log to verify drag end
-    console.log(`Finished dragging note ${noteId}`);
-  };
-
-  // Calculate the playhead position
-  const playheadPosition = scrollX + 100; // Offset from current scroll
-
-  // Reference for the header element to use as drag handle
-  const headerRef = useRef<HTMLDivElement>(null);
 
   // State for tracking note resizing
   const [isResizingNote, setIsResizingNote] = useState(false);
@@ -2035,37 +2082,38 @@ const PianoRoll: React.FC<PianoRollProps> = ({
         document.body.style.userSelect = '';
       }
     };
-  }, [isResizingNote, resizingNoteId, resizeDirection, resizeStartPos, noteInitialState, selectedNotesInitialState, selectedNoteIds, notes]);
+  }, [isResizingNote, resizingNoteId, resizeDirection, resizeStartPos, noteInitialState, selectedNotesInitialState, selectedNoteIds, visualNotes]);
 
   // Update notes when zoom level changes
   useEffect(() => {
-    if (notes.length > 0) {
+    if (visualNotes.length > 0) {
       // Scale all note positions and widths according to the new zoom level
-      setNotes(prevNotes => 
-        prevNotes.map(note => {
-          // Calculate base values (without zoom)
-          const baseStart = note.start / prevZoomLevel;
-          const baseWidth = note.width / prevZoomLevel;
-          
-          // Apply new zoom level
-          return {
-            ...note,
-            start: baseStart * zoomLevel,
-            width: baseWidth * zoomLevel
-          };
-        })
-      );
+      const updatedNotes = visualNotes.map(note => {
+        // Calculate base values (without zoom)
+        const baseStart = note.start / prevZoomLevel;
+        const baseWidth = note.width / prevZoomLevel;
+        
+        // Apply new zoom level
+        return {
+          ...note,
+          start: baseStart * zoomLevel,
+          width: baseWidth * zoomLevel
+        };
+      });
+      
+      // Update via callback
+      handleUpdateNotes(updatedNotes);
     }
     // Store current zoom level for next comparison
     setPrevZoomLevel(zoomLevel);
-  }, [zoomLevel, notes.length, prevZoomLevel]);
+  }, [zoomLevel, visualNotes.length, prevZoomLevel]);
 
   // Handler for starting note resize
   const handleNoteResizeStart = (noteId: number, direction: 'left' | 'right', e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true; // Prevent event bubbling
     
     // Find the note
-    const note = notes.find(n => n.id === noteId);
+    const note = visualNotes.find(n => n.id === noteId);
     if (!note) return;
     
     // Store the starting position and note's initial state
@@ -2080,7 +2128,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       const initialStates: {[id: number]: {start: number, width: number}} = {};
       
       // Record initial states for all selected notes
-      notes.forEach(n => {
+      visualNotes.forEach(n => {
         if (selectedNoteIds.includes(n.id)) {
           initialStates[n.id] = { start: n.start, width: n.width };
         }
@@ -2101,7 +2149,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     if (!isResizingNote || resizingNoteId === null || resizeDirection === null) return;
     
     // Find the note
-    const note = notes.find(n => n.id === resizingNoteId);
+    const note = visualNotes.find(n => n.id === resizingNoteId);
     if (!note) return;
     
     // Calculate how far the mouse has moved
@@ -2137,28 +2185,29 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       // Calculate absolute change in width (not ratio)
       const widthDelta = newWidth - noteInitialState.width;
       
-      setNotes(prevNotes => 
-        prevNotes.map(n => {
-          if (isMultiResize && selectedNoteIds.includes(n.id)) {
-            // Get this note's initial state
-            const initialState = selectedNotesInitialState[n.id];
-            if (!initialState) return n;
-            
-            // Calculate new width by adding the same absolute delta
-            // Ensure minimum width
-            const thisNoteNewWidth = Math.max(
-              pixelsPerTickScaled, // Ensure minimum width
-              initialState.width + widthDelta
-            );
-            
-            return { ...n, width: thisNoteNewWidth };
-          } else if (n.id === resizingNoteId) {
-            // Just update the resizing note
-            return { ...n, width: newWidth };
-          }
-          return n;
-        })
-      );
+      const updatedNotes = visualNotes.map(n => {
+        if (isMultiResize && selectedNoteIds.includes(n.id)) {
+          // Get this note's initial state
+          const initialState = selectedNotesInitialState[n.id];
+          if (!initialState) return n;
+          
+          // Calculate new width by adding the same absolute delta
+          // Ensure minimum width
+          const thisNoteNewWidth = Math.max(
+            pixelsPerTickScaled, // Ensure minimum width
+            initialState.width + widthDelta
+          );
+          
+          return { ...n, width: thisNoteNewWidth };
+        } else if (n.id === resizingNoteId) {
+          // Just update the resizing note
+          return { ...n, width: newWidth };
+        }
+        return n;
+      });
+      
+      // Update via callback
+      handleUpdateNotes(updatedNotes);
       
     } else if (resizeDirection === 'left') {
       // Resizing from left - update both start position and width
@@ -2189,92 +2238,44 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       const startDelta = snappedDeltaX;
       const widthDelta = -snappedDeltaX; // Width changes in opposite direction to start
       
-      setNotes(prevNotes => 
-        prevNotes.map(n => {
-          if (isMultiResize && selectedNoteIds.includes(n.id)) {
-            // Get this note's initial state
-            const initialState = selectedNotesInitialState[n.id];
-            if (!initialState) return n;
-            
-            // Calculate new values using absolute delta values
-            const thisNoteNewStart = initialState.start + startDelta;
-            const thisNoteNewWidth = Math.max(minSize, initialState.width + widthDelta);
-            
-            // If the new width would be less than minimum, limit the movement
-            if (initialState.width + widthDelta < minSize) {
-              return {
-                ...n,
-                start: initialState.start + (initialState.width - minSize),
-                width: minSize
-              };
-            }
-            
-            return { 
-              ...n, 
-              start: thisNoteNewStart,
-              width: thisNoteNewWidth
+      const updatedNotes = visualNotes.map(n => {
+        if (isMultiResize && selectedNoteIds.includes(n.id)) {
+          // Get this note's initial state
+          const initialState = selectedNotesInitialState[n.id];
+          if (!initialState) return n;
+          
+          // Calculate new values using absolute delta values
+          const thisNoteNewStart = initialState.start + startDelta;
+          const thisNoteNewWidth = Math.max(minSize, initialState.width + widthDelta);
+          
+          // If the new width would be less than minimum, limit the movement
+          if (initialState.width + widthDelta < minSize) {
+            return {
+              ...n,
+              start: initialState.start + (initialState.width - minSize),
+              width: minSize
             };
-          } else if (n.id === resizingNoteId) {
-            // Just update the resizing note
-            return { ...n, start: newStart, width: newWidth };
           }
-          return n;
-        })
-      );
+          
+          return { 
+            ...n, 
+            start: thisNoteNewStart,
+            width: thisNoteNewWidth
+          };
+        } else if (n.id === resizingNoteId) {
+          // Just update the resizing note
+          return { ...n, start: newStart, width: newWidth };
+        }
+        return n;
+      });
+      
+      // Update via callback
+      handleUpdateNotes(updatedNotes);
     }
   };
 
   // Add a flag to track if we just finished resizing
   const [justFinishedResize, setJustFinishedResize] = useState(false);
-
-  // Handler for note resize end
-  const handleNoteResizeEnd = () => {
-    if (isResizingNote && resizingNoteId !== null) {
-      // Find the resized note to get its final width
-      const resizedNote = notes.find(n => n.id === resizingNoteId);
-      if (resizedNote) {
-        // Update the last note width for future notes (normalize by zoom level)
-        setLastNoteWidth(resizedNote.width / zoomLevel);
-        console.log(`Remembered new width: ${resizedNote.width / zoomLevel}px (unzoomed) for future notes`);
-      }
-      
-      // Set the flag to indicate we just finished resizing
-      setJustFinishedResize(true);
-      
-      // Reset the flag after a short delay - long enough to prevent the click event
-      setTimeout(() => {
-        setJustFinishedResize(false);
-      }, 10); // 10ms is enough to prevent the click that follows a mouseup
-      
-      // Reset resize state
-      setIsResizingNote(false);
-      setResizingNoteId(null);
-      setResizeDirection(null);
-      setSelectedNotesInitialState({});
-      
-      // Log for debugging
-      console.log(`Finished resizing note`);
-    }
-  };
-
-  // Helper function to check if initialNotes have changed
-  const haveInitialNotesChanged = (currentNotes: NoteState[], prevNotes: Note[]): boolean => {
-    // Convert previous visual notes back to NoteState format for comparison
-    const prevNoteStates = convertNotesToState(prevNotes);
-    
-    // Check if the arrays are different lengths
-    if (currentNotes.length !== prevNoteStates.length) return true;
-    
-    // Deep compare the notes
-    return currentNotes.some((note, index) => {
-      const prevNote = prevNoteStates[index];
-      return !prevNote || 
-        prevNote.id !== note.id ||
-        prevNote.length !== note.length ||
-        prevNote.row !== note.row ||
-        prevNote.column !== note.column;
-    });
-  };
 
   // Initialize notes from props when component mounts or when initialNotes changes
   useEffect(() => {
@@ -2283,9 +2284,8 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     // Check if there's a meaningful change to initialNotes that requires updating
     // or if this is the first load (notes array is empty)
     const shouldUpdateNotes = 
-      notes.length === 0 || // First render
-      (lastProcessedNotesRef.current.length > 0 && 
-       haveInitialNotesChanged(initialNotes, lastProcessedNotesRef.current));
+      visualNotes.length === 0 // First render
+      ;
     
     if (shouldUpdateNotes) {
       console.log('Updating notes from initialNotes due to external change');
@@ -2301,16 +2301,14 @@ const PianoRoll: React.FC<PianoRollProps> = ({
       }));
       
       // Set the notes
-      setNotes(visualNotes);
+      updateNotes(visualNotes);
       
       // Set the next note ID to be higher than any existing note ID
       const maxId = Math.max(...visualNotes.map(note => note.id), 0);
       setNextNoteId(maxId + 1);
 
-      // Store the current notes reference for deep comparison
-      lastProcessedNotesRef.current = [...visualNotes];
     }
-  }, [initialNotes, zoomLevel, keyHeight, totalKeys, notes, noteColor]);
+  }, [initialNotes, zoomLevel, keyHeight, totalKeys, visualNotes, noteColor]);
 
   // Import necessary hooks
   const [hoveredNote, setHoveredNote] = useState<string | null>(null);
@@ -2336,6 +2334,22 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     return `${noteName}${octave}`;
   };
 
+  // Define cursors for each tool
+  const getToolCursor = () => {
+    switch (selectedTool) {
+      case 'select':
+        return `url('/icons/crop.svg') 0 0, auto`;
+      case 'pen':
+        return `url('/icons/pen.svg') 0 0, auto`;
+      case 'highlighter':
+        return `url('/icons/highlighter.svg') 0 0, auto`;
+      case 'eraser':
+        return `url('/icons/eraser.svg') 0 0, auto`;
+      default:
+        return 'default';
+    }
+  };
+
   // Handle mouse move on stage to track current note
   const handleStageMouseHover = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -2344,10 +2358,12 @@ const PianoRoll: React.FC<PianoRollProps> = ({
     const pointerPos = stage.getPointerPosition();
     if (!pointerPos) return;
     
-    // If using eraser tool, always keep default cursor
-    if (selectedTool === 'eraser') {
-      stage.container().style.cursor = 'default';
-    }
+    // // If using eraser tool, always keep default cursor
+    // if (selectedTool === 'eraser') {
+    //   stage.container().style.cursor = 'default';
+    // }
+
+    stage.container().style.cursor = getToolCursor();
     
     // Get note at current position
     const noteName = getNoteNameFromY(pointerPos.y);
@@ -2433,6 +2449,44 @@ const PianoRoll: React.FC<PianoRollProps> = ({
   const iconLeaveStyle = (e: React.MouseEvent<HTMLSpanElement>) => {
     e.currentTarget.style.opacity = "0.8";
     e.currentTarget.style.transform = "scale(1)";
+  };
+
+  // In the top section, add headerRef declaration
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Add isMultiResize state variable (near other resize state variables)
+  const [isMultiResize, setIsMultiResize] = useState(false);
+
+  // Replace the initialNotes effect with a simplified version
+  // Initialize notes from props when component mounts or when initialNotes changes
+  useEffect(() => {
+    // Update the next note ID to be higher than any existing note ID
+    if (initialNotes.length > 0) {
+      const maxId = Math.max(...initialNotes.map(note => note.id));
+      setNextNoteId(maxId + 1);
+    }
+  }, [initialNotes]);
+
+  // Add the handleNoteDragMove function
+  // Handler for note dragging
+  const handleNoteDragMove = (noteId: number, e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (draggedNoteId !== noteId) return;
+    
+    // Get stage and mouse position
+    const stage = e.target.getStage();
+    if (!stage) return;
+    
+    const mousePos = stage.getPointerPosition();
+    if (!mousePos) return;
+    
+    // Get the node being dragged
+    const node = e.target;
+    
+    // Store the current position for use when drag ends
+    mouseOffsetRef.current = {
+      x: node.x() + scrollX,
+      y: node.y() + scrollY
+    };
   };
 
   return (
@@ -2534,96 +2588,84 @@ const PianoRoll: React.FC<PianoRollProps> = ({
               }} />
               
               {/* Select tool */}
-              <span 
-                className="material-symbols-outlined" 
+              <img 
+                src="/icons/crop.svg"
+                alt="Select tool"
                 style={{ 
+                  width: "18px",
+                  height: "18px",
                   cursor: "pointer",
                   marginRight: "8px",
                   opacity: selectedTool === 'select' ? 1 : 0.8,
-                  fontVariationSettings: "'FILL' 0", // No fill
                   background: selectedTool === 'select' ? 'rgba(255,255,255,0.1)' : 'transparent',
                   padding: '2px',
                   borderRadius: '2px',
                   transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
                 }}
                 onClick={() => handleToolSelect('select')}
                 onMouseEnter={selectedTool !== 'select' ? iconHoverStyle : undefined}
                 onMouseLeave={selectedTool !== 'select' ? iconLeaveStyle : undefined}
-              >
-                select
-              </span>
+              />
               
               {/* Pen tool */}
-              <span 
-                className="material-symbols-outlined" 
+              <img 
+                src="/icons/pen.svg"
+                alt="Pen tool"
                 style={{ 
+                  width: "18px",
+                  height: "18px",
                   cursor: "pointer",
                   marginRight: "8px",
                   opacity: selectedTool === 'pen' ? 1 : 0.8,
-                  fontVariationSettings: "'FILL' 1", // Filled
                   background: selectedTool === 'pen' ? 'rgba(255,255,255,0.1)' : 'transparent',
                   padding: '2px',
                   borderRadius: '2px',
                   transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
                 }}
                 onClick={() => handleToolSelect('pen')}
                 onMouseEnter={selectedTool !== 'pen' ? iconHoverStyle : undefined}
                 onMouseLeave={selectedTool !== 'pen' ? iconLeaveStyle : undefined}
-              >
-                ink_pen
-              </span>
+              />
               
               {/* Highlighter tool */}
-              <span 
-                className="material-symbols-outlined" 
+              <img 
+                src="/icons/highlighter.svg"
+                alt="Highlighter tool"
                 style={{ 
+                  width: "18px",
+                  height: "18px",
                   cursor: "pointer",
                   marginRight: "8px",
                   opacity: selectedTool === 'highlighter' ? 1 : 0.8,
-                  fontVariationSettings: "'FILL' 1", // Filled
                   background: selectedTool === 'highlighter' ? 'rgba(255,255,255,0.1)' : 'transparent',
                   padding: '2px',
                   borderRadius: '2px',
                   transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
                 }}
                 onClick={() => handleToolSelect('highlighter')}
                 onMouseEnter={selectedTool !== 'highlighter' ? iconHoverStyle : undefined}
                 onMouseLeave={selectedTool !== 'highlighter' ? iconLeaveStyle : undefined}
-              >
-                format_ink_highlighter
-              </span>
+              />
               
               {/* Eraser tool */}
-              <span 
-                className="material-symbols-outlined" 
+              <img 
+                src="/icons/eraser.svg"
+                alt="Eraser tool"
                 style={{ 
+                  width: "18px",
+                  height: "18px",
                   cursor: "pointer",
                   marginRight: "0px",
                   opacity: selectedTool === 'eraser' ? 1 : 0.8,
-                  fontVariationSettings: "'FILL' 1", // Filled
                   background: selectedTool === 'eraser' ? 'rgba(255,255,255,0.1)' : 'transparent',
                   padding: '2px',
                   borderRadius: '2px',
                   transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
                 }}
                 onClick={() => handleToolSelect('eraser')}
                 onMouseEnter={selectedTool !== 'eraser' ? iconHoverStyle : undefined}
                 onMouseLeave={selectedTool !== 'eraser' ? iconLeaveStyle : undefined}
-              >
-                ink_eraser
-              </span>
+              />
             </div>
             
             {/* Grid Snap Controls */}
@@ -2646,12 +2688,17 @@ const PianoRoll: React.FC<PianoRollProps> = ({
                 backgroundColor: "rgba(255,255,255,0.1)" 
               }} />
               
-              <span 
-                className="material-symbols-outlined" 
-                onClick={handleGridSnapClick}
+              <img 
+                src="/icons/grid-on.svg"
+                alt="Grid snap"
+                onClick={handleGridIconClick}
                 style={{ 
+                  width: "18px",
+                  height: "18px",
                   opacity: gridSnapEnabled ? 1 : 0.5,
-                  cursor: "pointer"
+                  cursor: "pointer",
+                  filter: "brightness(0) invert(1)", // Make icon white
+                  transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
                   if (!gridSnapEnabled) e.currentTarget.style.opacity = "0.8";
@@ -2661,9 +2708,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
                   if (!gridSnapEnabled) e.currentTarget.style.opacity = "0.5";
                   e.currentTarget.style.transform = "scale(1)";
                 }}
-              >
-                grid_on
-              </span>
+              />
             </div>
             
             {/* Zoom Controls in fixed-width container */}
@@ -2674,15 +2719,20 @@ const PianoRoll: React.FC<PianoRollProps> = ({
               justifyContent: "space-between",
               marginRight: "8px" 
             }}>
-              <span 
-                className="material-symbols-outlined" 
+              <img 
+                src="/icons/zoom-out.svg"
+                alt="Zoom out"
                 onClick={handleZoomOut}
-                style={{ cursor: "pointer" }}
+                style={{ 
+                  width: "18px",
+                  height: "18px",
+                  cursor: "pointer",
+                  filter: "brightness(0) invert(1)", // Make icon white
+                  transition: 'all 0.2s ease',
+                }}
                 onMouseEnter={iconHoverStyle}
                 onMouseLeave={iconLeaveStyle}
-              >
-                zoom_out
-              </span>
+              />
               
               <span style={{ 
                 fontSize: "12px", 
@@ -2692,15 +2742,20 @@ const PianoRoll: React.FC<PianoRollProps> = ({
                 {Math.round(zoomLevel * 100)}%
               </span>
               
-              <span 
-                className="material-symbols-outlined" 
+              <img 
+                src="/icons/zoom-in.svg"
+                alt="Zoom in"
                 onClick={handleZoomIn}
-                style={{ cursor: "pointer" }}
+                style={{ 
+                  width: "18px",
+                  height: "18px",
+                  cursor: "pointer",
+                  filter: "brightness(0) invert(1)", // Make icon white
+                  transition: 'all 0.2s ease',
+                }}
                 onMouseEnter={iconHoverStyle}
                 onMouseLeave={iconLeaveStyle}
-              >
-                zoom_in
-              </span>
+              />
             </div>
             
             {/* Close button */}
@@ -2725,9 +2780,15 @@ const PianoRoll: React.FC<PianoRollProps> = ({
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
-                close
-              </span>
+              <img
+                src="/icons/close.svg"
+                alt="Close"
+                style={{
+                  width: "16px",
+                  height: "16px",
+                  filter: "brightness(0) invert(1)", // Make icon white
+                }}
+              />
             </div>
           </div>
         </div>
@@ -3170,7 +3231,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
 
                     {/* Notes layer */}
                     <NotesLayer
-                      notes={notes}
+                      notes={visualNotes}
                       scrollX={scrollX}
                       scrollY={scrollY}
                       onNoteClick={handleNoteClick}
@@ -3208,6 +3269,7 @@ const PianoRoll: React.FC<PianoRollProps> = ({
                         scrollY={scrollY}
                         keyHeight={keyHeight}
                         noteWidth={lastNoteWidth * zoomLevel}
+                        noteColor={noteColor}
                       />
                     )}
 
