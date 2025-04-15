@@ -1160,8 +1160,20 @@ export const PianoRoll: FC<PianoRollProps> = ({
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<number[]>([]);
   
-  // NEW: Store notes in tick-based format (this is our source of truth)
+  // Initialize directly from the prop
   const [normalizedNotes, setNormalizedNotes] = useState<NoteState[]>(initialNotes);
+  
+  // Effect to synchronize internal state when initialNotes prop changes from parent
+  useEffect(() => {
+    setNormalizedNotes(initialNotes);
+    // Update nextNoteId as well if external notes change
+    if (initialNotes.length > 0) {
+      const maxId = Math.max(...initialNotes.map(note => note.id), 0); // Added default 0 for empty array case
+      setNextNoteId(maxId + 1);
+    } else {
+      setNextNoteId(1); // Reset if notes are cleared externally
+    }
+  }, [initialNotes]); // Depend ONLY on the initialNotes prop
   
   // Handle tool selection with note deselection
   const handleToolSelect = (tool: 'select' | 'pen' | 'highlighter' | 'eraser') => {
