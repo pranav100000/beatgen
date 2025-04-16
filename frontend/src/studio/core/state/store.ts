@@ -386,7 +386,7 @@ export class Store implements StoreInterface {
     try {
       console.log(`Store: Connecting track ${trackId} to sampler with file ${file.name}`);
       
-      await this.getTransport().getSamplerController().connectTrackToSampler(
+      await this.getSamplerController().connectTrackToSampler(
         trackId,
         file,
         this.midiManager,

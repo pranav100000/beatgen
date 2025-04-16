@@ -91,6 +91,15 @@ interface StudioState {
 
   // New action to replace the audio file for an existing track
   replaceTrackAudioFile: (trackId: string, file: File) => Promise<void>;
+
+  // --- BEGIN ADDED ACTION SIGNATURES ---
+  // New action to add a sampler track file and link it to a drum track
+  addSamplerToDrumTrack: (drumTrackId: string, file: File) => Promise<void>;
+  // New action to remove a sampler track and unlink it from a drum track
+  removeSamplerFromDrumTrack: (drumTrackId: string, samplerTrackIdToDelete: string) => Promise<void>;
+  // New action to add an EMPTY sampler track and link it to a drum track
+  addEmptySamplerToDrumTrack: (drumTrackId: string, newSamplerName?: string) => Promise<string | null>;
+  // --- END ADDED ACTION SIGNATURES ---
 }
 
 export const useStudioStore = create<StudioState>((set, get) => {
@@ -934,23 +943,20 @@ export const useStudioStore = create<StudioState>((set, get) => {
         // Initialize sampler controller
         try {
           const samplerController = store.getTransport().getSamplerController();
-          await samplerController.initializeSampler(
+          
+          // *** CHANGE: Use connectTrackToSampler instead of separate init/subscribe ***
+          await samplerController.connectTrackToSampler(
             newTrack.id,
-            file,
-            defaultBaseNote,
-            defaultGrainSize,
+            file, // Pass the file
+            store.getMidiManager(), // Pass the MidiManager
+            defaultBaseNote, 
+            defaultGrainSize, 
             defaultOverlap
           );
           
-          // Connect to MidiManager for note data
-          samplerController.registerTrackSubscription(
-            newTrack.id,
-            store.getMidiManager()
-          );
-          
-          console.log(`Sampler initialized for track ${newTrack.id}`);
+          console.log(`Sampler initialized and connected for track ${newTrack.id}`);
         } catch (error) {
-          console.error(`Failed to initialize sampler for track ${newTrack.id}:`, error);
+          console.error(`Failed to initialize/subscribe sampler for track ${newTrack.id}:`, error);
           // Continue even if sampler init fails - track will still be created
         }
       } else {
@@ -1141,32 +1147,21 @@ export const useStudioStore = create<StudioState>((set, get) => {
         // Re-initialize sampler controller
         try {
           const samplerController = store.getTransport().getSamplerController();
-          await samplerController.initializeSampler(
+          
+          // *** CHANGE: Use connectTrackToSampler instead of separate init/subscribe ***
+          await samplerController.connectTrackToSampler(
             trackId,
-            file,
-            originalTrack.baseMidiNote,
-            originalTrack.grainSize,
+            file, // Pass the file
+            store.getMidiManager(), // Pass the MidiManager
+            originalTrack.baseMidiNote, 
+            originalTrack.grainSize, 
             originalTrack.overlap
           );
-          console.log(`Sampler re-initialized for track ${trackId}`);
-
-          // Immediately repopulate notes after re-initialization
-          const midiManager = store.getMidiManager();
-          if (midiManager) {
-            const notes = midiManager.getTrackNotes(trackId);
-            const sampler = samplerController.getSampler(trackId);
-            if (sampler && notes) {
-              sampler.setNotes(notes);
-              console.log(`Immediately repopulated sampler ${trackId} with ${notes.length} notes.`);
-            } else {
-              console.warn(`Could not repopulate notes for sampler ${trackId}: Sampler found=${!!sampler}, Notes found=${!!notes}`);
-            }
-          } else {
-            console.warn(`MidiManager not available, cannot repopulate notes for sampler ${trackId}`);
-          }
-
+          
+          console.log(`Sampler initialized and connected for track ${trackId}`);
         } catch (error) {
-          console.error(`Failed to re-initialize sampler for track ${trackId}:`, error);
+          console.error(`Failed to initialize/subscribe sampler for track ${trackId}:`, error);
+          // Continue even if sampler init fails - track will still be created
         }
 
         updatedTracks[trackIndex] = {
@@ -1392,7 +1387,7 @@ export const useStudioStore = create<StudioState>((set, get) => {
             console.log('handleAddTrack: [Drum] Returning...');
             return { mainDrumTrack: mainDrumTrackData, samplerTracks: createdSamplerTracks };
         }
-        // --- End of specific 'drum' type handling ---
+        // --- End of special 'drum' type handling ---
 
         // --- Original logic for other types ('audio', 'midi', 'sampler') ---
         // ... (rest of the function as it was, handling non-drum types) ...
@@ -1488,6 +1483,209 @@ export const useStudioStore = create<StudioState>((set, get) => {
   getTrackNotes: (trackId: string) => {
     const { store } = get();
     return store?.getMidiManager()?.getTrackNotes(trackId) || null;
+  },
+
+  // --- BEGIN ADDED ACTIONS ---
+  addSamplerToDrumTrack: async (drumTrackId, file) => {
+    const { uploadAudioFile, tracks } = get(); // Get existing upload action
+    console.log(`Adding sampler from file ${file.name} to drum track ${drumTrackId}`);
+
+    try {
+      // 1. Upload the file as a sampler track using the existing action
+      // We need to await this to ensure the track is created before linking
+      // NOTE: Assumes uploadAudioFile correctly adds the track to the store.
+      await uploadAudioFile(file, true); // Pass true for isSampler
+
+      // 2. Find the newly added sampler track (most recent sampler type track?)
+      const updatedTracks = get().tracks; // Get tracks again after upload
+      const newSamplerTrack = updatedTracks
+        .filter(t => t.type === 'sampler')
+        .sort((a, b) => (b.index ?? -1) - (a.index ?? -1))[0]; // Get the one with highest index
+
+      if (!newSamplerTrack) {
+        throw new Error("Failed to find the newly created sampler track after upload.");
+      }
+      const newSamplerTrackId = newSamplerTrack.id;
+      console.log(`Found new sampler track ID: ${newSamplerTrackId}`);
+
+      // 3. Find the main drum track
+      const drumTrackIndex = updatedTracks.findIndex(t => t.id === drumTrackId && t.type === 'drum');
+      if (drumTrackIndex === -1) {
+        throw new Error(`Drum track ${drumTrackId} not found.`);
+      }
+      const drumTrack = updatedTracks[drumTrackIndex] as DrumTrackState;
+
+      // 4. Update the drum track's samplerTrackIds
+      const updatedSamplerIds = [...(drumTrack.samplerTrackIds || []), newSamplerTrackId];
+      const updatedDrumTrack: DrumTrackState = {
+        ...drumTrack,
+        samplerTrackIds: updatedSamplerIds,
+      };
+
+      // 5. Update the Zustand state
+      // Note: handleAddTrack already updates the state and history for the *new sampler track*.
+      // We only need to update the *drum track's* state here.
+      // Directly update the drum track in the state for now (skipping history for this part)
+      const finalTracks = [...updatedTracks];
+      finalTracks[drumTrackIndex] = updatedDrumTrack;
+      set({ tracks: finalTracks });
+      
+      // We still need to update indices after modifying the tracks array
+      get().updateTrackIndices();
+      
+      // Update history buttons based on the handleAddTrack action that ran
+      set({
+          canUndo: historyManager.canUndo(),
+          canRedo: historyManager.canRedo()
+      });
+
+    } catch (error) {
+      console.error(`Failed to add sampler to drum track ${drumTrackId}:`, error);
+    }
+  },
+
+  removeSamplerFromDrumTrack: async (drumTrackId, samplerTrackIdToDelete) => {
+    const { handleTrackDelete, tracks } = get(); // Get existing delete action
+    console.log(`Removing sampler ${samplerTrackIdToDelete} from drum track ${drumTrackId}`);
+
+    try {
+      // 1. Delete the sampler track itself using the existing action
+      await handleTrackDelete(samplerTrackIdToDelete);
+
+      // 2. Find the main drum track (use get() again for latest state after deletion)
+      const currentTracks = get().tracks;
+      const drumTrackIndex = currentTracks.findIndex(t => t.id === drumTrackId && t.type === 'drum');
+      if (drumTrackIndex === -1) {
+        console.warn(`Drum track ${drumTrackId} not found after deleting sampler. Cannot unlink.`);
+        return;
+      }
+      const drumTrack = currentTracks[drumTrackIndex] as DrumTrackState;
+
+      // 3. Update the drum track's samplerTrackIds by filtering
+      const updatedSamplerIds = (drumTrack.samplerTrackIds || []).filter(id => id !== samplerTrackIdToDelete);
+      const updatedDrumTrack: DrumTrackState = {
+        ...drumTrack,
+        samplerTrackIds: updatedSamplerIds,
+      };
+
+      // 4. Update the Zustand state
+      // Note: handleAddTrack already updates the state and history for the *new sampler track*.
+      // We only need to update the *drum track's* state here.
+      // Directly update the drum track in the state for now (skipping history for this part)
+      const finalTracks = [...currentTracks];
+      finalTracks[drumTrackIndex] = updatedDrumTrack;
+      set({ tracks: finalTracks });
+      
+      // We still need to update indices after modifying the tracks array
+      get().updateTrackIndices();
+      
+      // Update history buttons based on the handleAddTrack action that ran
+      set({
+          canUndo: historyManager.canUndo(),
+          canRedo: historyManager.canRedo()
+      });
+
+    } catch (error) {
+      console.error(`Failed to remove sampler ${samplerTrackIdToDelete} from drum track ${drumTrackId}:`, error);
+    }
+  },
+
+  addEmptySamplerToDrumTrack: async (drumTrackId, newSamplerName) => {
+    const { handleAddTrack, tracks, updateTrackIndices, store } = get();
+    console.log(`Adding empty sampler track (optional name: ${newSamplerName}) to drum track ${drumTrackId}`);
+
+    try {
+      // 1. Create a new empty sampler track using handleAddTrack
+      const samplerCount = tracks.filter(t => t.type === 'sampler').length;
+      const defaultName = newSamplerName || `Sampler ${samplerCount + 1}`;
+      // handleAddTrack creates the TrackState and also the underlying AudioEngine track/player
+      const newSamplerTrackState = await handleAddTrack('sampler', undefined, defaultName, undefined);
+
+      if (!newSamplerTrackState || !newSamplerTrackState.id) {
+        throw new Error("Failed to create the new empty sampler track using handleAddTrack.");
+      }
+      const newSamplerTrackId = newSamplerTrackState.id;
+      console.log(`Created new empty sampler track ID: ${newSamplerTrackId} with name: ${defaultName}`);
+
+      // *** ADDED: Initialize SamplerController instance and subscribe ***
+      if (store) {
+          const samplerController = store.getTransport().getSamplerController();
+          const midiManager = store.getMidiManager();
+
+          if (samplerController && midiManager) {
+              try {
+                  // Initialize the sampler instance in the controller (without a file)
+                  // We pass undefined for the file argument
+                  await samplerController.initializeSampler(newSamplerTrackId, undefined, 60); // Use default baseNote 60
+                  console.log(`Initialized empty sampler instance ${newSamplerTrackId} in SamplerController`);
+
+                  // Explicitly subscribe it to the MidiManager
+                  samplerController.registerTrackSubscription(newSamplerTrackId, midiManager);
+                  console.log(`Registered subscription for empty sampler ${newSamplerTrackId}`);
+                  
+                   // Immediately repopulate notes after re-initialization (necessary after initializeSampler)
+                   const notes = midiManager.getTrackNotes(newSamplerTrackId);
+                   const sampler = samplerController.getSampler(newSamplerTrackId);
+                   if (sampler && notes) {
+                     sampler.setNotes(notes);
+                     console.log(`Immediately repopulated sampler ${newSamplerTrackId} with ${notes.length} notes.`);
+                   } else {
+                     console.warn(`Could not repopulate notes for sampler ${newSamplerTrackId}: Sampler found=${!!sampler}, Notes found=${!!notes}`);
+                   }
+
+              } catch (error) {
+                  console.error(`Failed to initialize/subscribe empty sampler ${newSamplerTrackId}:`, error);
+                  // Decide if we should rollback track creation here
+                  // await get().handleTrackDelete(newSamplerTrackId);
+                  // throw error; // Re-throw if needed
+              }
+          } else {
+              console.error(`SamplerController or MidiManager not found, cannot complete sampler setup for ${newSamplerTrackId}`);
+          }
+      } else {
+          console.error(`Store not found, cannot complete sampler setup for ${newSamplerTrackId}`);
+      }
+      // *** END ADDED SECTION ***
+
+      // 2. Find the main drum track
+      const drumTrackIndex = tracks.findIndex(t => t.id === drumTrackId && t.type === 'drum');
+      if (drumTrackIndex === -1) {
+        console.warn(`Drum track ${drumTrackId} not found after deleting sampler. Cannot unlink.`);
+        return null;
+      }
+      const drumTrack = tracks[drumTrackIndex] as DrumTrackState;
+
+      // 3. Update the drum track's samplerTrackIds
+      const updatedSamplerIds = (drumTrack.samplerTrackIds || []).filter(id => id !== newSamplerTrackId);
+      const updatedDrumTrack: DrumTrackState = {
+        ...drumTrack,
+        samplerTrackIds: updatedSamplerIds,
+      };
+
+      // 4. Update the Zustand state
+      // Note: handleAddTrack already updates the state and history for the *new sampler track*.
+      // We only need to update the *drum track's* state here.
+      // Directly update the drum track in the state for now (skipping history for this part)
+      const finalTracks = [...tracks];
+      finalTracks[drumTrackIndex] = updatedDrumTrack;
+      set({ tracks: finalTracks });
+      
+      // We still need to update indices after modifying the tracks array
+      updateTrackIndices();
+      
+      // Update history buttons based on the handleAddTrack action that ran
+      set({
+          canUndo: historyManager.canUndo(),
+          canRedo: historyManager.canRedo()
+      });
+
+      console.log(`Successfully added empty sampler ${newSamplerTrackId} and linked to drum track ${drumTrackId}`);
+      return newSamplerTrackId; // Return the new ID
+
+    } catch (error) {
+      console.error(`Failed to add empty sampler to drum track ${drumTrackId}:`, error);
+      return null; // Return null on failure
+    }
   },
 }
 });

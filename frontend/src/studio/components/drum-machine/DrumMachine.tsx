@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Rnd } from 'react-rnd';
 import PianoRoll from '../piano-roll2/PianoRoll';
 import CloseIcon from '@mui/icons-material/Close';
@@ -286,11 +286,6 @@ const Row: React.FC<RowProps> = ({
   );
 };
 
-// Type for exported methods via ref
-export interface DrumMachineHandle {
-  getDrumNotesForDisplay: () => { notes: NoteState[], drumName: string };
-}
-
 // Add at the top of the file after the import statements and interface declarations
 interface DrumMachineProps {
   scaleNotes?: number[]; // Same prop as in PianoRoll component, optional array of scale notes (0-11)
@@ -301,14 +296,16 @@ interface DrumMachineProps {
   onAddNote?: (trackId: string, note: NoteState) => void;
   onRemoveNote?: (trackId: string, noteId: number) => void;
   onUpdateNote?: (trackId: string, note: NoteState) => void;
+  // Add callback for display notes
+  onDisplayNotesChange?: (notes: NoteState[], drumName: string) => void;
 }
 
 // Constants from PianoRoll to maintain consistency
 const TICKS_PER_BEAT = 960; // Standard MIDI ticks per beat (quarter note)
 const TICKS_PER_STEP = TICKS_PER_BEAT / 16; // 4 steps per beat, 240 ticks per step
 
-// Modify the component definition to use forwardRef
-const DrumMachine = forwardRef<DrumMachineHandle, DrumMachineProps>(({ 
+// Modify the component definition to remove forwardRef
+const DrumMachine: React.FC<DrumMachineProps> = ({
   scaleNotes = [], 
   onClose, 
   trackId,
@@ -317,7 +314,14 @@ const DrumMachine = forwardRef<DrumMachineHandle, DrumMachineProps>(({
   onAddNote,
   onRemoveNote,
   onUpdateNote,
-}, ref) => {
+  // Destructure new callback prop
+  onDisplayNotesChange,
+}) => {
+  // Get the action to add an empty sampler track
+  const addEmptySamplerToDrumTrack = useStudioStore(state => state.addEmptySamplerToDrumTrack);
+  // Get all tracks to find sampler names later in useEffect
+  const allTracks = useStudioStore(state => state.tracks);
+
   const [selectedSound, setSelectedSound] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rndRef = useRef<Rnd>(null);
@@ -399,22 +403,73 @@ const DrumMachine = forwardRef<DrumMachineHandle, DrumMachineProps>(({
     [trackId] 
   ));
   
-  // Effect to initialize grid based on samplerTrackIds length
+  // Effect to initialize and synchronize grid/names/notes based on samplerTrackIds
   useEffect(() => {
-    if (samplerTrackIds.length > 0 && grid.length === 0) {
-       const numRows = samplerTrackIds.length;
-       // TODO: Fetch initial patterns/notes for these samplers?
-       const initialGrid = Array(numRows).fill(null).map(() => Array(MAX_COLUMNS).fill(false));
-       const initialNotes = Array(numRows).fill(null).map(() => []);
-       // TODO: Fetch sampler track names?
-       const initialNames = samplerTrackIds.map((id, i) => `Sampler ${i + 1}`); 
-       
-       setGrid(initialGrid);
-       setDrumNotes(initialNotes);
-       setDrumNames(initialNames);
-       console.log(`DrumMachine (${trackId}): Initialized with ${numRows} rows based on samplerTrackIds.`);
+    const numRows = samplerTrackIds.length;
+    if (numRows > 0) {
+      console.log(`DrumMachine (${trackId}): Syncing state with ${numRows} samplerTrackIds:`, samplerTrackIds);
+
+      // Fetch names for the sampler tracks
+      const newNames = samplerTrackIds.map((id, i) => {
+        const track = allTracks.find(t => t.id === id);
+        return track ? track.name : `Sampler ${i + 1}`; // Use index as fallback
+      });
+
+      // Synchronize the grid, notes, and names
+      setGrid(prevGrid => {
+        const currentLength = prevGrid.length;
+        if (numRows > currentLength) {
+          // Add new rows
+          const rowsToAdd = numRows - currentLength;
+          const newRows = Array(rowsToAdd).fill(null).map(() => Array(MAX_COLUMNS).fill(false));
+          return [...prevGrid, ...newRows];
+        } else if (numRows < currentLength) {
+          // Remove extra rows
+          return prevGrid.slice(0, numRows);
+        } else {
+          // Length matches, no change needed
+          return prevGrid;
+        }
+      });
+
+      setDrumNotes(prevNotes => {
+        const currentLength = prevNotes.length;
+        if (numRows > currentLength) {
+          // Add new empty note arrays
+          const rowsToAdd = numRows - currentLength;
+          const newRows = Array(rowsToAdd).fill(null).map(() => []);
+          return [...prevNotes, ...newRows];
+        } else if (numRows < currentLength) {
+          // Remove extra note arrays
+          return prevNotes.slice(0, numRows);
+        } else {
+          // Length matches, no change needed
+          return prevNotes;
+        }
+      });
+
+      setDrumNames(newNames);
+
+      // Adjust container height based on the number of rows
+      const newHeight = Math.max(200, (numRows * rowHeight) + 60); // Base height + rows + header/padding
+      setContainerSize(prev => ({ ...prev, height: newHeight }));
+      if (rndRef.current) {
+         rndRef.current.updateSize({ width: containerSize.width, height: newHeight });
+      }
+
+    } else {
+      // Handle case where there are no sampler tracks (e.g., initially or after deletion)
+      console.log(`DrumMachine (${trackId}): No samplerTrackIds found. Clearing state.`);
+      setGrid([]);
+      setDrumNotes([]);
+      setDrumNames([]);
+      setContainerSize(prev => ({ ...prev, height: 200 })); // Reset to min height
+       if (rndRef.current) {
+         rndRef.current.updateSize({ width: containerSize.width, height: 200 });
+      }
     }
-  }, [samplerTrackIds, grid.length]); // Rerun if IDs change or grid not initialized
+  // Depend on samplerTrackIds and allTracks (for names)
+  }, [samplerTrackIds, allTracks, trackId]); // Added trackId for logging clarity
   
   // Existing function to open INTERNAL piano roll (might be deprecated now)
   const openInternalPianoRoll = (drumIndex: number) => {
@@ -495,40 +550,19 @@ const DrumMachine = forwardRef<DrumMachineHandle, DrumMachineProps>(({
   
   // Add a new row
   const addRow = (): void => {
-    // Find a drum type not already in use, or use a numbered version
-    let newDrumName = '';
-    for (const type of defaultDrumTypes) {
-      if (!drumNames.includes(type)) {
-        newDrumName = type;
-        break;
+    console.log(`DrumMachine (${trackId}): Add Row button clicked. Calling addEmptySamplerToDrumTrack.`);
+    // Call the store action to create a new sampler and link it
+    addEmptySamplerToDrumTrack(trackId).then(newSamplerId => {
+      if (newSamplerId) {
+        console.log(`DrumMachine (${trackId}): Successfully added sampler ${newSamplerId} via store action.`);
+        // The useEffect hook reacting to samplerTrackIds will handle UI updates.
+      } else {
+        console.error(`DrumMachine (${trackId}): Failed to add sampler via store action.`);
       }
-    }
+    });
     
-    // If all default names are taken, add a numbered version
-    if (!newDrumName) {
-      newDrumName = `Drum ${drumNames.length + 1}`;
-    }
-    
-    // Update drum names
-    const newDrumNames = [...drumNames, newDrumName];
-    setDrumNames(newDrumNames);
-    
-    // Update grid with a new empty row
-    const newGrid = [...grid, Array(MAX_COLUMNS).fill(false)];
-    setGrid(newGrid);
-    
-    // Add an empty notes array for the new drum
-    const newDrumNotes = [...drumNotes, []];
-    setDrumNotes(newDrumNotes);
-    
-    // Resize the container to accommodate the new row
-    const newHeight = containerSize.height + rowHeight;
-    setContainerSize(prev => ({ ...prev, height: newHeight }));
-    
-    // Update the Rnd component size if it exists
-    if (rndRef.current) {
-      rndRef.current.updateSize({ width: containerSize.width, height: newHeight });
-    }
+    // Removed manual state updates (setDrumNames, setGrid, setDrumNotes)
+    // Removed resizing logic (setContainerSize, rndRef.current.updateSize)
   };
   
   // Delete a row
@@ -686,17 +720,15 @@ const DrumMachine = forwardRef<DrumMachineHandle, DrumMachineProps>(({
     };
   }, []);
   
-  // Expose methods to parent via ref
-  useImperativeHandle(ref, () => ({
-    getDrumNotesForDisplay: () => {
-      // If a drum is selected, return its notes, otherwise return notes for the first drum
-      const drumIndex = selectedSound;
-      return {
-        notes: drumNotes[drumIndex] || [],
-        drumName: drumNames[drumIndex] || "No drum selected"
-      };
+  // Add useEffect to call the onDisplayNotesChange callback when relevant state changes
+  useEffect(() => {
+    if (onDisplayNotesChange) {
+      const currentNotes = drumNotes[selectedSound] || [];
+      const currentDrumName = drumNames[selectedSound] || "No drum selected";
+      onDisplayNotesChange(currentNotes, currentDrumName);
     }
-  }));
+    // Include drumNames and the callback itself in the dependency array
+  }, [drumNotes, selectedSound, drumNames, onDisplayNotesChange]);
 
   // Calculate initial positions for multiple piano rolls
   const calculatePianoRollPosition = (index: number) => {
@@ -880,9 +912,9 @@ const DrumMachine = forwardRef<DrumMachineHandle, DrumMachineProps>(({
       </Rnd>
     </>
   );
-});
+};
 
 // Add display name for debugging
-DrumMachine.displayName = 'DrumMachine';
+// DrumMachine.displayName = 'DrumMachine';
 
 export default DrumMachine;
