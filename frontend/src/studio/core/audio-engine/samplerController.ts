@@ -29,28 +29,28 @@ export class SamplerController {
      */
     async initializeSampler(
         trackId: string, 
-        file: File, 
+        file: File | undefined, // Allow file to be undefined
         baseMidiNote: number = this.DEFAULT_BASE_NOTE, 
         grainSize: number = this.DEFAULT_GRAIN_SIZE, 
         overlap: number = this.DEFAULT_OVERLAP
     ): Promise<void> {
         try {
-            console.log(`Initializing sampler for track ${trackId}`);
+            console.log(`Initializing sampler for track ${trackId}${file ? ' with file ' + file.name : ' (empty)'}`);
             
-            // Create logger functions for the sampler
             const onLog = (message: string) => {
-                console.log(`Sampler ${trackId}: ${message}`);
+                console.log(`[Sampler ${trackId}] ${message}`);
             };
             
             const onPlaybackStatusChange = (isPlaying: boolean) => {
-                console.log(`Sampler ${trackId} playback status: ${isPlaying ? 'playing' : 'stopped'}`);
-                // You could emit a custom event here if needed
+                // Handle playback status change if needed
             };
-            
+
             // Clean up any existing sampler for this track
             if (this.samplers.has(trackId)) {
                 console.log(`Cleaning up existing sampler for track ${trackId}`);
-                // Implement cleanup if needed
+                const existingSampler = this.samplers.get(trackId);
+                existingSampler?.dispose(); // Ensure cleanup of the old instance
+                this.samplers.delete(trackId);
             }
             
             // Create new sampler
@@ -58,17 +58,28 @@ export class SamplerController {
             
             // Initialize audio context
             await sampler.initialize();
+
+            // Set base note before potentially loading file
+            sampler.setBaseNote(baseMidiNote);
             
-            // Load audio file
-            await sampler.loadAudioFile(file, grainSize, overlap);
+            // Load audio file ONLY if it exists
+            if (file) {
+                console.log(`Loading file ${file.name} for sampler ${trackId}`);
+                await sampler.loadAudioFile(file, grainSize, overlap);
+            } else {
+                console.log(`Skipping file load for empty sampler ${trackId}`);
+                // Optionally set default grain/overlap even without file?
+                // sampler.setGrainSize(grainSize);
+                // sampler.setOverlap(overlap);
+            }
             
             // Store sampler with track ID
             this.samplers.set(trackId, sampler);
             
-            console.log(`Sampler for track ${trackId} initialized successfully`);
+            console.log(`Sampler for track ${trackId} initialized successfully.`);
         } catch (error) {
             console.error(`Failed to initialize sampler for track ${trackId}:`, error);
-            throw error;
+            throw error; // Re-throw to signal failure
         }
     }
     

@@ -1387,7 +1387,7 @@ export const useStudioStore = create<StudioState>((set, get) => {
             console.log('handleAddTrack: [Drum] Returning...');
             return { mainDrumTrack: mainDrumTrackData, samplerTracks: createdSamplerTracks };
         }
-        // --- End of special 'drum' type handling ---
+        // --- End of specific 'drum' type handling ---
 
         // --- Original logic for other types ('audio', 'midi', 'sampler') ---
         // ... (rest of the function as it was, handling non-drum types) ...
@@ -1494,7 +1494,7 @@ export const useStudioStore = create<StudioState>((set, get) => {
       // 1. Upload the file as a sampler track using the existing action
       // We need to await this to ensure the track is created before linking
       // NOTE: Assumes uploadAudioFile correctly adds the track to the store.
-      await uploadAudioFile(file, true); // Pass true for isSampler
+      await uploadAudioFile(file); // FIX: Pass only the file argument
 
       // 2. Find the newly added sampler track (most recent sampler type track?)
       const updatedTracks = get().tracks; // Get tracks again after upload
@@ -1523,9 +1523,7 @@ export const useStudioStore = create<StudioState>((set, get) => {
       };
 
       // 5. Update the Zustand state
-      // Note: handleAddTrack already updates the state and history for the *new sampler track*.
-      // We only need to update the *drum track's* state here.
-      // Directly update the drum track in the state for now (skipping history for this part)
+      // Create a new array with the updated drum track
       const finalTracks = [...updatedTracks];
       finalTracks[drumTrackIndex] = updatedDrumTrack;
       set({ tracks: finalTracks });
@@ -1569,9 +1567,7 @@ export const useStudioStore = create<StudioState>((set, get) => {
       };
 
       // 4. Update the Zustand state
-      // Note: handleAddTrack already updates the state and history for the *new sampler track*.
-      // We only need to update the *drum track's* state here.
-      // Directly update the drum track in the state for now (skipping history for this part)
+      // Create a new array with the updated drum track
       const finalTracks = [...currentTracks];
       finalTracks[drumTrackIndex] = updatedDrumTrack;
       set({ tracks: finalTracks });
@@ -1648,25 +1644,27 @@ export const useStudioStore = create<StudioState>((set, get) => {
       // *** END ADDED SECTION ***
 
       // 2. Find the main drum track
-      const drumTrackIndex = tracks.findIndex(t => t.id === drumTrackId && t.type === 'drum');
+      // Use get() again to ensure we have the most up-to-date tracks array
+      const currentTracks = get().tracks; 
+      const drumTrackIndex = currentTracks.findIndex(t => t.id === drumTrackId && t.type === 'drum');
       if (drumTrackIndex === -1) {
-        console.warn(`Drum track ${drumTrackId} not found after deleting sampler. Cannot unlink.`);
-        return null;
+        // Rollback: Delete the sampler track if the drum track isn't found
+        console.warn(`Drum track ${drumTrackId} not found. Rolling back sampler creation.`);
+        await get().handleTrackDelete(newSamplerTrackId); // Use existing delete action
+        return null; // Indicate failure
       }
-      const drumTrack = tracks[drumTrackIndex] as DrumTrackState;
+      const drumTrack = currentTracks[drumTrackIndex] as DrumTrackState;
 
-      // 3. Update the drum track's samplerTrackIds
-      const updatedSamplerIds = (drumTrack.samplerTrackIds || []).filter(id => id !== newSamplerTrackId);
+      // 3. Update the drum track's samplerTrackIds - CORRECTLY ADD the new ID
+      const updatedSamplerIds = [...(drumTrack.samplerTrackIds || []), newSamplerTrackId];
       const updatedDrumTrack: DrumTrackState = {
         ...drumTrack,
         samplerTrackIds: updatedSamplerIds,
       };
 
       // 4. Update the Zustand state
-      // Note: handleAddTrack already updates the state and history for the *new sampler track*.
-      // We only need to update the *drum track's* state here.
-      // Directly update the drum track in the state for now (skipping history for this part)
-      const finalTracks = [...tracks];
+      // Create a new array with the updated drum track
+      const finalTracks = [...currentTracks];
       finalTracks[drumTrackIndex] = updatedDrumTrack;
       set({ tracks: finalTracks });
       
@@ -1687,5 +1685,6 @@ export const useStudioStore = create<StudioState>((set, get) => {
       return null; // Return null on failure
     }
   },
+  // --- END ADDED ACTIONS ---
 }
 });
