@@ -23,7 +23,6 @@ import {
   TrackData
 } from '../../../platform/api/assistant';
 import { historyManager } from '../../core/state/history/HistoryManager';
-import { TrackAddAction } from '../../core/state/history/actions/StudioActions';
 import { useStudioStore } from '../../stores/useStudioStore';
 import ChatModeMenu from './ChatModeMenu';
 import AddContextMenu from './AddContextMenu';
@@ -449,12 +448,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
         if (store) {
           try {
             const trackId = actionData.trackId || crypto.randomUUID();
-            const instrumentName = actionData.instrumentName || 'AI Generated Track';
             const instrumentId = actionData.instrument_id;  // Fix: map from snake_case to camelCase
             const storageKey = actionData.storageKey;
             const hasNotes = actionData.hasNotes || false;
             
-            console.log(`Adding generated track: ${instrumentName} with instrumentId: ${instrumentId}`);
+            console.log(`Adding generated track with instrumentId: ${instrumentId}`);
             
             // Find the result object that contains the notes
             const generatedTracks = messages
@@ -478,7 +476,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
               execute: async () => {
                 // Add track with the soundfont
                 console.log(`Adding generated track with instrumentId: ${instrumentId}`);
-                const newTrack = await handleAddTrack('midi', instrumentId, instrumentName, storageKey);
+                const newTrack = await handleAddTrack('midi', instrumentId, undefined, storageKey);
                 
                 // Get notes directly from the action data if available
                 const notesFromAction = actionData.notes || [];
@@ -534,9 +532,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
               undo: async () => {
                 // Find track by name
                 const tracks = useStudioStore.getState().tracks;
-                const trackToRemove = tracks.find(t => t.name === instrumentName);
+                const trackToRemove = tracks.find(t => t.id === trackId);
                 if (trackToRemove) {
-                  console.log(`Removing AI-generated track: ${instrumentName}`);
+                  console.log(`Removing AI-generated track: ${trackId}`);
                   const { handleTrackDelete } = useStudioStore.getState();
                   await handleTrackDelete(trackToRemove.id);
                 }
