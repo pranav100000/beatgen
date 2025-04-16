@@ -6,6 +6,13 @@ import Konva from "konva";
 import { Menu, MenuItem } from "@mui/material";
 // Import PianoKeyboard component
 import PianoKeyboard from "./PianoKeyboard";
+// Import grid constants and types
+import { 
+  GridSnapOption, 
+  getGridSnapOptionName, 
+  getAllGridSnapOptions, 
+  getSnapSizeInPixels 
+} from './gridConstants';
 
 // Define a constant grid size to use throughout the component
 const GRID_SIZE = 48; // pixels
@@ -153,6 +160,7 @@ interface PianoRollProps {
   scaleNotes?: number[]; // Add scale notes prop (0-11 representing notes in the scale)
   title?: string; // Add title prop
   onClose?: () => void; // Add callback for close button
+  initialGridSnapSize?: GridSnapOption; // Use enum for initial grid snap size
 }
 
 // Add this utility function at the top of your file, near the other helper functions
@@ -1122,7 +1130,8 @@ export const PianoRoll: FC<PianoRollProps> = ({
   initialNotes = [], // Default to empty array
   scaleNotes = [], // Default to empty array (all notes in scale)
   title = "Piano Roll (132 Keys)", // Default title
-  onClose
+  onClose,
+  initialGridSnapSize = GridSnapOption.STEP // Default to "Step" if not provided
 }) => {
   // Add mouseOffsetRef at the top of the component
   const mouseOffsetRef = useRef<{ 
@@ -1141,7 +1150,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
 
   // Grid snap settings
   const [gridSnapEnabled, setGridSnapEnabled] = useState(true);
-  const [gridSnapSize, setGridSnapSize] = useState(5); // Default to "Step"
+  const [gridSnapSize, setGridSnapSize] = useState<GridSnapOption>(initialGridSnapSize); // Use the enum state
   const [gridSnapAnchorEl, setGridSnapAnchorEl] = useState<null | HTMLElement>(null);
   const gridSnapMenuOpen = Boolean(gridSnapAnchorEl);
   
@@ -1197,7 +1206,8 @@ export const PianoRoll: FC<PianoRollProps> = ({
   // Calculate effective grid size based on zoom level
   const effectiveGridSize = GRID_SIZE * zoomLevel;
   
-  // Get snap option display name
+  // Get snap option display name - MOVED TO gridConstants.ts
+  /*
   const getSnapOptionName = (option: number): string => {
     switch(option) {
       case 0: return "None";
@@ -1215,8 +1225,10 @@ export const PianoRoll: FC<PianoRollProps> = ({
       default: return "Step";
     }
   };
+  */
   
-  // Convert snap option to actual pixel size
+  // Convert snap option to actual pixel size - MOVED TO gridConstants.ts
+  /*
   const getSnapSizeInPixels = (option: number): number => {
     switch(option) {
       case 0: return 1; // No snapping, but need a minimum value
@@ -1234,6 +1246,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
       default: return effectiveGridSize;
     }
   };
+  */
   
   // Handle grid snap menu open - modify to accept any element's mouse event
   const handleGridIconClick = (event: React.MouseEvent<Element>) => {
@@ -1751,12 +1764,12 @@ export const PianoRoll: FC<PianoRollProps> = ({
         }
       } else if (selectedTool === 'pen' || selectedTool === 'highlighter') {
         // Get current snap size in pixels (already accounts for zoom)
-        const actualGridSize = getSnapSizeInPixels(gridSnapSize);
+        const actualGridSize = getSnapSizeInPixels(gridSnapSize, effectiveGridSize);
 
         // Snap position
         let snappedX, snappedY;
         
-        if (gridSnapEnabled && gridSnapSize !== 0) {
+        if (gridSnapEnabled && gridSnapSize !== GridSnapOption.NONE) {
           // Snap to grid
           snappedX = Math.floor(x / actualGridSize) * actualGridSize;
         } else {
@@ -1825,12 +1838,12 @@ export const PianoRoll: FC<PianoRollProps> = ({
       if (e.target !== stage) return;
       
       // Get current snap size in pixels (already accounts for zoom)
-      const actualGridSize = getSnapSizeInPixels(gridSnapSize);
+      const actualGridSize = getSnapSizeInPixels(gridSnapSize, effectiveGridSize);
 
       // Snap position
       let snappedX, snappedY;
       
-      if (gridSnapEnabled && gridSnapSize !== 0) {
+      if (gridSnapEnabled && gridSnapSize !== GridSnapOption.NONE) {
         // Snap to grid
         snappedX = Math.floor(x / actualGridSize) * actualGridSize;
       } else {
@@ -1877,12 +1890,12 @@ export const PianoRoll: FC<PianoRollProps> = ({
       setHoveredNote(getNoteNameFromY(pointerPos.y));
       
       // Get current snap size in pixels (already accounts for zoom)
-      const actualGridSize = getSnapSizeInPixels(gridSnapSize);
+      const actualGridSize = getSnapSizeInPixels(gridSnapSize, effectiveGridSize);
 
       // Snap position
       let snappedX, snappedY;
       
-      if (gridSnapEnabled && gridSnapSize !== 0) {
+      if (gridSnapEnabled && gridSnapSize !== GridSnapOption.NONE) {
         // Snap to grid
         snappedX = Math.floor(x / actualGridSize) * actualGridSize;
       } else {
@@ -2215,7 +2228,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
     const deltaX = e.clientX - resizeStartPos.x;
     
     // Get current snap size in pixels (already accounts for zoom)
-    const actualGridSize = getSnapSizeInPixels(gridSnapSize);
+    const actualGridSize = getSnapSizeInPixels(gridSnapSize, effectiveGridSize);
     // Get the pixel size of one tick at current zoom level
     const pixelsPerTickScaled = PIXELS_PER_TICK * zoomLevel;
     
@@ -2234,7 +2247,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
       
       // Calculate new width for the primary note
       let newWidth;
-      if (gridSnapEnabled && gridSnapSize !== 0) {
+      if (gridSnapEnabled && gridSnapSize !== GridSnapOption.NONE) {
         // Snap to grid
         newWidth = Math.max(actualGridSize, Math.round((noteInitialState.width + deltaX) / actualGridSize) * actualGridSize);
       } else {
@@ -2274,7 +2287,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
       // Resizing from left - update both start position and width
       
       // Calculate values for the primary note
-      const minSize = gridSnapEnabled && gridSnapSize !== 0 
+      const minSize = gridSnapEnabled && gridSnapSize !== GridSnapOption.NONE 
         ? actualGridSize 
         : pixelsPerTickScaled; // Minimum size is one tick if not grid snapping
         
@@ -2283,7 +2296,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
       
       let snappedDeltaX, newStart, newWidth;
       
-      if (gridSnapEnabled && gridSnapSize !== 0) {
+      if (gridSnapEnabled && gridSnapSize !== GridSnapOption.NONE) {
         // Snap to grid
         snappedDeltaX = Math.round(boundedDeltaX / actualGridSize) * actualGridSize;
         newStart = noteInitialState.start + snappedDeltaX;
@@ -2428,12 +2441,12 @@ export const PianoRoll: FC<PianoRollProps> = ({
     const y = pointerPos.y + scrollY;
     
     // Get current snap size in pixels (already accounts for zoom)
-    const actualGridSize = getSnapSizeInPixels(gridSnapSize);
+    const actualGridSize = getSnapSizeInPixels(gridSnapSize, effectiveGridSize);
 
     // Snap position
     let snappedX, snappedY;
     
-    if (gridSnapEnabled && gridSnapSize !== 0) {
+    if (gridSnapEnabled && gridSnapSize !== GridSnapOption.NONE) {
       // Snap to grid
       snappedX = Math.floor(x / actualGridSize) * actualGridSize;
     } else {
@@ -3282,8 +3295,8 @@ export const PianoRoll: FC<PianoRollProps> = ({
                       keyHeight={keyHeight}
                       viewportWidth={dimensions.width - keyboardWidth}
                       viewportHeight={dimensions.height - 28 - 16}
-                      gridSize={getSnapSizeInPixels(gridSnapSize)}
-                      snapEnabled={gridSnapEnabled && gridSnapSize !== 0}
+                      gridSize={getSnapSizeInPixels(gridSnapSize, effectiveGridSize)} // Use helper function
+                      snapEnabled={gridSnapEnabled && gridSnapSize !== GridSnapOption.NONE}
                       zoomLevel={zoomLevel}
                       selectedTool={selectedTool}
                       noteColor={noteColor} // Pass color to NotesLayer
