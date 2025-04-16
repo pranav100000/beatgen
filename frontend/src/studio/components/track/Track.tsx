@@ -1,9 +1,12 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Box } from '@mui/material';
 import { TrackState, Position, DrumTrackState, SamplerTrackState } from '../../core/types/track';
 import { useStudioStore } from '../../stores/useStudioStore';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import TrackFactory from './TrackFactory';
+import { TrackResizeAction } from '../../core/state/history/actions/TrackActions';
+import { historyManager } from '../../core/state/history/HistoryManager';
+import { GRID_CONSTANTS, calculateTrackWidth } from '../../constants/gridConstants';
 
 /**
  * Track component serves as the main entry point for rendering tracks in the timeline.
@@ -46,38 +49,183 @@ function Track(props: TrackProps) {
     timeSignature = [4, 4]
   } = props;
 
-  // Get the necessary actions from stores
-  const track = useStudioStore(useCallback(state => state.tracks.find(t => t.id === id), [id]));
-  const openDrumMachine = useStudioStore(state => state.openDrumMachine); // <-- Get drum machine opener
-  const { openPianoRoll } = usePianoRollStore();
-
-  // Log the selected track data, especially the drumPattern
-  console.log(`Track ${id}: Selected track data from store:`, track); 
+  // Get the store from Zustand
+  const store = useStudioStore(state => state.store);
+  const updateTrack = useStudioStore(state => state.updateTrack);
+  const fullTrack = useStudioStore(state => state.tracks.find(t => t.id === id));
   
-  // Handle track click based on type
-  const handleTrackClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent event bubbling
-    
-    if (type === 'drum') {
-      console.log('Drum track clicked - opening Drum Machine for:', id);
-      openDrumMachine(id); // <-- Call drum machine opener
-    } else if (type === 'midi' || type === 'sampler') {
-      console.log('MIDI/Sampler track clicked - opening Piano Roll for:', id);
-      openPianoRoll(id); // <-- Call piano roll opener
+  // Directly subscribe to the stored track width and maintain a local state
+  const storedWidth = useStudioStore(state => 
+    state.tracks.find(t => t.id === id)?._calculatedWidth
+  );
+  
+  // Local state to ensure width persistence during rerenders
+  const [trackWidth, setTrackWidth] = useState(_calculatedWidth || 0);
+  
+  // Sync with store when it changes
+  useEffect(() => {
+    if (storedWidth !== undefined) {
+      setTrackWidth(storedWidth);
+    } else if (_calculatedWidth !== undefined) {
+      setTrackWidth(_calculatedWidth);
     }
-    // Audio tracks currently do nothing on click
+  }, [storedWidth, _calculatedWidth]);
+  
+  // Get piano roll context
+  const { openPianoRoll } = usePianoRollStore();
+  
+  // Handle piano roll opening when track is clicked
+  const handleTrackClick = (e: React.MouseEvent) => {
+    // For MIDI and drum tracks, directly open the piano roll
+    if (type === 'midi' || type === 'drum') {
+      e.stopPropagation();
+      openPianoRoll(id);
+    }
   };
 
   // Handle position changes
   const handlePositionChange = (trackId: string, newPosition: Position, isDragEnd: boolean) => {
-    props.onPositionChange(newPosition, isDragEnd);
+    // Call the callback properly
+    onPositionChange(newPosition, isDragEnd);
   };
-  
-  // If trackState couldn't be constructed, don't render
-  if (!track) {
-      console.warn(`Track component: Could not find track data in store for id: ${id}`);
-      return null; 
-  }
+
+  // Handle resize changes including trimming
+  const handleResizeEnd = useCallback((trackId: string, newPositionX: number, newWidth: number, resizeDirection: 'left' | 'right') => {
+    if (!fullTrack || !store) return;
+
+    // Create a copy of the track for updates
+    const updatedTrack = { ...fullTrack };
+    
+    // Update local width immediately for immediate visual feedback
+    setTrackWidth(newWidth);
+    
+    // IMPORTANT FIX: Always calculate originalDurationTicks - it may be missing
+    // Get track duration in ticks
+    const ticksPerPixel = store.getTicksPerPixel() || 1;
+    
+    // If originalDurationTicks is not set, calculate it from the full track width
+    if (!updatedTrack.originalDurationTicks) {
+      // Calculate from the ORIGINAL full width, not the current width
+      const originalWidth = updatedTrack.duration ? 
+        calculateTrackWidth(updatedTrack.duration, bpm, timeSignature) : 
+        (updatedTrack._calculatedWidth || 0);
+        
+      updatedTrack.originalDurationTicks = Math.round(originalWidth * ticksPerPixel);
+      updatedTrack.trimStartTicks = 0;
+      updatedTrack.trimEndTicks = updatedTrack.originalDurationTicks;
+      
+      console.log(`Initialized original track duration: ${updatedTrack.originalDurationTicks} ticks`);
+    }
+
+    // Store old values for history
+    const oldTrimStartTicks = updatedTrack.trimStartTicks || 0;
+    const oldTrimEndTicks = updatedTrack.trimEndTicks || updatedTrack.originalDurationTicks || 0;
+    const oldWidth = updatedTrack._calculatedWidth || 0;
+    const oldPositionX = updatedTrack.position.x;
+    
+    // CRITICAL: Ensure originalDurationTicks is never zero or undefined
+    if (!updatedTrack.originalDurationTicks || updatedTrack.originalDurationTicks <= 0) {
+      // Fallback to a reasonable value based on current width and ticksPerPixel
+      updatedTrack.originalDurationTicks = Math.round((oldWidth || 480) * ticksPerPixel);
+      console.warn('Invalid originalDurationTicks, using fallback:', updatedTrack.originalDurationTicks);
+    }
+    
+    if (resizeDirection === 'left') {
+      // Calculate trim start ticks based on position change
+      const deltaX = newPositionX - fullTrack.position.x;
+      const deltaTicks = Math.round(deltaX * ticksPerPixel);
+      
+      // Update trim values
+      updatedTrack.trimStartTicks = Math.max(0, (fullTrack.trimStartTicks || 0) + deltaTicks);
+      
+      // Ensure we don't trim beyond the track length
+      updatedTrack.trimStartTicks = Math.min(
+        updatedTrack.trimStartTicks, 
+        (updatedTrack.trimEndTicks || updatedTrack.originalDurationTicks || 0) - 1
+      );
+      
+      // Update position and width
+      updatedTrack.position = { 
+        ...fullTrack.position,
+        x: newPositionX
+      };
+      updatedTrack._calculatedWidth = newWidth;
+    } 
+    else if (resizeDirection === 'right') {
+      // Calculate trim end ticks based on width change
+      const newWidthTicks = Math.round(newWidth * ticksPerPixel);
+      
+      // Update trim values
+      updatedTrack.trimEndTicks = Math.min(
+        (fullTrack.trimStartTicks || 0) + newWidthTicks,
+        updatedTrack.originalDurationTicks || 0
+      );
+      
+      // Ensure we have at least 1 tick of content
+      updatedTrack.trimEndTicks = Math.max(
+        (updatedTrack.trimStartTicks || 0) + 1,
+        updatedTrack.trimEndTicks
+      );
+      
+      // Update width
+      updatedTrack._calculatedWidth = newWidth;
+    }
+    
+    // Log trim values for debugging
+    console.log('Track trim values updated:', {
+      id: trackId,
+      direction: resizeDirection,
+      originalDurationTicks: updatedTrack.originalDurationTicks,
+      trimStartTicks: updatedTrack.trimStartTicks,
+      trimEndTicks: updatedTrack.trimEndTicks,
+      visualWidth: newWidth,
+      calculatedWidth: updatedTrack._calculatedWidth
+    });
+
+    // Create and execute the resize action for history tracking
+    try {
+      // Create the TrackResizeAction directly
+      const action = new TrackResizeAction(
+        store,
+        trackId,
+        oldTrimStartTicks,
+        oldTrimEndTicks,
+        oldWidth,
+        oldPositionX,
+        updatedTrack.trimStartTicks || 0,
+        updatedTrack.trimEndTicks || updatedTrack.originalDurationTicks || 0,
+        updatedTrack._calculatedWidth || 0,
+        updatedTrack.position.x
+      );
+      
+      // Execute the action through history manager
+      historyManager.executeAction(action).then(() => {
+        // Update history state buttons
+        useStudioStore.setState({
+          canUndo: historyManager.canUndo(),
+          canRedo: historyManager.canRedo()
+        });
+      });
+    } catch (error) {
+      console.error('Failed to create track resize action:', error);
+    }
+    
+    // Update the track in the store immediately for visual feedback
+    updateTrack(updatedTrack);
+    
+    // Update audio engine if this is an audio track
+    if (updatedTrack.type === 'audio') {
+      const audioEngine = store.getAudioEngine();
+      if (audioEngine) {
+        // Update trim settings in audio engine
+        audioEngine.setTrackTrim?.(
+          trackId, 
+          updatedTrack.trimStartTicks || 0, 
+          updatedTrack.trimEndTicks || updatedTrack.originalDurationTicks || 0
+        );
+      }
+    }
+  }, [fullTrack, store, updateTrack, bpm, timeSignature]);
 
   return (
     <Box 
@@ -88,17 +236,34 @@ function Track(props: TrackProps) {
     >
       <TrackFactory
         // Pass down props expected by TrackFactory/BaseTrackPreview
-        track={track}
-        isPlaying={props.isPlaying}
-        currentTime={props.currentTime}
-        measureCount={props.measureCount}
-        gridLineStyle={props.gridLineStyle}
-        onPositionChange={handlePositionChange} // Ensure this uses the correct signature if needed by BaseTrackPreview
-        bpm={props.bpm}
-        timeSignature={props.timeSignature}
-        trackIndex={props.index}
-        trackWidth={track._calculatedWidth ?? 0} // <-- Pass trackWidth separately
-        // BaseTrackPreview requires trackColor which is handled by TrackFactory
+        track={fullTrack ? {
+          ...fullTrack,
+          _calculatedWidth: trackWidth // Ensure the track object has the correct width
+        } : {
+          name,
+          id,
+          type: type as 'audio' | 'midi' | 'drum' | 'sampler',
+          audioFile,
+          position,
+          duration,
+          _calculatedWidth: trackWidth,
+          // Default values if fullTrack not available
+          muted: false,
+          soloed: false,
+          volume: 80,
+          pan: 0,
+          channel: {} as any
+        }}
+        isPlaying={isPlaying}
+        currentTime={currentTime}
+        measureCount={measureCount}
+        gridLineStyle={gridLineStyle}
+        onPositionChange={handlePositionChange}
+        onResizeEnd={handleResizeEnd}
+        bpm={bpm}
+        timeSignature={timeSignature}
+        trackIndex={index}
+        trackWidth={trackWidth}
       />
     </Box>
   );

@@ -353,11 +353,153 @@ export class ParameterChangeAction extends TrackAction {
 }
 
 /**
+ * Action for resizing a track (including trim operations)
+ */
+export class TrackResizeAction extends TrackAction {
+    readonly type = 'TRACK_RESIZE';
+    private oldTrimStartTicks: number;
+    private oldTrimEndTicks: number;
+    private oldWidth: number;
+    private oldPositionX: number;
+    private newTrimStartTicks: number;
+    private newTrimEndTicks: number;
+    private newWidth: number;
+    private newPositionX: number;
+    
+    constructor(
+        store: Store,
+        trackId: string,
+        oldTrimStartTicks: number,
+        oldTrimEndTicks: number,
+        oldWidth: number,
+        oldPositionX: number,
+        newTrimStartTicks: number,
+        newTrimEndTicks: number,
+        newWidth: number,
+        newPositionX: number
+    ) {
+        super(store, trackId);
+        this.oldTrimStartTicks = oldTrimStartTicks;
+        this.oldTrimEndTicks = oldTrimEndTicks;
+        this.oldWidth = oldWidth;
+        this.oldPositionX = oldPositionX;
+        this.newTrimStartTicks = newTrimStartTicks;
+        this.newTrimEndTicks = newTrimEndTicks;
+        this.newWidth = newWidth;
+        this.newPositionX = newPositionX;
+    }
+    
+    private updateTrackResize(
+        trimStartTicks: number,
+        trimEndTicks: number,
+        width: number,
+        positionX: number,
+        operation: string
+    ): void {
+        // Update state directly through global store
+        useStudioStore.setState(state => ({
+            tracks: state.tracks.map(track => 
+                track.id === this.trackId 
+                    ? { 
+                          ...track, 
+                          trimStartTicks,
+                          trimEndTicks,
+                          _calculatedWidth: width,
+                          position: {
+                              ...track.position,
+                              x: positionX
+                          }
+                      }
+                    : track
+            )
+        }));
+        
+        // Update audio engine trim settings
+        this.store.getAudioEngine().setTrackTrim(
+            this.trackId, 
+            trimStartTicks, 
+            trimEndTicks
+        );
+        
+        // Update audio engine position
+        this.store.getAudioEngine().setTrackPosition(
+            this.trackId, 
+            positionX, 
+            useStudioStore.getState().tracks.find(t => t.id === this.trackId)?.position.y || 0
+        );
+        
+        // Check current playback state
+        const isCurrentlyPlaying = this.store.getTransport().isPlaying;
+        
+        // If playback is active, tell the transport controller to adjust playback
+        if (isCurrentlyPlaying) {
+            console.log(`Playback active during ${operation} - syncing track with transport`);
+            this.store.getTransport().handleTrackPositionChange?.(this.trackId, positionX);
+        }
+    }
+    
+    async execute(): Promise<void> {
+        this.updateTrackResize(
+            this.newTrimStartTicks,
+            this.newTrimEndTicks,
+            this.newWidth,
+            this.newPositionX,
+            'execute'
+        );
+        
+        this.log('Execute', { 
+            trackId: this.trackId, 
+            from: {
+                trimStartTicks: this.oldTrimStartTicks,
+                trimEndTicks: this.oldTrimEndTicks,
+                width: this.oldWidth,
+                positionX: this.oldPositionX
+            }, 
+            to: {
+                trimStartTicks: this.newTrimStartTicks,
+                trimEndTicks: this.newTrimEndTicks,
+                width: this.newWidth,
+                positionX: this.newPositionX
+            },
+            isCurrentlyPlaying: this.store.getTransport().isPlaying
+        });
+    }
+    
+    async undo(): Promise<void> {
+        this.updateTrackResize(
+            this.oldTrimStartTicks,
+            this.oldTrimEndTicks,
+            this.oldWidth,
+            this.oldPositionX,
+            'undo'
+        );
+        
+        this.log('Undo', { 
+            trackId: this.trackId, 
+            from: {
+                trimStartTicks: this.newTrimStartTicks,
+                trimEndTicks: this.newTrimEndTicks,
+                width: this.newWidth,
+                positionX: this.newPositionX
+            }, 
+            to: {
+                trimStartTicks: this.oldTrimStartTicks,
+                trimEndTicks: this.oldTrimEndTicks,
+                width: this.oldWidth,
+                positionX: this.oldPositionX
+            },
+            isCurrentlyPlaying: this.store.getTransport().isPlaying
+        });
+    }
+}
+
+/**
  * Export all track actions
  */
 export const TrackActions = {
     TrackPosition: TrackPositionAction,
     AddTrack: AddTrackAction, 
     DeleteTrack: DeleteTrackAction,
-    ParameterChange: ParameterChangeAction
+    ParameterChange: ParameterChangeAction,
+    TrackResize: TrackResizeAction
 };

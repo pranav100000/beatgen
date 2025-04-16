@@ -44,9 +44,7 @@ export const GRID_CONSTANTS = {
 
 /**
  * Calculate track width based on duration, BPM, and time signature
- * Example: At 120 BPM, a 30-second track = 60 beats = 15 bars (measures) in 4/4
- *          At 60 BPM, a 30-second track = 30 beats = 7.5 bars (measures) in 4/4
- *          But in 3/4, the same 30 beats would be 10 bars
+ * If trim values are provided, calculates width based on trimmed duration
  * 
  * Formula: 
  * 1. Beats = Duration * (BPM / 60)
@@ -56,21 +54,50 @@ export const GRID_CONSTANTS = {
 export const calculateTrackWidth = (
   durationInSeconds: number, 
   bpm: number,
-  timeSignature?: [number, number]
+  timeSignature?: [number, number],
+  trimValues?: {
+    trimStartTicks?: number,
+    trimEndTicks?: number,
+    originalDurationTicks?: number
+  }
 ): number => {
   const beatsPerMeasure = timeSignature ? timeSignature[0] : GRID_CONSTANTS.beatsPerMeasure;
   
   // Use getMeasureWidth() instead of GRID_CONSTANTS.measureWidth
   const currentMeasureWidth = getMeasureWidth();
   
-  console.log('Calculating track width:', {
-    durationInSeconds,
-    bpm,
-    timeSignature,
-    beatsPerMeasure,
-    measureWidth: currentMeasureWidth
-  });
+  // If we have trim values, calculate width based on trimmed duration
+  if (trimValues && 
+      trimValues.trimStartTicks !== undefined && 
+      trimValues.trimEndTicks !== undefined && 
+      trimValues.originalDurationTicks) {
+    
+    // Calculate the trimmed duration in ticks
+    const trimmedDurationTicks = trimValues.trimEndTicks - trimValues.trimStartTicks;
+    
+    // Calculate ratio of trimmed duration to original duration
+    const trimRatio = trimmedDurationTicks / trimValues.originalDurationTicks;
+    
+    // Apply ratio to the full width calculation
+    const fullWidth = calculateFullTrackWidth(durationInSeconds, bpm, beatsPerMeasure, currentMeasureWidth);
+    
+    // Return trimmed width
+    return fullWidth * trimRatio;
+  }
+  
+  // Standard width calculation for untrimmed tracks
+  return calculateFullTrackWidth(durationInSeconds, bpm, beatsPerMeasure, currentMeasureWidth);
+};
 
+/**
+ * Helper function for calculating full track width without trimming
+ */
+function calculateFullTrackWidth(
+  durationInSeconds: number,
+  bpm: number,
+  beatsPerMeasure: number,
+  measureWidth: number
+): number {
   // Calculate total beats in the duration
   const beatsPerSecond = bpm / 60;
   const totalBeats = durationInSeconds * beatsPerSecond;
@@ -79,17 +106,8 @@ export const calculateTrackWidth = (
   const measuresCount = totalBeats / beatsPerMeasure;
   
   // Convert measures to pixels
-  const width = measuresCount * currentMeasureWidth;
-
-  console.log('Track width calculation results:', {
-    beatsPerSecond,
-    totalBeats,
-    measuresCount,
-    finalWidth: width
-  });
-
-  return width;
-};
+  return measuresCount * measureWidth;
+}
 
 /**
  * Convert time to position based on musical timing rather than just seconds

@@ -21,6 +21,8 @@ export const MidiTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     timeSignature = [4, 4],
     trackIndex = 0,
     trackColor: providedTrackColor,
+    trackWidth: providedTrackWidth,
+    onResizeEnd,
     ...restProps
   } = props;
   
@@ -32,12 +34,20 @@ export const MidiTrackPreview: React.FC<TrackPreviewProps> = (props) => {
   const midiManager = store?.getMidiManager();
   const trackNotes = midiManager?.getTrackNotes(track.id) || [];
   
-  // Calculate MIDI track width
-  const trackWidth = useMemo(() => calculateMidiTrackWidth(
-    trackNotes,
-    timeSignature,
-    midiMeasureWidth
-  ), [trackNotes, timeSignature, midiMeasureWidth]);
+  // Calculate MIDI track width only if not provided
+  const trackWidth = useMemo(() => {
+    // If a width is explicitly provided, use it - this is critical for resize operations
+    if (providedTrackWidth && providedTrackWidth > 0) {
+      return providedTrackWidth;
+    }
+    
+    // Only calculate if we don't have an explicit width
+    return calculateMidiTrackWidth(
+      trackNotes,
+      timeSignature,
+      midiMeasureWidth
+    );
+  }, [trackNotes, timeSignature, midiMeasureWidth, providedTrackWidth]);
   
   // MIDI-specific track content rendering
   const renderTrackContent = () => (
@@ -80,6 +90,7 @@ export const MidiTrackPreview: React.FC<TrackPreviewProps> = (props) => {
       timeSignature={timeSignature}
       renderTrackContent={renderTrackContent}
       trackIndex={trackIndex}
+      onResizeEnd={onResizeEnd}
     />
   );
 };

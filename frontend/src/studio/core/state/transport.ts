@@ -133,128 +133,84 @@ export class TransportController implements Transport {
             this.audioEngine.getAllTracks().forEach(track => {
                 if (!track.player) return;
                 
-                // Get track's UI X position (defaulting to 0 if not set)
-                const trackX = track.position?.x || 0;
-                
-                // Get the track's start offset in seconds (where it sits on the timeline)
-                const trackOffset = this.getTrackTimeOffset(trackX);
-                
-                // Get the most current transport position directly from Tone.js
-                // This is crucial for accurate timing
-                transportPosition = Tone.getTransport().seconds;
-                
-                // SIMPLIFIED FIX: We want to know if the track should be playing now and if so, from what offset
-                const trackPlayTime = transportPosition - trackOffset;
-                
-                console.log(`URGENT DEBUG - Track ${track.id} position calculation:`, {
-                    formula: `transportPosition (${transportPosition}s) - trackOffset (${trackOffset}s) = trackPlayTime (${trackPlayTime}s)`,
-                    trackX: trackX,
-                    transportPositionSource: "direct from Tone.Transport.seconds",
-                    trackPlayTimeExplanation: trackPlayTime >= 0 
-                      ? `Play track from ${trackPlayTime}s offset` 
-                      : `Schedule track to start in ${Math.abs(trackPlayTime)}s`
-                });
-                
-                // We already unsynced all players at the start of this method
-                // No need to unsync again here, which could cause issues
-                
-                // Detailed debug logging for track timing calculations
-                console.log(`Track ${track.id} timing calculations:`, {
-                    transportPosition,
-                    trackX,
-                    trackOffset,
-                    trackPlayTime,
-                    formula: `${transportPosition}s - ${trackOffset}s = ${trackPlayTime}s`
-                });
-                
-                if (trackPlayTime >= 0) {
-                    // Track should play immediately from an offset position
-                    console.log(`Track ${track.id} starting now from position ${trackPlayTime}s (offset: ${trackOffset}s)`);
+                try {
+                    const trackX = track.position?.x || 0;
                     
-                    try {
-                        // URGENT FIX: Going back to the absolute simplest pattern
-                        // We need to ensure the player is 100% in the correct state
+                    // Get track's trim settings if available
+                    const hasTrimSettings = 
+                        track.player && 
+                        (track.player as any)._trimSettings && 
+                        (track.player as any)._trimSettings.trimEnabled;
+                    
+                    // Calculate the offset when this track should start playing
+                    // Standard offset based on track position
+                    const trackPositionOffset = this.getTrackTimeOffset(trackX);
+                    
+                    // If trim settings exist, adjust playback accordingly
+                    if (hasTrimSettings) {
+                        const trimSettings = (track.player as any)._trimSettings;
+                        console.log(`Scheduling trimmed track ${track.id}:`, trimSettings);
+                        
+                        // Clean start and sync of player
                         if (track.player.state === "started") {
                             track.player.stop();
                         }
-                        
-                        // Completely reset the player
                         track.player.unsync();
                         
-                        // Set volume using our conversion utility
-                        track.player.volume.value = convertVolumeToDecibels(track.volume, track.muted);
+                        // Calculate how much time has passed since the transport position
+                        const effectiveStartTime = Math.max(0, transportPosition - trackPositionOffset);
                         
-                        // CRITICAL FIX: There may be a bug in our usage of the sync()/start() pattern
-                        // Let's try a different approach with explicit start timing
-                        console.log(`REVISED APPROACH: Starting track ${track.id} from ${trackPlayTime}s`);
+                        // Check if we should skip ahead in the trimmed audio
+                        const trimStartSec = trimSettings.trimStartSeconds;
+                        const trimEndSec = trimSettings.trimEndSeconds;
+                        const trimmedDuration = trimEndSec - trimStartSec;
                         
-                        // Do NOT sync first - instead set up the player with its offset
-                        // Then start the player RIGHT NOW with the correct offset
-                        // This is the most direct approach
-                        track.player.start("+0", trackPlayTime);
+                        if (effectiveStartTime <= 0) {
+                            // Normal start from beginning of trimmed region
+                            console.log(`Starting trimmed track ${track.id} from beginning of trim`);
+                            // Set start position to trim start and sync playback
+                            track.player.start(0, trimStartSec);
+                            track.player.sync();
+                        } else if (effectiveStartTime < trimmedDuration) {
+                            // Start from a point inside the trimmed region
+                            const startOffset = trimStartSec + effectiveStartTime;
+                            console.log(`Starting trimmed track ${track.id} from offset ${startOffset}s`);
+                            track.player.start(0, startOffset);
+                            track.player.sync();
+                        } else {
+                            // We're past the end of this track - don't schedule
+                            console.log(`Transport position ${transportPosition}s is past end of trimmed track ${track.id}`);
+                        }
+                    } else {
+                        // Normal scheduling for untrimmed tracks - existing code path
+                        console.log(`Scheduling untrimmed track ${track.id} with offset ${trackPositionOffset}s`);
                         
-                        // Then sync AFTER starting - this allows us to directly control the start time
-                        // while still having future transport control (pause, etc.)
-                        track.player.sync();
-                        
-                        console.log(`Successfully started track ${track.id} at offset ${trackPlayTime}s`);
-                    } catch (error) {
-                        console.error(`Error starting track ${track.id}:`, error);
-                    }
-                } else {
-                    // Track shouldn't play yet - schedule it for future playback
-                    const startDelaySeconds = Math.abs(trackPlayTime);
-                    console.log(`Track ${track.id} will start in ${startDelaySeconds}s (at transport time ${trackOffset}s)`);
-                    
-                    try {
-                        // CRITICAL FIX: Explicitly unsync before scheduling
-                        // This ensures a clean state for the player
+                        // Clean start and sync of player
+                        if (track.player.state === "started") {
+                            track.player.stop();
+                        }
                         track.player.unsync();
                         
-                        // Schedule this track to start at the right time
-                        // Add a tiny safety buffer to avoid timing conflicts
-                        const safetyBuffer = 0.01; // 10ms buffer for reliability
-                        const scheduleTime = `+${startDelaySeconds + safetyBuffer}`;
-                        
-                        console.log(`Scheduling track ${track.id} to start in ${scheduleTime} seconds`);
-                        
-                        // CRITICAL FIX: Use a simpler, more direct approach
-                        // Schedule the track to play from its beginning at the right time
-                        const eventId = Tone.Transport.schedule(time => {
-                            try {
-                                console.log(`EXECUTING SCHEDULE: Track ${track.id} at time ${time}`);
-                                
-                                // Stop and unsync to be 100% certain of state
-                                if (track.player?.state === "started") {
-                                    track.player.stop();
-                                }
-                                track.player?.unsync();
-                                
-                                // Set volume using our conversion utility
-                                track.player.volume.value = convertVolumeToDecibels(track.volume, track.muted);
-                                
-                                // Explicitly start the player at the scheduled time from the beginning
-                                track.player?.start(time, 0);
-                                
-                                // Sync AFTER starting to ensure future transport control works
-                                // This is a crucial ordering detail based on Tone.js behavior
-                                track.player?.sync();
-                                
-                                console.log(`Track ${track.id} started at scheduled time ${time}`);
-                            } catch (error) {
-                                console.error(`Error starting scheduled track ${track.id}:`, error);
-                            }
-                        }, scheduleTime);
-                        
-                        // Store event ID for cleanup when stopping/seeking
-                        this.scheduledEvents.push(eventId);
-                        
-                    } catch (error) {
-                        console.error(`Error scheduling track ${track.id}:`, error);
+                        // Sync the player with the transport and set its start position
+                        // Only schedule if the track should be playing at this position
+                        if (trackPositionOffset <= transportPosition) {
+                            const startOffset = Math.max(0, transportPosition - trackPositionOffset);
+                            
+                            // CRITICAL: We must start the player at the correct offset
+                            // This is calculated as the difference between transport position
+                            // and the track's own position on the timeline
+                            track.player.start(0, startOffset);
+                            track.player.sync();
+                            
+                            console.log(`Track ${track.id} synced, starting at offset ${startOffset}s`);
+                        } else {
+                            // Track is in the future, don't schedule yet
+                            console.log(`Track ${track.id} is in the future, not scheduling yet`);
+                        }
                     }
+                } catch (error) {
+                    console.error(`Error scheduling track ${track.id}:`, error);
                 }
-                
-                console.log(`Prepared player for track ${track.id}, position: ${trackX}px`);
             });
 
             // URGENT FIX: Force a clean Transport start

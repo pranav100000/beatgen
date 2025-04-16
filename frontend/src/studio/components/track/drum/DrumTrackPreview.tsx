@@ -23,6 +23,8 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     timeSignature = [4, 4],
     trackIndex = 0,
     trackColor: providedTrackColor,
+    trackWidth: providedTrackWidth,
+    onResizeEnd,
     ...restProps
   } = props;
   
@@ -41,47 +43,34 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
   // Get the drum pattern directly from the casted track state
   const drumPattern = drumTrack.drumPattern;
   
-  // Calculate drum track width - revert to 4 measures wide for the container
+  // Calculate drum track width only if not provided
   const trackWidth = useMemo(() => {
-    // Calculate width equivalent to 4 measures
+    // If a width is explicitly provided, use it - this is critical for resize operations
+    if (providedTrackWidth && providedTrackWidth > 0) {
+      return providedTrackWidth;
+    }
+    
+    // Otherwise, calculate width equivalent to 4 measures (default for new tracks)
     const measures = 4;
     const beatsPerMeasure = timeSignature[0];
     const beatWidth = midiMeasureWidth / beatsPerMeasure;
     return measures * beatsPerMeasure * beatWidth;
     
-    // REMOVE: Previous calculation for 4 beats
-    /*
-    // Calculate width for the number of steps shown in the preview (PREVIEW_COLS = 16)
-    const beatsToShow = 16 / 4; 
-    const beatWidth = midiMeasureWidth / beatsPerMeasure;
-    return beatsToShow * beatWidth;
-    */
-  }, [timeSignature, midiMeasureWidth]);
+  }, [timeSignature, midiMeasureWidth, providedTrackWidth]);
   
   // Drum-specific track content rendering
   const renderTrackContent = () => {
-    // REMOVE: Calculation for 1-measure width
-    /*
-    const gridPreviewWidth = useMemo(() => {
-        const beatsToShow = 16 / 4; 
-        const beatsPerMeasure = timeSignature[0];
-        const beatWidth = midiMeasureWidth / beatsPerMeasure;
-        return beatsToShow * beatWidth; 
-    }, [timeSignature, midiMeasureWidth]);
-    */
-    
     return (
       <>
         <DrumGridPreview 
           pattern={drumPattern}
-          // width={gridPreviewWidth}
-          width={trackWidth} // <-- Pass the full 4-measure trackWidth
-        height={GRID_CONSTANTS.trackHeight - 6}
-        trackColor={trackColor}
-      />
-    </>
-  );
-  }
+          width={trackWidth}
+          height={GRID_CONSTANTS.trackHeight - 6}
+          trackColor={trackColor}
+        />
+      </>
+    );
+  };
   
   console.log(`DrumTrackPreview: Rendering for track ${track.id}, pattern:`, drumPattern);
   
@@ -94,6 +83,7 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
       timeSignature={timeSignature}
       renderTrackContent={renderTrackContent}
       trackIndex={trackIndex}
+      onResizeEnd={onResizeEnd}
     />
   );
 };

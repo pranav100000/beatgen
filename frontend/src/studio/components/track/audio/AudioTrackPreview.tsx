@@ -19,18 +19,29 @@ export const AudioTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     bpm, 
     trackIndex = 0,
     trackColor: providedTrackColor,
+    trackWidth: providedTrackWidth,
+    onResizeEnd,
     ...restProps 
   } = props;
   
   const audioMeasureWidth = useGridStore(state => state.audioMeasureWidth);
   const trackColor = providedTrackColor || getTrackColor(trackIndex);
   
-  // Calculate audio track width
-  const trackWidth = useMemo(() => calculateAudioTrackWidth(
-    track.duration || 8, // Default to 8 seconds if no duration specified
-    bpm,
-    audioMeasureWidth
-  ), [track.duration, bpm, audioMeasureWidth]);
+  // Only calculate width if not provided (for new tracks)
+  // Otherwise use the provided width to prevent snapping back
+  const trackWidth = useMemo(() => {
+    // If a width is explicitly provided, use it - this is critical for resize operations
+    if (providedTrackWidth && providedTrackWidth > 0) {
+      return providedTrackWidth;
+    }
+    
+    // Only calculate if we don't have an explicit width
+    return calculateAudioTrackWidth(
+      track.duration || 8, // Default to 8 seconds if no duration specified
+      bpm,
+      audioMeasureWidth
+    );
+  }, [track.duration, bpm, audioMeasureWidth, providedTrackWidth]);
   
   // Audio-specific track content rendering
   const renderTrackContent = () => {
@@ -68,6 +79,7 @@ export const AudioTrackPreview: React.FC<TrackPreviewProps> = (props) => {
       bpm={bpm}
       renderTrackContent={renderTrackContent}
       trackIndex={trackIndex}
+      onResizeEnd={onResizeEnd}
     />
   );
 };

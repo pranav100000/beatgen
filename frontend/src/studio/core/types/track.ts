@@ -26,6 +26,9 @@ export interface BaseTrackState {
     instrumentId?: string; // ID of the instrument
     instrumentName?: string; // Name of the instrument
     instrumentStorageKey?: string; // Storage key for the instrument
+    trimStartTicks?: number; // Trim start ticks
+    trimEndTicks?: number; // Trim end ticks
+    originalDurationTicks?: number; // Original duration ticks
     audioFile?: File;
 }
 

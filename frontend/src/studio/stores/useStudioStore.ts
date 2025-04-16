@@ -100,6 +100,8 @@ interface StudioState {
   // New action to add an EMPTY sampler track and link it to a drum track
   addEmptySamplerToDrumTrack: (drumTrackId: string, newSamplerName?: string) => Promise<string | null>;
   // --- END ADDED ACTION SIGNATURES ---
+
+  updateTrack: (updatedTrack: TrackState) => void;
 }
 
 export const useStudioStore = create<StudioState>((set, get) => {
@@ -1686,5 +1688,22 @@ export const useStudioStore = create<StudioState>((set, get) => {
     }
   },
   // --- END ADDED ACTIONS ---
+
+  updateTrack: (updatedTrack: TrackState) => {
+    const { tracks, store } = get();
+    
+    // Update the track in the tracks array
+    const updatedTracks = tracks.map(track => 
+      track.id === updatedTrack.id ? updatedTrack : track
+    );
+    
+    // Update the state
+    set({ tracks: updatedTracks });
+    
+    // Update in the audio engine if needed
+    if (store && updatedTrack.type === 'audio') {
+      store.getAudioEngine().updateTrack(updatedTrack.id, updatedTrack);
+    }
+  },
 }
 });

@@ -7,7 +7,7 @@ import { Position, TrackState } from '../../../core/types/track';
  * BaseTrackPreview is the foundation for all track visualizations in the timeline.
  * It provides common functionality like drag-and-drop positioning, visual styling,
  * and appearance management, while delegating track-specific content rendering to
- * specialized components.
+ * specialized components. It also supports resizing from the left and right edges.
  * 
  * This component follows the strategy pattern, where the rendering behavior is
  * provided by the implementing components.
@@ -51,6 +51,9 @@ export interface BaseTrackPreviewProps {
   
   /** Calculated width for the track */
   trackWidth: number;
+  
+  /** Callback when track resizing finishes */
+  onResizeEnd: (trackId: string, newPositionX: number, newWidth: number, resizeDirection: 'left' | 'right') => void;
 }
 
 export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
@@ -62,7 +65,8 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   trackStyleOverrides = {},
   renderTrackContent,
   trackWidth,
-  timeSignature = [4, 4]
+  timeSignature = [4, 4],
+  onResizeEnd
 }) => {
   // Refs and state for drag functionality
   const trackRef = useRef<HTMLDivElement>(null);
@@ -70,6 +74,22 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   const [startDragMousePosition, setStartDragMousePosition] = useState({ x: 0, y: 0 });
   const [startDragTrackPosition, setStartDragTrackPosition] = useState({ x: 0, y: 0 });
   const lastMovedPositionRef = useRef<Position>(track.position);
+  
+  // Store the trackWidth in a ref to ensure we maintain it during operations
+  const trackWidthRef = useRef(trackWidth);
+  useEffect(() => {
+    trackWidthRef.current = trackWidth;
+  }, [trackWidth]);
+
+  // Refs and state for resize functionality
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState<'left' | 'right' | null>(null);
+  const [startResizeInfo, setStartResizeInfo] = useState<{ startMouseX: number, startTrackX: number, startTrackWidth: number } | null>(null);
+  const lastResizeDataRef = useRef<{ newX: number, newWidth: number }>({ newX: track.position.x, newWidth: trackWidth });
+  const MIN_TRACK_WIDTH_SNAP_UNITS = 1; // Minimum width in terms of smallest grid subdivision
+
+  // Calculate content offset for trimming visualization
+  const contentOffsetX = track.trimStartTicks ? -(track.trimStartTicks * (trackWidth / (track.originalDurationTicks || 1))) : 0;
 
   // Create base style object for track
   const trackStyle = {
@@ -81,9 +101,9 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     borderRadius: '6px',
     left: `${track.position.x}px`,
     top: `${track.position.y}px`,
-    cursor: isDragging ? 'grabbing' : 'grab',
-    zIndex: isDragging ? 1001 : 1000,
-    transition: isDragging ? 'none' : 'width 0.2s ease',
+    cursor: isDragging ? 'grabbing' : (isResizing ? 'ew-resize' : 'grab'),
+    zIndex: isDragging || isResizing ? 1001 : 1000,
+    transition: isDragging || isResizing ? 'none' : 'width 0.2s ease, left 0.2s ease, top 0.2s ease',
     '&:hover': {
       boxShadow: `0 0 12px ${trackColor}`,
       zIndex: 9999
@@ -100,8 +120,8 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!trackRef.current) return;
     
-    // Prevent dragging when clicking on controls
-    if ((e.target as HTMLElement).closest('.track-control')) return;
+    // Prevent dragging when clicking on controls or resize handles
+    if ((e.target as HTMLElement).closest('.track-control') || (e.target as HTMLElement).closest('.resize-handle')) return;
 
     // Find container element for scroll offset
     const container = 
@@ -133,9 +153,45 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     e.preventDefault();
   };
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging || !trackRef.current) return;
+  const handleResizeMouseDown = (e: React.MouseEvent, direction: 'left' | 'right') => {
+    if (!trackRef.current) return;
     
+    const container = 
+      trackRef.current.closest('.timeline-container') || 
+      trackRef.current.closest('.MuiBox-root') ||
+      trackRef.current.parentElement?.parentElement;
+      
+    if (!container) return;
+
+    setIsResizing(true);
+    setResizeDirection(direction);
+    
+    // Always use the current trackWidth for start information
+    setStartResizeInfo({
+      startMouseX: e.clientX + (container.scrollLeft || 0),
+      startTrackX: track.position.x,
+      startTrackWidth: trackWidthRef.current // Use ref to ensure latest value
+    });
+    
+    lastResizeDataRef.current = { 
+      newX: track.position.x, 
+      newWidth: trackWidthRef.current // Use ref to ensure latest value
+    };
+
+    // Disable transitions immediately
+    if (trackRef.current) {
+      trackRef.current.style.transition = 'none';
+      // Explicitly set width to ensure it's correct
+      trackRef.current.style.width = `${trackWidthRef.current}px`;
+    }
+
+    e.stopPropagation(); // Prevent track drag
+    e.preventDefault();
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!trackRef.current) return;
+
     const container = 
       trackRef.current.closest('.timeline-container') || 
       trackRef.current.closest('.MuiBox-root') ||
@@ -147,63 +203,158 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     const currentMouseX = e.clientX + container.scrollLeft;
     const currentMouseY = e.clientY + container.scrollTop;
 
-    // Calculate position delta
-    const deltaX = currentMouseX - startDragMousePosition.x;
-    const deltaY = currentMouseY - startDragMousePosition.y;
-    const newX = startDragTrackPosition.x + deltaX;
-    const newY = startDragTrackPosition.y + deltaY;
+    // --- Dragging Logic ---
+    if (isDragging) {
+      // Calculate position delta
+      const deltaX = currentMouseX - startDragMousePosition.x;
+      const deltaY = currentMouseY - startDragMousePosition.y;
+      const newX = startDragTrackPosition.x + deltaX;
+      const newY = startDragTrackPosition.y + deltaY;
 
-    // Snap to grid function
-    const snapToGrid = (value: number, gridSize: number) => {
-      return Math.round(value / gridSize) * gridSize;
-    };
+      // Snap to grid function
+      const snapToGrid = (value: number, gridSize: number) => {
+        return Math.round(value / gridSize) * gridSize;
+      };
 
-    // Calculate grid sizes for snapping
-    const beatsPerMeasure = timeSignature[0];
-    const subdivisionsPerBeat = timeSignature[1];
-    const subdivisionsPerMeasure = beatsPerMeasure * subdivisionsPerBeat;
-    const subdivisionWidth = GRID_CONSTANTS.measureWidth / subdivisionsPerMeasure;
-    
-    // Apply snapping
-    const snappedX = snapToGrid(newX, subdivisionWidth);
-    const snappedY = snapToGrid(newY, GRID_CONSTANTS.trackHeight);
-    const newPosition = {
-      x: Math.max(0, snappedX),
-      y: Math.max(0, snappedY)
-    };
+      // Calculate grid sizes for snapping
+      const beatsPerMeasure = timeSignature[0];
+      const subdivisionsPerBeat = timeSignature[1];
+      const subdivisionsPerMeasure = beatsPerMeasure * subdivisionsPerBeat;
+      const subdivisionWidth = GRID_CONSTANTS.measureWidth / subdivisionsPerMeasure;
+      
+      // Apply snapping
+      const snappedX = snapToGrid(newX, subdivisionWidth);
+      const snappedY = snapToGrid(newY, GRID_CONSTANTS.trackHeight);
+      const newPosition = {
+        x: Math.max(0, snappedX),
+        y: Math.max(0, snappedY)
+      };
 
-    // Update visual position during drag
-    if (trackRef.current) {
-      trackRef.current.style.left = `${newPosition.x}px`;
-      trackRef.current.style.top = `${newPosition.y}px`;
+      // Update visual position during drag
+      if (trackRef.current) {
+        trackRef.current.style.left = `${newPosition.x}px`;
+        trackRef.current.style.top = `${newPosition.y}px`;
+      }
+      
+      // Store position for final update
+      lastMovedPositionRef.current = newPosition;
+    } 
+    // --- Resizing Logic ---
+    else if (isResizing && startResizeInfo) {
+      const deltaX = currentMouseX - startResizeInfo.startMouseX;
+      let snappedNewX = startResizeInfo.startTrackX;
+      let snappedNewWidth = startResizeInfo.startTrackWidth;
+      
+      // Calculate grid sizes for snapping
+      const beatsPerMeasure = timeSignature[0];
+      const subdivisionsPerBeat = timeSignature[1]; // Assuming beat unit maps directly
+      const subdivisionsPerMeasure = beatsPerMeasure * subdivisionsPerBeat;
+      const subdivisionWidth = GRID_CONSTANTS.measureWidth / subdivisionsPerMeasure;
+      const minPixelWidth = subdivisionWidth * MIN_TRACK_WIDTH_SNAP_UNITS;
+
+      // Snap function specific for resizing (ensures minimum width)
+      const snapResize = (value: number, gridSize: number, minValue: number = 0) => {
+          const snapped = Math.round(value / gridSize) * gridSize;
+          return Math.max(minValue, snapped);
+      };
+
+      if (resizeDirection === 'right') {
+          const newWidth = startResizeInfo.startTrackWidth + deltaX;
+          snappedNewWidth = snapResize(newWidth, subdivisionWidth, minPixelWidth);
+          
+          // Update visual width during resize
+          if (trackRef.current) {
+            trackRef.current.style.width = `${snappedNewWidth}px`;
+          }
+          
+      } else if (resizeDirection === 'left') {
+          const newX = startResizeInfo.startTrackX + deltaX;
+          const newWidth = startResizeInfo.startTrackWidth - deltaX;
+          
+          snappedNewX = snapResize(newX, subdivisionWidth); 
+          
+          // Calculate width based on the snapped X position to maintain right edge
+          const rightEdge = startResizeInfo.startTrackX + startResizeInfo.startTrackWidth;
+          let potentialSnappedWidth = rightEdge - snappedNewX;
+
+          // Ensure minimum width when adjusting based on snapped X
+          snappedNewWidth = snapResize(potentialSnappedWidth, subdivisionWidth, minPixelWidth);
+
+          // Recalculate snappedNewX if minimum width constraint changed the width
+          snappedNewX = rightEdge - snappedNewWidth;
+
+          // Update visual position and width during resize
+          if (trackRef.current) {
+              trackRef.current.style.left = `${snappedNewX}px`;
+              trackRef.current.style.width = `${snappedNewWidth}px`;
+          }
+      }
+      
+      // Store values for final update on mouse up
+      lastResizeDataRef.current = { newX: snappedNewX, newWidth: snappedNewWidth };
     }
-    
-    // Store position for final update
-    lastMovedPositionRef.current = newPosition;
   }, [
     isDragging, 
+    isResizing,
+    resizeDirection,
+    startResizeInfo,
     startDragMousePosition, 
     startDragTrackPosition, 
     timeSignature
   ]);
 
   const handleMouseUp = useCallback(() => {
+    // --- Drag End ---
     if (isDragging && trackRef.current) {
+      const finalPosition = lastMovedPositionRef.current;
+      setIsDragging(false); // Reset state first
+
       // Trigger position change with drag end flag
-      onPositionChange(track.id, lastMovedPositionRef.current, true);
+      onPositionChange(track.id, finalPosition, true);
       
-      // Restore transitions
+      // Restore transitions after state change
       if (trackRef.current) {
-        trackRef.current.style.transition = 'left 0.2s ease, top 0.2s ease';
+        // Explicitly set final position/width before re-enabling transition
+        trackRef.current.style.left = `${finalPosition.x}px`;
+        trackRef.current.style.top = `${finalPosition.y}px`;
+        // Ensure width is reset if needed (although drag shouldn't change it)
+        trackRef.current.style.width = `${trackWidth}px`;
+        trackRef.current.style.transition = 'left 0.2s ease, top 0.2s ease, width 0.2s ease'; 
+      }
+    } 
+    // --- Resize End ---
+    else if (isResizing && trackRef.current) {
+      const finalResizeData = lastResizeDataRef.current;
+      const currentDirection = resizeDirection;
+      
+      console.log('Final resize data before ending resize:', finalResizeData);
+      
+      setIsResizing(false); // Reset state first
+      setResizeDirection(null);
+      setStartResizeInfo(null);
+
+      // Trigger resize end callback with direction
+      if (currentDirection) {
+        onResizeEnd(track.id, finalResizeData.newX, finalResizeData.newWidth, currentDirection);
+      }
+
+      // Restore transitions after state change
+      if (trackRef.current) {
+        // Explicitly set final position/width before re-enabling transition
+        trackRef.current.style.left = `${finalResizeData.newX}px`;
+        trackRef.current.style.width = `${finalResizeData.newWidth}px`;
+        // Ensure top is reset if needed (although resize shouldn't change it)
+        trackRef.current.style.top = `${track.position.y}px`;
+        trackRef.current.style.transition = 'left 0.2s ease, top 0.2s ease, width 0.2s ease'; 
       }
     }
     
-    setIsDragging(false);
-  }, [isDragging, track.id, onPositionChange]);
+  }, [isDragging, isResizing, resizeDirection, track.id, track.position.y, onPositionChange, onResizeEnd]);
 
   // Add/remove mouse event listeners
   useEffect(() => {
-    if (isDragging) {
+    // Listen if either dragging or resizing
+    if (isDragging || isResizing) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     }
@@ -211,15 +362,32 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
   
-  // Sync position from props to DOM (for undo/redo)
+  // Sync position AND width from props to DOM (for undo/redo, or external changes)
   useEffect(() => {
-    if (trackRef.current && !isDragging) {
+    if (trackRef.current && !isDragging && !isResizing) { // Only sync if not actively dragging/resizing
       trackRef.current.style.left = `${track.position.x}px`;
       trackRef.current.style.top = `${track.position.y}px`;
+      
+      // Important: Always update the width to match props
+      trackRef.current.style.width = `${trackWidth}px`;
+      
+      console.log('Syncing track DOM:', { id: track.id, width: trackWidth });
     }
-  }, [track.position.x, track.position.y, isDragging]);
+  }, [track.position.x, track.position.y, trackWidth, isDragging, isResizing, track.id]);
+
+  // Define styles for resize handles
+  const resizeHandleStyle = {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: '8px', // Make handle easier to grab
+    cursor: 'ew-resize',
+    zIndex: 1002, // Ensure handles are above track content
+    // Optional: Add visual indicator for handles (e.g., background on hover)
+    // '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.3)' } 
+  };
 
   return (
     <Box
@@ -227,8 +395,29 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       onMouseDown={handleMouseDown}
       className="track"
       sx={trackStyle}
+      data-track-width={trackWidth} // Add data attribute for debugging
     >
-      {/* Track Timeline */}
+       {/* Left Resize Handle */}
+      <Box
+        className="resize-handle resize-handle-left"
+        sx={{
+          ...resizeHandleStyle,
+          left: '-4px', // Position slightly outside/overlapping the left edge
+        }}
+        onMouseDown={(e) => handleResizeMouseDown(e, 'left')}
+      />
+      
+       {/* Right Resize Handle */}
+      <Box
+        className="resize-handle resize-handle-right"
+        sx={{
+          ...resizeHandleStyle,
+          right: '-4px', // Position slightly outside/overlapping the right edge
+        }}
+        onMouseDown={(e) => handleResizeMouseDown(e, 'right')}
+      />
+
+      {/* Track Timeline Content (Original Inner Box) */}
       <Box sx={{ 
         display: 'flex',
         flex: 1,
@@ -247,7 +436,8 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
           opacity: track.muted ? 0.5 : 1,
           boxShadow: 'inset 0 0 10px rgba(255,255,255,0.3)'
         },
-        transition: 'opacity 0.2s ease'
+        transition: 'opacity 0.2s ease',
+        pointerEvents: 'none' // Ensure content doesn't interfere with handles/dragging
       }}>
         {/* Track Type Badge */}
         <Box sx={{
@@ -263,12 +453,13 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
           padding: '2px 6px',
           borderRadius: '3px',
           textTransform: 'uppercase',
-          opacity: 0.7
+          opacity: 0.7,
+          pointerEvents: 'none' // Ensure content doesn't interfere
         }}>
           {track.type}
         </Box>
         
-        {/* Call the render strategy function for specific track content */}
+        {/* Call the render strategy function for specific track content with transform for trimming */}
         <Box sx={{
           position: 'absolute',
           top: '0',
@@ -279,7 +470,8 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
           alignItems: 'center',
           justifyContent: 'flex-start',
           opacity: 0.8,
-          pointerEvents: 'none'
+          pointerEvents: 'none', // Ensure content doesn't interfere
+          transform: `translateX(${contentOffsetX}px)` // Apply content offset for trimming
         }}>
           {renderTrackContent()}
         </Box>
@@ -292,7 +484,8 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
           color: 'white',
           fontSize: '12px',
           fontWeight: 'bold',
-          textShadow: '1px 1px 2px rgba(0,0,0,0.7)'
+          textShadow: '1px 1px 2px rgba(0,0,0,0.7)',
+          pointerEvents: 'none' // Ensure content doesn't interfere
         }}>
           {track.name}
         </Box>
@@ -309,7 +502,8 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
             backgroundColor: 'rgba(0,0,0,0.4)',
             color: 'white',
             fontSize: '14px',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            pointerEvents: 'none' // Ensure content doesn't interfere
           }}>
             MUTED
           </Box>
