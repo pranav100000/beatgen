@@ -205,6 +205,18 @@ class MidiSampler {
      * @param startTime Position to start playback from (in seconds)
      */
     public playMidi(bpm: number = 120, startTime: number = 0): void {
+        console.log("playMidi", bpm, startTime);
+        console.log("this.player", this.player);
+        console.log("this.notes", this.notes);
+        console.log("this.offsetSeconds", this.offsetSeconds);
+        console.log("this.isPlaying", this.isPlaying);
+        console.log("this.onPlaybackStatusChange", this.onPlaybackStatusChange);
+        console.log("this.cutSelfOff", this.cutSelfOff);
+        console.log("this.baseNote", this.baseNote);
+        console.log("this.currentVolume", this.currentVolume);
+        console.log("this.isMuted", this.isMuted);
+        console.log("grainPlayers", this.playerPool);
+        
         if (!this.player?.buffer) {
             this.log("Cannot play: audio not ready");
             return;
@@ -231,12 +243,12 @@ class MidiSampler {
         // Schedule all notes
         for (const note of this.notes) {
             // Calculate note time based on grid position
-            const noteTimeInSeconds = note.column * gridUnitTime;
+            const noteTimeInSeconds = note.column / (bpm * 4);
             
             // Only schedule notes that should play after the effective start time
             if (noteTimeInSeconds >= effectiveStartTime) {
                 // Calculate note duration
-                const noteDuration = note.length * gridUnitTime;
+                const noteDuration = note.length / secPerBeat;
                 
                 // Calculate the absolute time in the transport timeline when this note should play
                 // Apply lookahead to schedule earlier to compensate for transport delay

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as Tone from 'tone';
 import { Store } from '../core/state/store';
-import { TrackState, Position } from '../core/types/track';
+import { TrackState, Position, AudioTrackState, DrumTrackState, SamplerTrackState, MidiTrackState, BaseTrackState } from '../core/types/track';
 import { calculateTrackWidth, getTrackColor, GRID_CONSTANTS } from '../constants/gridConstants';
 import { historyManager } from '../core/state/history/HistoryManager';
 import { getProject, Project } from '../../platform/api/projects';
@@ -9,6 +9,9 @@ import { downloadFile } from '../../platform/api/sounds';
 import { db } from '../core/db/dexie-client';
 // Import actions
 import { Actions } from '../core/state/history/actions';
+import { NoteState } from '../components/drum-machine/DrumMachine';
+import { Note } from '../core/types/note';
+import { convertFromNoteState, convertToNoteState } from '../utils/noteConversion';
 
 interface StudioState {
   // Audio Engine State
@@ -55,7 +58,7 @@ interface StudioState {
   handleTrackMuteToggle: (trackId: string, muted: boolean) => void;
   handleTrackSoloToggle: (trackId: string, soloed: boolean) => void;
   handleTrackDelete: (trackId: string) => Promise<void>;
-  handleAddTrack: (type: 'audio' | 'midi' | 'drum', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => Promise<any>;
+  handleAddTrack: (type: 'audio' | 'midi' | 'drum' | 'sampler', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => Promise<any>;
   handleTrackPositionChange: (trackId: string, newPosition: Position, isDragEnd: boolean) => void;
   uploadAudioFile: (file: File) => Promise<void>;
   handleTrackNameChange: (trackId: string, name: string) => void;
@@ -72,9 +75,128 @@ interface StudioState {
   
   // Function to update track indices based on current order in the array
   updateTrackIndices: () => void;
+
+  // Add back state and actions for multiple drum machines
+  openDrumMachines: Record<string, boolean>; 
+  openDrumMachine: (drumTrackId: string) => void;
+  closeDrumMachine: (trackId: string) => void;
+  setDrumPattern: (trackId: string, pattern: boolean[][]) => void;
+  
+  // Add MIDI actions
+  addMidiNote: (trackId: string, note: NoteState) => void;
+  removeMidiNote: (trackId: string, noteId: number) => void;
+  updateMidiNote: (trackId: string, note: NoteState) => void;
+  
+  getTrackNotes: (trackId: string) => Note[] | null;
+
+  // New action to replace the audio file for an existing track
+  replaceTrackAudioFile: (trackId: string, file: File) => Promise<void>;
+
+  // --- BEGIN ADDED ACTION SIGNATURES ---
+  // New action to add a sampler track file and link it to a drum track
+  addSamplerToDrumTrack: (drumTrackId: string, file: File) => Promise<void>;
+  // New action to remove a sampler track and unlink it from a drum track
+  removeSamplerFromDrumTrack: (drumTrackId: string, samplerTrackIdToDelete: string) => Promise<void>;
+  // New action to add an EMPTY sampler track and link it to a drum track
+  addEmptySamplerToDrumTrack: (drumTrackId: string, newSamplerName?: string) => Promise<string | null>;
+  // --- END ADDED ACTION SIGNATURES ---
 }
 
-export const useStudioStore = create<StudioState>((set, get) => ({
+export const useStudioStore = create<StudioState>((set, get) => {
+  // --- Helper function for core track creation and adding logic --- 
+  const _createAndAddTrack = async (
+    store: Store,
+    type: 'audio' | 'midi' | 'sampler' | 'drum', 
+    name: string,
+    trackId: string,
+    timeSignature: [number, number], 
+    bpm: number,
+    tracksLength: number,
+    initialProps: Partial<TrackState> = {}
+  ): Promise<TrackState | null> => {
+    try {
+      // Combine initial props with defaults ONLY for properties expected by store.createTrack
+      const createTrackProps = {
+          id: trackId,
+          volume: initialProps.volume ?? 80,
+          pan: initialProps.pan ?? 0,
+          muted: initialProps.muted ?? false,
+          soloed: initialProps.soloed ?? false,
+          instrumentId: initialProps.instrumentId,
+          instrumentName: initialProps.instrumentName,
+          instrumentStorageKey: initialProps.instrumentStorageKey,
+      };
+
+      // Let store.createTrack handle low-level creation & engine defaults
+      const newTrack = await store.createTrack(name, type, tracksLength, createTrackProps);
+      // Ensure the correct ID is used, as createTrack might generate its own
+      if (newTrack.id !== trackId) newTrack.id = trackId; 
+      
+      // Add audio engine representation
+      const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, newTrack.name);
+
+      // Calculate defaults for the TrackState object
+      const beatsPerBar = timeSignature[0];
+      const defaultBars = 4;
+      const totalBeats = defaultBars * beatsPerBar;
+      const defaultDuration = (totalBeats * 60) / bpm;
+      const calculatedWidth = calculateTrackWidth(defaultDuration, bpm, timeSignature);
+      const initialPosition = { x: 0, y: tracksLength * GRID_CONSTANTS.trackHeight };
+
+      // Build TrackState explicitly, combining known values and defaults
+      const trackData: TrackState = {
+          id: trackId,
+          name: newTrack.name, // Use name from engine track
+          type: type, // Use the type passed to this helper
+          channel: audioTrack.channel, // Assume exists on audioTrack
+          volume: newTrack.volume ?? 80,
+          pan: newTrack.pan ?? 0,
+          muted: newTrack.muted ?? false,
+          soloed: newTrack.soloed ?? false,
+          position: initialPosition,
+          duration: defaultDuration,
+          _calculatedWidth: calculatedWidth,
+          index: tracksLength, // Use passed length for initial index
+          // Use values from initialProps if provided, otherwise from newTrack or undefined
+          instrumentId: initialProps.instrumentId ?? newTrack.instrumentId,
+          instrumentName: initialProps.instrumentName ?? newTrack.instrumentName,
+          instrumentStorageKey: initialProps.instrumentStorageKey ?? newTrack.instrumentStorageKey,
+          // Add type-specific fields conditionally
+          ...(type === 'audio' && { 
+               audioFile: (initialProps as AudioTrackState)?.audioFile, // Get from initialProps if exists
+               // player: undefined // Usually runtime state
+          }),
+          ...(type === 'sampler' && { 
+               sampleFile: (initialProps as SamplerTrackState)?.sampleFile, 
+               baseMidiNote: (initialProps as SamplerTrackState)?.baseMidiNote, 
+               // etc.
+          }),
+          ...(type === 'drum' && {
+               drumPattern: (initialProps as DrumTrackState)?.drumPattern ?? Array(4).fill(null).map(() => Array(64).fill(false)), // Initialize pattern
+               drumPads: (initialProps as DrumTrackState)?.drumPads,
+          }),
+      };
+
+      // Add optional base fields ONLY if they exist on newTrack and are correct type
+      if ('dbId' in newTrack && typeof newTrack.dbId === 'string') trackData.dbId = newTrack.dbId;
+      if ('storage_key' in newTrack && typeof newTrack.storage_key === 'string') trackData.storage_key = newTrack.storage_key;
+
+      console.log(`_createAndAddTrack: Explicitly built track data for ${trackId}:`, trackData);
+
+      store.getAudioEngine().setTrackPosition(trackData.id, initialPosition.x, initialPosition.y);
+      const action = new Actions.AddTrack(store, trackData);
+      await historyManager.executeAction(action);
+      return trackData;
+
+    } catch (error) {
+       console.error(`_createAndAddTrack: Failed for ${trackId} (${type}):`, error);
+       return null;
+    }
+  };
+  // --- End Helper Function --- 
+
+  // Return the main store object
+  return {
   // Default State
   store: new Store(),
   isInitialized: false,
@@ -91,6 +213,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   canUndo: false,
   canRedo: false,
   addMenuAnchor: null,
+    openDrumMachines: {}, // Initialize drum machine state
   
   // Actions for state updates
   setStore: (store) => set({ store }),
@@ -215,6 +338,23 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setCanUndo: (canUndo) => set({ canUndo }),
   setCanRedo: (canRedo) => set({ canRedo }),
   setAddMenuAnchor: (addMenuAnchor) => set({ addMenuAnchor }),
+    
+    // Add back drum machine action implementations
+    openDrumMachine: (drumTrackId) => set((state) => ({ 
+      openDrumMachines: { ...state.openDrumMachines, [drumTrackId]: true }
+    })),
+    closeDrumMachine: (trackId) => set((state) => ({ 
+      openDrumMachines: { ...state.openDrumMachines, [trackId]: false }
+    })),
+    setDrumPattern: (trackId, pattern) => set(state => {
+      const updatedTracks = state.tracks.map(track => {
+        if (track.id === trackId && track.type === 'drum') {
+          return { ...track, drumPattern: pattern };
+        }
+        return track;
+      });
+      return { tracks: updatedTracks };
+    }),
   
   // Core initialization
   initializeAudio: async () => {
@@ -681,133 +821,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
   },
   
-  handleAddTrack: async (type: 'audio' | 'midi' | 'drum' | 'sampler', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => {
-    const { store, isInitialized, tracks, timeSignature, bpm } = get();
-    if (!store || !isInitialized) {
-      console.warn('Store not initialized');
-      return;
-    }
-
-    console.log('🎹 Adding track with params:', { 
-      type, 
-      instrumentId, 
-      instrumentName, 
-      instrumentStorageKey,
-      rawInstrumentId: instrumentId, // Log the raw value for debugging
-      typeofInstrumentId: typeof instrumentId
-    });
-
-    try {
-      // Create track name based on type
-      let trackName;
-      if (type === 'midi') {
-        trackName = `MIDI Track ${tracks.length + 1}`;
-      } else if (type === 'drum') {
-        trackName = "Drum Machine";
-      } else if (type === 'sampler') {
-        trackName = `Sampler ${tracks.length + 1}`;
-      } else {
-        trackName = `Audio Track ${tracks.length + 1}`;
-      }
-
-      let newTrack;
-      // Create the track
-      if (instrumentId) {
-        console.log('🎹 Creating track with instrument data:', {
-          trackName,
-          type,
-          instrumentId,
-          instrumentName,
-          instrumentStorageKey
-        });
-        const existingTrackData = {
-          id: crypto.randomUUID(),
-          volume: 80,
-          pan: 0,
-          muted: false,
-          soloed: false,
-          instrumentId: instrumentId,
-          instrumentName: instrumentName,
-          instrumentStorageKey: instrumentStorageKey
-        };
-        console.log('🎹 Track data being passed to createTrack:', existingTrackData);
-        newTrack = await store.createTrack(trackName, type, tracks.length, existingTrackData);
-        console.log('🎹 Track created:', newTrack);
-      } else {
-        console.log('🎹 Creating track without instrument data');
-        newTrack = await store.createTrack(trackName, type, tracks.length);
-      }
-      console.log('New track from createTrack:', newTrack);
-      
-      const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, newTrack.name);
-      console.log('Audio track from createTrack:', audioTrack);
-
-      // Default duration for tracks (4 bars at current time signature)
-      const beatsPerBar = timeSignature[0];
-      const defaultBars = 4;
-      const totalBeats = defaultBars * beatsPerBar;
-      const defaultDuration = (totalBeats * 60) / bpm;
-
-      // Create track data with initial position
-      const initialPosition = {
-        x: 0,
-        y: tracks.length * GRID_CONSTANTS.trackHeight // Use the proper track height from constants
-      };
-
-      // Create track data object
-      const trackData: TrackState = {
-        ...newTrack,
-        ...audioTrack,
-        position: initialPosition,
-        duration: defaultDuration,
-        type: type,
-        _calculatedWidth: calculateTrackWidth(defaultDuration, bpm, timeSignature)
-      };
-      
-      // Make sure instrumentId and instrumentName are properly carried over
-      if ((type === 'midi' || type === 'drum') && newTrack.instrumentId) {
-        trackData.instrumentId = newTrack.instrumentId;
-        trackData.instrumentName = newTrack.instrumentName;
-        console.log(`Preserved instrument properties: ${trackData.instrumentId}, ${trackData.instrumentName}`);
-      }
-      
-      console.log('Final track data being added:', trackData);
-
-      // Set track position in audio engine
-      store.getAudioEngine().setTrackPosition(
-        trackData.id,
-        initialPosition.x,
-        initialPosition.y
-      );
-
-      // Create direct add track action (no callbacks)
-      const action = new Actions.AddTrack(
-        store,
-        trackData
-      );
-      
-      // Execute the action through history manager
-      await historyManager.executeAction(action);
-      
-      // Update track indices after addition
-      get().updateTrackIndices();
-      
-      // Update history state buttons
-      set({
-        canUndo: historyManager.canUndo(),
-        canRedo: historyManager.canRedo()
-      });
-
-      console.log(`Added new ${type} track (with history support):`, trackData);
-      
-      // TEMPORARILY COMMENTED OUT TO DEBUG UI ISSUES
-      // // Soundfont connection now happens inside the Track Add callback
-      return newTrack;
-    } catch (error) {
-      console.error(`Failed to create ${type} track:`, error);
-    }
-  },
-  
   handleTrackPositionChange: (trackId, newPosition, isDragEnd) => {
     const { store, tracks, isPlaying } = get();
     if (!store) return;
@@ -930,23 +943,20 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         // Initialize sampler controller
         try {
           const samplerController = store.getTransport().getSamplerController();
-          await samplerController.initializeSampler(
+          
+          // *** CHANGE: Use connectTrackToSampler instead of separate init/subscribe ***
+          await samplerController.connectTrackToSampler(
             newTrack.id,
-            file,
-            defaultBaseNote,
-            defaultGrainSize,
+            file, // Pass the file
+            store.getMidiManager(), // Pass the MidiManager
+            defaultBaseNote, 
+            defaultGrainSize, 
             defaultOverlap
           );
           
-          // Connect to MidiManager for note data
-          samplerController.registerTrackSubscription(
-            newTrack.id,
-            store.getMidiManager()
-          );
-          
-          console.log(`Sampler initialized for track ${newTrack.id}`);
+          console.log(`Sampler initialized and connected for track ${newTrack.id}`);
         } catch (error) {
-          console.error(`Failed to initialize sampler for track ${newTrack.id}:`, error);
+          console.error(`Failed to initialize/subscribe sampler for track ${newTrack.id}:`, error);
           // Continue even if sampler init fails - track will still be created
         }
       } else {
@@ -1058,6 +1068,123 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
   },
   
+  // New action to replace the audio file for an existing track
+  replaceTrackAudioFile: async (trackId: string, file: File) => {
+    const { store, tracks, bpm, timeSignature } = get();
+    if (!store || !get().isInitialized) {
+      console.warn('Store not initialized, cannot replace audio file.');
+      return;
+    }
+
+    const trackIndex = tracks.findIndex(t => t.id === trackId);
+    if (trackIndex === -1) {
+      console.error(`Track with ID ${trackId} not found in store.`);
+      return;
+    }
+
+    const originalTrack = tracks[trackIndex];
+    if (originalTrack.type !== 'audio' && originalTrack.type !== 'sampler') {
+      console.error(`Cannot replace audio file for track type: ${originalTrack.type}`);
+      return;
+    }
+
+    try {
+      console.log(`Replacing audio file for track ${trackId} with ${file.name}`);
+      
+      // Stop playback for this specific sampler before reloading
+      const samplerController = store.getTransport().getSamplerController();
+      const sampler = samplerController.getSampler(trackId);
+      if (sampler) {
+        console.log(`Stopping playback for sampler ${trackId} before file replacement.`);
+        sampler.stopPlayback(); 
+      } else {
+        console.warn(`Sampler ${trackId} not found, cannot stop playback before replacement.`);
+      }
+
+      // Load the new file into the audio engine. This replaces the old player/buffer.
+      await store.loadAudioFile(trackId, file);
+
+      // Get the updated track info from the audio engine (especially duration)
+      const engineTrack = store.getAudioEngine().getAllTracks().find(t => t.id === trackId);
+      if (!engineTrack) {
+        throw new Error(`Failed to get updated engine track data for ${trackId} after file load.`);
+      }
+
+      const newDuration = engineTrack.player?.buffer?.duration || 0;
+      const newCalculatedWidth = calculateTrackWidth(newDuration, bpm, timeSignature);
+
+      // Update the track state in Zustand
+      const updatedTracks = [...tracks]; // Create a mutable copy
+      
+      // Use a more specific type for the update object initially
+      const commonUpdateData: Partial<BaseTrackState> & { duration: number, _calculatedWidth: number } = {
+        duration: newDuration,
+        _calculatedWidth: newCalculatedWidth,
+      };
+
+      if (originalTrack.type === 'audio') {
+        // Now we know it's an AudioTrackState
+        const audioUpdateData: Partial<AudioTrackState> = {
+          ...commonUpdateData,
+          type: 'audio',
+          audioFile: file,
+        };
+        updatedTracks[trackIndex] = {
+          ...originalTrack,
+          ...audioUpdateData
+        };
+      } else if (originalTrack.type === 'sampler') {
+        // Now we know it's a SamplerTrackState
+        const samplerUpdateData: Partial<SamplerTrackState> = {
+          ...commonUpdateData,
+          type: 'sampler',
+          sampleFile: file,
+          baseMidiNote: originalTrack.baseMidiNote,
+          grainSize: originalTrack.grainSize,
+          overlap: originalTrack.overlap,
+        };
+
+        // Re-initialize sampler controller
+        try {
+          const samplerController = store.getTransport().getSamplerController();
+          
+          // *** CHANGE: Use connectTrackToSampler instead of separate init/subscribe ***
+          await samplerController.connectTrackToSampler(
+            trackId,
+            file, // Pass the file
+            store.getMidiManager(), // Pass the MidiManager
+            originalTrack.baseMidiNote, 
+            originalTrack.grainSize, 
+            originalTrack.overlap
+          );
+          
+          console.log(`Sampler initialized and connected for track ${trackId}`);
+        } catch (error) {
+          console.error(`Failed to initialize/subscribe sampler for track ${trackId}:`, error);
+          // Continue even if sampler init fails - track will still be created
+        }
+
+        updatedTracks[trackIndex] = {
+          ...originalTrack,
+          ...samplerUpdateData
+        };
+      }
+
+      set({ tracks: updatedTracks });
+
+      console.log(`Successfully replaced audio file for track ${trackId}. New duration: ${newDuration}`);
+
+      // Optional: Consider adding this change to the history manager
+      // const action = new Actions.UpdateTrack(store, originalTrack, updatedTracks[trackIndex]);
+      // await historyManager.executeAction(action);
+      // set({ canUndo: historyManager.canUndo(), canRedo: historyManager.canRedo() });
+
+    } catch (error) {
+      console.error(`Failed to replace audio file for track ${trackId}:`, error);
+      // Optional: Revert state or show error to user
+    }
+  },
+  
   // Transport actions
   playPause: async () => {
     const { store, isPlaying } = get();
@@ -1140,5 +1267,424 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       index
     }));
     set({ tracks: updatedTracks });
-  }
-}));
+  },
+
+  // Main Add Track Action - Refactored to use helper
+  handleAddTrack: async (type: 'audio' | 'midi' | 'drum' | 'sampler', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => {
+    const { store, isInitialized, tracks, timeSignature, bpm, openDrumMachine } = get(); // Get openDrumMachine
+    if (!store || !isInitialized) {
+      console.warn('Store not initialized');
+      return null;
+    }
+
+    try {
+        // --- Special handling if type is 'drum' --- 
+        if (type === 'drum') {
+            console.log('handleAddTrack: [Drum] Entered block');
+            const defaultSamplerNames = ['Kick', 'Snare', 'Clap', 'Hi-Hat'];
+            const createdSamplerTracks: TrackState[] = [];
+            let currentTrackIndex = get().tracks.length; // Initial index
+
+            // 1. Create Sampler Tracks
+            for (const name of defaultSamplerNames) {
+                try {
+                    const samplerTrackId = crypto.randomUUID();
+                    const samplerType = 'sampler';
+                    const samplerTrackName = name;
+                    const newSamplerTrack = await store.createTrack(samplerTrackName, samplerType, currentTrackIndex, { id: samplerTrackId, instrumentName: 'Default Sampler' });
+                    const audioSamplerTrack = await store.getAudioEngine().createTrack(newSamplerTrack.id, newSamplerTrack.name);
+                    // ... (calculate defaults for sampler) ...
+                    const beatsPerBar = timeSignature[0];
+                    const defaultBars = 4;
+                    const totalBeats = defaultBars * beatsPerBar;
+                    const defaultDuration = (totalBeats * 60) / bpm;
+                    const initialPosition = { x: 0, y: currentTrackIndex * GRID_CONSTANTS.trackHeight };
+                    const samplerTrackData: TrackState = {
+                        id: newSamplerTrack.id,
+                        name: newSamplerTrack.name,
+                        type: samplerType,
+                        channel: audioSamplerTrack.channel,
+                        volume: newSamplerTrack.volume ?? 80,
+                        pan: newSamplerTrack.pan ?? 0,
+                        muted: newSamplerTrack.muted ?? false,
+                        soloed: newSamplerTrack.soloed ?? false,
+                        position: initialPosition,
+                        duration: defaultDuration,
+                        _calculatedWidth: calculateTrackWidth(defaultDuration, bpm, timeSignature),
+                        index: currentTrackIndex,
+                    };
+                    if ('dbId' in newSamplerTrack && typeof newSamplerTrack.dbId === 'string') samplerTrackData.dbId = newSamplerTrack.dbId;
+                    if ('storage_key' in newSamplerTrack && typeof newSamplerTrack.storage_key === 'string') samplerTrackData.storage_key = newSamplerTrack.storage_key;
+
+                    const addSamplerAction = new Actions.AddTrack(store, samplerTrackData);
+                    await historyManager.executeAction(addSamplerAction);
+                    createdSamplerTracks.push(samplerTrackData);
+                    currentTrackIndex++; 
+                    console.log('Added sampler track:', samplerTrackName);
+                } catch (error) {
+                    console.error(`Failed to create sampler track ${name}:`, error);
+                }
+            }
+            console.log('handleAddTrack: [Drum] Finished creating samplers:', createdSamplerTracks.length);
+
+            // 2. Create Main Drum Track Placeholder (AFTER samplers)
+            const mainDrumTrackId = crypto.randomUUID();
+            const mainDrumTrackName = instrumentName || `Drum Sequencer ${get().tracks.length + 1}`; 
+            const mainDrumType = 'drum';
+            let mainDrumTrackData: TrackState | null = null;
+            console.log(`handleAddTrack: [Drum] Attempting to create main drum track (${mainDrumTrackId})`);
+            try {
+                const newMainDrumTrack = await store.createTrack(mainDrumTrackName, mainDrumType, currentTrackIndex, { id: mainDrumTrackId, instrumentName: 'Drum Sequencer' });
+                const audioMainDrumTrack = await store.getAudioEngine().createTrack(newMainDrumTrack.id, newMainDrumTrack.name);
+                // ... (calculate defaults for drum track) ...
+                 const beatsPerBar = timeSignature[0];
+                 const defaultBars = 4;
+                 const totalBeats = defaultBars * beatsPerBar;
+                 const defaultDuration = (totalBeats * 60) / bpm;
+                 const initialPosition = { x: 0, y: currentTrackIndex * GRID_CONSTANTS.trackHeight }; // Use incremented index
+                mainDrumTrackData = {
+                    id: mainDrumTrackId,
+                    name: mainDrumTrackName,
+                    type: mainDrumType,
+                    channel: audioMainDrumTrack.channel,
+                    volume: newMainDrumTrack.volume ?? 80,
+                    pan: newMainDrumTrack.pan ?? 0,
+                    muted: newMainDrumTrack.muted ?? false,
+                    soloed: newMainDrumTrack.soloed ?? false,
+                    position: initialPosition,
+                    duration: defaultDuration,
+                    _calculatedWidth: calculateTrackWidth(defaultDuration, bpm, timeSignature),
+                    index: currentTrackIndex,
+                    drumPattern: Array(4).fill(null).map(() => Array(64).fill(false)),
+                    samplerTrackIds: createdSamplerTracks.map(t => t.id)
+                };
+                if ('dbId' in newMainDrumTrack && typeof newMainDrumTrack.dbId === 'string') mainDrumTrackData.dbId = newMainDrumTrack.dbId;
+                if ('storage_key' in newMainDrumTrack && typeof newMainDrumTrack.storage_key === 'string') mainDrumTrackData.storage_key = newMainDrumTrack.storage_key;
+
+                const addMainDrumAction = new Actions.AddTrack(store, mainDrumTrackData);
+                await historyManager.executeAction(addMainDrumAction);
+                console.log('handleAddTrack: [Drum] Added main drum track entry:', mainDrumTrackData);
+            } catch(error) {
+                 console.error('handleAddTrack: [Drum] Failed to create main drum track entry:', error);
+            }
+
+            // 3. Final Updates
+            get().updateTrackIndices();
+            set({
+                canUndo: historyManager.canUndo(),
+                canRedo: historyManager.canRedo()
+            });
+
+            // 4. Open UI for the main drum track
+            if (mainDrumTrackData) {
+                console.log(`handleAddTrack: [Drum] Calling openDrumMachine for ${mainDrumTrackId}`);
+                openDrumMachine(mainDrumTrackId);
+            } else {
+                console.error('handleAddTrack: [Drum] Cannot open UI, mainDrumTrackData is null');
+            }
+
+            // 5. Return
+            console.log('handleAddTrack: [Drum] Returning...');
+            return { mainDrumTrack: mainDrumTrackData, samplerTracks: createdSamplerTracks };
+        }
+        // --- End of specific 'drum' type handling ---
+
+        // --- Original logic for other types ('audio', 'midi', 'sampler') ---
+        // ... (rest of the function as it was, handling non-drum types) ...
+        console.log(`handleAddTrack: Handling default type: ${type}`);
+        let trackName;
+        if (type === 'midi') { trackName = instrumentName || `MIDI Track ${tracks.length + 1}`; }
+        else if (type === 'sampler') { trackName = instrumentName || `Sampler ${tracks.length + 1}`; }
+        else { trackName = `Audio Track ${tracks.length + 1}`; } // audio
+        
+        const trackId = crypto.randomUUID();
+        const newTrack = await store.createTrack(trackName, type, tracks.length, { id: trackId, instrumentId, instrumentName, instrumentStorageKey });
+        const audioTrack = await store.getAudioEngine().createTrack(newTrack.id, newTrack.name);
+        const beatsPerBar = timeSignature[0];
+        const defaultBars = 4;
+        const totalBeats = defaultBars * beatsPerBar;
+        const defaultDuration = (totalBeats * 60) / bpm;
+        const initialPosition = { x: 0, y: tracks.length * GRID_CONSTANTS.trackHeight };
+
+        const trackData: TrackState = {
+            id: newTrack.id,
+            name: newTrack.name,
+            type: type,
+            channel: audioTrack.channel,
+            volume: newTrack.volume ?? 80,
+            pan: newTrack.pan ?? 0,
+            muted: newTrack.muted ?? false,
+            soloed: newTrack.soloed ?? false,
+            position: initialPosition,
+            duration: defaultDuration,
+            _calculatedWidth: calculateTrackWidth(defaultDuration, bpm, timeSignature),
+            index: tracks.length,
+            instrumentId: newTrack.instrumentId ?? instrumentId,
+            instrumentName: newTrack.instrumentName ?? instrumentName,
+            instrumentStorageKey: newTrack.instrumentStorageKey ?? instrumentStorageKey,
+            ...(type === 'audio' && { audioFile: (newTrack as any).audioFile }),
+            ...(type === 'sampler' && { sampleFile: (newTrack as any).sampleFile }),
+        };
+        if ('dbId' in newTrack && typeof newTrack.dbId === 'string') trackData.dbId = newTrack.dbId;
+        if ('storage_key' in newTrack && typeof newTrack.storage_key === 'string') trackData.storage_key = newTrack.storage_key;
+
+        console.log('Final track data being added (non-drum):', trackData);
+        const action = new Actions.AddTrack(store, trackData);
+        await historyManager.executeAction(action);
+        
+        get().updateTrackIndices();
+        set({ canUndo: historyManager.canUndo(), canRedo: historyManager.canRedo() });
+        console.log(`Added new ${type} track (with history support):`, trackData);
+        return trackData;
+
+    } catch (error) {
+      console.error(`handleAddTrack: Failed overall for type ${type}:`, error);
+      return null;
+    }
+  },
+
+  // Add MIDI Action Implementations (with conversion)
+  addMidiNote: (trackId, note) => {
+    const { store } = get();
+    const midiManager = store?.getMidiManager();
+    if (midiManager?.addNoteToTrack) {
+      // Convert NoteState to internal Note format, ignoring the ID from UI
+      // The MidiManager should generate the final internal ID.
+      // We pass trackId=null here as convertFromNoteState expects it, but MidiManager likely ignores it for adding.
+      const internalNoteData = convertFromNoteState({ ...note, id: -1 }, trackId); // Pass dummy ID, manager should assign real one.
+      console.log(`useStudioStore: addMidiNote - Converted Note Data (ID ignored):`, internalNoteData);
+      midiManager.addNoteToTrack(trackId, internalNoteData); 
+    } else {
+      console.warn('MidiManager or addNoteToTrack not available');
+    }
+  },
+  removeMidiNote: (trackId, noteId) => {
+    const { store } = get();
+    const midiManager = store?.getMidiManager();
+    if (midiManager?.removeNoteFromTrack) {
+      midiManager.removeNoteFromTrack(trackId, noteId);
+    } else {
+      console.warn('MidiManager or removeNoteFromTrack not available');
+    }
+  },
+  updateMidiNote: (trackId, note) => {
+    const { store } = get();
+    const midiManager = store?.getMidiManager();
+    if (midiManager?.updateNote) { 
+      // Convert NoteState to internal Note format. ID is important here.
+      const internalNote = convertFromNoteState(note, trackId); 
+      console.log(`useStudioStore: updateMidiNote - Converted Note:`, internalNote);
+      midiManager.updateNote(trackId, internalNote);
+    } else {
+      console.warn('MidiManager or updateNote not available');
+    }
+  },
+  
+  getTrackNotes: (trackId: string) => {
+    const { store } = get();
+    return store?.getMidiManager()?.getTrackNotes(trackId) || null;
+  },
+
+  // --- BEGIN ADDED ACTIONS ---
+  addSamplerToDrumTrack: async (drumTrackId, file) => {
+    const { uploadAudioFile, tracks } = get(); // Get existing upload action
+    console.log(`Adding sampler from file ${file.name} to drum track ${drumTrackId}`);
+
+    try {
+      // 1. Upload the file as a sampler track using the existing action
+      // We need to await this to ensure the track is created before linking
+      // NOTE: Assumes uploadAudioFile correctly adds the track to the store.
+      await uploadAudioFile(file); // FIX: Pass only the file argument
+
+      // 2. Find the newly added sampler track (most recent sampler type track?)
+      const updatedTracks = get().tracks; // Get tracks again after upload
+      const newSamplerTrack = updatedTracks
+        .filter(t => t.type === 'sampler')
+        .sort((a, b) => (b.index ?? -1) - (a.index ?? -1))[0]; // Get the one with highest index
+
+      if (!newSamplerTrack) {
+        throw new Error("Failed to find the newly created sampler track after upload.");
+      }
+      const newSamplerTrackId = newSamplerTrack.id;
+      console.log(`Found new sampler track ID: ${newSamplerTrackId}`);
+
+      // 3. Find the main drum track
+      const drumTrackIndex = updatedTracks.findIndex(t => t.id === drumTrackId && t.type === 'drum');
+      if (drumTrackIndex === -1) {
+        throw new Error(`Drum track ${drumTrackId} not found.`);
+      }
+      const drumTrack = updatedTracks[drumTrackIndex] as DrumTrackState;
+
+      // 4. Update the drum track's samplerTrackIds
+      const updatedSamplerIds = [...(drumTrack.samplerTrackIds || []), newSamplerTrackId];
+      const updatedDrumTrack: DrumTrackState = {
+        ...drumTrack,
+        samplerTrackIds: updatedSamplerIds,
+      };
+
+      // 5. Update the Zustand state
+      // Create a new array with the updated drum track
+      const finalTracks = [...updatedTracks];
+      finalTracks[drumTrackIndex] = updatedDrumTrack;
+      set({ tracks: finalTracks });
+      
+      // We still need to update indices after modifying the tracks array
+      get().updateTrackIndices();
+      
+      // Update history buttons based on the handleAddTrack action that ran
+      set({
+          canUndo: historyManager.canUndo(),
+          canRedo: historyManager.canRedo()
+      });
+
+    } catch (error) {
+      console.error(`Failed to add sampler to drum track ${drumTrackId}:`, error);
+    }
+  },
+
+  removeSamplerFromDrumTrack: async (drumTrackId, samplerTrackIdToDelete) => {
+    const { handleTrackDelete, tracks } = get(); // Get existing delete action
+    console.log(`Removing sampler ${samplerTrackIdToDelete} from drum track ${drumTrackId}`);
+
+    try {
+      // 1. Delete the sampler track itself using the existing action
+      await handleTrackDelete(samplerTrackIdToDelete);
+
+      // 2. Find the main drum track (use get() again for latest state after deletion)
+      const currentTracks = get().tracks;
+      const drumTrackIndex = currentTracks.findIndex(t => t.id === drumTrackId && t.type === 'drum');
+      if (drumTrackIndex === -1) {
+        console.warn(`Drum track ${drumTrackId} not found after deleting sampler. Cannot unlink.`);
+        return;
+      }
+      const drumTrack = currentTracks[drumTrackIndex] as DrumTrackState;
+
+      // 3. Update the drum track's samplerTrackIds by filtering
+      const updatedSamplerIds = (drumTrack.samplerTrackIds || []).filter(id => id !== samplerTrackIdToDelete);
+      const updatedDrumTrack: DrumTrackState = {
+        ...drumTrack,
+        samplerTrackIds: updatedSamplerIds,
+      };
+
+      // 4. Update the Zustand state
+      // Create a new array with the updated drum track
+      const finalTracks = [...currentTracks];
+      finalTracks[drumTrackIndex] = updatedDrumTrack;
+      set({ tracks: finalTracks });
+      
+      // We still need to update indices after modifying the tracks array
+      get().updateTrackIndices();
+      
+      // Update history buttons based on the handleAddTrack action that ran
+      set({
+          canUndo: historyManager.canUndo(),
+          canRedo: historyManager.canRedo()
+      });
+
+    } catch (error) {
+      console.error(`Failed to remove sampler ${samplerTrackIdToDelete} from drum track ${drumTrackId}:`, error);
+    }
+  },
+
+  addEmptySamplerToDrumTrack: async (drumTrackId, newSamplerName) => {
+    const { handleAddTrack, tracks, updateTrackIndices, store } = get();
+    console.log(`Adding empty sampler track (optional name: ${newSamplerName}) to drum track ${drumTrackId}`);
+
+    try {
+      // 1. Create a new empty sampler track using handleAddTrack
+      const samplerCount = tracks.filter(t => t.type === 'sampler').length;
+      const defaultName = newSamplerName || `Sampler ${samplerCount + 1}`;
+      // handleAddTrack creates the TrackState and also the underlying AudioEngine track/player
+      const newSamplerTrackState = await handleAddTrack('sampler', undefined, defaultName, undefined);
+
+      if (!newSamplerTrackState || !newSamplerTrackState.id) {
+        throw new Error("Failed to create the new empty sampler track using handleAddTrack.");
+      }
+      const newSamplerTrackId = newSamplerTrackState.id;
+      console.log(`Created new empty sampler track ID: ${newSamplerTrackId} with name: ${defaultName}`);
+
+      // *** ADDED: Initialize SamplerController instance and subscribe ***
+      if (store) {
+          const samplerController = store.getTransport().getSamplerController();
+          const midiManager = store.getMidiManager();
+
+          if (samplerController && midiManager) {
+              try {
+                  // Initialize the sampler instance in the controller (without a file)
+                  // We pass undefined for the file argument
+                  await samplerController.initializeSampler(newSamplerTrackId, undefined, 60); // Use default baseNote 60
+                  console.log(`Initialized empty sampler instance ${newSamplerTrackId} in SamplerController`);
+
+                  // Explicitly subscribe it to the MidiManager
+                  samplerController.registerTrackSubscription(newSamplerTrackId, midiManager);
+                  console.log(`Registered subscription for empty sampler ${newSamplerTrackId}`);
+                  
+                   // Immediately repopulate notes after re-initialization (necessary after initializeSampler)
+                   const notes = midiManager.getTrackNotes(newSamplerTrackId);
+                   const sampler = samplerController.getSampler(newSamplerTrackId);
+                   if (sampler && notes) {
+                     sampler.setNotes(notes);
+                     console.log(`Immediately repopulated sampler ${newSamplerTrackId} with ${notes.length} notes.`);
+                   } else {
+                     console.warn(`Could not repopulate notes for sampler ${newSamplerTrackId}: Sampler found=${!!sampler}, Notes found=${!!notes}`);
+                   }
+
+              } catch (error) {
+                  console.error(`Failed to initialize/subscribe empty sampler ${newSamplerTrackId}:`, error);
+                  // Decide if we should rollback track creation here
+                  // await get().handleTrackDelete(newSamplerTrackId);
+                  // throw error; // Re-throw if needed
+              }
+          } else {
+              console.error(`SamplerController or MidiManager not found, cannot complete sampler setup for ${newSamplerTrackId}`);
+          }
+      } else {
+          console.error(`Store not found, cannot complete sampler setup for ${newSamplerTrackId}`);
+      }
+      // *** END ADDED SECTION ***
+
+      // 2. Find the main drum track
+      // Use get() again to ensure we have the most up-to-date tracks array
+      const currentTracks = get().tracks; 
+      const drumTrackIndex = currentTracks.findIndex(t => t.id === drumTrackId && t.type === 'drum');
+      if (drumTrackIndex === -1) {
+        // Rollback: Delete the sampler track if the drum track isn't found
+        console.warn(`Drum track ${drumTrackId} not found. Rolling back sampler creation.`);
+        await get().handleTrackDelete(newSamplerTrackId); // Use existing delete action
+        return null; // Indicate failure
+      }
+      const drumTrack = currentTracks[drumTrackIndex] as DrumTrackState;
+
+      // 3. Update the drum track's samplerTrackIds - CORRECTLY ADD the new ID
+      const updatedSamplerIds = [...(drumTrack.samplerTrackIds || []), newSamplerTrackId];
+      const updatedDrumTrack: DrumTrackState = {
+        ...drumTrack,
+        samplerTrackIds: updatedSamplerIds,
+      };
+
+      // 4. Update the Zustand state
+      // Create a new array with the updated drum track
+      const finalTracks = [...currentTracks];
+      finalTracks[drumTrackIndex] = updatedDrumTrack;
+      set({ tracks: finalTracks });
+      
+      // We still need to update indices after modifying the tracks array
+      updateTrackIndices();
+      
+      // Update history buttons based on the handleAddTrack action that ran
+      set({
+          canUndo: historyManager.canUndo(),
+          canRedo: historyManager.canRedo()
+      });
+
+      console.log(`Successfully added empty sampler ${newSamplerTrackId} and linked to drum track ${drumTrackId}`);
+      return newSamplerTrackId; // Return the new ID
+
+    } catch (error) {
+      console.error(`Failed to add empty sampler to drum track ${drumTrackId}:`, error);
+      return null; // Return null on failure
+    }
+  },
+  // --- END ADDED ACTIONS ---
+}
+});

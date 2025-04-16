@@ -36,15 +36,17 @@ export interface AudioTrackState extends BaseTrackState {
 }
 
 export interface MidiTrackState extends BaseTrackState {
-    type: 'midi' | 'drum';
+    type: 'midi';
     instrumentId?: string; // ID of the instrument
     instrumentName?: string; // Name of the instrument
     instrumentStorageKey?: string; // Storage key for the instrument
 }
 
-export interface DrumTrackState extends MidiTrackState {
+export interface DrumTrackState extends BaseTrackState {
     type: 'drum';
-    drumPads?: DrumPad[]; // For drum machine tracks
+    drumPads?: DrumPad[]; // For drum machine tracks - Keep for now
+    drumPattern?: boolean[][] | null; // Add field to store the grid pattern
+    samplerTrackIds?: string[]; // <-- Add array to store associated sampler track IDs
 }
 
 export interface SamplerTrackState extends BaseTrackState {

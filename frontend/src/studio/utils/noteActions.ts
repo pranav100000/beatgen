@@ -76,12 +76,12 @@ export const moveNoteWithHistory = (
   
   // Convert tick-based positions to grid-based positions for the action
   const oldPosition = { 
-    column: Math.round(oldNote.column / TICKS_PER_STEP), 
+    column: Math.round(oldNote.column), 
     row: oldNote.row 
   };
   
   const newPosition = { 
-    column: Math.round(newNote.column / TICKS_PER_STEP), 
+    column: Math.round(newNote.column), 
     row: newNote.row 
   };
   
@@ -117,12 +117,12 @@ export const resizeNoteWithHistory = (
   const convertedOldNote = convertFromNoteState(oldNote, trackId);
   
   // Convert tick-based lengths to grid-based lengths for the action
-  const oldLength = Math.round(oldNote.length / TICKS_PER_STEP);
-  const newLength = Math.round(newNote.length / TICKS_PER_STEP);
+  const oldLength = Math.round(oldNote.length);
+  const newLength = Math.round(newNote.length);
   
   // If resizing from left side, we also need column change
-  const oldColumn = Math.round(oldNote.column / TICKS_PER_STEP);
-  const newColumn = Math.round(newNote.column / TICKS_PER_STEP);
+  const oldColumn = Math.round(oldNote.column);
+  const newColumn = Math.round(newNote.column);
   
   const action = new Actions.ResizeNote(
     store,

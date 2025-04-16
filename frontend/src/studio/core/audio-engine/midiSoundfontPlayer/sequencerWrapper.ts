@@ -45,7 +45,7 @@ export class SequencerWrapper {
   private originalVolume: number;
   private savedVolume: number | null = null;
   private _isPlaying: boolean = false;
-  private ppq: number = 960; // Default MIDI Pulses Per Quarter Note
+  private ppq: number = 480; // Default MIDI Pulses Per Quarter Note
   private currentBpm: number = 120; // Default tempo
 
   constructor(
@@ -400,8 +400,6 @@ export class SequencerWrapper {
    * @param globalTick The current global timeline position
    */
   async play(globalTick: number): Promise<void> {
-    console.log(")))))))))globalTick", globalTick);
-
     // console.log("______currentbpm", this.currentBpm);
     // console.log("______currentppq", this.ppq);
     // console.log("______currentstartoffset", this.startOffset);
@@ -669,12 +667,12 @@ export class SequencerWrapper {
     
     for (const note of notes) {
       // Convert grid position to time (in seconds), then to ticks
-      const timeInSeconds = note.column / 4; // Convert grid position to time in seconds
-      const startTick = Math.round(timeInSeconds * ticksPerSecond);
+      const timeInSeconds = note.column * 2; // Convert grid position to time in seconds
+      const startTick = Math.round(timeInSeconds);
       
       // Convert grid length to duration (in ms)
-      const durationInSeconds = note.length / 4; // Convert grid length to duration in seconds
-      const duration = Math.round(durationInSeconds * 1000); // Convert to ms
+      const durationInSeconds = note.length * 2; // Convert grid length to duration in seconds
+      const duration = Math.round(durationInSeconds); // Convert to ms
       
       // Create note event
       events.push({
@@ -697,6 +695,7 @@ export class SequencerWrapper {
    * Original method - kept for initial setup and backward compatibility
    */
   convertMidiToNoteEvents(midi: Midi, channel: number, trackIndex: number = 0): EventInstance[] {
+    console.log('convertMidiToNoteEvents', midi, channel, trackIndex);
     const events: EventInstance[] = [];
     
     // Use the first track, or specified track
@@ -717,9 +716,10 @@ export class SequencerWrapper {
     for (const note of track.notes) {
       // Convert note timing from seconds to ACTUAL ticks, not milliseconds
       // Uses the correct ticks-per-second calculation based on tempo and PPQ
-      const startTick = Math.round(note.time * ticksPerSecond);
-      const duration = Math.round(note.duration * 1000); // Duration still in ms for event handling
+      const startTick = Math.round(note.time * 2);
+      const duration = Math.round(note.duration * 2); // Duration still in ms for event handling
       
+      console.log(`MIDI conversion: startTick=${startTick}, duration=${duration}`);
       // Create note event (single event with duration)
       events.push({
         tick: startTick,
@@ -731,6 +731,7 @@ export class SequencerWrapper {
           duration: duration
         }
       });
+      console.log(`MIDI conversion: events=${JSON.stringify(events)}`);
     }
     
     return events;

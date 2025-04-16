@@ -12,6 +12,9 @@ import { useStudioStore } from './stores/useStudioStore';
 // Import piano roll components
 import PianoRollWindows from './components/piano-roll-new/PianoRollWindows';
 
+// Import Drum Machine
+import DrumMachine from './components/drum-machine/DrumMachine';
+
 // Import custom hooks
 import { useStudioDBSession } from './hooks/useStudioDBSession';
 import { useHistorySync } from './hooks/useHistorySync';
@@ -74,13 +77,23 @@ function Studio({ projectId }: StudioProps) {
     handleInstrumentChange,
     uploadAudioFile,
     setBpm,
-    setAddMenuAnchor
+    setAddMenuAnchor,
+    openDrumMachines,
+    closeDrumMachine,
+    setDrumPattern,
+    // Fetch MIDI actions
+    addMidiNote,
+    removeMidiNote,
+    updateMidiNote,
+    replaceTrackAudioFile,
   } = useStudioStore();
   
   const scrollRef = useRef<TimelineRef>(null);
   const animationFrameRef = useRef<number | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [existingProjectId, setExistingProjectId] = useState<string | null>(projectId || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [trackIdForFileUpload, setTrackIdForFileUpload] = useState<string | null>(null);
 
   const handleChatToggle = () => {
     setIsChatOpen(prev => !prev);
@@ -152,6 +165,25 @@ function Studio({ projectId }: StudioProps) {
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setProjectTitle(event.target.value);
+  };
+
+  // Handler to trigger file input for replacing track audio
+  const handleLoadAudioFile = (trackId: string) => {
+    if (fileInputRef.current) {
+      setTrackIdForFileUpload(trackId);
+      fileInputRef.current.click();
+    }
+  };
+
+  // Handler for when a file is selected via the hidden input
+  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && trackIdForFileUpload) {
+      console.log(`File selected for track ${trackIdForFileUpload}:`, file.name);
+      replaceTrackAudioFile(trackIdForFileUpload, file);
+    }
+    event.target.value = '';
+    setTrackIdForFileUpload(null);
   };
 
   // Control playback cursor directly when playback state changes
@@ -304,6 +336,7 @@ function Studio({ projectId }: StudioProps) {
               onTrackDelete={handleTrackDelete}
               onTrackNameChange={handleTrackNameChange}
               onInstrumentChange={handleInstrumentChange}
+              onLoadAudioFile={handleLoadAudioFile}
             />
           </Box>
         </Box>
@@ -346,7 +379,33 @@ function Studio({ projectId }: StudioProps) {
         
         {/* Render the new piano roll windows directly in Studio */}
         {<PianoRollWindows />}
+        
+        {/* Render open Drum Machine instances */}
+        {Object.entries(openDrumMachines || {})
+          .filter(([, isOpen]) => isOpen) 
+          .map(([trackId]) => ( 
+            <DrumMachine 
+              key={trackId} 
+              trackId={trackId} 
+              onClose={() => closeDrumMachine(trackId)} 
+              onPatternChange={setDrumPattern} 
+              // Pass MIDI actions
+              onAddNote={addMidiNote}
+              onRemoveNote={removeMidiNote}
+              onUpdateNote={updateMidiNote}
+            />
+        ))}
+
       </Box>
+      
+      {/* Hidden file input for replacing track audio */}
+      <input 
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelected}
+        accept="audio/*" 
+        style={{ display: 'none' }}
+      />
     </Box>
   );
 }

@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Note } from '../types/note';
 import { db } from '../db/dexie-client';
 
+const TICKS_PER_BEAT = 960; // Standard MIDI ticks per beat
+
 /**
  * Interface for track data
  */
@@ -56,6 +58,9 @@ export class MidiManager {
   private currentBpm: number = 120;
   private currentTimeSignature: [number, number] = [4, 4];
   
+  // Internal counter for generating unique note IDs
+  private nextNoteIdCounter: number = 1;
+  
   // Debouncing for persistence operations
   private pendingUpdates: Map<string, NodeJS.Timeout> = new Map();
   private debounceTime: number = 500; // 500ms debounce time
@@ -106,9 +111,9 @@ export class MidiManager {
    * @throws Error if the track doesn't exist
    */
   updateTrack(trackId: string, notes: Note[]): void {
-    console.log(`MidiManager: Updating track ${trackId} with ${notes.length} notes`);
+    // Log notes being set
+    console.log(`MidiManager.updateTrack [${trackId}]: Setting notes:`, JSON.stringify(notes.slice(0, 5))); // Log first few
     
-    // Fail if the track doesn't exist
     if (!this.tracks.has(trackId)) {
       throw new Error(`Cannot update track ${trackId}: track does not exist`);
     }
@@ -133,21 +138,34 @@ export class MidiManager {
 
   /**
    * Add a single note to a track
+   * Assigns a unique ID if the incoming note ID is invalid (-1).
    * @param trackId The track ID
    * @param note The note to add
    * @throws Error if the track doesn't exist
    */
   async addNoteToTrack(trackId: string, note: Note): Promise<void> {
-    console.log(`MidiManager: Adding note to track ${trackId}`, note);
+    // Log received note
+    console.log(`MidiManager.addNoteToTrack [${trackId}]: Received note:`, JSON.stringify(note));
     
-    // Get existing notes - will throw if track doesn't exist
     const notes = this.getTrackNotes(trackId);
     if (notes === null) {
       throw new Error(`Cannot add note to track ${trackId}: track does not exist`);
     }
     
-    // Add the new note (create a copy to avoid mutation)
-    const updatedNotes = [...notes, {...note}];
+    let noteToAdd = { ...note }; // Create a copy to potentially modify
+
+    // Check if the incoming ID needs to be replaced
+    if (noteToAdd.id === -1 || noteToAdd.id === undefined || noteToAdd.id === null) {
+      const newId = this.nextNoteIdCounter++; // Get next ID and increment counter
+      console.log(`MidiManager: Assigning new ID ${newId} to incoming note (original ID: ${note.id})`);
+      noteToAdd.id = newId; 
+    } else {
+      // Ensure the counter is always ahead of any explicitly provided IDs
+      this.nextNoteIdCounter = Math.max(this.nextNoteIdCounter, noteToAdd.id + 1);
+    }
+    
+    // Add the note with the correct ID
+    const updatedNotes = [...notes, noteToAdd]; 
     
     // Update the track with the new note - this will notify subscribers too
     this.updateTrack(trackId, updatedNotes);
@@ -160,6 +178,7 @@ export class MidiManager {
    * @throws Error if the track doesn't exist
    */
   async removeNoteFromTrack(trackId: string, noteId: number): Promise<void> {
+    console.log("MidiManager: current notes:", this.getTrackNotes(trackId));
     console.log(`MidiManager: Removing note ${noteId} from track ${trackId}`);
     
     // Get existing notes - will throw if track doesn't exist
@@ -173,6 +192,7 @@ export class MidiManager {
     
     // Update the track without the removed note - this will notify subscribers too
     this.updateTrack(trackId, updatedNotes);
+    console.log("MidiManager: updated notes:", this.getTrackNotes(trackId));
   }
 
   /**
@@ -467,8 +487,8 @@ export class MidiManager {
       notes: track.notes.map(note => ({
         id: Date.now(),
         row: note.midi,  // MIDI note number
-        column: Math.floor(note.time * 4), // Convert time to grid columns (assuming quarter notes)
-        length: Math.floor(note.duration * 4), // Convert duration to grid units
+        column: Math.floor(note.time), // Convert time to grid columns (assuming quarter notes)
+        length: Math.floor(note.duration), // Convert duration to grid units
         velocity: note.velocity, // Keep in Tone.js 0-1 scale
         duration: note.duration,
         time: note.time
@@ -504,8 +524,8 @@ export class MidiManager {
       track.notes.forEach(note => {
         midiTrack.addNote({
           midi: note.row,
-          time: note.time || note.column / 4, // Convert grid position to time if not provided
-          duration: note.duration || note.length / 4, // Convert grid length to duration if not provided
+          time: note.time,
+          duration: note.duration,
           velocity: note.velocity // Use velocity as-is (already in 0-1 scale)
         });
       });
@@ -543,13 +563,19 @@ export class MidiManager {
   notesToMidi(trackId: string, notes: Note[], bpm: number): MidiData {
     const track: MidiTrack = {
       id: trackId,
-      instrumentId: 'default', // This will be overridden if known
-      notes: notes.map(note => ({
+      instrumentId: 'default', 
+      notes: notes.map(note => {
+        // Log note being converted
+        console.log(`MidiManager.notesToMidi [${trackId}]: Converting note:`, JSON.stringify(note)); 
+        const convertedNote = {
         ...note,
         velocity: note.velocity || 100,
-        duration: note.length / 4, // Convert grid units to seconds
-        time: note.column / 4 // Convert grid units to seconds
-      }))
+          duration: note.length, // Convert ticks to seconds based on TICKS_PER_BEAT
+          time: note.column // Convert ticks to seconds based on TICKS_PER_BEAT
+        };
+        console.log(`MidiManager.notesToMidi [${trackId}]: Converted note result:`, JSON.stringify(convertedNote));
+        return convertedNote;
+      })
     };
 
     return {
