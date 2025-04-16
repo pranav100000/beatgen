@@ -49,8 +49,11 @@ export interface BaseTrackPreviewProps {
   /** Function to render track-specific content */
   renderTrackContent: () => React.ReactNode;
   
-  /** Calculated width for the track */
+  /** Calculated width for the track container */
   trackWidth: number;
+  
+  /** Full content width (before trimming) - used for positioning the content within the viewport */
+  contentWidth?: number;
   
   /** Callback when track resizing finishes */
   onResizeEnd: (trackId: string, newPositionX: number, newWidth: number, resizeDirection: 'left' | 'right') => void;
@@ -65,15 +68,23 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   trackStyleOverrides = {},
   renderTrackContent,
   trackWidth,
+  contentWidth,
   timeSignature = [4, 4],
   onResizeEnd
 }) => {
+  // Use the provided content width or default to track width if not specified
+  const actualContentWidth = contentWidth || trackWidth;
+  
   // Refs and state for drag functionality
   const trackRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startDragMousePosition, setStartDragMousePosition] = useState({ x: 0, y: 0 });
   const [startDragTrackPosition, setStartDragTrackPosition] = useState({ x: 0, y: 0 });
   const lastMovedPositionRef = useRef<Position>(track.position);
+  
+  // Track the content transform during left-side resize
+  const [contentTransform, setContentTransform] = useState(0);
   
   // Store the trackWidth in a ref to ensure we maintain it during operations
   const trackWidthRef = useRef(trackWidth);
@@ -88,8 +99,19 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   const lastResizeDataRef = useRef<{ newX: number, newWidth: number }>({ newX: track.position.x, newWidth: trackWidth });
   const MIN_TRACK_WIDTH_SNAP_UNITS = 1; // Minimum width in terms of smallest grid subdivision
 
-  // Calculate content offset for trimming visualization
-  const contentOffsetX = track.trimStartTicks ? -(track.trimStartTicks * (trackWidth / (track.originalDurationTicks || 1))) : 0;
+  // Calculate the normal content offset for trimming from the beginning
+  const calculateContentOffset = () => {
+    if (!track.originalDurationTicks || !track.trimStartTicks) return 0;
+    
+    // Calculate what percentage of the original content is trimmed from start
+    const trimRatio = track.trimStartTicks / track.originalDurationTicks;
+    
+    // Apply that ratio to the full content width to get the offset
+    return -(trimRatio * actualContentWidth);
+  };
+  
+  // The normal position offset for content (used when not actively resizing)
+  const contentOffsetX = calculateContentOffset();
 
   // Create base style object for track
   const trackStyle = {
@@ -112,7 +134,7 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     margin: 0,
     padding: 0,
     width: `${trackWidth}px`,
-    overflow: 'hidden',
+    overflow: 'hidden', // This creates the clipping viewport
     ...trackStyleOverrides
   };
 
@@ -166,23 +188,34 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     setIsResizing(true);
     setResizeDirection(direction);
     
+    // Initialize content transform with current offset to prevent jumping
+    // This ensures we start from the current visual position
+    setContentTransform(contentOffsetX);
+    
     // Always use the current trackWidth for start information
     setStartResizeInfo({
       startMouseX: e.clientX + (container.scrollLeft || 0),
       startTrackX: track.position.x,
-      startTrackWidth: trackWidthRef.current // Use ref to ensure latest value
+      startTrackWidth: trackWidthRef.current
     });
     
     lastResizeDataRef.current = { 
       newX: track.position.x, 
-      newWidth: trackWidthRef.current // Use ref to ensure latest value
+      newWidth: trackWidthRef.current
     };
 
     // Disable transitions immediately
     if (trackRef.current) {
       trackRef.current.style.transition = 'none';
-      // Explicitly set width to ensure it's correct
       trackRef.current.style.width = `${trackWidthRef.current}px`;
+    }
+
+    // Also disable transitions on content wrapper
+    if (contentRef.current) {
+      contentRef.current.style.transition = 'none';
+      
+      // Explicitly set the transform to the current offset to ensure consistency
+      contentRef.current.style.transform = `translateX(${contentOffsetX}px)`;
     }
 
     e.stopPropagation(); // Prevent track drag
@@ -259,15 +292,19 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       };
 
       if (resizeDirection === 'right') {
+          // Right resize - simply change the container width
           const newWidth = startResizeInfo.startTrackWidth + deltaX;
           snappedNewWidth = snapResize(newWidth, subdivisionWidth, minPixelWidth);
           
-          // Update visual width during resize
           if (trackRef.current) {
             trackRef.current.style.width = `${snappedNewWidth}px`;
           }
           
+          // For right resize, we keep the initial content offset
+          // No additional transform needed as content stays anchored to left
+          
       } else if (resizeDirection === 'left') {
+          // Left resize - change both container position and width
           const newX = startResizeInfo.startTrackX + deltaX;
           const newWidth = startResizeInfo.startTrackWidth - deltaX;
           
@@ -277,7 +314,7 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
           const rightEdge = startResizeInfo.startTrackX + startResizeInfo.startTrackWidth;
           let potentialSnappedWidth = rightEdge - snappedNewX;
 
-          // Ensure minimum width when adjusting based on snapped X
+          // Ensure minimum width
           snappedNewWidth = snapResize(potentialSnappedWidth, subdivisionWidth, minPixelWidth);
 
           // Recalculate snappedNewX if minimum width constraint changed the width
@@ -285,8 +322,21 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
 
           // Update visual position and width during resize
           if (trackRef.current) {
-              trackRef.current.style.left = `${snappedNewX}px`;
-              trackRef.current.style.width = `${snappedNewWidth}px`;
+            trackRef.current.style.left = `${snappedNewX}px`;
+            trackRef.current.style.width = `${snappedNewWidth}px`;
+            
+            // Calculate how much the container has moved from its original position
+            const containerDeltaX = snappedNewX - startResizeInfo.startTrackX;
+            
+            // Apply a counter-transform to the content
+            // Start with the initial offset (contentOffsetX) and adjust by container movement
+            if (contentRef.current) {
+              // Note: contentOffsetX is negative for left trim, so we ADD the container delta
+              // which is positive when moving right
+              const counterTransform = contentOffsetX - containerDeltaX;
+              contentRef.current.style.transform = `translateX(${counterTransform}px)`;
+              setContentTransform(counterTransform);
+            }
           }
       }
       
@@ -300,7 +350,8 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     startResizeInfo,
     startDragMousePosition, 
     startDragTrackPosition, 
-    timeSignature
+    timeSignature,
+    contentOffsetX
   ]);
 
   const handleMouseUp = useCallback(() => {
@@ -332,7 +383,17 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       setIsResizing(false); // Reset state first
       setResizeDirection(null);
       setStartResizeInfo(null);
-
+      
+      // Clear explicit content transform - will be recalculated based on new trim values
+      setContentTransform(0);
+      
+      if (contentRef.current) {
+        contentRef.current.style.transition = 'transform 0.2s ease';
+        // Let the normal content offset from trim values take over
+        // (will be recalculated after the resize completes and track updates)
+        contentRef.current.style.transform = '';
+      }
+      
       // Trigger resize end callback with direction
       if (currentDirection) {
         onResizeEnd(track.id, finalResizeData.newX, finalResizeData.newWidth, currentDirection);
@@ -349,7 +410,7 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       }
     }
     
-  }, [isDragging, isResizing, resizeDirection, track.id, track.position.y, onPositionChange, onResizeEnd]);
+  }, [isDragging, isResizing, resizeDirection, track.id, track.position.y, onPositionChange, onResizeEnd, trackWidth]);
 
   // Add/remove mouse event listeners
   useEffect(() => {
@@ -377,6 +438,18 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     }
   }, [track.position.x, track.position.y, trackWidth, isDragging, isResizing, track.id]);
 
+  // Calculate the transform to use for content position
+  // Use contentTransform during resizing, otherwise use the normal offset from trim values
+  const getContentTransform = () => {
+    if (isResizing) {
+      // During resize, use the dynamic content transform that's updated during mouse movement
+      return contentTransform;
+    } else {
+      // Otherwise use normal offset based on trim values
+      return contentOffsetX;
+    }
+  };
+
   // Define styles for resize handles
   const resizeHandleStyle = {
     position: 'absolute',
@@ -385,8 +458,6 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     width: '8px', // Make handle easier to grab
     cursor: 'ew-resize',
     zIndex: 1002, // Ensure handles are above track content
-    // Optional: Add visual indicator for handles (e.g., background on hover)
-    // '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.3)' } 
   };
 
   return (
@@ -459,20 +530,25 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
           {track.type}
         </Box>
         
-        {/* Call the render strategy function for specific track content with transform for trimming */}
-        <Box sx={{
-          position: 'absolute',
-          top: '0',
-          left: '0',
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          opacity: 0.8,
-          pointerEvents: 'none', // Ensure content doesn't interfere
-          transform: `translateX(${contentOffsetX}px)` // Apply content offset for trimming
-        }}>
+        {/* Content Wrapper - Visible part is controlled by the container's overflow: hidden */}
+        <Box 
+          ref={contentRef}
+          className="track-content-wrapper"
+          sx={{
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: `${actualContentWidth}px`, // Set to full content width
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            opacity: 0.8,
+            pointerEvents: 'none', // Ensure content doesn't interfere
+            transform: `translateX(${getContentTransform()}px)`,
+            transition: isResizing ? 'none' : 'transform 0.2s ease',
+          }}
+        >
           {renderTrackContent()}
         </Box>
         

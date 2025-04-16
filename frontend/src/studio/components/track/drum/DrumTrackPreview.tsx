@@ -43,7 +43,7 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
   // Get the drum pattern directly from the casted track state
   const drumPattern = drumTrack.drumPattern;
   
-  // Calculate drum track width only if not provided
+  // Calculate display width for the track container (viewport)
   const trackWidth = useMemo(() => {
     // If a width is explicitly provided, use it - this is critical for resize operations
     if (providedTrackWidth && providedTrackWidth > 0) {
@@ -55,16 +55,26 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     const beatsPerMeasure = timeSignature[0];
     const beatWidth = midiMeasureWidth / beatsPerMeasure;
     return measures * beatsPerMeasure * beatWidth;
-    
   }, [timeSignature, midiMeasureWidth, providedTrackWidth]);
+  
+  // Calculate full content width - this should NEVER change due to trimming
+  // This is the standard full width for drum patterns (4 measures)
+  const fullContentWidth = useMemo(() => {
+    const measures = 4;
+    const beatsPerMeasure = timeSignature[0];
+    const beatWidth = midiMeasureWidth / beatsPerMeasure;
+    return measures * beatsPerMeasure * beatWidth;
+  }, [timeSignature, midiMeasureWidth]);
   
   // Drum-specific track content rendering
   const renderTrackContent = () => {
     return (
       <>
+        {/* DrumGridPreview is always rendered at full content width, 
+            but only part of it is visible through the trimmed container */}
         <DrumGridPreview 
           pattern={drumPattern}
-          width={trackWidth}
+          width={fullContentWidth} // Always use the full content width
           height={GRID_CONSTANTS.trackHeight - 6}
           trackColor={trackColor}
         />
@@ -79,6 +89,7 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
       {...restProps}
       track={drumTrack}
       trackWidth={trackWidth}
+      contentWidth={fullContentWidth}
       trackColor={trackColor}
       timeSignature={timeSignature}
       renderTrackContent={renderTrackContent}
