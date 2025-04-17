@@ -10,7 +10,8 @@ import { SamplerController } from '../audio-engine/samplerController';
 import { Note } from '../types/note'; // Added for Note type
 import { NoteActions } from './history/actions/NoteActions'; // Added for NoteActions
 import { historyManager } from './history/HistoryManager'; // Added for historyManager
-
+import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
+import { DEFAULT_MEASURE_WIDTH, useGridStore } from './gridStore';
 /**
  * Interface for a drum pad in the drum machine grid
  */
@@ -523,10 +524,10 @@ export class Store implements StoreInterface {
     
     // Standard MIDI ticks per beat (quarter note) is typically 480 or 960
     // We'll use 480 as it's common for DAWs
-    const TICKS_PER_BEAT = 480;
+    const TICKS_PER_BEAT = MUSIC_CONSTANTS.pulsesPerQuarterNote;
     
     // Calculate measure width in pixels from grid constants
-    const MEASURE_WIDTH = 120; // Matches GRID_CONSTANTS.measureWidth
+    const MEASURE_WIDTH = DEFAULT_MEASURE_WIDTH; // Matches GRID_CONSTANTS.measureWidth
     
     // Calculate beats per measure from time signature
     const beatWidth = MEASURE_WIDTH / beatsPerMeasure;
@@ -538,5 +539,16 @@ export class Store implements StoreInterface {
     const ticksPerPixel = ticksPerBeat / beatWidth;
     
     return ticksPerPixel;
+  }
+
+  /**
+   * Gets the pixels per tick conversion rate based on current BPM and grid settings
+   * Inverse of getTicksPerPixel() - used for converting from ticks to pixel measurements
+   * @returns Number of pixels per tick at current settings
+   */
+  public getPixelsPerTick(): number {
+    const ticksPerPixel = this.getTicksPerPixel();
+    // Return the inverse of ticks per pixel
+    return 1 / ticksPerPixel;
   }
 }

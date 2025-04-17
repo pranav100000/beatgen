@@ -14,7 +14,7 @@ export interface AudioTrack {
   trimEndTicks?: number;
   originalDurationTicks?: number;
   position?: {
-    x: number; // Position in pixels from left (timeline position)
+    x: number; // Position in ticks from left (musical time position)
     y: number; // Position in pixels from top (track order)
   };
 }

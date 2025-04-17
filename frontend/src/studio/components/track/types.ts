@@ -24,7 +24,7 @@ export interface TrackPreviewProps {
   onPositionChange: (trackId: string, newPosition: Position, isDragEnd: boolean) => void;
   
   /** Callback when track is resized */
-  onResizeEnd?: (trackId: string, newPositionX: number, newWidth: number, resizeDirection: 'left' | 'right') => void;
+  onResizeEnd?: (trackId: string, trimDeltaPixels: number, resizeDirection: 'left' | 'right') => void;
   
   /** Current project BPM */
   bpm: number;

@@ -3,6 +3,7 @@ import { TrackState, Position } from '../../../types/track';
 import { useGridStore } from '../../gridStore';
 import { useStudioStore } from '../../../../stores/useStudioStore';
 import { BaseAction, TrackAction } from './BaseAction';
+import { pixelsToTicks, ticksToPixels } from '../../../../constants/gridConstants';
 
 /**
  * Action for changing track position without callbacks
@@ -52,22 +53,22 @@ export class TrackPositionAction extends TrackAction {
         // Update soundfont offset if it's a MIDI or drum track
         const track = this.store.getTrackDataById(this.trackId);
         if (track && (track.type === 'midi' || track.type === 'drum' || track.type === 'sampler')) {
-            // Convert X position (pixels) to milliseconds
-            const beatDurationMs = (60 / this.store.getProjectManager().getTempo()) * 1000;
+            // Convert X position in ticks to milliseconds
+            const bpm = this.store.getProjectManager().getTempo();
             const timeSignature = this.store.getProjectManager().getTimeSignature();
-            const beatsPerMeasure = timeSignature[0];
-            // Get grid constants from the store
-            const measureWidth = useGridStore.getState().midiMeasureWidth;
-            const pixelsPerBeat = measureWidth / beatsPerMeasure;
             
-            // Calculate offset in milliseconds
-            const offsetBeats = position.x / pixelsPerBeat;
+            // Calculate beats from ticks
+            const PPQ = 480; // Standard MIDI ticks per quarter note
+            const offsetBeats = position.x / PPQ;
+            
+            // Convert beats to milliseconds
+            const beatDurationMs = (60 / bpm) * 1000;
             const offsetMs = offsetBeats * beatDurationMs;
             
             // Set track offset in milliseconds
             this.store.getSoundfontController().setTrackOffset(this.trackId, offsetMs);
             this.store.getSamplerController().setTrackOffset(this.trackId, offsetMs);
-            console.log(`Set track ${this.trackId} offset: ${position.x}px → ${offsetMs}ms (${offsetBeats} beats)`);
+            console.log(`Set track ${this.trackId} offset: ${position.x} ticks → ${offsetMs}ms (${offsetBeats} beats)`);
         }
     }
     
@@ -393,7 +394,7 @@ export class TrackResizeAction extends TrackAction {
         trimStartTicks: number,
         trimEndTicks: number,
         width: number,
-        positionX: number,
+        positionXTicks: number,
         operation: string
     ): void {
         // Update state directly through global store
@@ -407,7 +408,7 @@ export class TrackResizeAction extends TrackAction {
                           _calculatedWidth: width,
                           position: {
                               ...track.position,
-                              x: positionX
+                              x: positionXTicks // Already in ticks
                           }
                       }
                     : track
@@ -424,7 +425,7 @@ export class TrackResizeAction extends TrackAction {
         // Update audio engine position
         this.store.getAudioEngine().setTrackPosition(
             this.trackId, 
-            positionX, 
+            positionXTicks, // Already in ticks
             useStudioStore.getState().tracks.find(t => t.id === this.trackId)?.position.y || 0
         );
         
@@ -434,7 +435,7 @@ export class TrackResizeAction extends TrackAction {
         // If playback is active, tell the transport controller to adjust playback
         if (isCurrentlyPlaying) {
             console.log(`Playback active during ${operation} - syncing track with transport`);
-            this.store.getTransport().handleTrackPositionChange?.(this.trackId, positionX);
+            this.store.getTransport().handleTrackPositionChange?.(this.trackId, positionXTicks);
         }
     }
     

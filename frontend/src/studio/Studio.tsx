@@ -20,7 +20,7 @@ import { useStudioDBSession } from './hooks/useStudioDBSession';
 import { useHistorySync } from './hooks/useHistorySync';
 
 import StudioControlBar from './components/control-bar/ControlBar';
-import { useGridStore } from './core/state/gridStore';
+import { DEFAULT_MEASURE_WIDTH, useGridStore } from './core/state/gridStore';
 import ChatWindow from './components/ai-assistant/ChatWindow';
 
 // Studio Component Props
@@ -148,19 +148,19 @@ function Studio({ projectId }: StudioProps) {
   };
 
   const handleZoomIn = () => {
-    setZoomLevel(Math.min(zoomLevel + 0.1, 4));
+    setZoomLevel(Math.min(zoomLevel + GRID_CONSTANTS.studioZoomStep, GRID_CONSTANTS.studioZoomMax));
     // Update measureWidth in gridStore based on zoom level
-    const newMeasureWidth = 200 * (Math.min(zoomLevel + 0.1, 4));
-    useGridStore.getState().setMidiMeasureWidth(newMeasureWidth);
-    useGridStore.getState().setAudioMeasureWidth(newMeasureWidth);
+    const newMeasureWidth = DEFAULT_MEASURE_WIDTH * (Math.min(zoomLevel + GRID_CONSTANTS.studioZoomStep, GRID_CONSTANTS.studioZoomMax));
+    useGridStore.getState().setMidiMeasurePixelWidth(newMeasureWidth);
+    useGridStore.getState().setAudioMeasurePixelWidth(newMeasureWidth);
   };
 
   const handleZoomOut = () => {
-    setZoomLevel(Math.max(zoomLevel - 0.1, 0.3));
+    setZoomLevel(Math.max(zoomLevel - GRID_CONSTANTS.studioZoomStep, GRID_CONSTANTS.studioZoomMin));
     // Update measureWidth in gridStore based on zoom level
-    const newMeasureWidth = 200 * (Math.max(zoomLevel - 0.1, 0.3));
-    useGridStore.getState().setMidiMeasureWidth(newMeasureWidth);
-    useGridStore.getState().setAudioMeasureWidth(newMeasureWidth);
+    const newMeasureWidth = DEFAULT_MEASURE_WIDTH * (Math.max(zoomLevel - GRID_CONSTANTS.studioZoomStep, GRID_CONSTANTS.studioZoomMin));
+    useGridStore.getState().setMidiMeasurePixelWidth(newMeasureWidth);
+    useGridStore.getState().setAudioMeasurePixelWidth(newMeasureWidth);
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {

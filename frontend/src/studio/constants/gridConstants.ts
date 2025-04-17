@@ -1,9 +1,14 @@
 import { useGridStore } from '../core/state/gridStore';
+import { MUSIC_CONSTANTS } from './musicConstants';
 
 // Create a function to get the current measure width
-export const getMeasureWidth = () => useGridStore.getState().audioMeasureWidth;
+export const getMeasureWidth = () => useGridStore.getState().audioMeasurePixelWidth;
 
 export const GRID_CONSTANTS = {
+  studioZoomMin: 0.3,
+  studioZoomMax: 4,
+  studioZoomDefault: 1,
+  studioZoomStep: 0.1,
   headerHeight: 28,
   trackHeight: 80,
   drumPadHeight: 20,
@@ -169,6 +174,60 @@ export const calculatePositionTime = (
 };
 
 /**
+ * Convert pixel position to ticks
+ * Used for storing position in a musically-accurate form
+ * 
+ * @param positionInPixels Position in pixels
+ * @param bpm Beats per minute
+ * @param timeSignature Optional time signature to use for calculation
+ * @param ppq Pulses (ticks) per quarter note (default: 960)
+ * @returns Position in ticks
+ */
+export const pixelsToTicks = (
+  positionInPixels: number,
+  bpm: number,
+  timeSignature?: [number, number],
+  ppq: number = MUSIC_CONSTANTS.pulsesPerQuarterNote
+): number => {
+  // Use the passed time signature's numerator or fall back to the default
+  const beatsPerMeasure = timeSignature ? timeSignature[0] : GRID_CONSTANTS.beatsPerMeasure;
+  
+  // Calculate how many beats per pixel
+  const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
+  const beats = positionInPixels / beatWidth;
+  
+  // Convert beats to ticks
+  return Math.round(beats * ppq);
+};
+
+/**
+ * Convert ticks to pixel position
+ * Used for displaying musically-accurate position
+ * 
+ * @param ticks Position in ticks
+ * @param bpm Beats per minute
+ * @param timeSignature Optional time signature to use for calculation
+ * @param ppq Pulses (ticks) per quarter note (default: 960)
+ * @returns Position in pixels
+ */
+export const ticksToPixels = (
+  ticks: number,
+  bpm: number,
+  timeSignature?: [number, number],
+  ppq: number = MUSIC_CONSTANTS.pulsesPerQuarterNote
+): number => {
+  // Use the passed time signature's numerator or fall back to the default
+  const beatsPerMeasure = timeSignature ? timeSignature[0] : GRID_CONSTANTS.beatsPerMeasure;
+  
+  // Calculate beats from ticks
+  const beats = ticks / ppq;
+  
+  // Calculate pixels from beats
+  const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
+  return beats * beatWidth;
+};
+
+/**
  * Get track color based on track index
  * Colors are selected in sequence from the trackColors array
  * After reaching the end of the array, it cycles back to the beginning
@@ -180,4 +239,48 @@ export const getTrackColor = (trackIndex: number): string => {
   // Use modulo to cycle through the colors
   const colorIndex = trackIndex % GRID_CONSTANTS.trackColors.length;
   return GRID_CONSTANTS.trackColors[colorIndex];
+};
+
+/**
+ * Convert a Position object with tick-based x coordinate to one with pixel-based x
+ * Used for display in UI components
+ * 
+ * @param position Position with x in ticks
+ * @param bpm Beats per minute
+ * @param timeSignature Optional time signature to use for calculation
+ * @param ppq Pulses (ticks) per quarter note (default: 960)
+ * @returns Position with x in pixels
+ */
+export const positionToPixels = (
+  position: { x: number, y: number },
+  bpm: number,
+  timeSignature?: [number, number],
+  ppq: number = MUSIC_CONSTANTS.pulsesPerQuarterNote
+): { x: number, y: number } => {
+  return {
+    x: ticksToPixels(position.x, bpm, timeSignature, ppq),
+    y: position.y
+  };
+};
+
+/**
+ * Convert a Position object with pixel-based x coordinate to one with tick-based x
+ * Used for storing position in state
+ * 
+ * @param position Position with x in pixels
+ * @param bpm Beats per minute
+ * @param timeSignature Optional time signature to use for calculation
+ * @param ppq Pulses (ticks) per quarter note (default: 960)
+ * @returns Position with x in ticks
+ */
+export const positionToTicks = (
+  position: { x: number, y: number },
+  bpm: number,
+  timeSignature?: [number, number],
+  ppq: number = MUSIC_CONSTANTS.pulsesPerQuarterNote
+): { x: number, y: number } => {
+  return {
+    x: pixelsToTicks(position.x, bpm, timeSignature, ppq),
+    y: position.y
+  };
 }; 

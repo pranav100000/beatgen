@@ -1,9 +1,6 @@
 import { Midi } from '@tonejs/midi';
-import { v4 as uuidv4 } from 'uuid';
 import { Note } from '../types/note';
 import { db } from '../db/dexie-client';
-
-const TICKS_PER_BEAT = 960; // Standard MIDI ticks per beat
 
 /**
  * Interface for track data

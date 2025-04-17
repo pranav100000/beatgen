@@ -26,7 +26,7 @@ export const MidiTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     ...restProps
   } = props;
   
-  const midiMeasureWidth = useGridStore(state => state.midiMeasureWidth);
+  const midiMeasureWidth = useGridStore(state => state.midiMeasurePixelWidth);
   const trackColor = providedTrackColor || getTrackColor(trackIndex);
   
   // Get notes directly from MidiManager

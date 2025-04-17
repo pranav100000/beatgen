@@ -6,6 +6,7 @@ import { IconButton, Tooltip } from '@mui/material';
 import { DrumTrackState } from '../../core/types/track';
 import { useStudioStore } from '../../stores/useStudioStore';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
+import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
 
 // Define theme colors to match PianoRoll
 const DARK_THEME = {
@@ -301,7 +302,7 @@ interface DrumMachineProps {
 }
 
 // Constants from PianoRoll to maintain consistency
-const TICKS_PER_BEAT = 960; // Standard MIDI ticks per beat (quarter note)
+const TICKS_PER_BEAT = MUSIC_CONSTANTS.pulsesPerQuarterNote; // Standard MIDI ticks per beat (quarter note)
 const TICKS_PER_STEP = TICKS_PER_BEAT / 16; // 4 steps per beat, 240 ticks per step
 
 // Modify the component definition to remove forwardRef

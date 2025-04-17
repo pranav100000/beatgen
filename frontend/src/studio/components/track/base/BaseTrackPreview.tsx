@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import { GRID_CONSTANTS } from '../../../constants/gridConstants';
 import { Position, TrackState } from '../../../core/types/track';
+import { pixelsToTicks, ticksToPixels } from '../../../constants/gridConstants';
 
 /**
  * BaseTrackPreview is the foundation for all track visualizations in the timeline.
@@ -56,7 +57,7 @@ export interface BaseTrackPreviewProps {
   contentWidth?: number;
   
   /** Callback when track resizing finishes */
-  onResizeEnd: (trackId: string, newPositionX: number, newWidth: number, resizeDirection: 'left' | 'right') => void;
+  onResizeEnd: (trackId: string, newTrimTicks: number, resizeDirection: 'left' | 'right') => void;
 }
 
 export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
@@ -70,6 +71,7 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   trackWidth,
   contentWidth,
   timeSignature = [4, 4],
+  bpm,
   onResizeEnd
 }) => {
   // Use the provided content width or default to track width if not specified
@@ -95,7 +97,12 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   // Refs and state for resize functionality
   const [isResizing, setIsResizing] = useState(false);
   const [resizeDirection, setResizeDirection] = useState<'left' | 'right' | null>(null);
-  const [startResizeInfo, setStartResizeInfo] = useState<{ startMouseX: number, startTrackX: number, startTrackWidth: number } | null>(null);
+  const [startResizeInfo, setStartResizeInfo] = useState<{ 
+    startMouseX: number, 
+    startTrackX: number, 
+    startTrackWidth: number,
+    startContentTransform?: number 
+  } | null>(null);
   const lastResizeDataRef = useRef<{ newX: number, newWidth: number }>({ newX: track.position.x, newWidth: trackWidth });
   const MIN_TRACK_WIDTH_SNAP_UNITS = 1; // Minimum width in terms of smallest grid subdivision
 
@@ -158,15 +165,19 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       x: e.clientX + (container.scrollLeft || 0),
       y: e.clientY + (container.scrollTop || 0)
     });
+    
+    // Convert track position from ticks to pixels before storing
+    const positionXPixels = ticksToPixels(track.position.x, bpm, timeSignature);
     setStartDragTrackPosition({
-      x: track.position.x,
+      x: positionXPixels, // Store in pixels for consistent drag calculations
       y: track.position.y
     });
+    
     lastMovedPositionRef.current = track.position;
 
     // Setup initial style for dragging
     if (trackRef.current) {
-      trackRef.current.style.left = `${track.position.x}px`;
+      trackRef.current.style.left = `${positionXPixels}px`; // Use pixels for visual position
       trackRef.current.style.top = `${track.position.y}px`;
       trackRef.current.style.transition = 'none';
     }
@@ -188,19 +199,34 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     setIsResizing(true);
     setResizeDirection(direction);
     
-    // Initialize content transform with current offset to prevent jumping
-    // This ensures we start from the current visual position
-    setContentTransform(contentOffsetX);
+    // Capture current visual transform directly from the DOM
+    let initialTransform = contentOffsetX;
+    if (contentRef.current) {
+      const transformStyle = contentRef.current.style.transform;
+      if (transformStyle && transformStyle.includes('translateX(')) {
+        const match = transformStyle.match(/translateX\(([-\d.]+)px\)/);
+        if (match && match[1]) {
+          initialTransform = parseFloat(match[1]);
+        }
+      }
+    }
+    
+    // Store the actual current transform as our starting point
+    setContentTransform(initialTransform);
+    
+    // Convert track position x from ticks to pixels for visual operations
+    const trackXPixels = ticksToPixels(track.position.x, bpm, timeSignature);
     
     // Always use the current trackWidth for start information
     setStartResizeInfo({
       startMouseX: e.clientX + (container.scrollLeft || 0),
-      startTrackX: track.position.x,
-      startTrackWidth: trackWidthRef.current
+      startTrackX: trackXPixels, // Store in pixels for visual resize
+      startTrackWidth: trackWidthRef.current,
+      startContentTransform: initialTransform // Store the initial transform
     });
     
     lastResizeDataRef.current = { 
-      newX: track.position.x, 
+      newX: trackXPixels, // Store in pixels
       newWidth: trackWidthRef.current
     };
 
@@ -208,14 +234,13 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     if (trackRef.current) {
       trackRef.current.style.transition = 'none';
       trackRef.current.style.width = `${trackWidthRef.current}px`;
+      trackRef.current.style.left = `${trackXPixels}px`; // Ensure left position is in pixels
     }
 
     // Also disable transitions on content wrapper
     if (contentRef.current) {
       contentRef.current.style.transition = 'none';
-      
-      // Explicitly set the transform to the current offset to ensure consistency
-      contentRef.current.style.transform = `translateX(${contentOffsetX}px)`;
+      // No need to set transform here - already set correctly
     }
 
     e.stopPropagation(); // Prevent track drag
@@ -255,17 +280,21 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       const subdivisionsPerMeasure = beatsPerMeasure * subdivisionsPerBeat;
       const subdivisionWidth = GRID_CONSTANTS.measureWidth / subdivisionsPerMeasure;
       
-      // Apply snapping
+      // Apply snapping to pixels first (for visual positioning)
       const snappedX = snapToGrid(newX, subdivisionWidth);
       const snappedY = snapToGrid(newY, GRID_CONSTANTS.trackHeight);
+      
+      // Create a position object with x in ticks for data storage
+      // For visual display, we still use pixels
+      const tickPositionX = pixelsToTicks(Math.max(0, snappedX), bpm, timeSignature);
       const newPosition = {
-        x: Math.max(0, snappedX),
+        x: tickPositionX, // Store in ticks
         y: Math.max(0, snappedY)
       };
 
-      // Update visual position during drag
+      // Update visual position during drag (still using pixels for visual display)
       if (trackRef.current) {
-        trackRef.current.style.left = `${newPosition.x}px`;
+        trackRef.current.style.left = `${snappedX}px`; // Display in pixels
         trackRef.current.style.top = `${newPosition.y}px`;
       }
       
@@ -300,15 +329,16 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
             trackRef.current.style.width = `${snappedNewWidth}px`;
           }
           
-          // For right resize, we keep the initial content offset
-          // No additional transform needed as content stays anchored to left
+          // For right resize, we don't need to adjust content transform
+          // Content stays anchored to the left edge
           
       } else if (resizeDirection === 'left') {
           // Left resize - change both container position and width
           const newX = startResizeInfo.startTrackX + deltaX;
           const newWidth = startResizeInfo.startTrackWidth - deltaX;
           
-          snappedNewX = snapResize(newX, subdivisionWidth); 
+          // Snap to grid
+          snappedNewX = snapResize(Math.max(0, newX), subdivisionWidth); 
           
           // Calculate width based on the snapped X position to maintain right edge
           const rightEdge = startResizeInfo.startTrackX + startResizeInfo.startTrackWidth;
@@ -318,24 +348,24 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
           snappedNewWidth = snapResize(potentialSnappedWidth, subdivisionWidth, minPixelWidth);
 
           // Recalculate snappedNewX if minimum width constraint changed the width
-          snappedNewX = rightEdge - snappedNewWidth;
+          snappedNewX = Math.max(0, rightEdge - snappedNewWidth);
 
           // Update visual position and width during resize
           if (trackRef.current) {
             trackRef.current.style.left = `${snappedNewX}px`;
             trackRef.current.style.width = `${snappedNewWidth}px`;
             
-            // Calculate how much the container has moved from its original position
-            const containerDeltaX = snappedNewX - startResizeInfo.startTrackX;
-            
-            // Apply a counter-transform to the content
-            // Start with the initial offset (contentOffsetX) and adjust by container movement
+            // For left resize, we need to adjust content position to compensate for container movement
             if (contentRef.current) {
-              // Note: contentOffsetX is negative for left trim, so we ADD the container delta
-              // which is positive when moving right
-              const counterTransform = contentOffsetX - containerDeltaX;
-              contentRef.current.style.transform = `translateX(${counterTransform}px)`;
-              setContentTransform(counterTransform);
+              // Calculate container movement from the start position
+              const containerDeltaX = snappedNewX - startResizeInfo.startTrackX;
+              
+              // Use captured initial transform as the base
+              const initialTransform = startResizeInfo.startContentTransform || contentOffsetX;
+              
+              // Content should move in opposite direction of container
+              const transform = initialTransform - containerDeltaX;
+              contentRef.current.style.transform = `translateX(${transform}px)`;
             }
           }
       }
@@ -351,7 +381,8 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     startDragMousePosition, 
     startDragTrackPosition, 
     timeSignature,
-    contentOffsetX
+    contentOffsetX,
+    bpm
   ]);
 
   const handleMouseUp = useCallback(() => {
@@ -365,8 +396,11 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       
       // Restore transitions after state change
       if (trackRef.current) {
+        // Convert tick position back to pixels for visual display
+        const pixelX = ticksToPixels(finalPosition.x, bpm, timeSignature);
+        
         // Explicitly set final position/width before re-enabling transition
-        trackRef.current.style.left = `${finalPosition.x}px`;
+        trackRef.current.style.left = `${pixelX}px`;
         trackRef.current.style.top = `${finalPosition.y}px`;
         // Ensure width is reset if needed (although drag shouldn't change it)
         trackRef.current.style.width = `${trackWidth}px`;
@@ -382,35 +416,50 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       
       setIsResizing(false); // Reset state first
       setResizeDirection(null);
-      setStartResizeInfo(null);
       
-      // Clear explicit content transform - will be recalculated based on new trim values
-      setContentTransform(0);
-      
+      // Enable transitions for smooth visual updates
       if (contentRef.current) {
         contentRef.current.style.transition = 'transform 0.2s ease';
-        // Let the normal content offset from trim values take over
-        // (will be recalculated after the resize completes and track updates)
-        contentRef.current.style.transform = '';
-      }
-      
-      // Trigger resize end callback with direction
-      if (currentDirection) {
-        onResizeEnd(track.id, finalResizeData.newX, finalResizeData.newWidth, currentDirection);
       }
 
-      // Restore transitions after state change
-      if (trackRef.current) {
-        // Explicitly set final position/width before re-enabling transition
-        trackRef.current.style.left = `${finalResizeData.newX}px`;
-        trackRef.current.style.width = `${finalResizeData.newWidth}px`;
-        // Ensure top is reset if needed (although resize shouldn't change it)
-        trackRef.current.style.top = `${track.position.y}px`;
-        trackRef.current.style.transition = 'left 0.2s ease, top 0.2s ease, width 0.2s ease'; 
+      if (currentDirection === 'left') {
+        // For left resize: calculate position change in pixels
+        const deltaXPixels = finalResizeData.newX - (startResizeInfo?.startTrackX || 0);
+        
+        // Set final visual position and width
+        if (trackRef.current) {
+          trackRef.current.style.left = `${finalResizeData.newX}px`;
+          trackRef.current.style.width = `${finalResizeData.newWidth}px`;
+          
+          // Calculate the final transform for content
+          if (contentRef.current) {
+            const containerDeltaX = finalResizeData.newX - (startResizeInfo?.startTrackX || 0);
+            const initialTransform = startResizeInfo?.startContentTransform || contentOffsetX;
+            const finalTransform = initialTransform - containerDeltaX;
+            
+            // Apply the transform - we'll keep this until the state updates
+            contentRef.current.style.transform = `translateX(${finalTransform}px)`;
+            setContentTransform(finalTransform);
+          }
+        }
+        
+        // Pass the pixel delta directly to the callback
+        onResizeEnd(track.id, deltaXPixels, currentDirection);
+      } else if (currentDirection === 'right') {
+        // For right resize: calculate width change in pixels
+        const deltaWidthPixels = finalResizeData.newWidth - (startResizeInfo?.startTrackWidth || trackWidth);
+        
+        // No transform adjustments needed for right resize
+        
+        // Pass the pixel delta directly to the callback
+        onResizeEnd(track.id, deltaWidthPixels, currentDirection);
       }
+      
+      // Clear the startResizeInfo after we're done with it
+      setStartResizeInfo(null);
     }
     
-  }, [isDragging, isResizing, resizeDirection, track.id, track.position.y, onPositionChange, onResizeEnd, trackWidth]);
+  }, [isDragging, isResizing, resizeDirection, track.id, track.position, onPositionChange, onResizeEnd, trackWidth, bpm, timeSignature, startResizeInfo, contentOffsetX]);
 
   // Add/remove mouse event listeners
   useEffect(() => {
@@ -428,26 +477,39 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   // Sync position AND width from props to DOM (for undo/redo, or external changes)
   useEffect(() => {
     if (trackRef.current && !isDragging && !isResizing) { // Only sync if not actively dragging/resizing
-      trackRef.current.style.left = `${track.position.x}px`;
+      // Convert track position from ticks to pixels for display
+      const pixelX = ticksToPixels(track.position.x, bpm, timeSignature);
+      
+      trackRef.current.style.left = `${pixelX}px`;
       trackRef.current.style.top = `${track.position.y}px`;
       
       // Important: Always update the width to match props
       trackRef.current.style.width = `${trackWidth}px`;
       
-      console.log('Syncing track DOM:', { id: track.id, width: trackWidth });
+      console.log('Syncing track DOM:', { id: track.id, width: trackWidth, ticksX: track.position.x, pixelsX: pixelX });
     }
-  }, [track.position.x, track.position.y, trackWidth, isDragging, isResizing, track.id]);
+  }, [track.position.x, track.position.y, trackWidth, isDragging, isResizing, track.id, bpm, timeSignature]);
+
+  // Reset content transform after trim values change and component re-renders
+  // This ensures we switch back to using the calculated offset once state updates
+  useEffect(() => {
+    if (!isResizing && contentTransform !== 0) {
+      // We want to wait until the state has fully updated
+      const timer = setTimeout(() => {
+        setContentTransform(0);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [track.trimStartTicks, track.trimEndTicks, isResizing, contentTransform]);
 
   // Calculate the transform to use for content position
-  // Use contentTransform during resizing, otherwise use the normal offset from trim values
   const getContentTransform = () => {
-    if (isResizing) {
-      // During resize, use the dynamic content transform that's updated during mouse movement
+    if (contentTransform !== 0) {
+      // Use the manually set transform if we have one
       return contentTransform;
-    } else {
-      // Otherwise use normal offset based on trim values
-      return contentOffsetX;
-    }
+    } 
+    // Otherwise use normal offset based on trim values
+    return contentOffsetX;
   };
 
   // Define styles for resize handles

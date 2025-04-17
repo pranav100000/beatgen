@@ -1,11 +1,10 @@
 import React from 'react';
 import { Box } from '@mui/material';
-import { NoteState } from '../../../components/drum-machine/DrumMachine'; // Reuse NoteState
-import { GRID_CONSTANTS } from '../../../constants/gridConstants';
+import { MUSIC_CONSTANTS } from '../../../constants/musicConstants';
 
 // Constants for the preview grid
 const PREVIEW_COLS = 64; // Show 4 bars (16 steps * 4)
-const TICKS_PER_STEP = 960 / 4; // Assuming 4 steps per beat (like DrumMachine)
+const TICKS_PER_STEP = MUSIC_CONSTANTS.pulsesPerQuarterNote / 4; // Assuming 4 steps per beat (like DrumMachine)
 
 interface DrumGridPreviewProps {
   pattern: boolean[][] | null;

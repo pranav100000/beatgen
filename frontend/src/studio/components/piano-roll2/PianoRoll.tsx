@@ -13,12 +13,13 @@ import {
   getAllGridSnapOptions, 
   getSnapSizeInPixels 
 } from './gridConstants';
+import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
 
 // Define a constant grid size to use throughout the component
 const GRID_SIZE = 48; // pixels
-const TICKS_PER_BEAT = 960; // Standard MIDI ticks per beat (quarter note)
-const TICKS_PER_STEP = TICKS_PER_BEAT / 4; // 4 steps per beat, 240 ticks per step
-const PIXELS_PER_TICK = GRID_SIZE / TICKS_PER_STEP; // Pixels per tick at 1.0 zoom
+const PULSES_PER_QUARTER_NOTE = MUSIC_CONSTANTS.pulsesPerQuarterNote; // 4 steps per beat, 240 ticks per step
+const TICKS_PER_BEAT = PULSES_PER_QUARTER_NOTE * 4; // Standard MIDI ticks per beat (quarter note)
+const PIXELS_PER_TICK = GRID_SIZE / PULSES_PER_QUARTER_NOTE; // Pixels per tick at 1.0 zoom
 
 // Define our note state interface (normalized values independent of zoom)
 export interface NoteState {
@@ -1614,7 +1615,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
 
   // Add state to track the most recently used note width in ticks (not pixels)
   // Default to one beat (quarter note)
-  const [lastNoteWidth, setLastNoteWidth] = useState(TICKS_PER_BEAT);
+  const [lastNoteWidth, setLastNoteWidth] = useState(PULSES_PER_QUARTER_NOTE);
 
   // Convert NoteState objects to visual Note objects
   const visualNotes = useMemo(() => {

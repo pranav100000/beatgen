@@ -28,7 +28,7 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     ...restProps
   } = props;
   
-  const midiMeasureWidth = useGridStore(state => state.midiMeasureWidth);
+  const midiMeasureWidth = useGridStore(state => state.midiMeasurePixelWidth);
   const trackColor = providedTrackColor || getTrackColor(trackIndex);
   
   // Type guard to ensure this is a drum track

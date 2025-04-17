@@ -4,7 +4,7 @@ import { AudioTrack } from '../audio-engine/audioEngine';
 import { DrumPad } from '../state/store';
 
 export interface Position {
-    x: number; // Position in pixels from left (time)
+    x: number; // Position in pixels from left (ticks)
     y: number; // Position in pixels from top (track order)
 }
 

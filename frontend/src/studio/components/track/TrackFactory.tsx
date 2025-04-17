@@ -4,7 +4,6 @@ import { TrackPreviewProps } from './types';
 import AudioTrackPreview from './audio/AudioTrackPreview';
 import MidiTrackPreview from './midi/MidiTrackPreview';
 import DrumTrackPreview from './drum/DrumTrackPreview';
-import { TrackState } from '../../core/types/track';
 
 /**
  * TrackFactory is responsible for creating the appropriate track component

@@ -2,6 +2,7 @@ import { AudioWorkletNodeSynthesizer } from 'js-synthesizer';
 import { ISequencer } from 'js-synthesizer';
 import { Midi } from '@tonejs/midi';
 import { Note } from '../../types/note';
+import { MUSIC_CONSTANTS } from '../../../constants/musicConstants';
 
 /**
  * Custom types for event handling
@@ -45,7 +46,7 @@ export class SequencerWrapper {
   private originalVolume: number;
   private savedVolume: number | null = null;
   private _isPlaying: boolean = false;
-  private ppq: number = 480; // Default MIDI Pulses Per Quarter Note
+  private ppq: number = MUSIC_CONSTANTS.pulsesPerQuarterNote; // Default MIDI Pulses Per Quarter Note
   private currentBpm: number = 120; // Default tempo
 
   constructor(

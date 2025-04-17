@@ -60,13 +60,22 @@ export class TransportController implements Transport {
     }
     
     /**
-     * Converts a track's UI position (in pixels) to a time offset (in seconds)
+     * Converts a track's position (in ticks) to a time offset (in seconds)
      * This is crucial for properly aligning tracks on the timeline
+     * 
+     * @param trackXTicks Position in ticks
+     * @returns Time offset in seconds
      */
-    private getTrackTimeOffset(trackX: number): number {
-        // Using the grid utilities to convert pixel position to time
-        // This ensures consistency between UI representation and audio timing
-        return calculatePositionTime(trackX, Tone.getTransport().bpm.value);
+    private getTrackTimeOffset(trackXTicks: number): number {
+        // First convert ticks to beats
+        const ppq = 480; // Standard MIDI ticks per quarter note
+        const beats = trackXTicks / ppq;
+        
+        // Then convert beats to seconds based on current BPM
+        const bpm = Tone.getTransport().bpm.value;
+        const secondsPerBeat = 60 / bpm;
+        
+        return beats * secondsPerBeat;
     }
     
     /**
@@ -74,13 +83,13 @@ export class TransportController implements Transport {
      * 1. Current transport position
      * 2. Track's position on the timeline
      * 
-     * @param transportTime Global transport time
-     * @param trackX The track's X position in pixels
+     * @param transportTime Global transport time in seconds
+     * @param trackXTicks The track's X position in ticks
      * @returns The adjusted playback position in seconds
      */
-    private calculateTrackPlayPosition(transportTime: number, trackX: number): number {
+    private calculateTrackPlayPosition(transportTime: number, trackXTicks: number): number {
         // Get track's start time offset based on its position
-        const trackOffset = this.getTrackTimeOffset(trackX);
+        const trackOffset = this.getTrackTimeOffset(trackXTicks);
         
         // Cases:
         // 1. If transport < trackOffset: track shouldn't play yet (return negative to indicate this)
@@ -134,7 +143,7 @@ export class TransportController implements Transport {
                 if (!track.player) return;
                 
                 try {
-                    const trackX = track.position?.x || 0;
+                    const trackXTicks = track.position?.x || 0;
                     
                     // Get track's trim settings if available
                     const hasTrimSettings = 
@@ -143,8 +152,8 @@ export class TransportController implements Transport {
                         (track.player as any)._trimSettings.trimEnabled;
                     
                     // Calculate the offset when this track should start playing
-                    // Standard offset based on track position
-                    const trackPositionOffset = this.getTrackTimeOffset(trackX);
+                    // Standard offset based on track position in ticks
+                    const trackPositionOffset = this.getTrackTimeOffset(trackXTicks);
                     
                     // If trim settings exist, adjust playback accordingly
                     if (hasTrimSettings) {
@@ -516,8 +525,12 @@ export class TransportController implements Transport {
     /**
      * Handle track position changes during playback
      * This recalculates and adjusts the playback for a specific track that was moved
+     * 
+     * @param trackId The ID of the track being moved
+     * @param newPositionXTicks The new X position in ticks
+     * @param type Optional type parameter
      */
-    public handleTrackPositionChange(trackId: string, newPositionX: number, type?: string): void {
+    public handleTrackPositionChange(trackId: string, newPositionXTicks: number, type?: string): void {
         // Only do anything if we're playing
         if (!this.isPlaying) {
             console.log(`Track ${trackId} position changed, but not playing - no action needed`);
@@ -531,7 +544,7 @@ export class TransportController implements Transport {
             return;
         }
         
-        console.log(`Handling position change for track ${trackId} to x:${newPositionX}px during playback`);
+        console.log(`Handling position change for track ${trackId} to x:${newPositionXTicks} ticks during playback`);
         
         // CRITICAL: This function needs to stop and restart ALL tracks to ensure proper synchronization
         // This is because Tone.js transport synchronization doesn't support repositioning individual tracks

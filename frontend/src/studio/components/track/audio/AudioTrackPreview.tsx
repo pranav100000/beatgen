@@ -24,7 +24,7 @@ export const AudioTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     ...restProps 
   } = props;
   
-  const audioMeasureWidth = useGridStore(state => state.audioMeasureWidth);
+  const audioMeasureWidth = useGridStore(state => state.audioMeasurePixelWidth);
   const trackColor = providedTrackColor || getTrackColor(trackIndex);
   
   // Calculate display width for the track container (viewport)
