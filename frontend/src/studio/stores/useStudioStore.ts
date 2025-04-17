@@ -11,7 +11,7 @@ import { db } from '../core/db/dexie-client';
 import { Actions } from '../core/state/history/actions';
 import { NoteState } from '../components/drum-machine/DrumMachine';
 import { Note } from '../core/types/note';
-import { convertFromNoteState, convertToNoteState } from '../utils/noteConversion';
+import { convertFromNoteState, convertToNoteState, PULSES_PER_QUARTER_NOTE } from '../utils/noteConversion';
 
 interface StudioState {
   // Audio Engine State
@@ -100,6 +100,8 @@ interface StudioState {
   // New action to add an EMPTY sampler track and link it to a drum track
   addEmptySamplerToDrumTrack: (drumTrackId: string, newSamplerName?: string) => Promise<string | null>;
   // --- END ADDED ACTION SIGNATURES ---
+
+  updateTrack: (updatedTrack: TrackState) => void;
 }
 
 export const useStudioStore = create<StudioState>((set, get) => {
@@ -564,12 +566,16 @@ export const useStudioStore = create<StudioState>((set, get) => {
           }
         }
         
-        // Calculate width based on duration and BPM
         const calculatedWidth = calculateTrackWidth(
           duration, 
           projectData.bpm, 
-          [projectData.time_signature_numerator, projectData.time_signature_denominator]
-        );
+          [projectData.time_signature_numerator, projectData.time_signature_denominator],
+          {
+              trimStartTicks: apiTrack.trim_start_ticks,
+              trimEndTicks: apiTrack.trim_end_ticks,
+              originalDurationTicks: PULSES_PER_QUARTER_NOTE * 4
+          }
+      );
         
         // Create a track state object
         const trackState: TrackState = {
@@ -577,6 +583,8 @@ export const useStudioStore = create<StudioState>((set, get) => {
           ...audioTrack,
           position,
           duration,
+          trimStartTicks: apiTrack.trim_start_ticks,
+          trimEndTicks: apiTrack.trim_end_ticks,
           type: apiTrack.type as "audio" | "midi" | "drum",
           volume: apiTrack.volume,
           pan: apiTrack.pan,
@@ -627,7 +635,7 @@ export const useStudioStore = create<StudioState>((set, get) => {
       
       // Store the project ID for later reference (saving, etc.)
       (window as any).loadedProjectId = projectId;
-      
+      console.log(`Successfully loaded project with ${trackStates.length} tracks`);
       return projectData;
     } catch (error) {
       console.error('Failed to load project:', error);
@@ -1309,6 +1317,8 @@ export const useStudioStore = create<StudioState>((set, get) => {
                         muted: newSamplerTrack.muted ?? false,
                         soloed: newSamplerTrack.soloed ?? false,
                         position: initialPosition,
+                        trimStartTicks: 0,
+                        trimEndTicks: 0,
                         duration: defaultDuration,
                         _calculatedWidth: calculateTrackWidth(defaultDuration, bpm, timeSignature),
                         index: currentTrackIndex,
@@ -1352,6 +1362,8 @@ export const useStudioStore = create<StudioState>((set, get) => {
                     muted: newMainDrumTrack.muted ?? false,
                     soloed: newMainDrumTrack.soloed ?? false,
                     position: initialPosition,
+                    trimStartTicks: 0,
+                    trimEndTicks: 0,
                     duration: defaultDuration,
                     _calculatedWidth: calculateTrackWidth(defaultDuration, bpm, timeSignature),
                     index: currentTrackIndex,
@@ -1416,6 +1428,8 @@ export const useStudioStore = create<StudioState>((set, get) => {
             muted: newTrack.muted ?? false,
             soloed: newTrack.soloed ?? false,
             position: initialPosition,
+            trimStartTicks: 0,
+            trimEndTicks: 0,
             duration: defaultDuration,
             _calculatedWidth: calculateTrackWidth(defaultDuration, bpm, timeSignature),
             index: tracks.length,
@@ -1686,5 +1700,22 @@ export const useStudioStore = create<StudioState>((set, get) => {
     }
   },
   // --- END ADDED ACTIONS ---
+
+  updateTrack: (updatedTrack: TrackState) => {
+    const { tracks, store } = get();
+    
+    // Update the track in the tracks array
+    const updatedTracks = tracks.map(track => 
+      track.id === updatedTrack.id ? updatedTrack : track
+    );
+    
+    // Update the state
+    set({ tracks: updatedTracks });
+    
+    // Update in the audio engine if needed
+    if (store && updatedTrack.type === 'audio') {
+      store.getAudioEngine().updateTrack(updatedTrack.id, updatedTrack);
+    }
+  },
 }
 });

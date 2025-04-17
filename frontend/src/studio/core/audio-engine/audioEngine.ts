@@ -10,8 +10,11 @@ export interface AudioTrack {
   pan: number;
   muted: boolean;
   soloed: boolean;
+  trimStartTicks?: number;
+  trimEndTicks?: number;
+  originalDurationTicks?: number;
   position?: {
-    x: number; // Position in pixels from left (timeline position)
+    x: number; // Position in ticks from left (musical time position)
     y: number; // Position in pixels from top (track order)
   };
 }
@@ -223,6 +226,80 @@ class AudioEngine {
           }
         });
       }
+    }
+  }
+
+  public setTrackTrim(trackId: string, trimStartTicks: number, trimEndTicks: number): void {
+    const track = this.tracks.get(trackId);
+    if (!track || !track.player) return;
+    
+    // Store trim values on the track
+    track.trimStartTicks = trimStartTicks;
+    track.trimEndTicks = trimEndTicks;
+    
+    // If we have a Tone.Player, update its trim settings
+    if (track.player instanceof Tone.Player) {
+      // Convert ticks to seconds
+      const ticksPerSecond = Tone.Transport.bpm.value * Tone.Transport.PPQ / 60;
+      const trimStartSeconds = trimStartTicks / ticksPerSecond;
+      const trimEndSeconds = trimEndTicks / ticksPerSecond;
+      
+      // Log the trim values for debugging
+      console.log(`Setting track trim for ${trackId}:`, {
+        trimStartTicks,
+        trimEndTicks,
+        trimStartSeconds,
+        trimEndSeconds,
+        playerDuration: track.player.buffer?.duration || 0
+      });
+      
+      // Set playback region for the player
+      if (track.player.buffer) {
+        // Clamp values to buffer duration
+        const bufferDuration = track.player.buffer.duration;
+        const startSec = Math.min(Math.max(0, trimStartSeconds), bufferDuration);
+        const endSec = Math.min(Math.max(startSec, trimEndSeconds), bufferDuration);
+        
+        // Update player settings - these will be used during playback
+        // The key is to set both loopStart/End AND playbackRate.
+        // Simply setting loopStart/End is not enough - we need to modify how the player is scheduled
+        track.player.loopStart = startSec;
+        track.player.loopEnd = endSec;
+        
+        // Store additional settings on the player instance for use during playback scheduling
+        // These will be used by the transport controller when syncing the player
+        (track.player as any)._trimSettings = {
+          trimStartSeconds: startSec,
+          trimEndSeconds: endSec,
+          trimEnabled: true
+        };
+        
+        console.log(`Set player trim for ${trackId}: ${startSec}s to ${endSec}s (${endSec - startSec}s duration)`);
+      } else {
+        console.warn(`Cannot set trim for ${trackId}: player has no buffer`);
+      }
+    }
+  }
+
+  public updateTrack(trackId: string, updatedTrack: AudioTrack): void {
+    // Check if track exists in the map
+    if (!this.tracks.has(trackId)) return;
+    
+    // Get the existing track
+    const existingTrack = this.tracks.get(trackId);
+    
+    // Update the track in the tracks map
+    this.tracks.set(trackId, { 
+      ...existingTrack,
+      ...updatedTrack,
+      // Ensure player and channel instances are preserved
+      player: existingTrack.player,
+      channel: existingTrack.channel
+    });
+    
+    // If the track has trim settings, apply them
+    if (updatedTrack.trimStartTicks !== undefined && updatedTrack.trimEndTicks !== undefined) {
+      this.setTrackTrim(trackId, updatedTrack.trimStartTicks, updatedTrack.trimEndTicks);
     }
   }
 }

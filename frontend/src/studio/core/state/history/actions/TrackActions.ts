@@ -3,6 +3,7 @@ import { TrackState, Position } from '../../../types/track';
 import { useGridStore } from '../../gridStore';
 import { useStudioStore } from '../../../../stores/useStudioStore';
 import { BaseAction, TrackAction } from './BaseAction';
+import { pixelsToTicks, ticksToPixels } from '../../../../constants/gridConstants';
 
 /**
  * Action for changing track position without callbacks
@@ -52,22 +53,22 @@ export class TrackPositionAction extends TrackAction {
         // Update soundfont offset if it's a MIDI or drum track
         const track = this.store.getTrackDataById(this.trackId);
         if (track && (track.type === 'midi' || track.type === 'drum' || track.type === 'sampler')) {
-            // Convert X position (pixels) to milliseconds
-            const beatDurationMs = (60 / this.store.getProjectManager().getTempo()) * 1000;
+            // Convert X position in ticks to milliseconds
+            const bpm = this.store.getProjectManager().getTempo();
             const timeSignature = this.store.getProjectManager().getTimeSignature();
-            const beatsPerMeasure = timeSignature[0];
-            // Get grid constants from the store
-            const measureWidth = useGridStore.getState().midiMeasureWidth;
-            const pixelsPerBeat = measureWidth / beatsPerMeasure;
             
-            // Calculate offset in milliseconds
-            const offsetBeats = position.x / pixelsPerBeat;
+            // Calculate beats from ticks
+            const PPQ = 480; // Standard MIDI ticks per quarter note
+            const offsetBeats = position.x / PPQ;
+            
+            // Convert beats to milliseconds
+            const beatDurationMs = (60 / bpm) * 1000;
             const offsetMs = offsetBeats * beatDurationMs;
             
             // Set track offset in milliseconds
             this.store.getSoundfontController().setTrackOffset(this.trackId, offsetMs);
             this.store.getSamplerController().setTrackOffset(this.trackId, offsetMs);
-            console.log(`Set track ${this.trackId} offset: ${position.x}px → ${offsetMs}ms (${offsetBeats} beats)`);
+            console.log(`Set track ${this.trackId} offset: ${position.x} ticks → ${offsetMs}ms (${offsetBeats} beats)`);
         }
     }
     
@@ -353,11 +354,153 @@ export class ParameterChangeAction extends TrackAction {
 }
 
 /**
+ * Action for resizing a track (including trim operations)
+ */
+export class TrackResizeAction extends TrackAction {
+    readonly type = 'TRACK_RESIZE';
+    private oldTrimStartTicks: number;
+    private oldTrimEndTicks: number;
+    private oldWidth: number;
+    private oldPositionX: number;
+    private newTrimStartTicks: number;
+    private newTrimEndTicks: number;
+    private newWidth: number;
+    private newPositionX: number;
+    
+    constructor(
+        store: Store,
+        trackId: string,
+        oldTrimStartTicks: number,
+        oldTrimEndTicks: number,
+        oldWidth: number,
+        oldPositionX: number,
+        newTrimStartTicks: number,
+        newTrimEndTicks: number,
+        newWidth: number,
+        newPositionX: number
+    ) {
+        super(store, trackId);
+        this.oldTrimStartTicks = oldTrimStartTicks;
+        this.oldTrimEndTicks = oldTrimEndTicks;
+        this.oldWidth = oldWidth;
+        this.oldPositionX = oldPositionX;
+        this.newTrimStartTicks = newTrimStartTicks;
+        this.newTrimEndTicks = newTrimEndTicks;
+        this.newWidth = newWidth;
+        this.newPositionX = newPositionX;
+    }
+    
+    private updateTrackResize(
+        trimStartTicks: number,
+        trimEndTicks: number,
+        width: number,
+        positionXTicks: number,
+        operation: string
+    ): void {
+        // Update state directly through global store
+        useStudioStore.setState(state => ({
+            tracks: state.tracks.map(track => 
+                track.id === this.trackId 
+                    ? { 
+                          ...track, 
+                          trimStartTicks,
+                          trimEndTicks,
+                          _calculatedWidth: width,
+                          position: {
+                              ...track.position,
+                              x: positionXTicks // Already in ticks
+                          }
+                      }
+                    : track
+            )
+        }));
+        
+        // Update audio engine trim settings
+        this.store.getAudioEngine().setTrackTrim(
+            this.trackId, 
+            trimStartTicks, 
+            trimEndTicks
+        );
+        
+        // Update audio engine position
+        this.store.getAudioEngine().setTrackPosition(
+            this.trackId, 
+            positionXTicks, // Already in ticks
+            useStudioStore.getState().tracks.find(t => t.id === this.trackId)?.position.y || 0
+        );
+        
+        // Check current playback state
+        const isCurrentlyPlaying = this.store.getTransport().isPlaying;
+        
+        // If playback is active, tell the transport controller to adjust playback
+        if (isCurrentlyPlaying) {
+            console.log(`Playback active during ${operation} - syncing track with transport`);
+            this.store.getTransport().handleTrackPositionChange?.(this.trackId, positionXTicks);
+        }
+    }
+    
+    async execute(): Promise<void> {
+        this.updateTrackResize(
+            this.newTrimStartTicks,
+            this.newTrimEndTicks,
+            this.newWidth,
+            this.newPositionX,
+            'execute'
+        );
+        
+        this.log('Execute', { 
+            trackId: this.trackId, 
+            from: {
+                trimStartTicks: this.oldTrimStartTicks,
+                trimEndTicks: this.oldTrimEndTicks,
+                width: this.oldWidth,
+                positionX: this.oldPositionX
+            }, 
+            to: {
+                trimStartTicks: this.newTrimStartTicks,
+                trimEndTicks: this.newTrimEndTicks,
+                width: this.newWidth,
+                positionX: this.newPositionX
+            },
+            isCurrentlyPlaying: this.store.getTransport().isPlaying
+        });
+    }
+    
+    async undo(): Promise<void> {
+        this.updateTrackResize(
+            this.oldTrimStartTicks,
+            this.oldTrimEndTicks,
+            this.oldWidth,
+            this.oldPositionX,
+            'undo'
+        );
+        
+        this.log('Undo', { 
+            trackId: this.trackId, 
+            from: {
+                trimStartTicks: this.newTrimStartTicks,
+                trimEndTicks: this.newTrimEndTicks,
+                width: this.newWidth,
+                positionX: this.newPositionX
+            }, 
+            to: {
+                trimStartTicks: this.oldTrimStartTicks,
+                trimEndTicks: this.oldTrimEndTicks,
+                width: this.oldWidth,
+                positionX: this.oldPositionX
+            },
+            isCurrentlyPlaying: this.store.getTransport().isPlaying
+        });
+    }
+}
+
+/**
  * Export all track actions
  */
 export const TrackActions = {
     TrackPosition: TrackPositionAction,
     AddTrack: AddTrackAction, 
     DeleteTrack: DeleteTrackAction,
-    ParameterChange: ParameterChangeAction
+    ParameterChange: ParameterChangeAction,
+    TrackResize: TrackResizeAction
 };

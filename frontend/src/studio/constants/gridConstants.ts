@@ -1,9 +1,14 @@
 import { useGridStore } from '../core/state/gridStore';
+import { MUSIC_CONSTANTS } from './musicConstants';
 
 // Create a function to get the current measure width
-export const getMeasureWidth = () => useGridStore.getState().audioMeasureWidth;
+export const getMeasureWidth = () => useGridStore.getState().audioMeasurePixelWidth;
 
 export const GRID_CONSTANTS = {
+  studioZoomMin: 0.3,
+  studioZoomMax: 4,
+  studioZoomDefault: 1,
+  studioZoomStep: 0.1,
   headerHeight: 28,
   trackHeight: 80,
   drumPadHeight: 20,
@@ -44,9 +49,7 @@ export const GRID_CONSTANTS = {
 
 /**
  * Calculate track width based on duration, BPM, and time signature
- * Example: At 120 BPM, a 30-second track = 60 beats = 15 bars (measures) in 4/4
- *          At 60 BPM, a 30-second track = 30 beats = 7.5 bars (measures) in 4/4
- *          But in 3/4, the same 30 beats would be 10 bars
+ * If trim values are provided, calculates width based on trimmed duration
  * 
  * Formula: 
  * 1. Beats = Duration * (BPM / 60)
@@ -56,21 +59,50 @@ export const GRID_CONSTANTS = {
 export const calculateTrackWidth = (
   durationInSeconds: number, 
   bpm: number,
-  timeSignature?: [number, number]
+  timeSignature?: [number, number],
+  trimValues?: {
+    trimStartTicks?: number,
+    trimEndTicks?: number,
+    originalDurationTicks?: number
+  }
 ): number => {
   const beatsPerMeasure = timeSignature ? timeSignature[0] : GRID_CONSTANTS.beatsPerMeasure;
   
   // Use getMeasureWidth() instead of GRID_CONSTANTS.measureWidth
   const currentMeasureWidth = getMeasureWidth();
   
-  console.log('Calculating track width:', {
-    durationInSeconds,
-    bpm,
-    timeSignature,
-    beatsPerMeasure,
-    measureWidth: currentMeasureWidth
-  });
+  // If we have trim values, calculate width based on trimmed duration
+  if (trimValues && 
+      trimValues.trimStartTicks !== undefined && 
+      trimValues.trimEndTicks !== undefined && 
+      trimValues.originalDurationTicks) {
+    
+    // Calculate the trimmed duration in ticks
+    const trimmedDurationTicks = trimValues.trimEndTicks - trimValues.trimStartTicks;
+    
+    // Calculate ratio of trimmed duration to original duration
+    const trimRatio = trimmedDurationTicks / trimValues.originalDurationTicks;
+    
+    // Apply ratio to the full width calculation
+    const fullWidth = calculateFullTrackWidth(durationInSeconds, bpm, beatsPerMeasure, currentMeasureWidth);
+    
+    // Return trimmed width
+    return fullWidth * trimRatio;
+  }
+  
+  // Standard width calculation for untrimmed tracks
+  return calculateFullTrackWidth(durationInSeconds, bpm, beatsPerMeasure, currentMeasureWidth);
+};
 
+/**
+ * Helper function for calculating full track width without trimming
+ */
+function calculateFullTrackWidth(
+  durationInSeconds: number,
+  bpm: number,
+  beatsPerMeasure: number,
+  measureWidth: number
+): number {
   // Calculate total beats in the duration
   const beatsPerSecond = bpm / 60;
   const totalBeats = durationInSeconds * beatsPerSecond;
@@ -79,17 +111,8 @@ export const calculateTrackWidth = (
   const measuresCount = totalBeats / beatsPerMeasure;
   
   // Convert measures to pixels
-  const width = measuresCount * currentMeasureWidth;
-
-  console.log('Track width calculation results:', {
-    beatsPerSecond,
-    totalBeats,
-    measuresCount,
-    finalWidth: width
-  });
-
-  return width;
-};
+  return measuresCount * measureWidth;
+}
 
 /**
  * Convert time to position based on musical timing rather than just seconds
@@ -151,6 +174,60 @@ export const calculatePositionTime = (
 };
 
 /**
+ * Convert pixel position to ticks
+ * Used for storing position in a musically-accurate form
+ * 
+ * @param positionInPixels Position in pixels
+ * @param bpm Beats per minute
+ * @param timeSignature Optional time signature to use for calculation
+ * @param ppq Pulses (ticks) per quarter note (default: 960)
+ * @returns Position in ticks
+ */
+export const pixelsToTicks = (
+  positionInPixels: number,
+  bpm: number,
+  timeSignature?: [number, number],
+  ppq: number = MUSIC_CONSTANTS.pulsesPerQuarterNote
+): number => {
+  // Use the passed time signature's numerator or fall back to the default
+  const beatsPerMeasure = timeSignature ? timeSignature[0] : GRID_CONSTANTS.beatsPerMeasure;
+  
+  // Calculate how many beats per pixel
+  const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
+  const beats = positionInPixels / beatWidth;
+  
+  // Convert beats to ticks
+  return Math.round(beats * ppq);
+};
+
+/**
+ * Convert ticks to pixel position
+ * Used for displaying musically-accurate position
+ * 
+ * @param ticks Position in ticks
+ * @param bpm Beats per minute
+ * @param timeSignature Optional time signature to use for calculation
+ * @param ppq Pulses (ticks) per quarter note (default: 960)
+ * @returns Position in pixels
+ */
+export const ticksToPixels = (
+  ticks: number,
+  bpm: number,
+  timeSignature?: [number, number],
+  ppq: number = MUSIC_CONSTANTS.pulsesPerQuarterNote
+): number => {
+  // Use the passed time signature's numerator or fall back to the default
+  const beatsPerMeasure = timeSignature ? timeSignature[0] : GRID_CONSTANTS.beatsPerMeasure;
+  
+  // Calculate beats from ticks
+  const beats = ticks / ppq;
+  
+  // Calculate pixels from beats
+  const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
+  return beats * beatWidth;
+};
+
+/**
  * Get track color based on track index
  * Colors are selected in sequence from the trackColors array
  * After reaching the end of the array, it cycles back to the beginning
@@ -162,4 +239,48 @@ export const getTrackColor = (trackIndex: number): string => {
   // Use modulo to cycle through the colors
   const colorIndex = trackIndex % GRID_CONSTANTS.trackColors.length;
   return GRID_CONSTANTS.trackColors[colorIndex];
+};
+
+/**
+ * Convert a Position object with tick-based x coordinate to one with pixel-based x
+ * Used for display in UI components
+ * 
+ * @param position Position with x in ticks
+ * @param bpm Beats per minute
+ * @param timeSignature Optional time signature to use for calculation
+ * @param ppq Pulses (ticks) per quarter note (default: 960)
+ * @returns Position with x in pixels
+ */
+export const positionToPixels = (
+  position: { x: number, y: number },
+  bpm: number,
+  timeSignature?: [number, number],
+  ppq: number = MUSIC_CONSTANTS.pulsesPerQuarterNote
+): { x: number, y: number } => {
+  return {
+    x: ticksToPixels(position.x, bpm, timeSignature, ppq),
+    y: position.y
+  };
+};
+
+/**
+ * Convert a Position object with pixel-based x coordinate to one with tick-based x
+ * Used for storing position in state
+ * 
+ * @param position Position with x in pixels
+ * @param bpm Beats per minute
+ * @param timeSignature Optional time signature to use for calculation
+ * @param ppq Pulses (ticks) per quarter note (default: 960)
+ * @returns Position with x in ticks
+ */
+export const positionToTicks = (
+  position: { x: number, y: number },
+  bpm: number,
+  timeSignature?: [number, number],
+  ppq: number = MUSIC_CONSTANTS.pulsesPerQuarterNote
+): { x: number, y: number } => {
+  return {
+    x: pixelsToTicks(position.x, bpm, timeSignature, ppq),
+    y: position.y
+  };
 }; 

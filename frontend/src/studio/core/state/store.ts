@@ -10,7 +10,8 @@ import { SamplerController } from '../audio-engine/samplerController';
 import { Note } from '../types/note'; // Added for Note type
 import { NoteActions } from './history/actions/NoteActions'; // Added for NoteActions
 import { historyManager } from './history/HistoryManager'; // Added for historyManager
-
+import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
+import { DEFAULT_MEASURE_WIDTH, useGridStore } from './gridStore';
 /**
  * Interface for a drum pad in the drum machine grid
  */
@@ -467,14 +468,13 @@ export class Store implements StoreInterface {
     // Find if a note already exists at this position (row = pitch, column = time)
     const existingNote = notes.find(note => note.column === column && note.row === row);
 
-    // Import necessary action classes and history manager instance
-    const { AddNoteAction, DeleteNoteAction } = NoteActions;
-    // const { historyManager } = await import('./history/HistoryManager'); // Use direct import now added at top
+    // Use the proper action names from NoteActions
+    const { AddNote, DeleteNote } = NoteActions;
 
     if (existingNote) {
-      // Note exists - create and execute a DeleteNoteAction
+      // Note exists - create and execute a DeleteNote action
       console.log(`Drum pad exists at [${column}, ${row}], removing note ID: ${existingNote.id}`);
-      const deleteAction = new DeleteNoteAction(
+      const deleteAction = new DeleteNote(
         this, // Pass the store instance
         trackId,
         String(existingNote.id), // Action expects string ID
@@ -483,7 +483,7 @@ export class Store implements StoreInterface {
       await historyManager.executeAction(deleteAction);
 
     } else {
-      // Note does not exist - create and execute an AddNoteAction
+      // Note does not exist - create and execute an AddNote action
       console.log(`Drum pad does not exist at [${column}, ${row}], adding note.`);
 
       // Create a new note object
@@ -499,7 +499,7 @@ export class Store implements StoreInterface {
         trackId: trackId
       };
 
-      const addAction = new AddNoteAction(
+      const addAction = new AddNote(
         this, // Pass the store instance
         trackId,
         String(newNoteId), // Action expects string ID
@@ -511,5 +511,44 @@ export class Store implements StoreInterface {
 
   public getProjectManager(): ProjectManager {
     return this.projectManager;
+  }
+
+  /**
+   * Gets the ticks per pixel conversion rate based on current BPM and grid settings
+   * Used for converting between pixel measurements and musical time
+   * @returns Number of ticks per pixel at current settings
+   */
+  public getTicksPerPixel(): number {
+    const bpm = this.getMidiManager().getBpm();
+    const [beatsPerMeasure] = this.getMidiManager().getTimeSignature();
+    
+    // Standard MIDI ticks per beat (quarter note) is typically 480 or 960
+    // We'll use 480 as it's common for DAWs
+    const TICKS_PER_BEAT = MUSIC_CONSTANTS.pulsesPerQuarterNote;
+    
+    // Calculate measure width in pixels from grid constants
+    const MEASURE_WIDTH = DEFAULT_MEASURE_WIDTH; // Matches GRID_CONSTANTS.measureWidth
+    
+    // Calculate beats per measure from time signature
+    const beatWidth = MEASURE_WIDTH / beatsPerMeasure;
+    
+    // Calculate ticks per beat
+    const ticksPerBeat = TICKS_PER_BEAT;
+    
+    // Calculate ticks per pixel
+    const ticksPerPixel = ticksPerBeat / beatWidth;
+    
+    return ticksPerPixel;
+  }
+
+  /**
+   * Gets the pixels per tick conversion rate based on current BPM and grid settings
+   * Inverse of getTicksPerPixel() - used for converting from ticks to pixel measurements
+   * @returns Number of pixels per tick at current settings
+   */
+  public getPixelsPerTick(): number {
+    const ticksPerPixel = this.getTicksPerPixel();
+    // Return the inverse of ticks per pixel
+    return 1 / ticksPerPixel;
   }
 }

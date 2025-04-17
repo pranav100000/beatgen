@@ -34,12 +34,30 @@ export class BPMChangeAction extends BaseAction {
             // First update BPM
             const updatedState = { ...state, bpm };
             
-            // Then recalculate track widths
+            // Then recalculate track widths while preserving trim values
             const updatedTracks = state.tracks.map(track => {
                 if (track.duration) {
+                    // Check if this track has trim values
+                    const hasTrimValues = 
+                        track.trimStartTicks !== undefined && 
+                        track.trimEndTicks !== undefined && 
+                        track.originalDurationTicks !== undefined;
+                    
+                    // Calculate width, considering trim values if available
+                    const newCalculatedWidth = calculateTrackWidth(
+                        track.duration, 
+                        bpm, 
+                        this.timeSignature,
+                        hasTrimValues ? {
+                            trimStartTicks: track.trimStartTicks,
+                            trimEndTicks: track.trimEndTicks,
+                            originalDurationTicks: track.originalDurationTicks
+                        } : undefined
+                    );
+                    
                     return {
                         ...track,
-                        _calculatedWidth: calculateTrackWidth(track.duration, bpm, this.timeSignature)
+                        _calculatedWidth: newCalculatedWidth
                     };
                 }
                 return track;
@@ -93,12 +111,30 @@ export class TimeSignatureAction extends BaseAction {
             // First update time signature
             const updatedState = { ...state, timeSignature };
             
-            // Then recalculate track widths
+            // Then recalculate track widths while preserving trim values
             const updatedTracks = state.tracks.map(track => {
                 if (track.duration) {
+                    // Check if this track has trim values
+                    const hasTrimValues = 
+                        track.trimStartTicks !== undefined && 
+                        track.trimEndTicks !== undefined && 
+                        track.originalDurationTicks !== undefined;
+                    
+                    // Calculate width, considering trim values if available
+                    const newCalculatedWidth = calculateTrackWidth(
+                        track.duration, 
+                        this.bpm, 
+                        timeSignature,
+                        hasTrimValues ? {
+                            trimStartTicks: track.trimStartTicks,
+                            trimEndTicks: track.trimEndTicks,
+                            originalDurationTicks: track.originalDurationTicks
+                        } : undefined
+                    );
+                    
                     return {
                         ...track,
-                        _calculatedWidth: calculateTrackWidth(track.duration, this.bpm, timeSignature)
+                        _calculatedWidth: newCalculatedWidth
                     };
                 }
                 return track;

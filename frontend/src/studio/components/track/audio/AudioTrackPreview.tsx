@@ -19,18 +19,38 @@ export const AudioTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     bpm, 
     trackIndex = 0,
     trackColor: providedTrackColor,
+    trackWidth: providedTrackWidth,
+    onResizeEnd,
     ...restProps 
   } = props;
   
-  const audioMeasureWidth = useGridStore(state => state.audioMeasureWidth);
+  const audioMeasureWidth = useGridStore(state => state.audioMeasurePixelWidth);
   const trackColor = providedTrackColor || getTrackColor(trackIndex);
   
-  // Calculate audio track width
-  const trackWidth = useMemo(() => calculateAudioTrackWidth(
-    track.duration || 8, // Default to 8 seconds if no duration specified
-    bpm,
-    audioMeasureWidth
-  ), [track.duration, bpm, audioMeasureWidth]);
+  // Calculate display width for the track container (viewport)
+  const trackWidth = useMemo(() => {
+    // If a width is explicitly provided, use it - this is critical for resize operations
+    if (providedTrackWidth && providedTrackWidth > 0) {
+      return providedTrackWidth;
+    }
+    
+    // Only calculate if we don't have an explicit width
+    return calculateAudioTrackWidth(
+      track.duration || 8, // Default to 8 seconds if no duration specified
+      bpm,
+      audioMeasureWidth
+    );
+  }, [track.duration, bpm, audioMeasureWidth, providedTrackWidth]);
+  
+  // Calculate full content width - this should NEVER change due to trimming
+  // This is the full width of the audio waveform
+  const fullContentWidth = useMemo(() => {
+    return calculateAudioTrackWidth(
+      track.duration || 8, // Default to 8 seconds if no duration specified
+      bpm,
+      audioMeasureWidth
+    );
+  }, [track.duration, bpm, audioMeasureWidth]);
   
   // Audio-specific track content rendering
   const renderTrackContent = () => {
@@ -40,7 +60,7 @@ export const AudioTrackPreview: React.FC<TrackPreviewProps> = (props) => {
           audioFile={track.audioFile}
           trackColor={trackColor}
           duration={track.duration || 0}
-          width={trackWidth}
+          width={fullContentWidth} // Always use the full content width
         />
       );
     } else {
@@ -64,10 +84,12 @@ export const AudioTrackPreview: React.FC<TrackPreviewProps> = (props) => {
       {...restProps}
       track={track}
       trackWidth={trackWidth}
+      contentWidth={fullContentWidth}
       trackColor={trackColor}
       bpm={bpm}
       renderTrackContent={renderTrackContent}
       trackIndex={trackIndex}
+      onResizeEnd={onResizeEnd}
     />
   );
 };
