@@ -85,6 +85,9 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   const [startDragTrackPosition, setStartDragTrackPosition] = useState({ x: 0, y: 0 });
   const lastMovedPositionRef = useRef<Position>(track.position);
   
+  // Track the mouse start position for click detection
+  const mouseStartPosRef = useRef<{x: number, y: number} | null>(null);
+  
   // Track the content transform during left-side resize
   const [contentTransform, setContentTransform] = useState(0);
   
@@ -160,6 +163,11 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       
     if (!container) return;
     
+    // Mark the element as interacting
+    if (trackRef.current) {
+      trackRef.current.setAttribute('data-interacting', 'true');
+    }
+    
     // Store initial positions
     setStartDragMousePosition({
       x: e.clientX + (container.scrollLeft || 0),
@@ -195,6 +203,11 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       trackRef.current.parentElement?.parentElement;
       
     if (!container) return;
+
+    // Mark the element as interacting
+    if (trackRef.current) {
+      trackRef.current.setAttribute('data-interacting', 'true');
+    }
 
     setIsResizing(true);
     setResizeDirection(direction);
@@ -405,6 +418,13 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
         // Ensure width is reset if needed (although drag shouldn't change it)
         trackRef.current.style.width = `${trackWidth}px`;
         trackRef.current.style.transition = 'left 0.2s ease, top 0.2s ease, width 0.2s ease'; 
+        
+        // Keep the interaction attribute for a short period, then remove it
+        setTimeout(() => {
+          if (trackRef.current) {
+            trackRef.current.removeAttribute('data-interacting');
+          }
+        }, 0);
       }
     } 
     // --- Resize End ---
@@ -457,9 +477,25 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       
       // Clear the startResizeInfo after we're done with it
       setStartResizeInfo(null);
+      
+      // Keep the interaction attribute for a short period, then remove it
+      setTimeout(() => {
+        if (trackRef.current) {
+          trackRef.current.removeAttribute('data-interacting');
+        }
+      }, 0);
     }
     
   }, [isDragging, isResizing, resizeDirection, track.id, track.position, onPositionChange, onResizeEnd, trackWidth, bpm, timeSignature, startResizeInfo, contentOffsetX]);
+
+  // Handle click event
+  const handleClick = (e: React.MouseEvent) => {
+    // If this track is being interacted with (has data-interacting attribute)
+    // stop the event propagation to prevent piano roll from opening
+    if (trackRef.current?.hasAttribute('data-interacting')) {
+      e.stopPropagation();
+    }
+  };
 
   // Add/remove mouse event listeners
   useEffect(() => {
@@ -526,6 +562,7 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     <Box
       ref={trackRef}
       onMouseDown={handleMouseDown}
+      onClick={handleClick}
       className="track"
       sx={trackStyle}
       data-track-width={trackWidth} // Add data attribute for debugging

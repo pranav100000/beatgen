@@ -121,12 +121,44 @@ function Track(props: TrackProps) {
     // Convert the pixel delta to tick delta for storage
     const deltaTicks = pixelsToTicks(deltaPixels, bpm, timeSignature);
     
+    // Store old values for history
+    const oldTrimStartTicks = updatedTrack.trimStartTicks || 0;
+    const oldTrimEndTicks = updatedTrack.trimEndTicks || 0;
+    const oldPositionX = updatedTrack.position.x;
+    
     // Update the appropriate trim value based on resize direction
     if (resizeDirection === 'left') {
       updatedTrack.trimStartTicks = oldTrimTicks + deltaTicks;
       updatedTrack.position.x = updatedTrack.position.x + deltaTicks;
     } else if (resizeDirection === 'right') {
       updatedTrack.trimEndTicks = oldTrimTicks + deltaTicks;
+    }
+    
+    // Create and execute a resize action for history tracking
+    try {
+      const action = new TrackResizeAction(
+        store,
+        trackId,
+        oldTrimStartTicks,
+        oldTrimEndTicks,
+        oldWidth,
+        oldPositionX,
+        updatedTrack.trimStartTicks || 0,
+        updatedTrack.trimEndTicks || 0,
+        newWidth,
+        updatedTrack.position.x
+      );
+      
+      // Execute the action through history manager
+      historyManager.executeAction(action).then(() => {
+        // Update history state buttons
+        useStudioStore.setState({
+          canUndo: historyManager.canUndo(),
+          canRedo: historyManager.canRedo()
+        });
+      });
+    } catch (error) {
+      console.error('Failed to create track resize action:', error);
     }
     
     // Update local state and track data
