@@ -15,9 +15,9 @@ export interface BaseTrackState {
   x_position?: number;
   y_position?: number;
   storage_key?: string;
-  left_trim_ms?: number;
+  trim_start_ticks?: number;
+  trim_end_ticks?: number;
   track_number?: number;
-  right_trim_ms?: number;
   instrument_id?: string;
   instrument_name?: string;
   instrument_storage_key?: string;
@@ -113,9 +113,9 @@ export interface AudioTrackData {
   storage_key?: string;          // Will be populated after upload
   x_position: number;            // Horizontal position (time) in the track layout
   y_position: number;            // Vertical position in the track layout
-  track_number: number;          // Track order number
-  left_trim_ms: number;          // Left trim in milliseconds (0 for now)
-  right_trim_ms: number;         // Right trim in milliseconds (0 for now)
+  trim_start_ticks: number;       // Left trim in ticks (0 for now)
+  trim_end_ticks: number;      // Right trim in ticks (0 for now)
+  track_number: number;          // Track order number        // Right trim in milliseconds (0 for now)
   duration?: number;             // Duration in seconds (populated after processing)
   volume: number;                // Volume level 0-100
   pan: number;                   // Pan level -100 to 100
@@ -132,6 +132,8 @@ export interface MidiTrackData {
   storage_key?: string;          // Will be populated after upload
   x_position: number;            // Horizontal position (time) in the track layout
   y_position: number;            // Vertical position in the track layout
+  trim_start_ticks: number;       // Left trim in ticks (0 for now)
+  trim_end_ticks: number;      // Right trim in ticks (0 for now)
   volume: number;                // Volume level 0-1
   pan: number;                   // Pan level -1 to 1
   is_muted: boolean;             // Whether track is muted
@@ -262,8 +264,8 @@ export const saveProjectWithSounds = async (
     x_position: track.x_position,
     y_position: track.y_position,
     track_number: track.track_number,
-    left_trim_ms: track.left_trim_ms,
-    right_trim_ms: track.right_trim_ms
+    trim_start_ticks: track.trim_start_ticks,
+    trim_end_ticks: track.trim_end_ticks
   }));
   
   const midiTrackObjects = processedMidiTracks.map(track => ({
@@ -276,6 +278,8 @@ export const saveProjectWithSounds = async (
     storage_key: track.storage_key,
     x_position: track.x_position,
     y_position: track.y_position,
+    trim_start_ticks: track.trim_start_ticks,
+    trim_end_ticks: track.trim_end_ticks,
     // Add instrument information
     instrument_id: track.instrument_id,
     instrument_name: track.instrument_name,

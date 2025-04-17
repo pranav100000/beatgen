@@ -18,10 +18,10 @@ class Track(TrackBase):
     duration: Optional[float] = None
     x_position: float = 0.0  # Changed to float to support partial positions
     y_position: float = 0.0  # Changed to float for consistency
+    trim_start_ticks: int = 0
+    trim_end_ticks: int = 0
     storage_key: str
-    left_trim_ms: int = 0
     track_number: int = 0
-    right_trim_ms: int = 0
     instrument_id: Optional[str] = None
     instrument_name: Optional[str] = None
     instrument_storage_key: Optional[str] = None

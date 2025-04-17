@@ -1,11 +1,9 @@
-import React, { forwardRef, useRef, useImperativeHandle, useEffect } from 'react';
+import React, { forwardRef, useRef, useImperativeHandle } from 'react';
 import { Box } from '@mui/material';
-import { GRID_CONSTANTS, calculatePositionTime, calculateTrackWidth } from '../../constants/gridConstants';
+import { GRID_CONSTANTS, calculatePositionTime } from '../../constants/gridConstants';
 import Track from '../track/Track';
 import PlaybackCursor, { PlaybackCursorRef } from './PlaybackCursor';
 import { TrackState, Position } from '../../core/types/track';
-import { useGridStore } from '../../core/state/gridStore';
-import { useStudioStore } from '../../stores/useStudioStore';
 
 export interface TimelineProps {
   tracks: TrackState[];
@@ -56,62 +54,9 @@ export const Timeline = forwardRef<TimelineRef, TimelineProps>(({
   // Calculate the total width needed for the entire timeline
   const totalTimelineWidth = measureCount * GRID_CONSTANTS.measureWidth;
   
-  // Get the measure width from gridStore
-  const audioMeasurePixelWidth = useGridStore(state => state.audioMeasurePixelWidth);
-  
   // Refs for the cursor and container
   const cursorRef = useRef<PlaybackCursorRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Recalculate track widths when zoomLevel or audioMeasurePixelWidth changes
-  useEffect(() => {
-    // Create a copy of tracks with recalculated widths
-    const updatedTracks = tracks.map(track => {
-      // Only recalculate for tracks with duration
-      if (!track.duration) return track;
-      
-      // Calculate the new width based on current measure width
-      const newWidth = calculateTrackWidth(
-        track.duration,
-        bpm,
-        timeSignature,
-        {
-          trimStartTicks: track.trimStartTicks,
-          trimEndTicks: track.trimEndTicks,
-          originalDurationTicks: track.originalDurationTicks
-        }
-      );
-      
-      console.log(`Recalculating track ${track.id} width due to zoom change: ${newWidth}px`);
-      
-      // Return updated track with new calculated width
-      return {
-        ...track,
-        _calculatedWidth: newWidth
-      };
-    });
-    
-    // Update tracks in store if widths have changed
-    const hasWidthChanges = updatedTracks.some((track, index) => 
-      track._calculatedWidth !== tracks[index]._calculatedWidth
-    );
-    
-    if (hasWidthChanges) {
-      console.log('Track widths updated due to zoom change');
-      
-      // Get updateTrack function from store
-      const { updateTrack } = useStudioStore.getState();
-      
-      // Update each track that has changed
-      updatedTracks.forEach(track => {
-        const originalTrack = tracks.find(t => t.id === track.id);
-        if (track._calculatedWidth !== originalTrack?._calculatedWidth) {
-          // Use the store's updateTrack method
-          updateTrack(track);
-        }
-      });
-    }
-  }, [zoomLevel, audioMeasurePixelWidth, tracks, bpm, timeSignature]);
   
   // Expose imperative methods to parent component
   useImperativeHandle(ref, () => {

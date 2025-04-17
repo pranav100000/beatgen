@@ -79,8 +79,8 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
             x_position: track.position?.x || 0,
             y_position: track.position?.y || 0,
             track_number: track.trackIndex || 0,
-            left_trim_ms: 0, // Default for now
-            right_trim_ms: 0, // Default for now
+            trim_start_ticks: track.trimStartTicks || 0,
+            trim_end_ticks: track.trimEndTicks || 0, 
             volume: track.volume || 1, // Keep as 0-1 scale
             pan: track.pan || 0, // Keep as -1 to 1 scale
             is_muted: track.muted || false,
@@ -114,6 +114,8 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
           x_position: track.position?.x || 0,
           y_position: track.position?.y || 0,
           duration: track.duration,
+          trim_start_ticks: track.trimStartTicks || 0,
+          trim_end_ticks: track.trimEndTicks || 0,
           storage_key: track.storage_key, // Include storage key if available
           // Add instrument information for MIDI and drum tracks
           instrument_id: track.type === 'midi' || track.type === 'drum' ? track.instrumentId : undefined,
@@ -151,6 +153,8 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
               file: midiBlob,
               x_position: track.position?.x || 0,
               y_position: track.position?.y || 0,
+              trim_start_ticks: track.trimStartTicks || 0,
+              trim_end_ticks: track.trimEndTicks || 0,
               volume: track.volume || 1,
               pan: track.pan || 0,
               is_muted: track.muted || false,
@@ -175,6 +179,8 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
               color: track.color || '#4285F4',
               x_position: track.position?.x || 0,
               y_position: track.position?.y || 0,
+              trim_start_ticks: track.trimStartTicks || 0,
+              trim_end_ticks: track.trimEndTicks || 0,
               duration: track.duration,
               storage_key: track.storage_key, // Include storage key if available
               // Add instrument information

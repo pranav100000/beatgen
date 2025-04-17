@@ -11,7 +11,7 @@ import { db } from '../core/db/dexie-client';
 import { Actions } from '../core/state/history/actions';
 import { NoteState } from '../components/drum-machine/DrumMachine';
 import { Note } from '../core/types/note';
-import { convertFromNoteState, convertToNoteState } from '../utils/noteConversion';
+import { convertFromNoteState, convertToNoteState, PULSES_PER_QUARTER_NOTE } from '../utils/noteConversion';
 
 interface StudioState {
   // Audio Engine State
@@ -566,12 +566,16 @@ export const useStudioStore = create<StudioState>((set, get) => {
           }
         }
         
-        // Calculate width based on duration and BPM
         const calculatedWidth = calculateTrackWidth(
           duration, 
           projectData.bpm, 
-          [projectData.time_signature_numerator, projectData.time_signature_denominator]
-        );
+          [projectData.time_signature_numerator, projectData.time_signature_denominator],
+          {
+              trimStartTicks: apiTrack.trim_start_ticks,
+              trimEndTicks: apiTrack.trim_end_ticks,
+              originalDurationTicks: PULSES_PER_QUARTER_NOTE * 4
+          }
+      );
         
         // Create a track state object
         const trackState: TrackState = {
@@ -579,6 +583,8 @@ export const useStudioStore = create<StudioState>((set, get) => {
           ...audioTrack,
           position,
           duration,
+          trimStartTicks: apiTrack.trim_start_ticks,
+          trimEndTicks: apiTrack.trim_end_ticks,
           type: apiTrack.type as "audio" | "midi" | "drum",
           volume: apiTrack.volume,
           pan: apiTrack.pan,
@@ -629,7 +635,7 @@ export const useStudioStore = create<StudioState>((set, get) => {
       
       // Store the project ID for later reference (saving, etc.)
       (window as any).loadedProjectId = projectId;
-      
+      console.log(`Successfully loaded project with ${trackStates.length} tracks`);
       return projectData;
     } catch (error) {
       console.error('Failed to load project:', error);
