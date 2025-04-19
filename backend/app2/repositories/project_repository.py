@@ -1,203 +1,297 @@
+"""
+Project repository for database operations using SQLModel
+Handles basic CRUD operations for project entities
+"""
 from typing import Dict, Any, List, Optional
-from uuid import UUID
+from sqlmodel import Session, select
+from sqlalchemy.orm import selectinload
 import traceback
 from datetime import datetime
+import uuid
 
 from app2.core.exceptions import DatabaseException, NotFoundException
-from .base_repository import BaseRepository
+from app2.core.logging import get_repository_logger
+from app2.models.project import Project
+from app2.models.track import Track
 
-class ProjectRepository(BaseRepository):
+class ProjectRepository:
     """Repository for project operations"""
     
-    def __init__(self):
-        """Initialize the repository with the project table"""
-        super().__init__("project")
-        
-    async def find_project_with_tracks(self, project_id: str, user_id: str) -> Dict[str, Any]:
+    def __init__(self, session: Session):
         """
-        Find a project with all its tracks
+        Initialize the repository with database session
+        
+        Args:
+            session: The SQLModel session for database operations
+        """
+        self.session = session
+        self.logger = get_repository_logger("project")
+    
+    async def get_by_id(self, project_id: uuid.UUID) -> Project:
+        """
+        Get a project by ID
         
         Args:
             project_id: The ID of the project
-            user_id: The ID of the user who owns the project
             
         Returns:
-            The project with tracks
+            The project
             
         Raises:
             NotFoundException: If the project is not found
-            DatabaseException: If the query fails
+            DatabaseException: If there's a database error
         """
-        self.logger.info(f"Finding project with ID {project_id} for user {user_id}")
+        self.logger.info(f"Getting project with ID: {project_id}")
         try:
-            from app2.infrastructure.database.supabase_client import supabase
+            statement = select(Project).where(Project.id == project_id)
+            project = self.session.exec(statement).first()
             
-            result = supabase.execute_query(
-                self.table_name,
-                lambda table: table.select("*").eq("id", str(project_id)).eq("user_id", str(user_id)).single()
+            if not project:
+                self.logger.error(f"Project with ID {project_id} not found")
+                raise NotFoundException("Project", project_id)
+            
+            self.logger.info(f"Found project with ID: {project_id}")
+            return project
+        except Exception as e:
+            if isinstance(e, NotFoundException):
+                raise
+            self.logger.error(f"Error getting project: {str(e)}")
+            self.logger.error(traceback.format_exc())
+            raise DatabaseException(f"Failed to get project: {str(e)}")
+    
+    async def get_with_tracks(self, project_id: uuid.UUID) -> Project:
+        """
+        Get a project by ID with its tracks loaded
+        
+        Args:
+            project_id: The ID of the project
+            
+        Returns:
+            The project with tracks loaded
+            
+        Raises:
+            NotFoundException: If the project is not found
+            DatabaseException: If there's a database error
+        """
+        self.logger.info(f"Getting project with ID: {project_id} with tracks")
+        try:
+            # We just need a normal query with selectinload
+            # Let's get the tracks from the project first
+            statement = (
+                select(Project)
+                .options(selectinload(Project.tracks))
+                .where(Project.id == project_id)
             )
             
-            if not result:
-                self.logger.error(f"Project with ID {project_id} not found for user {user_id}")
+            project = self.session.exec(statement).first()
+            
+            if not project:
+                self.logger.error(f"Project with ID {project_id} not found")
                 raise NotFoundException("Project", project_id)
-                
-            self.logger.info(f"Found project with ID {project_id} for user {user_id}")
-            return result
+            
+            track_count = len(project.tracks) if project.tracks else 0
+            self.logger.info(f"Found project with ID: {project_id} with {track_count} tracks")
+            self.logger.info(f"Project: {project}")
+            
+            # Don't try to add fields to Track objects, they're pydantic models
+            # We'll handle this at the service layer instead
+            
+            return project
         except Exception as e:
             if isinstance(e, NotFoundException):
                 raise
-            self.logger.error(f"Error finding project with tracks: {str(e)}")
+            self.logger.error(f"Error getting project with tracks: {str(e)}")
             self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to find project: {str(e)}")
-            
-    async def add_track_to_project(self, project_id: str, user_id: str, track_data: Dict[str, Any]) -> Dict[str, Any]:
+            raise DatabaseException(f"Failed to get project with tracks: {str(e)}")
+    
+    async def get_all(self, **filters) -> List[Project]:
         """
-        Add a track to a project
+        Get all projects with optional filters
+        
+        Args:
+            **filters: Optional filter criteria (e.g., user_id=uuid)
+            
+        Returns:
+            List of projects
+            
+        Raises:
+            DatabaseException: If there's a database error
+        """
+        filter_str = ", ".join(f"{k}={v}" for k, v in filters.items())
+        self.logger.info(f"Getting projects with filters: {filter_str}")
+        try:
+            # Build query with filters
+            query = select(Project)
+            for key, value in filters.items():
+                if hasattr(Project, key):
+                    query = query.where(getattr(Project, key) == value)
+            
+            # Execute query
+            results = self.session.exec(query).all()
+            
+            self.logger.info(f"Found {len(results)} projects")
+            return results
+        except Exception as e:
+            self.logger.error(f"Error getting projects: {str(e)}")
+            self.logger.error(traceback.format_exc())
+            raise DatabaseException(f"Failed to get projects: {str(e)}")
+    
+    async def get_by_user_id(self, user_id: uuid.UUID) -> List[Project]:
+        """
+        Get all projects for a user
+        
+        Args:
+            user_id: The ID of the user
+            
+        Returns:
+            List of projects
+            
+        Raises:
+            DatabaseException: If there's a database error
+        """
+        self.logger.info(f"Getting projects for user: {user_id}")
+        try:
+            return await self.get_all(user_id=user_id)
+        except Exception as e:
+            self.logger.error(f"Error getting projects for user: {str(e)}")
+            self.logger.error(traceback.format_exc())
+            raise DatabaseException(f"Failed to get projects for user: {str(e)}")
+    
+    async def get_by_user_id_with_tracks(self, user_id: uuid.UUID) -> List[Project]:
+        """
+        Get all projects for a user with tracks loaded
+        
+        Args:
+            user_id: The ID of the user
+            
+        Returns:
+            List of projects with tracks loaded
+            
+        Raises:
+            DatabaseException: If there's a database error
+        """
+        self.logger.info(f"Getting projects for user: {user_id} with tracks")
+        try:
+            statement = (
+                select(Project)
+                .options(selectinload(Project.tracks))
+                .where(Project.user_id == user_id)
+            )
+            
+            projects = self.session.exec(statement).all()
+            
+            self.logger.info(f"Found {len(projects)} projects for user: {user_id}")
+            return projects
+        except Exception as e:
+            self.logger.error(f"Error getting projects with tracks: {str(e)}")
+            self.logger.error(traceback.format_exc())
+            raise DatabaseException(f"Failed to get projects with tracks: {str(e)}")
+    
+    async def create(self, project_data: Dict[str, Any]) -> Project:
+        """
+        Create a new project
+        
+        Args:
+            project_data: The project data
+            
+        Returns:
+            The created project
+            
+        Raises:
+            DatabaseException: If there's a database error
+        """
+        self.logger.info("Creating new project")
+        try:
+            # Create project instance
+            project = Project(**project_data)
+            
+            # Add to session and commit
+            self.session.add(project)
+            self.session.commit()
+            self.session.refresh(project)
+            
+            self.logger.info(f"Created project with ID: {project.id}")
+            return project
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Error creating project: {str(e)}")
+            self.logger.error(traceback.format_exc())
+            raise DatabaseException(f"Failed to create project: {str(e)}")
+    
+    async def update(self, project_id: uuid.UUID, project_data: Dict[str, Any]) -> Project:
+        """
+        Update a project
         
         Args:
             project_id: The ID of the project
-            user_id: The ID of the user who owns the project
-            track_data: The track data to add
+            project_data: The updated data
             
         Returns:
             The updated project
             
         Raises:
             NotFoundException: If the project is not found
-            DatabaseException: If the operation fails
+            DatabaseException: If there's a database error
         """
-        self.logger.info(f"Adding track to project {project_id}")
+        self.logger.info(f"Updating project with ID: {project_id}")
         try:
-            # Get the existing project
-            project = await self.find_project_with_tracks(project_id, user_id)
+            # First check if project exists
+            project = await self.get_by_id(project_id)
             
-            # Get existing tracks or empty list
-            tracks = project.get("tracks", [])
+            # Update fields
+            for key, value in project_data.items():
+                if hasattr(project, key):
+                    setattr(project, key, value)
             
-            # Add the new track
-            tracks.append(track_data)
+            # Update timestamp if it exists
+            if hasattr(project, "updated_at"):
+                project.updated_at = datetime.utcnow()
             
-            # Update the project
-            update_data = {
-                "tracks": tracks,
-                "updated_at": datetime.utcnow().isoformat()
-            }
+            # Commit changes
+            self.session.add(project)
+            self.session.commit()
+            self.session.refresh(project)
             
-            # Update the project
-            updated_project = await self.update(project_id, update_data)
-            
-            self.logger.info(f"Added track to project {project_id}")
-            return updated_project
+            self.logger.info(f"Updated project with ID: {project_id}")
+            return project
         except Exception as e:
+            self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
-            self.logger.error(f"Error adding track to project: {str(e)}")
+            self.logger.error(f"Error updating project: {str(e)}")
             self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to add track to project: {str(e)}")
-            
-    async def update_track_in_project(self, project_id: str, user_id: str, track_id: str, track_data: Dict[str, Any]) -> Dict[str, Any]:
+            raise DatabaseException(f"Failed to update project: {str(e)}")
+    
+    async def delete(self, project_id: uuid.UUID) -> bool:
         """
-        Update a track in a project
+        Delete a project
         
         Args:
             project_id: The ID of the project
-            user_id: The ID of the user who owns the project
-            track_id: The ID of the track to update
-            track_data: The updated track data
             
         Returns:
-            The updated project
+            True if successful
             
         Raises:
-            NotFoundException: If the project or track is not found
-            DatabaseException: If the operation fails
+            NotFoundException: If the project is not found
+            DatabaseException: If there's a database error
         """
-        self.logger.info(f"Updating track {track_id} in project {project_id}")
+        self.logger.info(f"Deleting project with ID: {project_id}")
         try:
-            # Get the existing project
-            project = await self.find_project_with_tracks(project_id, user_id)
+            # First check if project exists
+            project = await self.get_by_id(project_id)
             
-            # Get existing tracks
-            tracks = project.get("tracks", [])
+            # Delete the project (associated ProjectTrack entries should be deleted
+            # by the service layer before calling this method)
+            self.session.delete(project)
+            self.session.commit()
             
-            # Update the specific track
-            updated_tracks = []
-            track_found = False
-            
-            for track in tracks:
-                if track["id"] == str(track_id):
-                    updated_tracks.append(track_data)
-                    track_found = True
-                else:
-                    updated_tracks.append(track)
-            
-            if not track_found:
-                self.logger.error(f"Track {track_id} not found in project {project_id}")
-                raise NotFoundException("Track", track_id)
-            
-            # Update the project
-            update_data = {
-                "tracks": updated_tracks,
-                "updated_at": datetime.utcnow().isoformat()
-            }
-            
-            # Update the project
-            updated_project = await self.update(project_id, update_data)
-            
-            self.logger.info(f"Updated track {track_id} in project {project_id}")
-            return updated_project
+            self.logger.info(f"Deleted project with ID: {project_id}")
+            return True
         except Exception as e:
+            self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
-            self.logger.error(f"Error updating track in project: {str(e)}")
+            self.logger.error(f"Error deleting project: {str(e)}")
             self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to update track in project: {str(e)}")
-            
-    async def remove_track_from_project(self, project_id: str, user_id: str, track_id: str) -> Dict[str, Any]:
-        """
-        Remove a track from a project
-        
-        Args:
-            project_id: The ID of the project
-            user_id: The ID of the user who owns the project
-            track_id: The ID of the track to remove
-            
-        Returns:
-            The updated project
-            
-        Raises:
-            NotFoundException: If the project or track is not found
-            DatabaseException: If the operation fails
-        """
-        self.logger.info(f"Removing track {track_id} from project {project_id}")
-        try:
-            # Get the existing project
-            project = await self.find_project_with_tracks(project_id, user_id)
-            
-            # Get existing tracks
-            tracks = project.get("tracks", [])
-            
-            # Filter out the track to delete
-            updated_tracks = [track for track in tracks if track["id"] != str(track_id)]
-            
-            if len(updated_tracks) == len(tracks):
-                self.logger.error(f"Track {track_id} not found in project {project_id}")
-                raise NotFoundException("Track", track_id)
-            
-            # Update the project
-            update_data = {
-                "tracks": updated_tracks,
-                "updated_at": datetime.utcnow().isoformat()
-            }
-            
-            # Update the project
-            updated_project = await self.update(project_id, update_data)
-            
-            self.logger.info(f"Removed track {track_id} from project {project_id}")
-            return updated_project
-        except Exception as e:
-            if isinstance(e, NotFoundException):
-                raise
-            self.logger.error(f"Error removing track from project: {str(e)}")
-            self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to remove track from project: {str(e)}")
+            raise DatabaseException(f"Failed to delete project: {str(e)}")

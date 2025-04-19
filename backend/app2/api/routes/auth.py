@@ -9,8 +9,8 @@ from app2.core.logging import get_api_logger
 from app2.core.exceptions import UnauthorizedException, ServiceException
 
 # Import the schemas for compatibility with the old API
-from app2.schemas.token import Token
-from app2.schemas.user import UserCreate
+from app2.models.token import Token
+from app2.models.user import UserCreate
 
 router = APIRouter()
 logger = get_api_logger("auth")

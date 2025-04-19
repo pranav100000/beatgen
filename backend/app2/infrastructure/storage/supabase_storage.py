@@ -21,12 +21,13 @@ class SupabaseStorage:
         self._storage = supabase.storage()
         self._bucket = self._storage.from_(bucket_name)
         
-    def create_signed_upload_url(self, path: str) -> Dict[str, str]:
+    def create_signed_upload_url(self, path: str, should_overwrite: bool = True) -> Dict[str, str]:
         """
         Create a signed URL for uploading a file
         
         Args:
             path: The storage path where the file will be stored
+            should_overwrite: Whether to overwrite an existing file with the same path (default True)
             
         Returns:
             A dictionary containing the signed URL and storage path
@@ -36,6 +37,24 @@ class SupabaseStorage:
         """
         try:
             logger.info(f"Creating signed upload URL for path: {path}")
+            
+            # Check if file exists and delete it first if overwrite is requested
+            if should_overwrite:
+                try:
+                    # Check if the file exists
+                    self._bucket.list(path)
+                    # File exists, try to delete it first
+                    logger.info(f"File exists at path: {path}, deleting before creating new upload URL")
+                    try:
+                        self._bucket.remove([path])
+                        logger.info(f"Successfully deleted existing file at: {path}")
+                    except Exception as delete_err:
+                        logger.warning(f"Could not delete existing file: {str(delete_err)}, will try to overwrite anyway")
+                except Exception:
+                    # File doesn't exist or can't be accessed, which is fine
+                    logger.info(f"No existing file at path: {path} or couldn't check")
+            
+            # Now create the signed URL
             response = self._bucket.create_signed_upload_url(path)
             
             # Extract the signed URL

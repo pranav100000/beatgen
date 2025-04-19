@@ -175,6 +175,7 @@ class AuthService:
         Raises:
             UnauthorizedException: If the token is invalid
         """
+        logger.info(f"Getting current user from token: {token[:10]}...")
         return await self.verify_token(token)
         
     async def create_user_profile(self, user_id: str, email: str, username: Optional[str] = None, display_name: Optional[str] = None) -> Dict[str, Any]:
