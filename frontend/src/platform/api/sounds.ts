@@ -7,9 +7,11 @@ export interface UploadUrlResponse {
   storage_key: string;
 }
 
-export interface SoundCreateRequest {
+export interface AudioTrackCreateRequest {
+  type: 'AUDIO';
   id: string;
   name: string;
+  audio_file_id: string;
   file_format: string;
   duration: number;
   file_size: number;
@@ -45,8 +47,8 @@ export const getUploadUrl = async (
  * @param soundData The sound data including metadata
  * @returns The created sound object
  */
-export const createSoundRecord = async (soundData: SoundCreateRequest): Promise<Sound> => {
-  console.log('Creating sound record with data:', {
+export const createSoundRecord = async (soundData: AudioTrackCreateRequest): Promise<Sound> => {
+  console.log('Creating file and track records with data:', {
     ...soundData,
     waveform_data: soundData.waveform_data ? `[${soundData.waveform_data.length} points]` : 'none'
   });

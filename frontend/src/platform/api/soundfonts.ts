@@ -16,6 +16,7 @@ export interface Soundfont {
  */
 export const getPublicSoundfonts = async (category?: string): Promise<Soundfont[]> => {
   const params = category ? { category } : {};
+  console.log('Getting public soundfonts with params:', params);
   const response = await apiClient.get('/soundfonts/public', { params });
   return response.data;
 };
@@ -26,7 +27,7 @@ export const getPublicSoundfonts = async (category?: string): Promise<Soundfont[
  * @returns The soundfont object
  */
 export const getPublicSoundfont = async (id: string): Promise<Soundfont> => {
-  const response = await apiClient.get(`/soundfonts/public/${id}`);
+  const response = await apiClient.get(`/soundfonts/${id}`);
   return response.data;
 };
 

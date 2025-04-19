@@ -65,7 +65,9 @@ export default function SoundUploader({ onSoundUploaded, onCancel }: SoundUpload
       
       // 4. Create database record
       await createSoundRecord({
-        id,
+        type: 'AUDIO',
+        audio_file_id: id,
+        id: id,
         name: soundName,
         file_format: metadata.format,
         duration: metadata.duration,

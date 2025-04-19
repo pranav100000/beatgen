@@ -179,13 +179,15 @@ export const saveProjectWithSounds = async (
       try {
         soundRecord = await createSoundRecord({
           id,
+          audio_file_id: id,
           name: track.name || track.file.name.split('.')[0], // Use provided name or filename without extension
           file_format: metadata.format,
           duration: metadata.duration,
           file_size: track.file.size,
           sample_rate: metadata.sampleRate,
           waveform_data: metadata.waveform,
-          storage_key
+          storage_key,
+          type: 'AUDIO'
         });
         console.log(`Sound record created successfully: ${JSON.stringify({
           id: soundRecord.id,

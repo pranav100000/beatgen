@@ -212,10 +212,6 @@ export default function Projects() {
                       Time: {project.time_signature_numerator}/{project.time_signature_denominator}
                     </Typography>
                   </Box>
-                  
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Tracks: {project.tracks.length}
-                  </Typography>
                 </CardContent>
                 
                 <Box className="project-card-actions">
