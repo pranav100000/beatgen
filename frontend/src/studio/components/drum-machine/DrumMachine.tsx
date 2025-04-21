@@ -3,11 +3,16 @@ import { Rnd } from 'react-rnd';
 import PianoRoll from '../piano-roll2/PianoRoll';
 import CloseIcon from '@mui/icons-material/Close';
 import { IconButton, Tooltip } from '@mui/material';
-import { DrumTrack } from '../../../types/track';
 import { useStudioStore } from '../../stores/useStudioStore';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
+import { TrackState } from 'src/platform/api/projects';
 
+export interface DrumTrackState extends TrackState {
+  type: 'drum';
+  drumPattern?: boolean[][];
+  samplerTrackIds?: string[];
+}
 // Define theme colors to match PianoRoll
 const DARK_THEME = {
   background: "#252525",
@@ -323,6 +328,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
   // Get all tracks to find sampler names later in useEffect
   const allTracks = useStudioStore(state => state.tracks);
 
+
   const [selectedSound, setSelectedSound] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rndRef = useRef<Rnd>(null);
@@ -395,14 +401,19 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
   // Get the action to open the piano roll
   const { openPianoRoll: openExternalPianoRoll } = usePianoRollStore();
   
-  // Fetch the associated sampler track IDs from the store
-  const samplerTrackIds = useStudioStore(useCallback(
-    state => {
-      const mainTrack = state.tracks.find(t => t.id === trackId && t.type === 'drum') as DrumTrack | undefined;
-      return mainTrack?.samplerTrackIds || []; 
-    },
-    [trackId] 
-  ));
+  // Fetch the associated sampler track IDs from the store using useState and useEffect
+  const [samplerTrackIds, setSamplerTrackIds] = useState<string[]>([]);
+  
+  // Use effect to fetch the sampler track IDs when tracks change
+  useEffect(() => {
+    const mainTrack = allTracks.find(t => t.id === trackId && t.type === 'drum') as DrumTrackState | undefined;
+    if (mainTrack?.samplerTrackIds) {
+      console.log(`Drum track ${trackId} has samplers:`, mainTrack.samplerTrackIds);
+      setSamplerTrackIds(mainTrack.samplerTrackIds);
+    } else {
+      console.log(`Drum track ${trackId} has no samplers or is not found`);
+    }
+  }, [trackId, allTracks]);
   
   // Effect to initialize and synchronize grid/names/notes based on samplerTrackIds
   useEffect(() => {
@@ -471,13 +482,6 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
     }
   // Depend on samplerTrackIds and allTracks (for names)
   }, [samplerTrackIds, allTracks, trackId]); // Added trackId for logging clarity
-  
-  // Existing function to open INTERNAL piano roll (might be deprecated now)
-  const openInternalPianoRoll = (drumIndex: number) => {
-    const newOpenPianoRolls = new Set(openPianoRolls);
-    newOpenPianoRolls.add(drumIndex);
-    setOpenPianoRolls(newOpenPianoRolls);
-  };
   
   // Existing function to close INTERNAL piano roll
   const closeInternalPianoRoll = (drumIndex: number) => {

@@ -13,6 +13,7 @@ import { NoteState } from '../components/drum-machine/DrumMachine';
 import { convertJsonToNotes, Note } from '../../types/note';
 import { convertFromNoteState, convertToNoteState, PULSES_PER_QUARTER_NOTE } from '../utils/noteConversion';
 import { AudioTrackRead, MidiTrackRead, SamplerTrackRead } from 'src/platform/types/project';
+import { Position } from '../components/track';
 
 interface StudioState {
   // Audio Engine State
@@ -500,9 +501,20 @@ export const useStudioStore = create<StudioState>((set, get) => {
         else if (apiTrack.type === 'sampler') {
           // For sampler tracks, we need both audio and MIDI files
           const samplerTrack = apiTrack.track as SamplerTrackRead;
-          const audioStorageKey = samplerTrack.audio_storage_key;
+          // IMPORTANT: Update the outer variable, not create a new one with 'const'
+          audioStorageKey = samplerTrack.audio_storage_key; 
           const audioFileName = samplerTrack.audio_file_name;
           console.log(`Sampler track: using audio_file key: ${audioStorageKey} and audio file name: ${audioFileName}`);
+          
+          // IMPORTANT: Load MIDI notes into MidiManager first, like we do for MIDI tracks
+          if (store.getMidiManager()) {
+            const midiManager = store.getMidiManager();
+            const midiNotes = convertJsonToNotes(newTrack.id, samplerTrack.midi_notes_json);
+            console.log(`Loaded ${midiNotes.length} notes for sampler track ${newTrack.id} from midi_notes_json:`, samplerTrack.midi_notes_json);
+            midiManager.updateTrack(newTrack.id, midiNotes);
+          } else {
+            console.warn('MidiManager not available, cannot load sampler track notes');
+          }
         }
         else if (apiTrack.type === 'drum') {
           // Drum tracks don't need file downloads
@@ -653,17 +665,15 @@ export const useStudioStore = create<StudioState>((set, get) => {
         const trackState: TrackState = {
           ...newTrack,
           ...audioTrack,
-          position,
-          duration,
-          trimStartTicks: apiTrack.trim_start_ticks,
-          trimEndTicks: apiTrack.trim_end_ticks,
+          x_position: apiTrack.x_position,
+          y_position: apiTrack.y_position,
+          trim_start_ticks: apiTrack.trim_start_ticks,
+          trim_end_ticks: apiTrack.trim_end_ticks,
           type: apiTrack.type as "audio" | "midi" | "drum" | "sampler",
           volume: apiTrack.volume,
           pan: apiTrack.pan,
-          muted: apiTrack.mute,
-          _calculatedWidth: calculatedWidth,
+          mute: apiTrack.mute,
           // Add instrument data if available (for MIDI and drum tracks)
-          instrumentId: instrumentId,
           instrumentStorageKey: instrumentStorageKey,
           // Store original API data for reference
           dbId: apiTrack.id,
