@@ -1,7 +1,7 @@
 """
-Service for track and file operations
+Service for track operations with specialized track models
 """
-from typing import Dict, Any, List, Optional, Union, Type, TypeVar
+from typing import Dict, Any, List, Optional, Union, Type, TypeVar, Tuple
 from enum import Enum
 import traceback
 from datetime import datetime
@@ -9,117 +9,112 @@ import uuid
 
 from app2.core.logging import get_service_logger
 from app2.core.exceptions import ServiceException, NotFoundException, ForbiddenException, StorageException
-from app2.repositories.track_repository import TrackRepository
+from app2.repositories.audio_track_repository import AudioTrackRepository
+from app2.repositories.midi_track_repository import MidiTrackRepository
+from app2.repositories.sampler_track_repository import SamplerTrackRepository
+from app2.repositories.drum_track_repository import DrumTrackRepository
 from app2.repositories.file_repository import FileRepository
+from app2.repositories.project_track_repository import ProjectTrackRepository
+
 from app2.types.track_types import TrackType
-from app2.models.track import Track, TrackRead, TrackCreate, TrackUpdate
-from app2.models.file_models.audio_file import AudioFile, AudioFileRead, AudioFileCreate
-from app2.models.file_models.midi_file import MidiFile
-from app2.models.file_models.instrument_file import InstrumentFile, InstrumentFileRead
 from app2.types.file_types import FileType
+
+from app2.models.track_models.audio_track import AudioTrack, AudioTrackRead, AudioTrackCreate, AudioTrackUpdate
+from app2.models.track_models.midi_track import MidiTrack, MidiTrackRead, MidiTrackCreate, MidiTrackUpdate
+from app2.models.track_models.sampler_track import SamplerTrack, SamplerTrackRead, SamplerTrackCreate, SamplerTrackUpdate
+from app2.models.track_models.drum_track import DrumTrack, DrumTrackRead, DrumTrackCreate, DrumTrackUpdate
 
 logger = get_service_logger("track")
 
-# Generic type for file models
-T = TypeVar('T', AudioFile, MidiFile, InstrumentFile)
-TRead = TypeVar('TRead', AudioFileRead, InstrumentFileRead)
+# Type for all track read models
+AnyTrackRead = Union[AudioTrackRead, MidiTrackRead, SamplerTrackRead, DrumTrackRead]
 
 class TrackService:
-    """Service for track and associated file operations"""
+    """Service for track operations with specialized track models"""
     
-    def __init__(self, track_repository: TrackRepository, file_repository: FileRepository):
+    def __init__(
+        self, 
+        audio_repository: AudioTrackRepository,
+        midi_repository: MidiTrackRepository,
+        sampler_repository: SamplerTrackRepository,
+        drum_repository: DrumTrackRepository,
+        project_track_repository: ProjectTrackRepository,
+        file_repository: FileRepository
+    ):
         """
         Initialize the service with repositories
         
         Args:
-            track_repository: The repository for track operations
-            file_repository: The repository for file operations
+            audio_repository: Repository for audio tracks
+            midi_repository: Repository for MIDI tracks
+            sampler_repository: Repository for sampler tracks
+            drum_repository: Repository for drum tracks
+            project_track_repository: Repository for project-track associations
+            file_repository: Repository for file operations
         """
-        self.track_repository = track_repository
+        self.audio_repository = audio_repository
+        self.midi_repository = midi_repository
+        self.sampler_repository = sampler_repository
+        self.drum_repository = drum_repository
+        self.project_track_repository = project_track_repository
         self.file_repository = file_repository
-        
-        # Map file types to their model classes
-        self._file_models = {
-            FileType.AUDIO: AudioFile,
-            FileType.MIDI: MidiFile,
-            FileType.INSTRUMENT: InstrumentFile
-        }
-        
-        # Map file types to their read model classes
-        self._file_read_models = {
-            FileType.AUDIO: AudioFileRead,
-            FileType.MIDI: None,  # Add the read model if available
-            FileType.INSTRUMENT: InstrumentFileRead
-        }
-        
-        # Map file types to track field names
-        self._track_field_mapping = {
-            FileType.AUDIO: "audio_file_id",
-            FileType.MIDI: "midi_file_id",
-            FileType.INSTRUMENT: "instrument_id"
-        }
     
-    async def get_user_tracks(self, user_id: uuid.UUID) -> List[TrackRead]:
+    async def get_user_tracks(self, user_id: uuid.UUID) -> Dict[str, List[AnyTrackRead]]:
         """
-        Get all tracks for a user
+        Get all tracks for a user, organized by track type
         
         Args:
             user_id: The ID of the user
             
         Returns:
-            A list of tracks
+            A dictionary with track types as keys and lists of tracks as values
             
         Raises:
             ServiceException: If the operation fails
         """
         logger.info(f"Getting tracks for user ID: {user_id}")
         try:
-            tracks = await self.track_repository.get_by_user_id(user_id)
-            logger.info(f"Found {len(tracks)} tracks for user ID: {user_id}")
-            return [TrackRead.model_validate(track) for track in tracks]
+            # Get tracks by type
+            audio_tracks = self.audio_repository.get_by_user_id(user_id)
+            midi_tracks = self.midi_repository.get_by_user_id(user_id)
+            sampler_tracks = self.sampler_repository.get_by_user_id(user_id)
+            drum_tracks = self.drum_repository.get_by_user_id(user_id)
+            
+            # Convert to read models
+            audio_read = [AudioTrackRead.model_validate(track) for track in audio_tracks]
+            midi_read = [MidiTrackRead.model_validate(track) for track in midi_tracks]
+            sampler_read = [SamplerTrackRead.model_validate(track) for track in sampler_tracks]
+            drum_read = [DrumTrackRead.model_validate(track) for track in drum_tracks]
+            
+            result = {
+                TrackType.AUDIO.value: audio_read,
+                TrackType.MIDI.value: midi_read,
+                TrackType.SAMPLER.value: sampler_read,
+                TrackType.DRUM.value: drum_read
+            }
+            
+            total_tracks = len(audio_read) + len(midi_read) + len(sampler_read) + len(drum_read)
+            logger.info(f"Found {total_tracks} tracks for user ID: {user_id}")
+            
+            return result
         except Exception as e:
             logger.error(f"Error getting user tracks: {str(e)}")
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to get user tracks: {str(e)}")
     
-    async def get_user_files(self, user_id: uuid.UUID, file_type: FileType) -> List[Any]:
+    async def get_track(
+        self, 
+        track_id: uuid.UUID, 
+        track_type: TrackType, 
+        user_id: uuid.UUID
+    ) -> AnyTrackRead:
         """
-        Get all files of a specific type for a user
-        
-        Args:
-            user_id: The ID of the user
-            file_type: The type of files to get
-            
-        Returns:
-            A list of files
-            
-        Raises:
-            ServiceException: If the operation fails
-        """
-        logger.info(f"Getting {file_type.value} files for user ID: {user_id}")
-        try:
-            # Get files directly from the file repository 
-            files = await self.file_repository.get_by_user_id(user_id, file_type)
-            logger.info(f"Found {len(files)} {file_type.value} files for user ID: {user_id}")
-            
-            # Convert to read models if available
-            read_model = self._file_read_models.get(file_type)
-            if read_model:
-                return [read_model.model_validate(file) for file in files]
-            else:
-                return files
-        except Exception as e:
-            logger.error(f"Error getting user {file_type.value} files: {str(e)}")
-            logger.error(traceback.format_exc())
-            raise ServiceException(f"Failed to get user {file_type.value} files: {str(e)}")
-    
-    async def get_track(self, track_id: uuid.UUID, user_id: uuid.UUID) -> TrackRead:
-        """
-        Get a track by ID
+        Get a track by ID and type
         
         Args:
             track_id: The ID of the track
-            user_id: The ID of the user
+            track_type: The type of the track
+            user_id: The ID of the user (for permission check)
             
         Returns:
             The track
@@ -129,131 +124,192 @@ class TrackService:
             ForbiddenException: If the user does not own the track
             ServiceException: If the operation fails
         """
-        logger.info(f"Getting track with ID: {track_id} for user ID: {user_id}")
+        logger.info(f"Getting {track_type.value} track with ID: {track_id} for user ID: {user_id}")
         try:
-            # Get the track with all associated files
-            track = await self.track_repository.get_with_files(track_id)
+            # Get the track based on type
+            track = None
+            
+            if track_type == TrackType.AUDIO:
+                track = await self.audio_repository.get(track_id)
+                if track:
+                    track_read = AudioTrackRead.model_validate(track)
+            elif track_type == TrackType.MIDI:
+                track = await self.midi_repository.get(track_id)
+                if track:
+                    track_read = MidiTrackRead.model_validate(track)
+            elif track_type == TrackType.SAMPLER:
+                track = await self.sampler_repository.get(track_id)
+                if track:
+                    track_read = SamplerTrackRead.model_validate(track)
+            elif track_type == TrackType.DRUM:
+                track = await self.drum_repository.get(track_id)
+                if track:
+                    track_read = DrumTrackRead.model_validate(track)
+            else:
+                raise ValueError(f"Invalid track type: {track_type}")
+            
+            # Check if track exists
+            if not track:
+                logger.error(f"{track_type.value} track with ID {track_id} not found")
+                raise NotFoundException(f"{track_type.value} track", str(track_id))
             
             # Verify track ownership
             if track.user_id != user_id:
-                logger.error(f"User {user_id} does not own track {track_id}")
-                raise ForbiddenException("You do not have permission to access this track")
+                logger.error(f"User {user_id} does not own {track_type.value} track {track_id}")
+                raise ForbiddenException(f"You do not have permission to access this {track_type.value} track")
             
-            logger.info(f"Found track with ID: {track_id} for user ID: {user_id}")
-            return TrackRead.model_validate(track)
+            logger.info(f"Found {track_type.value} track with ID: {track_id} for user ID: {user_id}")
+            return track_read
         except Exception as e:
             if isinstance(e, (NotFoundException, ForbiddenException)):
                 raise
-            logger.error(f"Error getting track: {str(e)}")
+            logger.error(f"Error getting {track_type.value} track: {str(e)}")
             logger.error(traceback.format_exc())
-            raise ServiceException(f"Failed to get track: {str(e)}")
+            raise ServiceException(f"Failed to get {track_type.value} track: {str(e)}")
     
-    async def get_file(self, file_id: uuid.UUID, file_type: FileType, user_id: uuid.UUID) -> Any:
+    async def create_audio_track(self, user_id: uuid.UUID, track_data: Dict[str, Any]) -> AudioTrackRead:
         """
-        Get a file by ID and type
-        
-        Args:
-            file_id: The ID of the file
-            file_type: The type of file
-            user_id: The ID of the user
-            
-        Returns:
-            The file
-            
-        Raises:
-            NotFoundException: If the file is not found
-            ForbiddenException: If the user does not own the file
-            ServiceException: If the operation fails
-        """
-        logger.info(f"Getting {file_type.value} file with ID: {file_id} for user ID: {user_id}")
-        try:
-            # First find tracks with this file attached
-            field_name = self._track_field_mapping.get(file_type)
-            if not field_name:
-                raise ValueError(f"Unsupported file type: {file_type}")
-            
-            # Get the track that contains this file
-            tracks = await self.track_repository.get_by_file_id(file_id, file_type)
-            
-            if not tracks:
-                logger.error(f"{file_type.value.capitalize()} file {file_id} not found")
-                raise NotFoundException(f"{file_type.value.capitalize()} file", file_id)
-            
-            # Check if any of these tracks belong to the user
-            user_track = None
-            for track in tracks:
-                if track.user_id == user_id:
-                    user_track = track
-                    break
-            
-            if not user_track:
-                logger.error(f"User {user_id} does not own any track with {file_type.value} file {file_id}")
-                raise ForbiddenException(f"You do not have permission to access this {file_type.value} file")
-            
-            # Get the file from the file repository
-            file = await self.file_repository.get_by_id(file_id, file_type)
-            
-            if not file:
-                logger.error(f"{file_type.value.capitalize()} file {file_id} not found")
-                raise NotFoundException(f"{file_type.value.capitalize()} file", file_id)
-            
-            logger.info(f"Found {file_type.value} file with ID: {file_id} for user ID: {user_id}")
-            
-            # Convert to read model if available
-            read_model = self._file_read_models.get(file_type)
-            if read_model:
-                return read_model.model_validate(file)
-            else:
-                return file
-        except Exception as e:
-            if isinstance(e, (NotFoundException, ForbiddenException)):
-                raise
-            logger.error(f"Error getting {file_type.value} file: {str(e)}")
-            logger.error(traceback.format_exc())
-            raise ServiceException(f"Failed to get {file_type.value} file: {str(e)}")
-    
-    async def create_track(self, user_id: uuid.UUID, track_data: Dict[str, Any], file_type: FileType) -> TrackRead:
-        """
-        Create a new track
+        Create a new audio track
         
         Args:
             user_id: The ID of the user
             track_data: The track data
             
         Returns:
-            The created track
+            The created audio track
             
         Raises:
             ServiceException: If the operation fails
         """
-        logger.info(f"Creating track for user ID: {user_id}")
+        logger.info(f"Creating audio track for user ID: {user_id}")
         try:
             # Add user ID
-            create_track_req = track_data.model_dump()
-            create_track_req["user_id"] = user_id
-            
-            # Process the track data based on track type if needed
-            track_type = create_track_req.get("type")
-            if track_type:
-                # Additional processing for different track types could go here
-                pass
+            track_data["user_id"] = user_id
+            track_data["type"] = TrackType.AUDIO
             
             # Create the track
-            track = await self.track_repository.create(create_track_req, file_type)
+            track = await self.audio_repository.create(track_data)
             
-            logger.info(f"Created track with ID: {track.id} for user ID: {user_id}")
-            return TrackRead.model_validate(track)
+            logger.info(f"Created audio track with ID: {track.id} for user ID: {user_id}")
+            return AudioTrackRead.model_validate(track)
         except Exception as e:
-            logger.error(f"Error creating track: {str(e)}")
+            logger.error(f"Error creating audio track: {str(e)}")
             logger.error(traceback.format_exc())
-            raise ServiceException(f"Failed to create track: {str(e)}")
+            raise ServiceException(f"Failed to create audio track: {str(e)}")
     
-    async def update_track(self, track_id: uuid.UUID, user_id: uuid.UUID, track_data: Dict[str, Any]) -> TrackRead:
+    async def create_midi_track(self, user_id: uuid.UUID, midi_track_data: MidiTrackCreate) -> MidiTrackRead:
+        """
+        Create a new MIDI track
+        
+        Args:
+            user_id: The ID of the user
+            track_data: The track data
+            
+        Returns:
+            The created MIDI track
+            
+        Raises:
+            ServiceException: If the operation fails
+        """
+        logger.info(f"Creating MIDI track for user ID: {user_id}")
+        try:
+            # Add user ID
+            midi_track_data["user_id"] = user_id
+            midi_track_data["type"] = TrackType.MIDI
+            
+            # Validate required fields
+            if "instrument_id" not in midi_track_data:
+                raise ValueError("MIDI tracks require an instrument_id")
+            
+            # Create the track
+            logger.info(f"Creating MIDI track with data: {midi_track_data}")
+            track = await self.midi_repository.create(midi_track_data)
+            
+            logger.info(f"Created MIDI track with ID: {track.id} for user ID: {user_id}")
+            return MidiTrackRead.model_validate(track)
+        except Exception as e:
+            logger.error(f"Error creating MIDI track: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise ServiceException(f"Failed to create MIDI track: {str(e)}")
+    
+    async def create_sampler_track(self, user_id: uuid.UUID, track_data: Dict[str, Any]) -> SamplerTrackRead:
+        """
+        Create a new sampler track
+        
+        Args:
+            user_id: The ID of the user
+            track_data: The track data
+            
+        Returns:
+            The created sampler track
+            
+        Raises:
+            ServiceException: If the operation fails
+        """
+        logger.info(f"Creating sampler track for user ID: {user_id}")
+        logger.info(f"Track data: {track_data}")
+        try:
+            # Add user ID
+            track_data["user_id"] = user_id
+            track_data["type"] = TrackType.SAMPLER
+            
+            # Validate required fields
+            if "audio_storage_key" not in track_data:
+                raise ValueError("Sampler tracks require audio_storage_key")
+            
+            # Create the track
+            track = await self.sampler_repository.create(track_data)
+            
+            logger.info(f"Created sampler track with ID: {track.id} for user ID: {user_id}")
+            return SamplerTrackRead.model_validate(track)
+        except Exception as e:
+            logger.error(f"Error creating sampler track: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise ServiceException(f"Failed to create sampler track: {str(e)}")
+    
+    async def create_drum_track(self, user_id: uuid.UUID, track_data: Dict[str, Any]) -> DrumTrackRead:
+        """
+        Create a new drum track
+        
+        Args:
+            user_id: The ID of the user
+            track_data: The track data
+            
+        Returns:
+            The created drum track
+            
+        Raises:
+            ServiceException: If the operation fails
+        """
+        logger.info(f"Creating drum track for user ID: {user_id}")
+        try:
+            # Add user ID
+            track_data["user_id"] = user_id
+            track_data["type"] = TrackType.DRUM
+            
+            # Create the track
+            track = await self.drum_repository.create(track_data)
+            
+            logger.info(f"Created drum track with ID: {track.id} for user ID: {user_id}")
+            return DrumTrackRead.model_validate(track)
+        except Exception as e:
+            logger.error(f"Error creating drum track: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise ServiceException(f"Failed to create drum track: {str(e)}")
+    
+    async def update_track(
+        self, 
+        track_id: uuid.UUID, 
+        track_type: TrackType,
+        user_id: uuid.UUID, 
+        track_data: Dict[str, Any]
+    ) -> AnyTrackRead:
         """
         Update a track
         
         Args:
             track_id: The ID of the track
+            track_type: The type of the track
             user_id: The ID of the user
             track_data: The updated track data
             
@@ -265,29 +321,45 @@ class TrackService:
             ForbiddenException: If the user does not own the track
             ServiceException: If the operation fails
         """
-        logger.info(f"Updating track with ID: {track_id} for user ID: {user_id}")
+        logger.info(f"Updating {track_type.value} track with ID: {track_id} for user ID: {user_id}")
         try:
             # First get the track (ensures it exists and user has access)
-            existing_track = await self.get_track(track_id, user_id)
+            existing_track = await self.get_track(track_id, track_type, user_id)
             
-            # Update the track
-            updated_track = await self.track_repository.update(track_id, track_data)
+            # Update the track based on type
+            updated_track = None
             
-            logger.info(f"Updated track with ID: {track_id} for user ID: {user_id}")
-            return TrackRead.model_validate(updated_track)
+            if track_type == TrackType.AUDIO:
+                updated_track = await self.audio_repository.update(track_id, track_data)
+                track_read = AudioTrackRead.model_validate(updated_track)
+            elif track_type == TrackType.MIDI:
+                updated_track = await self.midi_repository.update(track_id, track_data)
+                track_read = MidiTrackRead.model_validate(updated_track)
+            elif track_type == TrackType.SAMPLER:
+                updated_track = await self.sampler_repository.update(track_id, track_data)
+                track_read = SamplerTrackRead.model_validate(updated_track)
+            elif track_type == TrackType.DRUM:
+                updated_track = await self.drum_repository.update(track_id, track_data)
+                track_read = DrumTrackRead.model_validate(updated_track)
+            else:
+                raise ValueError(f"Invalid track type: {track_type}")
+            
+            logger.info(f"Updated {track_type.value} track with ID: {track_id} for user ID: {user_id}")
+            return track_read
         except Exception as e:
             if isinstance(e, (NotFoundException, ForbiddenException)):
                 raise
-            logger.error(f"Error updating track: {str(e)}")
+            logger.error(f"Error updating {track_type.value} track: {str(e)}")
             logger.error(traceback.format_exc())
-            raise ServiceException(f"Failed to update track: {str(e)}")
+            raise ServiceException(f"Failed to update {track_type.value} track: {str(e)}")
     
-    async def delete_track(self, track_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+    async def delete_track(self, track_id: uuid.UUID, track_type: TrackType, user_id: uuid.UUID) -> bool:
         """
         Delete a track
         
         Args:
             track_id: The ID of the track
+            track_type: The type of the track
             user_id: The ID of the user
             
         Returns:
@@ -298,22 +370,36 @@ class TrackService:
             ForbiddenException: If the user does not own the track
             ServiceException: If the operation fails
         """
-        logger.info(f"Deleting track with ID: {track_id} for user ID: {user_id}")
+        logger.info(f"Deleting {track_type.value} track with ID: {track_id} for user ID: {user_id}")
         try:
             # First get the track (ensures it exists and user has access)
-            existing_track = await self.get_track(track_id, user_id)
+            existing_track = await self.get_track(track_id, track_type, user_id)
             
-            # Delete the track
-            result = await self.track_repository.delete(track_id)
+            # Delete all project associations for this track
+            await self.project_track_repository.delete_by_track(track_type, track_id)
             
-            logger.info(f"Deleted track with ID: {track_id} for user ID: {user_id}")
+            # Delete the track based on type
+            result = False
+            
+            if track_type == TrackType.AUDIO:
+                result = await self.audio_repository.delete(track_id)
+            elif track_type == TrackType.MIDI:
+                result = await self.midi_repository.delete(track_id)
+            elif track_type == TrackType.SAMPLER:
+                result = await self.sampler_repository.delete(track_id)
+            elif track_type == TrackType.DRUM:
+                result = await self.drum_repository.delete(track_id)
+            else:
+                raise ValueError(f"Invalid track type: {track_type}")
+            
+            logger.info(f"Deleted {track_type.value} track with ID: {track_id} for user ID: {user_id}")
             return result
         except Exception as e:
             if isinstance(e, (NotFoundException, ForbiddenException)):
                 raise
-            logger.error(f"Error deleting track: {str(e)}")
+            logger.error(f"Error deleting {track_type.value} track: {str(e)}")
             logger.error(traceback.format_exc())
-            raise ServiceException(f"Failed to delete track: {str(e)}")
+            raise ServiceException(f"Failed to delete {track_type.value} track: {str(e)}")
     
     async def create_upload_url(self, file_name: str, file_id: uuid.UUID, user_id: uuid.UUID, file_type: FileType) -> Dict[str, str]:
         """
@@ -342,3 +428,160 @@ class TrackService:
             logger.error(f"Error creating upload URL: {str(e)}")
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to create upload URL: {str(e)}")
+            
+    async def add_track_to_project(
+        self,
+        project_id: uuid.UUID,
+        track_type: TrackType,
+        track_id: uuid.UUID,
+        user_id: uuid.UUID,
+        settings: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Add a track to a project
+        
+        Args:
+            project_id: The ID of the project
+            track_type: The type of the track
+            track_id: The ID of the track
+            user_id: The ID of the user
+            settings: Project-track settings (volume, pan, position, etc.)
+            
+        Returns:
+            The project-track association data
+            
+        Raises:
+            NotFoundException: If the track or project is not found
+            ForbiddenException: If the user does not own the track or project
+            ServiceException: If the operation fails
+        """
+        logger.info(f"Adding {track_type.value} track {track_id} to project {project_id} for user {user_id}")
+        try:
+            # First verify track access
+            track = await self.get_track(track_id, track_type, user_id)
+            
+            # Create project-track association data
+            project_track_data = {
+                "project_id": project_id,
+                "track_type": track_type,
+                **settings
+            }
+            
+            # Set track_id directly (not using type-specific foreign keys)
+            project_track_data["track_id"] = track_id
+            
+            # Create the association
+            project_track = await self.project_track_repository.create(project_track_data)
+            
+            # Get track data with settings
+            # Note: ProjectTrack uses a composite primary key (project_id, track_id), not a single id field
+            result = {
+                "project_id": project_id,
+                "track_type": track_type,
+                "track_id": track_id,
+                "track": track,
+                **{k: getattr(project_track, k) for k in settings.keys()}
+            }
+            
+            logger.info(f"Added {track_type.value} track {track_id} to project {project_id}")
+            return result
+        except Exception as e:
+            if isinstance(e, (NotFoundException, ForbiddenException)):
+                raise
+            logger.error(f"Error adding track to project: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise ServiceException(f"Failed to add track to project: {str(e)}")
+            
+    async def remove_track_from_project(
+        self,
+        project_id: uuid.UUID,
+        track_type: TrackType,
+        track_id: uuid.UUID,
+        user_id: uuid.UUID
+    ) -> bool:
+        """
+        Remove a track from a project
+        
+        Args:
+            project_id: The ID of the project
+            track_type: The type of the track
+            track_id: The ID of the track
+            user_id: The ID of the user
+            
+        Returns:
+            True if the track was removed from the project
+            
+        Raises:
+            NotFoundException: If the track or project is not found
+            ForbiddenException: If the user does not own the track or project
+            ServiceException: If the operation fails
+        """
+        logger.info(f"Removing {track_type.value} track {track_id} from project {project_id} for user {user_id}")
+        try:
+            # First verify track access
+            track = await self.get_track(track_id, track_type, user_id)
+            
+            # Delete the association
+            result = await self.project_track_repository.delete(project_id, track_type, track_id)
+            
+            logger.info(f"Removed {track_type.value} track {track_id} from project {project_id}")
+            return result
+        except Exception as e:
+            if isinstance(e, (NotFoundException, ForbiddenException)):
+                raise
+            logger.error(f"Error removing track from project: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise ServiceException(f"Failed to remove track from project: {str(e)}")
+            
+    async def update_track_project_settings(
+        self,
+        project_id: uuid.UUID,
+        track_type: TrackType,
+        track_id: uuid.UUID,
+        user_id: uuid.UUID,
+        settings: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Update project-specific settings for a track
+        
+        Args:
+            project_id: The ID of the project
+            track_type: The type of the track
+            track_id: The ID of the track
+            user_id: The ID of the user
+            settings: Updated project-track settings (volume, pan, position, etc.)
+            
+        Returns:
+            The updated project-track association data
+            
+        Raises:
+            NotFoundException: If the track or project is not found
+            ForbiddenException: If the user does not own the track or project
+            ServiceException: If the operation fails
+        """
+        logger.info(f"Updating settings for {track_type.value} track {track_id} in project {project_id}")
+        try:
+            # First verify track access
+            track = await self.get_track(track_id, track_type, user_id)
+            
+            # Update the association
+            project_track = await self.project_track_repository.update(project_id, track_type, track_id, settings)
+            
+            # Get track data with updated settings
+            # Note: ProjectTrack uses a composite primary key (project_id, track_id), not a single id field
+            result = {
+                "project_id": project_id,
+                "track_type": track_type,
+                "track_id": track_id,
+                "track": track,
+                **{k: getattr(project_track, k) for k in settings.keys()}
+            }
+            
+            logger.info(f"Updated settings for {track_type.value} track {track_id} in project {project_id}")
+            return result
+        except Exception as e:
+            if isinstance(e, (NotFoundException, ForbiddenException)):
+                raise
+            logger.error(f"Error updating track project settings: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise ServiceException(f"Failed to update track project settings: {str(e)}")

@@ -2,7 +2,7 @@
 Track repository for database operations using SQLModel
 Handles basic CRUD operations for track entities
 """
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Union
 from sqlmodel import Session, select
 from sqlalchemy.orm import joinedload
 import traceback
@@ -13,11 +13,11 @@ from app2.core.exceptions import DatabaseException, NotFoundException
 from app2.core.logging import get_repository_logger
 from app2.types.track_types import TrackType
 from app2.types.file_types import FileType
-from app2.models.track import Track
+from app2.models.track_models.audio_track import AudioTrack
+from app2.models.track_models.midi_track import MidiTrack
+from app2.models.track_models.sampler_track import SamplerTrack
+from app2.models.track_models.drum_track import DrumTrack
 from app2.models.project_track import ProjectTrack
-from app2.models.file_models.audio_file import AudioFile
-from app2.models.file_models.midi_file import MidiFile
-from app2.models.file_models.instrument_file import InstrumentFile
 
 class TrackRepository:
     """Repository for track operations"""
@@ -53,7 +53,7 @@ class TrackRepository:
             raise ValueError(f"Unsupported file type: {file_type}")
         return field
     
-    async def get_by_id(self, track_id: uuid.UUID) -> Track:
+    async def get_by_id(self, track_id: uuid.UUID) -> Union[AudioTrack, MidiTrack, SamplerTrack, DrumTrack]:
         """
         Get a track by ID
         
@@ -85,7 +85,7 @@ class TrackRepository:
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to get track: {str(e)}")
     
-    async def get_with_files(self, track_id: uuid.UUID) -> Track:
+    async def get_with_files(self, track_id: uuid.UUID) -> Union[AudioTrack, MidiTrack, SamplerTrack, DrumTrack]:
         """
         Get a track by ID with its files loaded
         
@@ -126,7 +126,7 @@ class TrackRepository:
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to get track with files: {str(e)}")
     
-    async def get_all(self, **filters) -> List[Track]:
+    async def get_all(self, **filters) -> List[Union[AudioTrack, MidiTrack, SamplerTrack, DrumTrack]]:
         """
         Get all tracks with optional filters
         
@@ -158,7 +158,7 @@ class TrackRepository:
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to get tracks: {str(e)}")
     
-    async def get_by_user_id(self, user_id: uuid.UUID) -> List[Track]:
+    async def get_by_user_id(self, user_id: uuid.UUID) -> List[Union[AudioTrack, MidiTrack, SamplerTrack, DrumTrack]]:
         """
         Get all tracks for a user
         
@@ -179,7 +179,7 @@ class TrackRepository:
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to get tracks for user: {str(e)}")
     
-    async def get_by_file_id(self, file_id: uuid.UUID, file_type: FileType) -> List[Track]:
+    async def get_by_file_id(self, file_id: uuid.UUID, file_type: FileType) -> List[Union[AudioTrack, MidiTrack, SamplerTrack, DrumTrack]]:
         """
         Get all tracks that reference a specific file
         
@@ -209,7 +209,7 @@ class TrackRepository:
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to get tracks by file ID: {str(e)}")
     
-    async def create(self, track_data: Dict[str, Any], file_type: FileType) -> Track:
+    async def create(self, track_data: Dict[str, Any], track_type: TrackType) -> Union[AudioTrack, MidiTrack, SamplerTrack, DrumTrack]:
         """
         Create a new track
         
@@ -225,9 +225,12 @@ class TrackRepository:
         self.logger.info("Creating new track")
         self.logger.info(f"Track data: {track_data}")
         try:
-            # Create track instance
-            track = Track(**track_data)
-            track.type = file_type
+            # Ensure the correct type is in the data dictionary
+            track_data_with_type = track_data.copy()
+            track_data_with_type['type'] = track_type
+            
+            # Create track instance using the dictionary with the type included
+            track = Track(**track_data_with_type)
             
             # Add to session and commit
             self.session.add(track)
@@ -242,7 +245,7 @@ class TrackRepository:
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to create track: {str(e)}")
     
-    async def update(self, track_id: uuid.UUID, track_data: Dict[str, Any]) -> Track:
+    async def update(self, track_id: uuid.UUID, track_data: Dict[str, Any]) -> Union[AudioTrack, MidiTrack, SamplerTrack, DrumTrack]:
         """
         Update a track
         

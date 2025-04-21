@@ -3,11 +3,11 @@ import { TransportController } from './transport';
 import { MidiManager } from '../midi/MidiManagerNew';
 import { InstrumentManager } from '../instruments/InstrumentManager';
 import AudioEngine from '../audio-engine/audioEngine';
-import { TrackState } from '../types/track';
+import { TrackState } from '../../../types/track';
 import * as Tone from 'tone';
 import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
 import { SamplerController } from '../audio-engine/samplerController';
-import { Note } from '../types/note'; // Added for Note type
+import { Note } from '../../../types/note'; // Added for Note type
 import { NoteActions } from './history/actions/NoteActions'; // Added for NoteActions
 import { historyManager } from './history/HistoryManager'; // Added for historyManager
 import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
@@ -178,7 +178,7 @@ export class Store implements StoreInterface {
     console.log(`Store: Track created through ProjectManager:`, track);
     
     // For MIDI, drum, and sampler tracks, handle persistence
-    if (type === 'midi' || type === 'drum' || type === 'sampler') {
+    if (type === 'midi' || type === 'sampler') {
       try {
         // Use MIDI persistence
         const project = this.projectManager.getCurrentProject();
@@ -189,8 +189,7 @@ export class Store implements StoreInterface {
           // For sampler, we need a default instrumentId since MidiManager requires one
           const effectiveInstrumentId = track.instrumentId || 'sampler';
           
-          // Create persisted track directly in MidiManager
-          await this.midiManager.createTrackWithPersistence(
+          await this.midiManager.createTrack(
             track.id, // Always use the track ID (whether new or existing)
             effectiveInstrumentId,
             name

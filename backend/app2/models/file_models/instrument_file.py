@@ -1,24 +1,23 @@
 """
 Soundfont models for SQL database
 """
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, List
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
 import uuid
 
 from app2.models.base import InstrumentFileBase
-from app2.models.track import Track
 
-# Handle circular imports
 if TYPE_CHECKING:
-    from app2.models.user import User
+    from app2.models.track_models.midi_track import MidiTrack
 
 # Database model
 class InstrumentFile(InstrumentFileBase, table=True):
     """Instrument model for the database"""
     __tablename__ = "instrument_files"
-    # Relationships
-    track: Optional["Track"] = Relationship(back_populates="instrument_file")
+    
+    # Relationship with specialized track models
+    midi_tracks: List["MidiTrack"] = Relationship(back_populates="instrument_file")
     
 # API Models
 class InstrumentFileRead(InstrumentFileBase):

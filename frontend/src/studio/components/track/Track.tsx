@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Box } from '@mui/material';
-import { Position } from '../../core/types/track';
+import { Position } from './types';
 import { useStudioStore } from '../../stores/useStudioStore';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import TrackFactory from './TrackFactory';

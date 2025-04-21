@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box } from '@mui/material';
-import { Note } from '../../../core/types/note';
+import { Note } from '../../../../types/note';
 import { useStudioStore } from '../../../stores/useStudioStore';
 import { scaleToPreview } from '../../../utils/noteConversion';
 

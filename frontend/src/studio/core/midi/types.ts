@@ -1,4 +1,4 @@
-import { Note } from '../types/note';
+import { Note } from '../../../types/note';
 
 export interface MidiNote extends Note {
   velocity: number;

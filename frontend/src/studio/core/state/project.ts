@@ -13,6 +13,10 @@ export interface Track {
   grainSize?: number;       // Grain size for samplers (in seconds)
   overlap?: number;         // Overlap amount for samplers (0-1)
   sampleFile?: File;        // Sample file for samplers
+  audioFileId?: string;     // ID of the audio file for samplers
+  trimStartTicks?: number;  // Trim start ticks for samplers
+  trimEndTicks?: number;    // Trim end ticks for samplers
+  durationTicks?: number;   // Duration ticks for samplers
 }
 
 export interface Project {

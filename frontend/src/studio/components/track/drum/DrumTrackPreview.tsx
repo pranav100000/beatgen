@@ -8,7 +8,7 @@ import MidiNotesPreview from '../../piano-roll/components/MidiNotesPreview';
 import BaseTrackPreview from '../base/BaseTrackPreview';
 import { TrackPreviewProps } from '../types';
 import DrumGridPreview from './DrumGridPreview';
-import { DrumTrackState } from '../../../core/types/track';
+import { DrumTrack } from '../../../../types/track';
 
 /**
  * DrumTrackPreview is a specialized track component for drum tracks.
@@ -38,7 +38,7 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
   }
   
   // Explicitly cast track to DrumTrackState after the guard
-  const drumTrack = track as DrumTrackState;
+  const drumTrack = track as DrumTrack;
   
   // Get the drum pattern directly from the casted track state
   const drumPattern = drumTrack.drumPattern;

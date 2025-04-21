@@ -12,21 +12,17 @@ from app2.core.exceptions import ServiceException, NotFoundException, ForbiddenE
 from app2.repositories.track_repository import TrackRepository
 from app2.repositories.file_repository import FileRepository
 from app2.types.track_types import TrackType
-from app2.models.file_models.audio_file import AudioFile, AudioFileRead
-from app2.models.file_models.midi_file import MidiFile
 from app2.models.file_models.instrument_file import InstrumentFile, InstrumentFileRead
 from app2.types.file_types import FileType
 
 logger = get_service_logger("file")
 
 # Generic type variables for file models
-T = TypeVar('T', AudioFile, MidiFile, InstrumentFile)
-TRead = TypeVar('TRead', AudioFileRead, InstrumentFileRead)
 
 class FileService:
     """Service for file operations independent of tracks"""
     
-    def __init__(self, track_repository: TrackRepository, file_repository: FileRepository):
+    def __init__(self, file_repository: FileRepository):
         """
         Initialize the service with repositories
         
@@ -34,20 +30,15 @@ class FileService:
             track_repository: The repository for track operations
             file_repository: The repository for direct file operations
         """
-        self.track_repository = track_repository
         self.file_repository = file_repository
         
         # Map file types to their model classes
         self._file_models = {
-            FileType.AUDIO: AudioFile,
-            FileType.MIDI: MidiFile,
             FileType.INSTRUMENT: InstrumentFile
         }
         
         # Map file types to their read model classes
         self._file_read_models = {
-            FileType.AUDIO: AudioFileRead,
-            FileType.MIDI: None,  # Add the read model if available
             FileType.INSTRUMENT: InstrumentFileRead
         }
     
@@ -339,8 +330,11 @@ class FileService:
             
             logger.info(f"Created upload URL for {file_type} file {file_name} for user ID: {user_id}")
             return result
+        
             
         except Exception as e:
+            if e.status_code == 409:
+                return None
             logger.error(f"Error creating upload URL: {str(e)}")
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to create upload URL: {str(e)}")

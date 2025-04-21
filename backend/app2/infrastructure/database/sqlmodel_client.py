@@ -9,9 +9,10 @@ from app2.core.logging import get_logger
 # This is necessary for create_all to create all tables
 from app2.models.user import User
 from app2.models.project import Project
-from app2.models.track import Track
-from app2.models.file_models.audio_file import AudioFile
-from app2.models.file_models.midi_file import MidiFile
+from app2.models.track_models.audio_track import AudioTrack
+from app2.models.track_models.midi_track import MidiTrack
+from app2.models.track_models.sampler_track import SamplerTrack
+from app2.models.track_models.drum_track import DrumTrack
 from app2.models.file_models.instrument_file import InstrumentFile
 
 logger = get_logger("beatgen.database.sqlmodel")

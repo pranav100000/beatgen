@@ -1,5 +1,5 @@
 import * as Tone from "tone";
-import { Note } from "../../types/note";
+import { Note } from "../../../../types/note";
 
 // Types for event callbacks
 type LogCallback = (message: string) => void;
@@ -236,14 +236,14 @@ class MidiSampler {
         
         // Calculate timing constants
         const secPerBeat = 60 / bpm;
-        const gridUnitTime = secPerBeat / 4 * 2; // Assuming 16th note grid
+        const gridUnitTime = secPerBeat / 4; // Assuming 16th note grid
         
         // Add a small lookahead to compensate for transport timing delays
         const lookAheadTime = 0.025; // 25ms lookahead
         // Schedule all notes
         for (const note of this.notes) {
             // Calculate note time based on grid position
-            const noteTimeInSeconds = note.column / (bpm * 4);
+            const noteTimeInSeconds = note.column / (bpm * 8);
             
             // Only schedule notes that should play after the effective start time
             if (noteTimeInSeconds >= effectiveStartTime) {

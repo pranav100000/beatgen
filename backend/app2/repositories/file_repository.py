@@ -12,13 +12,11 @@ import uuid
 from app2.core.exceptions import DatabaseException, NotFoundException, StorageException
 from app2.core.logging import get_repository_logger
 from app2.types.file_types import FileType
-from app2.models.file_models.audio_file import AudioFile
-from app2.models.file_models.midi_file import MidiFile
 from app2.models.file_models.instrument_file import InstrumentFile
 from app2.infrastructure.storage.supabase_storage import SupabaseStorage
 
 # Generic type for file models
-FileModel = TypeVar('FileModel', AudioFile, MidiFile, InstrumentFile)
+FileModel = InstrumentFile
 
 class FileRepository:
     """Repository for operations on all file types (audio, MIDI, instrument)"""
@@ -35,15 +33,12 @@ class FileRepository:
         
         # Map file types to their model classes
         self._file_models = {
-            FileType.AUDIO: AudioFile,
-            FileType.MIDI: MidiFile,
             FileType.INSTRUMENT: InstrumentFile
         }
         
         # Map file types to storage buckets
         self._storage_buckets = {
             FileType.AUDIO: "tracks/audio",
-            FileType.MIDI: "tracks/midi",
             FileType.INSTRUMENT: "instruments"
         }
     

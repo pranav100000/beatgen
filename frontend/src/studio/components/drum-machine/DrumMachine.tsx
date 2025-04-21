@@ -3,7 +3,7 @@ import { Rnd } from 'react-rnd';
 import PianoRoll from '../piano-roll2/PianoRoll';
 import CloseIcon from '@mui/icons-material/Close';
 import { IconButton, Tooltip } from '@mui/material';
-import { DrumTrackState } from '../../core/types/track';
+import { DrumTrack } from '../../../types/track';
 import { useStudioStore } from '../../stores/useStudioStore';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
@@ -398,7 +398,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
   // Fetch the associated sampler track IDs from the store
   const samplerTrackIds = useStudioStore(useCallback(
     state => {
-      const mainTrack = state.tracks.find(t => t.id === trackId && t.type === 'drum') as DrumTrackState | undefined;
+      const mainTrack = state.tracks.find(t => t.id === trackId && t.type === 'drum') as DrumTrack | undefined;
       return mainTrack?.samplerTrackIds || []; 
     },
     [trackId] 

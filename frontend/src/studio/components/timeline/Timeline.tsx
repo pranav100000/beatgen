@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { GRID_CONSTANTS, calculatePositionTime } from '../../constants/gridConstants';
 import Track from '../track/Track';
 import PlaybackCursor, { PlaybackCursorRef } from './PlaybackCursor';
-import { TrackState, Position } from '../../core/types/track';
+import { TrackState, Position } from '../../../types/track';
 
 export interface TimelineProps {
   tracks: TrackState[];

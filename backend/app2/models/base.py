@@ -3,14 +3,27 @@ Base models for SQL database entities
 """
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, TypeVar
+from typing import Optional, List, Type, TypeVar, get_type_hints
+import pydantic
 from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import TIMESTAMP
-from pydantic import validator
+from pydantic import BaseModel, create_model, validator
 import uuid
 
 from app2.types.track_types import TrackType
 from app2.types.file_types import FileType
+
+def all_optional(base_model: Type[BaseModel], name: str) -> Type[BaseModel]:
+    """
+    Creates a new model with the same fields, but all optional.
+
+    Usage: SomeOptionalModel = SomeModel.all_optional('SomeOptionalModel')
+    """
+    return create_model(
+        name,
+        __base__=base_model,
+        **{name: (info.annotation, None) for name, info in base_model.model_fields.items() if name not in ['type', 'id']}
+    )
 
 class TimestampMixin(SQLModel):
     """Mixin that adds created_at and updated_at fields to models"""
@@ -26,7 +39,7 @@ class TimestampMixin(SQLModel):
 class UUIDMixin(SQLModel):
     """Mixin that adds UUID primary key"""
     id: uuid.UUID = Field(
-        default_factory=lambda: uuid.uuid4(),
+        default_factory=uuid.uuid4,
         primary_key=True,
         index=True
     )
@@ -57,12 +70,13 @@ class ProjectBase(StandardBase):
     time_signature_denominator: int
     key_signature: str
     
-class TrackBase(StandardBase):
+class TrackBase(TimestampMixin):
     """Base model for tracks"""
+    id: uuid.UUID = Field(primary_key=True)
     name: str
     type: TrackType
     
-class ProjectTrackBase(StandardBase):
+class ProjectTrackBase(TimestampMixin):
     """Base model for project tracks"""
     name: str
     volume: Optional[float] = 0.0
@@ -80,14 +94,13 @@ class AudioFileBase(FileBase):
     duration: float
     sample_rate: int
     
-class MidiFileBase(FileBase):
-    """Base model for MIDI files"""
-    pass
+# class MidiFileBase(FileBase):
+#     """Base model for MIDI files"""
+#     pass
 
 class InstrumentFileBase(FileBase):
     """Base model for instruments"""
-    instrument_name: str
     category: str
     is_public: bool
     description: Optional[str] = None
-    pass
+    

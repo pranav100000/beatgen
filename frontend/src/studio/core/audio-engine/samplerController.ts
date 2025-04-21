@@ -1,7 +1,5 @@
 import MidiSampler from './midiSamplePlayer/sampler';
 import { MidiManager } from '../midi/MidiManagerNew';
-import { Note } from '../types/note';
-import * as Tone from 'tone';
 
 /**
  * Manages all sampler instances and handles communication between the MidiManager,
@@ -276,6 +274,7 @@ export class SamplerController {
             // Ensure the track exists in MidiManager
             if (!midiManager.hasTrack(trackId)) {
                 console.log(`Track ${trackId} not found in MidiManager, cannot set up sampler`);
+                midiManager.createTrack(trackId, "sampler");
                 throw new Error(`Track ${trackId} not found in MidiManager`);
             }
             

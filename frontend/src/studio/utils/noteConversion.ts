@@ -1,4 +1,4 @@
-import { Note } from '../core/types/note';
+import { Note } from '../../types/note';
 import { MUSIC_CONSTANTS } from '../constants/musicConstants';
 // Define NoteState interface (matching PianoRoll2's interface)
 export interface NoteState {
@@ -42,4 +42,13 @@ export const convertFromNoteState = (note: NoteState, trackId: string): Note => 
 
 export const scaleToPreview = (dimension: number): number => {
   return Math.round(dimension / TICKS_PER_STEP);
+};
+
+export const convertMapToNoteState = (midiNotes: Map<number, number>): NoteState[] => {
+  return Array.from(midiNotes.entries()).map(([tick, note]) => ({
+    id: tick,
+    row: note,
+    column: tick,
+    length: 1,
+  }));
 };

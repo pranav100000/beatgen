@@ -1,7 +1,7 @@
-import { AudioWorkletNodeSynthesizer } from 'js-synthesizer';
-import { ISequencer } from 'js-synthesizer';
+
+import { AudioWorkletNodeSynthesizer, ISequencer } from 'js-synthesizer';
 import { Midi } from '@tonejs/midi';
-import { Note } from '../../types/note';
+import { Note } from '../../../../types/note';
 import { MUSIC_CONSTANTS } from '../../../constants/musicConstants';
 
 /**

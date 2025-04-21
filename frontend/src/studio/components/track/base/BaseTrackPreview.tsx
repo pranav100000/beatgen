@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import { GRID_CONSTANTS } from '../../../constants/gridConstants';
-import { Position, TrackState } from '../../../core/types/track';
+import { TrackState, Position } from '../../../../types/track';
 import { pixelsToTicks, ticksToPixels } from '../../../constants/gridConstants';
 
 /**
@@ -108,10 +108,10 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
 
   // Calculate the normal content offset for trimming from the beginning
   const calculateContentOffset = () => {
-    if (!track.originalDurationTicks || !track.trimStartTicks) return 0;
+    if (!track.durationTicks || !track.trimStartTicks) return 0;
     
     // Calculate what percentage of the original content is trimmed from start
-    const trimRatio = track.trimStartTicks / track.originalDurationTicks;
+    const trimRatio = track.trimStartTicks / track.durationTicks;
     
     // Apply that ratio to the full content width to get the offset
     return -(trimRatio * actualContentWidth);

@@ -12,7 +12,10 @@ import uuid
 from app2.core.exceptions import DatabaseException, NotFoundException
 from app2.core.logging import get_repository_logger
 from app2.models.project import Project
-from app2.models.track import Track
+from app2.models.track_models.audio_track import AudioTrack
+from app2.models.track_models.midi_track import MidiTrack
+from app2.models.track_models.sampler_track import SamplerTrack
+from app2.models.track_models.drum_track import DrumTrack
 
 class ProjectRepository:
     """Repository for project operations"""
@@ -61,25 +64,35 @@ class ProjectRepository:
     
     async def get_with_tracks(self, project_id: uuid.UUID) -> Project:
         """
-        Get a project by ID with its tracks loaded
+        Get a project by ID with its tracks and associated files loaded
         
         Args:
             project_id: The ID of the project
             
         Returns:
-            The project with tracks loaded
+            The project with tracks and files loaded
             
         Raises:
             NotFoundException: If the project is not found
             DatabaseException: If there's a database error
         """
-        self.logger.info(f"Getting project with ID: {project_id} with tracks")
+        self.logger.info(f"Getting project with ID: {project_id} with tracks and files")
         try:
-            # We just need a normal query with selectinload
-            # Let's get the tracks from the project first
+            # We need a query with multiple selectinload calls to eagerly load tracks and related files
+            from app2.models.track import Track
+            from app2.models.file_models.audio_file import AudioFile
+            from app2.models.file_models.midi_file import MidiFile
+            from app2.models.file_models.instrument_file import InstrumentFile
+            
             statement = (
                 select(Project)
-                .options(selectinload(Project.tracks))
+                .options(
+                    selectinload(Project.tracks).options(
+                        selectinload(Track.audio_file),
+                        selectinload(Track.midi_file),
+                        selectinload(Track.instrument_file)
+                    )
+                )
                 .where(Project.id == project_id)
             )
             
@@ -91,10 +104,13 @@ class ProjectRepository:
             
             track_count = len(project.tracks) if project.tracks else 0
             self.logger.info(f"Found project with ID: {project_id} with {track_count} tracks")
-            self.logger.info(f"Project: {project}")
             
-            # Don't try to add fields to Track objects, they're pydantic models
-            # We'll handle this at the service layer instead
+            # Log file counts for debugging
+            audio_file_count = sum(1 for t in project.tracks if hasattr(t, "audio_file") and t.audio_file is not None)
+            midi_file_count = sum(1 for t in project.tracks if hasattr(t, "midi_file") and t.midi_file is not None)
+            instrument_file_count = sum(1 for t in project.tracks if hasattr(t, "instrument_file") and t.instrument_file is not None)
+            
+            self.logger.info(f"Loaded {audio_file_count} audio files, {midi_file_count} MIDI files, and {instrument_file_count} instrument files")
             
             return project
         except Exception as e:
@@ -204,6 +220,12 @@ class ProjectRepository:
         try:
             # Create project instance
             project = Project(**project_data)
+            
+            # Ensure ID is set
+            if not getattr(project, 'id', None):
+                project.id = uuid.uuid4()
+            
+            self.logger.info(f"Creating project with data: {project_data}, ID: {project.id}")
             
             # Add to session and commit
             self.session.add(project)

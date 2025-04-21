@@ -1,19 +1,19 @@
 from fastapi import APIRouter, Depends, status, HTTPException, Request
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel
+from typing import Any, Dict, List, Optional, Union
+from pydantic import BaseModel, Field
 from datetime import datetime
 import uuid
 
 from app2.api.dependencies import get_current_user, get_track_service, get_file_service
 from app2.core.logging import get_api_logger
 from app2.core.exceptions import NotFoundException, ForbiddenException, ServiceException
-from app2.models.file_models.audio_file import AudioFile, AudioFileCreate, AudioFileRead
-from app2.models.file_models.midi_file import MidiFile
 from app2.services.track_service import TrackService
 from app2.types.file_types import FileType
 from app2.types.track_types import TrackType
 from app2.services.file_service import FileService
-from app2.models.project_track import ProjectTrackCreate
+from app2.models.track_models.audio_track import AudioTrackRead, AudioTrackCreate
+from app2.models.track_models.midi_track import MidiTrackRead, MidiTrackCreate
+from app2.models.track_models.sampler_track import SamplerTrackRead, SamplerTrackCreate
 
 router = APIRouter()
 logger = get_api_logger("sounds")
@@ -21,8 +21,8 @@ logger = get_api_logger("sounds")
 class UploadUrlRequest(BaseModel):
     """Request model for generating upload URLs"""
     file_name: str
-    id: str  # ID for the sound (UUID)
-    file_type: str  # 'audio' or 'midi'
+    id: str  # ID for the file (UUID)
+    file_type: str  # 'audio', 'midi', or 'instrument'
     should_overwrite: bool = False  # Whether to overwrite existing file
 
 class UploadUrlResponse(BaseModel):
@@ -30,16 +30,16 @@ class UploadUrlResponse(BaseModel):
     id: str
     upload_url: str
     storage_key: str
-
+    
+    
 @router.post("/upload-url", response_model=UploadUrlResponse)
 async def get_upload_url(
-    request: Request,
     request_data: UploadUrlRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
     file_service: FileService = Depends(get_file_service)
 ) -> UploadUrlResponse:
     """
-    Generate a presigned URL for uploading an audio file
+    Generate a presigned URL for uploading a file
     """
     logger.info(f"Upload URL requested for file: {request_data.file_name} by user: {current_user['id']}")
     try:
@@ -66,194 +66,350 @@ async def get_upload_url(
             detail=f"Failed to generate upload URL: {str(e)}"
         )
 
-@router.post("", response_model=AudioFileRead)
-@router.post("/", response_model=AudioFileRead)
-async def create_project_track(
-    request: Request,
-    project_track_data: AudioFileCreate,
+@router.post("/audio", response_model=AudioTrackRead)
+async def create_audio_track(
+    track_data: AudioTrackCreate,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    track_service: TrackService = Depends(get_track_service),
-    file_service: FileService = Depends(get_file_service)
-) -> AudioFileRead:
+    track_service: TrackService = Depends(get_track_service)
+) -> AudioTrackRead:
     """
-    Create a new audio track record after successful upload
+    Create a new audio track
     """
-    logger.info(f"Creating audio track record for ID: {project_track_data.id} by user: {current_user['id']}")
-    logger.info(f"Project track data: {project_track_data}")
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Creating audio track '{track_data.name}' for user: {user_id}")
     try:
+        # Create the track
+        audio_track = await track_service.create_audio_track(user_id, track_data.model_dump())
         
-        file = await file_service.create_file(
-            file_data=project_track_data,
-            file_type=FileType.AUDIO
-        )
-        
-        track = await track_service.create_track(
-            user_id=uuid.UUID(current_user["id"]),
-            track_data=project_track_data,
-            file_type=FileType.AUDIO
-        )
-        
-        # Get the audio file through the file service
-        result = await file_service.get_file_by_id(
-            file_id=uuid.UUID(str(project_track_data.id)),
-            file_type=FileType.AUDIO,
-            user_id=uuid.UUID(current_user["id"])
-        )
-        
-        logger.info(f"Created audio track record with ID: {project_track_data.id}")
-        return result
+        logger.info(f"Created audio track with ID: {audio_track.id}")
+        return audio_track
     except Exception as e:
-        logger.error(f"Error creating audio track record: {str(e)}")
+        logger.error(f"Error creating audio track: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create audio track record: {str(e)}"
+            detail=f"Failed to create audio track: {str(e)}"
         )
 
-@router.get("", response_model=List[AudioFileRead])
-@router.get("/", response_model=List[AudioFileRead])
-async def get_audio_files(
-    request: Request,
+@router.post("/midi", response_model=MidiTrackRead)
+async def create_midi_track(
+    track_data: MidiTrackCreate,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    file_service: FileService = Depends(get_file_service)
-) -> List[AudioFileRead]:
+    track_service: TrackService = Depends(get_track_service)
+) -> MidiTrackRead:
     """
-    Get all audio files for the current user
+    Create a new MIDI track
     """
-    logger.info(f"Getting audio files for user: {current_user['id']}")
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Creating MIDI track '{track_data.name}' for user: {user_id}")
+    logger.info(f"DEbuG: MIDI Track data: {track_data}")
     try:
-        audio_files = await file_service.get_user_files(
-            user_id=uuid.UUID(current_user["id"]),
-            file_type=FileType.AUDIO
-        )
-        logger.info(f"Found {len(audio_files)} audio files for user: {current_user['id']}")
-        return audio_files
+        
+        # Log the MIDI notes if available
+        if track_data.midi_notes_json:
+            logger.info(f"Received MIDI notes JSON with {len(track_data.midi_notes_json)} keys")
+        
+        # Create the track
+        midi_track = await track_service.create_midi_track(user_id, track_data.model_dump())
+        
+        logger.info(f"Created MIDI track with ID: {midi_track.id}")
+        return midi_track
     except Exception as e:
-        logger.error(f"Error getting audio files: {str(e)}")
+        logger.error(f"Error creating MIDI track: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get audio files: {str(e)}"
+            detail=f"Failed to create MIDI track: {str(e)}"
         )
 
-@router.get("/{audio_file_id}", response_model=AudioFileRead)
-async def get_audio_file(
-    request: Request,
-    audio_file_id: str,
+@router.post("/sampler", response_model=SamplerTrackRead)
+async def create_sampler_track(
+    track_data: SamplerTrackCreate,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    file_service: FileService = Depends(get_file_service)
-) -> AudioFileRead:
+    track_service: TrackService = Depends(get_track_service)
+) -> SamplerTrackRead:
     """
-    Get a specific audio file by ID
+    Create a new sampler track
     """
-    logger.info(f"Getting audio file with ID: {audio_file_id} for user: {current_user['id']}")
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Creating sampler track '{track_data.name}' for user: {user_id}")
     try:
-        audio_file = await file_service.get_file_by_id(
-            file_id=uuid.UUID(audio_file_id),
-            file_type=FileType.AUDIO,
-            user_id=uuid.UUID(current_user["id"])
+        # Create the track
+        sampler_track = await track_service.create_sampler_track(user_id, track_data.model_dump())
+        
+        logger.info(f"Created sampler track with ID: {sampler_track.id}")
+        return sampler_track
+    except Exception as e:
+        logger.error(f"Error creating sampler track: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create sampler track: {str(e)}"
         )
-        logger.info(f"Found audio file with ID: {audio_file_id}")
-        return audio_file
-    except NotFoundException:
-        logger.error(f"Audio file with ID {audio_file_id} not found")
+
+@router.get("/audio", response_model=List[AudioTrackRead])
+async def get_audio_tracks(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service)
+) -> List[AudioTrackRead]:
+    """
+    Get all audio tracks for the current user
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Getting audio tracks for user: {user_id}")
+    try:
+        # Get all tracks for the user
+        all_tracks = await track_service.get_user_tracks(user_id)
+        
+        # Return just the audio tracks
+        return all_tracks[TrackType.AUDIO.value]
+    except Exception as e:
+        logger.error(f"Error getting audio tracks: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get audio tracks: {str(e)}"
+        )
+
+@router.get("/midi", response_model=List[MidiTrackRead])
+async def get_midi_tracks(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service)
+) -> List[MidiTrackRead]:
+    """
+    Get all MIDI tracks for the current user
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Getting MIDI tracks for user: {user_id}")
+    try:
+        # Get all tracks for the user
+        all_tracks = await track_service.get_user_tracks(user_id)
+        
+        # Return just the MIDI tracks
+        return all_tracks[TrackType.MIDI.value]
+    except Exception as e:
+        logger.error(f"Error getting MIDI tracks: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get MIDI tracks: {str(e)}"
+        )
+        
+@router.get("/sampler", response_model=List[SamplerTrackRead])
+async def get_sampler_tracks(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service)
+) -> List[SamplerTrackRead]:
+    """
+    Get all sampler tracks for the current user
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Getting sampler tracks for user: {user_id}")
+    try:
+        # Get all tracks for the user
+        all_tracks = await track_service.get_user_tracks(user_id)
+        
+        # Return just the sampler tracks
+        return all_tracks[TrackType.SAMPLER.value]
+    except Exception as e:
+        logger.error(f"Error getting sampler tracks: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get sampler tracks: {str(e)}"
+        )
+
+@router.get("/audio/{track_id}", response_model=AudioTrackRead)
+async def get_audio_track(
+    track_id: uuid.UUID,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service)
+) -> AudioTrackRead:
+    """
+    Get a specific audio track by ID
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Getting audio track with ID: {track_id} for user: {user_id}")
+    try:
+        return await track_service.get_track(track_id, TrackType.AUDIO, user_id)
+    except NotFoundException as e:
+        logger.error(f"Audio track not found: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Audio file not found"
+            detail="Audio track not found"
         )
-    except ForbiddenException:
-        logger.error(f"User {current_user['id']} does not have permission to access audio file {audio_file_id}")
+    except ForbiddenException as e:
+        logger.error(f"Forbidden: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this audio file"
+            detail="You do not have permission to access this audio track"
         )
     except Exception as e:
-        logger.error(f"Error getting audio file: {str(e)}")
+        logger.error(f"Error getting audio track: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get audio file: {str(e)}"
+            detail=f"Failed to get audio track: {str(e)}"
         )
 
-@router.delete("/{audio_file_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_audio_file(
-    request: Request,
-    audio_file_id: str,
+@router.get("/midi/{track_id}", response_model=MidiTrackRead)
+async def get_midi_track(
+    track_id: uuid.UUID,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    track_service: TrackService = Depends(get_track_service),
-    file_service: FileService = Depends(get_file_service)
+    track_service: TrackService = Depends(get_track_service)
+) -> MidiTrackRead:
+    """
+    Get a specific MIDI track by ID
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Getting MIDI track with ID: {track_id} for user: {user_id}")
+    try:
+        return await track_service.get_track(track_id, TrackType.MIDI, user_id)
+    except NotFoundException as e:
+        logger.error(f"MIDI track not found: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="MIDI track not found"
+        )
+    except ForbiddenException as e:
+        logger.error(f"Forbidden: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this MIDI track"
+        )
+    except Exception as e:
+        logger.error(f"Error getting MIDI track: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get MIDI track: {str(e)}"
+        )
+
+@router.get("/sampler/{track_id}", response_model=SamplerTrackRead)
+async def get_sampler_track(
+    track_id: uuid.UUID,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service)
+) -> SamplerTrackRead:
+    """
+    Get a specific sampler track by ID
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Getting sampler track with ID: {track_id} for user: {user_id}")
+    try:
+        return await track_service.get_track(track_id, TrackType.SAMPLER, user_id)
+    except NotFoundException as e:
+        logger.error(f"Sampler track not found: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sampler track not found"
+        )
+    except ForbiddenException as e:
+        logger.error(f"Forbidden: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this sampler track"
+        )
+    except Exception as e:
+        logger.error(f"Error getting sampler track: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get sampler track: {str(e)}"
+        )
+
+@router.delete("/audio/{track_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_audio_track(
+    track_id: uuid.UUID,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service)
 ) -> None:
     """
-    Delete an audio file by first deleting its track
+    Delete an audio track
     """
-    logger.info(f"Deleting audio file with ID: {audio_file_id} for user: {current_user['id']}")
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Deleting audio track with ID: {track_id} for user: {user_id}")
     try:
-        # First try to get the file directly to verify it exists
-        try:
-            await file_service.file_repository.get_by_id(
-                file_id=uuid.UUID(audio_file_id),
-                file_type=FileType.AUDIO
-            )
-        except NotFoundException:
-            logger.error(f"Audio file with ID {audio_file_id} not found")
-            raise NotFoundException("Audio file", audio_file_id)
-        
-        # Get tracks that reference this file
-        tracks = await track_service.track_repository.get_by_file_id(
-            file_id=uuid.UUID(audio_file_id),
-            file_type=FileType.AUDIO
-        )
-        
-        if not tracks:
-            logger.warning(f"No tracks found with audio file ID {audio_file_id}, attempting direct file delete")
-            # If no tracks, try to delete the file directly
-            result = await file_service.file_repository.delete(
-                file_id=uuid.UUID(audio_file_id),
-                file_type=FileType.AUDIO
-            )
-            logger.info(f"Directly deleted audio file with ID: {audio_file_id}, result: {result}")
-            return None
-            
-        # Find a track owned by this user
-        user_track = None
-        for track in tracks:
-            if track.user_id == uuid.UUID(current_user["id"]):
-                user_track = track
-                break
-                
-        if not user_track:
-            logger.error(f"User {current_user['id']} does not own any track with audio file {audio_file_id}")
-            raise ForbiddenException("You do not have permission to delete this audio file")
-            
-        # Delete the track (which should delete the file association)
-        await track_service.delete_track(
-            track_id=user_track.id,
-            user_id=uuid.UUID(current_user["id"])
-        )
-        
-        # Also delete the file itself to clean up
-        try:
-            await file_service.file_repository.delete(
-                file_id=uuid.UUID(audio_file_id),
-                file_type=FileType.AUDIO
-            )
-        except Exception as e:
-            logger.warning(f"Error cleaning up audio file after track deletion: {str(e)}")
-        
-        logger.info(f"Deleted audio file with ID: {audio_file_id}")
+        result = await track_service.delete_track(track_id, TrackType.AUDIO, user_id)
+        if result:
+            logger.info(f"Deleted audio track with ID: {track_id}")
         return None
-    except NotFoundException:
-        logger.error(f"Audio file with ID {audio_file_id} not found")
+    except NotFoundException as e:
+        logger.error(f"Audio track not found: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Audio file not found"
+            detail="Audio track not found"
         )
-    except ForbiddenException:
-        logger.error(f"User {current_user['id']} does not have permission to delete audio file {audio_file_id}")
+    except ForbiddenException as e:
+        logger.error(f"Forbidden: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to delete this audio file"
+            detail="You do not have permission to delete this audio track"
         )
     except Exception as e:
-        logger.error(f"Error deleting audio file: {str(e)}")
+        logger.error(f"Error deleting audio track: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete audio file: {str(e)}"
+            detail=f"Failed to delete audio track: {str(e)}"
+        )
+
+@router.delete("/midi/{track_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_midi_track(
+    track_id: uuid.UUID,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service)
+) -> None:
+    """
+    Delete a MIDI track
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Deleting MIDI track with ID: {track_id} for user: {user_id}")
+    try:
+        result = await track_service.delete_track(track_id, TrackType.MIDI, user_id)
+        if result:
+            logger.info(f"Deleted MIDI track with ID: {track_id}")
+        return None
+    except NotFoundException as e:
+        logger.error(f"MIDI track not found: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="MIDI track not found"
+        )
+    except ForbiddenException as e:
+        logger.error(f"Forbidden: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete this MIDI track"
+        )
+    except Exception as e:
+        logger.error(f"Error deleting MIDI track: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete MIDI track: {str(e)}"
+        )
+
+@router.delete("/sampler/{track_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_sampler_track(
+    track_id: uuid.UUID,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service)
+) -> None:
+    """
+    Delete a sampler track
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Deleting sampler track with ID: {track_id} for user: {user_id}")
+    try:
+        result = await track_service.delete_track(track_id, TrackType.SAMPLER, user_id)
+        if result:
+            logger.info(f"Deleted sampler track with ID: {track_id}")
+        return None
+    except NotFoundException as e:
+        logger.error(f"Sampler track not found: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sampler track not found"
+        )
+    except ForbiddenException as e:
+        logger.error(f"Forbidden: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete this sampler track"
+        )
+    except Exception as e:
+        logger.error(f"Error deleting sampler track: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete sampler track: {str(e)}"
         )

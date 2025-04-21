@@ -1,43 +1,50 @@
-from typing import Dict, Any, List, Optional
-from uuid import UUID
+"""
+Service for project operations with specialized track models
+"""
+from typing import Dict, Any, List, Optional, Union, Type, TypeVar, Tuple
+from enum import Enum
 import traceback
 from datetime import datetime
-from pydantic import parse_obj_as
+import uuid
 
 from app2.core.logging import get_service_logger
 from app2.core.exceptions import ServiceException, NotFoundException, ForbiddenException
 from app2.repositories.project_repository import ProjectRepository
-from app2.repositories.track_repository import TrackRepository
 from app2.repositories.project_track_repository import ProjectTrackRepository
-from app2.models.project import Project, ProjectWithTracks, ProjectRead
-from app2.models.track import Track
-from app2.models.project_track import ProjectTrackRead
+from app2.repositories.audio_track_repository import AudioTrackRepository
+from app2.repositories.midi_track_repository import MidiTrackRepository
+from app2.repositories.sampler_track_repository import SamplerTrackRepository
+from app2.repositories.drum_track_repository import DrumTrackRepository
+from app2.models.project import Project, ProjectWithTracks, ProjectRead, CombinedTrack
+from app2.models.project_track import ProjectTrack
+from app2.types.track_types import TrackType
 from app2.types.file_types import FileType
+from app2.services.track_service import TrackService
 
 logger = get_service_logger("project")
 
 class ProjectService:
-    """Service for project operations"""
+    """Service for project operations with the new track model structure"""
     
     def __init__(
         self, 
         project_repository: ProjectRepository,
-        track_repository: TrackRepository,
-        project_track_repository: ProjectTrackRepository
+        project_track_repository: ProjectTrackRepository,
+        track_service: TrackService
     ):
         """
-        Initialize the service with repositories
+        Initialize the service with repositories and services
         
         Args:
             project_repository: The repository for project operations
-            track_repository: The repository for track operations
             project_track_repository: The repository for project-track relationship operations
+            track_service: The service for track operations
         """
         self.project_repository = project_repository
-        self.track_repository = track_repository
         self.project_track_repository = project_track_repository
+        self.track_service = track_service
         
-    async def get_user_projects(self, user_id: str) -> List[ProjectRead]:
+    async def get_user_projects(self, user_id: uuid.UUID) -> List[ProjectRead]:
         """
         Get all projects for a user
         
@@ -62,9 +69,9 @@ class ProjectService:
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to get user projects: {str(e)}")
             
-    async def get_project(self, project_id: str, user_id: str) -> ProjectWithTracks:
+    async def get_project(self, project_id: uuid.UUID, user_id: uuid.UUID) -> ProjectWithTracks:
         """
-        Get a project by ID
+        Get a project by ID with all its tracks
         
         Args:
             project_id: The ID of the project
@@ -80,23 +87,58 @@ class ProjectService:
         """
         logger.info(f"Getting project with ID: {project_id} for user ID: {user_id}")
         try:
-            project = await self.project_repository.get_with_tracks(project_id)
-            
+            # Get the project
+            project = await self.project_repository.get_by_id(project_id)
+            if not project:
+                logger.error(f"Project with ID {project_id} not found")
+                raise NotFoundException("Project", str(project_id))
+                
             # Verify project ownership
-            if str(project.user_id) != user_id:
-                logger.error(f"Project: {project}")
+            if project.user_id != user_id:
                 logger.error(f"User {user_id} does not own project {project_id}")
                 raise ForbiddenException("You do not have permission to access this project")
                 
-            logger.info(f"Found project with ID: {project_id} for user ID: {user_id}")
+            # Get all tracks with their project-specific settings
+            tracks_with_settings = await self.project_track_repository.get_track_with_settings(project_id)
+            logger.info(f"tracks_with_settings: {tracks_with_settings}")
+            # Create CombinedTrack objects
+            combined_tracks = []
+            for track_data in tracks_with_settings:
+                if "track" in track_data and track_data["track"]:
+                    # Create a combined track with all data
+                    combined_track = CombinedTrack(
+                        id=track_data["track_id"],
+                        name=track_data["name"],
+                        type=track_data["track_type"],
+                        # Project-specific track properties
+                        volume=track_data["volume"],
+                        pan=track_data["pan"],
+                        mute=track_data["mute"],
+                        x_position=track_data["x_position"],
+                        y_position=track_data["y_position"],
+                        trim_start_ticks=track_data["trim_start_ticks"],
+                        trim_end_ticks=track_data["trim_end_ticks"],
+                        duration_ticks=track_data["duration_ticks"],
+                        track_number=track_data["track_number"],
+                        # Specialized track data
+                        track=track_data["track"]
+                    )
+                    combined_tracks.append(combined_track)
             
-            # Log the project data before validation
-            logger.info(f"Project_data before validation: {project}")
-            logger.info(f"Project_data.tracks: {project.tracks}") # Log the tracks field
-
-            # Convert SQLModel object to API model
-            # Note: We've updated ProjectWithTracks to expect 'tracks' instead of 'project_links'
-            return ProjectWithTracks.model_validate(project)
+            # Create the ProjectWithTracks response model
+            result = ProjectWithTracks(
+                id=project.id,
+                name=project.name,
+                bpm=project.bpm,
+                time_signature_numerator=project.time_signature_numerator,
+                time_signature_denominator=project.time_signature_denominator,
+                key_signature=project.key_signature,
+                user_id=project.user_id,
+                tracks=combined_tracks
+            )
+            
+            logger.info(f"Found project with ID: {project_id} with {len(combined_tracks)} tracks")
+            return result
         except Exception as e:
             if isinstance(e, (NotFoundException, ForbiddenException)):
                 raise
@@ -104,14 +146,13 @@ class ProjectService:
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to get project: {str(e)}")
             
-    async def create_project(self, user_id: str, project_data: Dict[str, Any], file_repository=None) -> ProjectWithTracks:
+    async def create_project(self, user_id: uuid.UUID, project_data: Dict[str, Any]) -> ProjectWithTracks:
         """
-        Create a new project with all associated tracks and files
+        Create a new project
         
         Args:
             user_id: The ID of the user
-            project_data: The project data including tracks and files
-            file_repository: Optional file repository for creating files (if None, no files will be created)
+            project_data: The project data including tracks
             
         Returns:
             The created project with all its tracks
@@ -120,53 +161,86 @@ class ProjectService:
             ServiceException: If the operation fails
         """
         logger.info(f"Creating project for user ID: {user_id}")
-        logger.info(f"Project data: {project_data}")
-        logger.info(f"File repository provided: {file_repository is not None}")
         try:
             # Add user ID to project data
             project_data["user_id"] = user_id
             
             # Extract tracks data if present
             tracks_data = project_data.pop("tracks", None)
-            logger.info(f"Extracted tracks data: {tracks_data}")
             
             # Create the project
             project = await self.project_repository.create(project_data)
             logger.info(f"Created project with ID: {project.id} for user ID: {user_id}")
             
-            # Create tracks and files if provided
+            # Add tracks to the project if provided
             if tracks_data and isinstance(tracks_data, list):
-                logger.info(f"Creating {len(tracks_data)} tracks for project {project.id}")
+                logger.info(f"Adding {len(tracks_data)} tracks to project {project.id}")
                 
                 for track_idx, track_data in enumerate(tracks_data):
-                    logger.info(f"Processing track {track_idx}: {track_data}")
-                    # Add track to project
-                    if file_repository and isinstance(track_data, dict):
-                        logger.info(f"Using file_repository for track {track_idx}")
+                    if isinstance(track_data, dict) and "type" in track_data:
                         # Set track number if not provided
                         if "track_number" not in track_data:
                             track_data["track_number"] = track_idx
                             
-                        # Add user ID to track data
-                        track_data["user_id"] = user_id
+                        # Get track type
+                        track_type = TrackType(track_data["type"])
                         
+                        # Extract project-track settings
+                        project_track_settings = {
+                            "name": track_data.get("name", "Unnamed Track"),
+                            "track_id": track_data.get("id"),
+                            "volume": track_data.get("volume", 1.0),
+                            "pan": track_data.get("pan", 0.0),
+                            "mute": track_data.get("mute", False),
+                            "x_position": track_data.get("x_position", 0.0),
+                            "y_position": track_data.get("y_position", 0.0),
+                            "trim_start_ticks": track_data.get("trim_start_ticks", 0),
+                            "trim_end_ticks": track_data.get("trim_end_ticks", 0),
+                            "duration_ticks": track_data.get("duration_ticks", 0),
+                            "track_number": track_data.get("track_number", 0)
+                        }
                         
-                        # Create the track
-                        track = await self.track_repository.create(track_data)
+                        # Extract track-specific data
+                        track_specific_data = {k: v for k, v in track_data.items() 
+                                            if k not in project_track_settings.keys() and k != "type"}
+                        track_specific_data["id"] = track_data.get("id")
                         
-                        logger.info(f"Creating project-track association: {track_data}")
-                        await self.project_track_repository.create(track_data)
+                        logger.info(f"Track specific data: {track_specific_data}")
+                        
+                        # Create track based on type
+                        track_id = None
+                        if track_type == TrackType.AUDIO:
+                            created_track = await self.track_service.create_audio_track(user_id, track_specific_data)
+                            track_id = created_track.id
+                        elif track_type == TrackType.MIDI:
+                            created_track = await self.track_service.create_midi_track(user_id, track_specific_data)
+                            track_id = created_track.id
+                        elif track_type == TrackType.SAMPLER:
+                            created_track = await self.track_service.create_sampler_track(user_id, track_specific_data)
+                            track_id = created_track.id
+                        elif track_type == TrackType.DRUM:
+                            created_track = await self.track_service.create_drum_track(user_id, track_specific_data)
+                            track_id = created_track.id
+                            
+                        # Add track to project
+                        if track_id:
+                            await self.track_service.add_track_to_project(
+                                project_id=project.id,
+                                track_type=track_type,
+                                track_id=track_id,
+                                user_id=user_id,
+                                settings=project_track_settings
+                            )
             
             # Get the project with its tracks
-            project_with_tracks = await self.get_project(str(project.id), user_id)
+            project_with_tracks = await self.get_project(project.id, user_id)
             return project_with_tracks
         except Exception as e:
             logger.error(f"Error creating project: {str(e)}")
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to create project: {str(e)}")
-            
                 
-    async def update_project(self, project_id: str, user_id: str, project_data: Dict[str, Any]) -> ProjectWithTracks:
+    async def update_project(self, project_id: uuid.UUID, user_id: uuid.UUID, project_data: Dict[str, Any]) -> ProjectWithTracks:
         """
         Update a project
         
@@ -186,14 +260,21 @@ class ProjectService:
         logger.info(f"Updating project with ID: {project_id} for user ID: {user_id}")
         try:
             # First get the project to verify ownership
-            project = await self.get_project(project_id, user_id)
+            project = await self.project_repository.get_by_id(project_id)
+            if not project:
+                logger.error(f"Project with ID {project_id} not found")
+                raise NotFoundException("Project", str(project_id))
+                
+            # Verify project ownership
+            if project.user_id != user_id:
+                logger.error(f"User {user_id} does not own project {project_id}")
+                raise ForbiddenException("You do not have permission to access this project")
             
             # Extract tracks data if present
-            tracks_data = project_data.get("tracks", None)
-            logger.info(f"Extracted tracks data: {tracks_data is not None}")
+            tracks_data = project_data.pop("tracks", None)
             
             # Filter out fields that cannot be updated
-            safe_data = {k: v for k, v in project_data.items() if k not in ["id", "user_id", "created_at", "tracks"]}
+            safe_data = {k: v for k, v in project_data.items() if k not in ["id", "user_id", "created_at"]}
             
             # Add updated timestamp
             safe_data["updated_at"] = datetime.utcnow()
@@ -201,17 +282,15 @@ class ProjectService:
             # Update the project
             updated_project = await self.project_repository.update(project_id, safe_data)
             
-            # Update the tracks if provided
+            # Update tracks if provided
             if tracks_data is not None:
-                logger.info(f"Updating tracks for project with ID: {project_id} for user ID: {user_id}")
+                logger.info(f"Updating tracks for project with ID: {project_id}")
                 await self.update_project_tracks(project_id, user_id, tracks_data)
             
-            # Get the updated project with all its tracks
+            # Get the updated project with tracks
             project_with_tracks = await self.get_project(project_id, user_id)
+            logger.info(f"Updated project with ID: {project_id}")
             
-            logger.info(f"Updated project with ID: {project_id} for user ID: {user_id}")
-            
-            # Return the project with tracks
             return project_with_tracks
         except Exception as e:
             if isinstance(e, (NotFoundException, ForbiddenException)):
@@ -219,8 +298,8 @@ class ProjectService:
             logger.error(f"Error updating project: {str(e)}")
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to update project: {str(e)}")
-        
-    async def update_project_tracks(self, project_id: str, user_id: str, tracks_data: List[Dict[str, Any]]) -> None:
+    
+    async def update_project_tracks(self, project_id: uuid.UUID, user_id: uuid.UUID, tracks_data: List[Dict[str, Any]]) -> None:
         """
         Update the tracks of a project
         
@@ -238,39 +317,49 @@ class ProjectService:
             await self.project_track_repository.delete_by_project_id(project_id)
             logger.info(f"Cleared existing project-track associations for project {project_id}")
             
-            # Create new project-track associations
-            for track in tracks_data:
-                if isinstance(track, dict) and "id" in track:
-                    track_id = track["id"]
+            # Add tracks to the project
+            for track_idx, track_data in enumerate(tracks_data):
+                if isinstance(track_data, dict) and "id" in track_data and "type" in track_data:
+                    # Get track type and ID
+                    track_type = TrackType(track_data["type"])
+                    track_id = uuid.UUID(track_data["id"])
                     
-                    # Create project-track association with all required fields
-                    # Copy relevant fields from the track data
-                    project_track_data = {
-                        "project_id": project_id,
-                        "track_id": track_id,
-                        "name": track.get("name", "Unnamed Track"),
-                        "volume": track.get("volume", 1.0),
-                        "pan": track.get("pan", 0.0),
-                        "mute": track.get("mute", False),
-                        "x_position": track.get("x_position", 0.0),
-                        "y_position": track.get("y_position", 0.0),
-                        "trim_start_ticks": track.get("trim_start_ticks", 0),
-                        "trim_end_ticks": track.get("trim_end_ticks", 0),
-                        "duration_ticks": track.get("duration_ticks", 0),
-                        "track_number": track.get("track_number", 0),
-                        # Add type field from the track data
-                        "type": track.get("type", "audio")  # Default to audio if not specified
+                    # Set track number if not provided
+                    if "track_number" not in track_data:
+                        track_data["track_number"] = track_idx
+                    
+                    # Extract project-track settings
+                    project_track_settings = {
+                        "name": track_data.get("name", "Unnamed Track"),
+                        "track_id": track_data.get("id"),
+                        "volume": track_data.get("volume", 1.0),
+                        "pan": track_data.get("pan", 0.0),
+                        "mute": track_data.get("mute", False),
+                        "x_position": track_data.get("x_position", 0.0),
+                        "y_position": track_data.get("y_position", 0.0),
+                        "trim_start_ticks": track_data.get("trim_start_ticks", 0),
+                        "trim_end_ticks": track_data.get("trim_end_ticks", 0),
+                        "duration_ticks": track_data.get("duration_ticks", 0),
+                        "track_number": track_data.get("track_number", 0)
                     }
-                    await self.project_track_repository.create(project_track_data)
-                    logger.info(f"Created project-track association: project={project_id}, track={track_id}")
+                    
+                    # Add track to project
+                    await self.track_service.add_track_to_project(
+                        project_id=project_id,
+                        track_type=track_type,
+                        track_id=track_id,
+                        user_id=user_id,
+                        settings=project_track_settings
+                    )
+                    logger.info(f"Added track {track_id} to project {project_id}")
                 else:
-                    logger.warning(f"Invalid track data format: {track}")
+                    logger.warning(f"Invalid track data format: {track_data}")
         except Exception as e:
             logger.error(f"Error updating project tracks: {str(e)}")
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to update project tracks: {str(e)}")
         
-    async def delete_project(self, project_id: str, user_id: str) -> bool:
+    async def delete_project(self, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """
         Delete a project
         
@@ -289,15 +378,23 @@ class ProjectService:
         logger.info(f"Deleting project with ID: {project_id} for user ID: {user_id}")
         try:
             # First get the project to verify ownership
-            project = await self.get_project(project_id, user_id)
+            project = await self.project_repository.get(project_id)
+            if not project:
+                logger.error(f"Project with ID {project_id} not found")
+                raise NotFoundException("Project", str(project_id))
+                
+            # Verify project ownership
+            if project.user_id != user_id:
+                logger.error(f"User {user_id} does not own project {project_id}")
+                raise ForbiddenException("You do not have permission to access this project")
             
-            # Delete all project-track associations first
+            # Delete all project-track associations
             await self.project_track_repository.delete_by_project_id(project_id)
             
             # Delete the project
             result = await self.project_repository.delete(project_id)
             
-            logger.info(f"Deleted project with ID: {project_id} for user ID: {user_id}")
+            logger.info(f"Deleted project with ID: {project_id}")
             return result
         except Exception as e:
             if isinstance(e, (NotFoundException, ForbiddenException)):
@@ -306,16 +403,19 @@ class ProjectService:
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to delete project: {str(e)}")
             
-    async def add_track(self, project_id: str, user_id: str, track_data: Dict[str, Any], 
-                        file_repository=None) -> ProjectWithTracks:
+    async def add_track(
+        self, 
+        project_id: uuid.UUID, 
+        user_id: uuid.UUID, 
+        track_data: Dict[str, Any]
+    ) -> ProjectWithTracks:
         """
         Add a track to a project
         
         Args:
             project_id: The ID of the project
             user_id: The ID of the user
-            track_data: The track data
-            file_repository: Optional file repository for creating files
+            track_data: The track data with type and track-specific properties
             
         Returns:
             The updated project with tracks
@@ -328,60 +428,68 @@ class ProjectService:
         logger.info(f"Adding track to project with ID: {project_id} for user ID: {user_id}")
         try:
             # First get the project to verify ownership
-            project = await self.get_project(project_id, user_id)
-            
-            # Add user ID to track data
-            track_data["user_id"] = user_id
-            
-            # Handle file creation if file_repository is provided
-            if file_repository:
-                # Process file data based on track type
-                track_type = track_data.get("type")
+            project = await self.project_repository.get_by_id(project_id)
+            if not project:
+                logger.error(f"Project with ID {project_id} not found")
+                raise NotFoundException("Project", str(project_id))
                 
-                if track_type == "audio" and "audio_file" in track_data:
-                    # Extract and create audio file
-                    audio_file_data = track_data.pop("audio_file")
-                    audio_file_data["user_id"] = user_id
-                    audio_file = await file_repository.create(audio_file_data, FileType.AUDIO)
-                    track_data["audio_file_id"] = str(audio_file.id)
-                    
-                elif track_type == "midi" and "midi_file" in track_data:
-                    # Extract and create midi file
-                    midi_file_data = track_data.pop("midi_file")
-                    midi_file_data["user_id"] = user_id
-                    midi_file = await file_repository.create(midi_file_data, FileType.MIDI)
-                    track_data["midi_file_id"] = str(midi_file.id)
-                    
-                elif track_type == "instrument":
-                    # Handle instrument files and MIDI data
-                    if "instrument_file" in track_data:
-                        # Extract and create instrument file
-                        instrument_data = track_data.pop("instrument_file")
-                        instrument_data["user_id"] = user_id
-                        instrument_file = await file_repository.create(instrument_data, FileType.INSTRUMENT)
-                        track_data["instrument_id"] = str(instrument_file.id)
-                        
-                    if "midi_file" in track_data:
-                        # Extract and create midi file
-                        midi_file_data = track_data.pop("midi_file")
-                        midi_file_data["user_id"] = user_id
-                        midi_file = await file_repository.create(midi_file_data, FileType.MIDI)
-                        track_data["midi_file_id"] = str(midi_file.id)
+            # Verify project ownership
+            if project.user_id != user_id:
+                logger.error(f"User {user_id} does not own project {project_id}")
+                raise ForbiddenException("You do not have permission to access this project")
             
-            # Create the track
-            track = await self.track_repository.create(track_data)
+            # Validate track data
+            if "type" not in track_data:
+                raise ValueError("Track data must include 'type' field")
+                
+            # Get track type
+            track_type = TrackType(track_data["type"])
             
-            # Create the project-track association
-            project_track_data = {
-                "project_id": project_id,
-                "track_id": track.id
+            # Extract project-track settings
+            project_track_settings = {
+                "name": track_data.get("name"),
+                "track_id": track_data.get("id"),
+                "volume": track_data.get("volume"),
+                "pan": track_data.get("pan"),
+                "mute": track_data.get("mute"),
+                "x_position": track_data.get("x_position"),
+                "y_position": track_data.get("y_position"),
+                "trim_start_ticks": track_data.get("trim_start_ticks"),
+                "trim_end_ticks": track_data.get("trim_end_ticks"),
+                "duration_ticks": track_data.get("duration_ticks"),
+                "track_number": track_data.get("track_number")
             }
-            await self.project_track_repository.create(project_track_data)
+            
+            logger.info(f"Project track settings: {project_track_settings}")
+            
+            # Extract track-specific data
+            track_specific_data = {k: v for k, v in track_data.items() 
+                                if k not in project_track_settings.keys() and k != "type"}
+            track_specific_data["id"] = track_data.get("id")
+            
+            # Create track based on type
+            created_track = None
+            if track_type == TrackType.AUDIO:
+                created_track = await self.track_service.create_audio_track(user_id, track_specific_data)
+            elif track_type == TrackType.MIDI:
+                created_track = await self.track_service.create_midi_track(user_id, track_specific_data)
+            elif track_type == TrackType.SAMPLER:
+                created_track = await self.track_service.create_sampler_track(user_id, track_specific_data)
+            elif track_type == TrackType.DRUM:
+                created_track = await self.track_service.create_drum_track(user_id, track_specific_data)
+            
+            # Add track to project
+            await self.track_service.add_track_to_project(
+                project_id=project_id,
+                track_type=track_type,
+                track_id=created_track.id,
+                user_id=user_id,
+                settings=project_track_settings
+            )
             
             # Get the updated project with tracks
             updated_project = await self.get_project(project_id, user_id)
-            
-            logger.info(f"Added track with ID: {track.id} to project with ID: {project_id}")
+            logger.info(f"Added track with ID: {created_track.id} to project with ID: {project_id}")
             
             return updated_project
         except Exception as e:
@@ -391,17 +499,23 @@ class ProjectService:
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to add track to project: {str(e)}")
             
-    async def update_track(self, project_id: str, user_id: str, track_id: str, track_data: Dict[str, Any], 
-                          file_repository=None) -> ProjectWithTracks:
+    async def update_track(
+        self, 
+        project_id: uuid.UUID, 
+        track_id: uuid.UUID,
+        track_type: TrackType,
+        user_id: uuid.UUID, 
+        track_data: Dict[str, Any]
+    ) -> ProjectWithTracks:
         """
         Update a track in a project
         
         Args:
             project_id: The ID of the project
-            user_id: The ID of the user
             track_id: The ID of the track
+            track_type: The type of the track
+            user_id: The ID of the user
             track_data: The updated track data
-            file_repository: Optional file repository for updating files
             
         Returns:
             The updated project with tracks
@@ -411,98 +525,58 @@ class ProjectService:
             ForbiddenException: If the user does not own the project
             ServiceException: If the operation fails
         """
-        logger.info(f"Updating track with ID: {track_id} in project with ID: {project_id} for user ID: {user_id}")
+        logger.info(f"Updating {track_type.value} track with ID: {track_id} in project with ID: {project_id}")
         try:
-            # First get the project to verify ownership
-            project = await self.get_project(project_id, user_id)
+            # Get the project to verify ownership
+            project = await self.project_repository.get(project_id)
+            if not project:
+                logger.error(f"Project with ID {project_id} not found")
+                raise NotFoundException("Project", str(project_id))
+                
+            # Verify project ownership
+            if project.user_id != user_id:
+                logger.error(f"User {user_id} does not own project {project_id}")
+                raise ForbiddenException("You do not have permission to access this project")
             
             # Check if the track is in the project
-            project_track = await self.project_track_repository.get_by_ids(project_id, track_id)
+            project_track = await self.project_track_repository.get_by_project_and_track(
+                project_id, track_type, track_id
+            )
             if not project_track:
                 logger.error(f"Track {track_id} not found in project {project_id}")
                 raise NotFoundException("Track in project", f"{project_id}/{track_id}")
             
-            # Handle file updates if file_repository is provided
-            if file_repository:
-                # Process file data based on track type
-                track_type = track_data.get("type")
-                
-                if track_type == "audio" and "audio_file" in track_data:
-                    # Extract and update or create audio file
-                    audio_file_data = track_data.pop("audio_file")
-                    audio_file_data["user_id"] = user_id
-                    
-                    # Check if there's an audio_file_id to update or if we need to create
-                    if "audio_file_id" in track_data and track_data["audio_file_id"]:
-                        # Update existing audio file
-                        await file_repository.update(track_data["audio_file_id"], audio_file_data, FileType.AUDIO)
-                    else:
-                        # Create new audio file
-                        audio_file = await file_repository.create(audio_file_data, FileType.AUDIO)
-                        track_data["audio_file_id"] = str(audio_file.id)
-                
-                elif track_type == "midi" and "midi_file" in track_data:
-                    # Extract and update or create midi file
-                    midi_file_data = track_data.pop("midi_file")
-                    midi_file_data["user_id"] = user_id
-                    
-                    # Check if there's a midi_file_id to update or if we need to create
-                    if "midi_file_id" in track_data and track_data["midi_file_id"]:
-                        # Update existing midi file
-                        await file_repository.update(track_data["midi_file_id"], midi_file_data, FileType.MIDI)
-                    else:
-                        # Create new midi file
-                        midi_file = await file_repository.create(midi_file_data, FileType.MIDI)
-                        track_data["midi_file_id"] = str(midi_file.id)
-                
-                elif track_type == "instrument":
-                    # Handle instrument file updates
-                    if "instrument_file" in track_data:
-                        instrument_data = track_data.pop("instrument_file")
-                        instrument_data["user_id"] = user_id
-                        
-                        # Check if there's an instrument_id to update or if we need to create
-                        if "instrument_id" in track_data and track_data["instrument_id"]:
-                            # Update existing instrument file
-                            await file_repository.update(track_data["instrument_id"], instrument_data, FileType.INSTRUMENT)
-                        else:
-                            # Create new instrument file
-                            instrument_file = await file_repository.create(instrument_data, FileType.INSTRUMENT)
-                            track_data["instrument_id"] = str(instrument_file.id)
-                    
-                    # Handle MIDI file updates for instrument tracks
-                    if "midi_file" in track_data:
-                        midi_file_data = track_data.pop("midi_file")
-                        midi_file_data["user_id"] = user_id
-                        
-                        # Check if there's a midi_file_id to update or if we need to create
-                        if "midi_file_id" in track_data and track_data["midi_file_id"]:
-                            # Update existing midi file
-                            await file_repository.update(track_data["midi_file_id"], midi_file_data, FileType.MIDI)
-                        else:
-                            # Create new midi file
-                            midi_file = await file_repository.create(midi_file_data, FileType.MIDI)
-                            track_data["midi_file_id"] = str(midi_file.id)
+            # Separate track-specific data from project-track settings
+            project_track_fields = [
+                "name", "volume", "pan", "mute", "x_position", "y_position", 
+                "trim_start_ticks", "trim_end_ticks", "duration_ticks", "track_number"
+            ]
             
-            # Update the track
-            # Only update project-track specific fields in the project_track table
-            # and track-specific fields in the track table
-            project_track_fields = ["order", "position_x", "position_y"]
-            pt_data = {k: v for k, v in track_data.items() if k in project_track_fields}
-            track_fields = {k: v for k, v in track_data.items() if k not in project_track_fields}
+            project_track_data = {k: v for k, v in track_data.items() if k in project_track_fields}
+            track_specific_data = {k: v for k, v in track_data.items() if k not in project_track_fields}
             
-            # Update the project-track if there are any project-track fields
-            if pt_data:
-                await self.project_track_repository.update(project_id, track_id, pt_data)
+            # Update project-track settings if provided
+            if project_track_data:
+                await self.track_service.update_track_project_settings(
+                    project_id=project_id,
+                    track_type=track_type,
+                    track_id=track_id,
+                    user_id=user_id,
+                    settings=project_track_data
+                )
             
-            # Update the track if there are any track fields
-            if track_fields:
-                await self.track_repository.update(track_id, track_fields)
+            # Update track-specific data if provided
+            if track_specific_data:
+                await self.track_service.update_track(
+                    track_id=track_id,
+                    track_type=track_type,
+                    user_id=user_id,
+                    track_data=track_specific_data
+                )
             
             # Get the updated project with tracks
             updated_project = await self.get_project(project_id, user_id)
-            
-            logger.info(f"Updated track with ID: {track_id} in project with ID: {project_id}")
+            logger.info(f"Updated {track_type.value} track with ID: {track_id} in project with ID: {project_id}")
             
             return updated_project
         except Exception as e:
@@ -512,14 +586,21 @@ class ProjectService:
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to update track in project: {str(e)}")
             
-    async def remove_track(self, project_id: str, user_id: str, track_id: str) -> ProjectWithTracks:
+    async def remove_track(
+        self, 
+        project_id: uuid.UUID, 
+        track_id: uuid.UUID,
+        track_type: TrackType,
+        user_id: uuid.UUID
+    ) -> ProjectWithTracks:
         """
         Remove a track from a project
         
         Args:
             project_id: The ID of the project
-            user_id: The ID of the user
             track_id: The ID of the track
+            track_type: The type of the track
+            user_id: The ID of the user
             
         Returns:
             The updated project with tracks
@@ -529,27 +610,40 @@ class ProjectService:
             ForbiddenException: If the user does not own the project
             ServiceException: If the operation fails
         """
-        logger.info(f"Removing track with ID: {track_id} from project with ID: {project_id} for user ID: {user_id}")
+        logger.info(f"Removing {track_type.value} track with ID: {track_id} from project with ID: {project_id}")
         try:
-            # First get the project to verify ownership
-            project = await self.get_project(project_id, user_id)
+            # Get the project to verify ownership
+            project = await self.project_repository.get(project_id)
+            if not project:
+                logger.error(f"Project with ID {project_id} not found")
+                raise NotFoundException("Project", str(project_id))
+                
+            # Verify project ownership
+            if project.user_id != user_id:
+                logger.error(f"User {user_id} does not own project {project_id}")
+                raise ForbiddenException("You do not have permission to access this project")
             
             # Check if the track is in the project
-            project_track = await self.project_track_repository.get_by_ids(project_id, track_id)
+            project_track = await self.project_track_repository.get_by_project_and_track(
+                project_id, track_type, track_id
+            )
             if not project_track:
                 logger.error(f"Track {track_id} not found in project {project_id}")
                 raise NotFoundException("Track in project", f"{project_id}/{track_id}")
             
             # Remove the track from the project
-            await self.project_track_repository.delete(project_id, track_id)
+            await self.track_service.remove_track_from_project(
+                project_id=project_id,
+                track_type=track_type,
+                track_id=track_id,
+                user_id=user_id
+            )
             
             # Get the updated project with tracks
-            updated_project = await self.project_repository.get_with_tracks(project_id)
+            updated_project = await self.get_project(project_id, user_id)
+            logger.info(f"Removed {track_type.value} track with ID: {track_id} from project with ID: {project_id}")
             
-            logger.info(f"Removed track with ID: {track_id} from project with ID: {project_id}")
-            
-            # Convert SQLModel object to API model
-            return ProjectWithTracks.from_orm(updated_project)
+            return updated_project
         except Exception as e:
             if isinstance(e, (NotFoundException, ForbiddenException)):
                 raise

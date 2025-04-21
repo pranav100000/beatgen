@@ -1,9 +1,15 @@
-import { TrackState, Position } from '../../core/types/track';
+import { TrackState } from '../../../types/track';
 
 /**
  * Common props interface shared by all track preview components.
  * Each specialized component may extend this with additional props.
  */
+
+export interface Position {
+  x: number;
+  y: number;
+}
+
 export interface TrackPreviewProps {
   /** Track data including ID, type, and state */
   track: TrackState;

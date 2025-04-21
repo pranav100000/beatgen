@@ -15,7 +15,7 @@ import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PanToolIcon from '@mui/icons-material/PanTool';
-import { TrackState, AudioTrackState, SamplerTrackState } from '../../core/types/track';
+import { TrackState, AudioTrack, SamplerTrack } from '../../../types/track';
 import { getTrackColor, GRID_CONSTANTS } from '../../constants/gridConstants';
 import ControlKnob from './track-sidebar-controls/ControlKnob';
 
@@ -216,7 +216,7 @@ const TrackControls: React.FC<TrackControlsProps> = ({
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
             }}>
-              {track.instrumentName}
+              {track.name}
             </Box>
           </Box>
         );
@@ -254,14 +254,9 @@ const TrackControls: React.FC<TrackControlsProps> = ({
       case 'audio':
       case 'sampler':
         // Explicitly cast track to the correct type to satisfy TypeScript
-        const audioTrack = track as AudioTrackState;
-        const samplerTrack = track as SamplerTrackState;
-        const fileName = track.type === 'audio'
-            ? audioTrack.audioFile?.name
-            : track.type === 'sampler'
-              ? samplerTrack.sampleFile?.name || 'No file loaded'
-              : 'No file loaded';
-
+        const audioTrack = track as AudioTrack;
+        const samplerTrack = track as SamplerTrack;
+        const fileName = track.name;
         return (
           <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center' }}>
             <Typography variant="caption" sx={{ 
@@ -328,7 +323,7 @@ const TrackControls: React.FC<TrackControlsProps> = ({
         mb: 0.4,
         width: '100%'
       }}>
-        {/* Type-specific controls */}
+        {/* Track name and type-specific controls */}
         <Box sx={{ flexGrow: 1, mr: 1, maxWidth: 146 }}>
           {renderTypeSpecificControls()}
         </Box>

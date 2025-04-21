@@ -1,5 +1,5 @@
 import { Store } from '../../store';
-import { TrackState, Position } from '../../../types/track';
+import { TrackState, Position } from '../../../../../types/track';
 import { useGridStore } from '../../gridStore';
 import { useStudioStore } from '../../../../stores/useStudioStore';
 import { BaseAction, TrackAction } from './BaseAction';

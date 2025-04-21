@@ -1,5 +1,5 @@
 import { Midi } from '@tonejs/midi';
-import { Note } from '../types/note';
+import { Note } from '../../../types/note';
 import { db } from '../db/dexie-client';
 
 /**
@@ -301,81 +301,81 @@ export class MidiManager {
    * @param name Optional track name
    * @returns The created track
    */
-  async createTrackWithPersistence(
-    trackId: string,
-    instrumentId: string, 
-    name: string = `Track ${instrumentId}`
-  ): Promise<MidiTrack> {
-    console.log(`MidiManager: Creating new track with instrument ${instrumentId} and name "${name}"`);
+  // async createTrackWithPersistence(
+  //   trackId: string,
+  //   instrumentId: string, 
+  //   name: string = `Track ${instrumentId}`
+  // ): Promise<MidiTrack> {
+  //   console.log(`MidiManager: Creating new track with instrument ${instrumentId} and name "${name}"`);
     
-    // Create the track in memory
-    const track = this.createTrack(trackId, instrumentId, name);
+  //   // Create the track in memory
+  //   const track = this.createTrack(trackId, instrumentId, name);
     
-    try {
-      // Create empty MIDI file in DB
-      await this.createMidiFileForTrack(
-        trackId,
-        name,
-        instrumentId,
-        this.currentBpm,
-        this.currentTimeSignature
-      );
-      console.log(`MidiManager: Created persisted track ${track.id}`);
-    } catch (error) {
-      console.error(`MidiManager: Error creating persisted track ${track.id}:`, error);
-      // Continue even if persistence fails
-    }
+  //   try {
+  //     // Create empty MIDI file in DB
+  //     await this.createMidiFileForTrack(
+  //       trackId,
+  //       name,
+  //       instrumentId,
+  //       this.currentBpm,
+  //       this.currentTimeSignature
+  //     );
+  //     console.log(`MidiManager: Created persisted track ${track.id}`);
+  //   } catch (error) {
+  //     console.error(`MidiManager: Error creating persisted track ${track.id}:`, error);
+  //     // Continue even if persistence fails
+  //   }
     
-    // Notify subscribers that this track now exists (with empty notes)
-    this.notifyTrackSubscribers(track.id, []);
+  //   // Notify subscribers that this track now exists (with empty notes)
+  //   this.notifyTrackSubscribers(track.id, []);
     
-    return track;
-  }
+  //   return track;
+  // }
 
   /**
    * Load track notes from the database
    * @param trackId The track ID to load
    * @returns The loaded notes array
    */
-  async loadTrackFromDB(trackId: string): Promise<Note[]> {
-    try {
-      console.log(`MidiManager: Loading track ${trackId} from DB`);
+  // async loadTrackFromDB(trackId: string): Promise<Note[]> {
+  //   try {
+  //     console.log(`MidiManager: Loading track ${trackId} from DB`);
       
-      // Get MIDI blob from DB
-      const midiBlob = await db.getMidiTrackBlob(trackId);
+  //     // Get MIDI blob from DB
+  //     const midiBlob = await db.getMidiTrackBlob(trackId);
       
-      if (!midiBlob) {
-        console.log(`MidiManager: No MIDI file found for track ${trackId}`);
-        return [];
-      }
+  //     if (!midiBlob) {
+  //       console.log(`MidiManager: No MIDI file found for track ${trackId}`);
+  //       return [];
+  //     }
       
-      // Convert to File object for loadMidiFile
-      const file = new File([midiBlob], `track_${trackId}.mid`, { type: 'audio/midi' });
+  //     // Convert to File object for loadMidiFile
+  //     const file = new File([midiBlob], `track_${trackId}.mid`, { type: 'audio/midi' });
       
-      // Load and parse the MIDI file
-      const midiData = await this.loadMidiFile(trackId, file);
+  //     // Load and parse the MIDI file
+  //     const midiData = await this.loadMidiFile(trackId, file);
       
-      // Convert to notes
-      const notes = this.midiToNotes(midiData);
+  //     // Convert to notes
+  //     const notes = this.midiToNotes(midiData);
       
-      // Update in-memory state
-      if (notes && notes.length > 0) {
-        // Make sure track exists in our map
-        if (!this.tracks.has(trackId)) {
-          this.tracks.set(trackId, []);
-        }
+  //     // Update in-memory state
+  //     if (notes && notes.length > 0) {
+  //       // Make sure track exists in our map
+  //       if (!this.tracks.has(trackId)) {
+  //         this.tracks.set(trackId, []);
+  //       }
         
-        // Update the track notes - use updateTrack to trigger notifications
-        this.updateTrack(trackId, notes);
-        console.log(`MidiManager: Loaded ${notes.length} notes for track ${trackId} from DB`);
-      }
+  //       // Update the track notes - use updateTrack to trigger notifications
+  //       this.updateTrack(trackId, notes);
+  //       console.log(`MidiManager: Loaded ${notes.length} notes for track ${trackId} from DB`);
+  //     }
       
-      return notes;
-    } catch (error) {
-      console.error(`MidiManager: Error loading track ${trackId} from DB:`, error);
-      return [];
-    }
-  }
+  //     return notes;
+  //   } catch (error) {
+  //     console.error(`MidiManager: Error loading track ${trackId} from DB:`, error);
+  //     return [];
+  //   }
+  // }
 
   /**
    * Delete a track and its persistence
@@ -394,7 +394,7 @@ export class MidiManager {
       }
       
       // Delete from DB
-      await db.deleteMidiTrack(trackId);
+      // await db.deleteMidiTrack(trackId);
       console.log(`MidiManager: Deleted persisted track ${trackId}`);
     } catch (error) {
       console.error(`MidiManager: Error deleting persisted track ${trackId}:`, error);
@@ -448,12 +448,12 @@ export class MidiManager {
     // Schedule a new update
     const timeoutId = setTimeout(async () => {
       try {
-        await this.updateMidiFileForTrack(
-          trackId,
-          notes,
-          this.currentBpm,
-          this.currentTimeSignature
-        );
+        // await this.updateMidiFileForTrack(
+        //   trackId,
+        //   notes,
+        //   this.currentBpm,
+        //   this.currentTimeSignature
+        // );
         
         // Clear from pending updates
         this.pendingUpdates.delete(trackId);
@@ -590,30 +590,30 @@ export class MidiManager {
    * @param bpm The BPM
    * @param timeSignature The time signature
    */
-  private async createMidiFileForTrack(
-    trackId: string, 
-    name: string, 
-    instrumentId: string, 
-    bpm: number, 
-    timeSignature: [number, number]
-  ): Promise<void> {
-    try {
-      console.log(`MidiManager: Creating MIDI file for track ${trackId}`);
+  // private async createMidiFileForTrack(
+  //   trackId: string, 
+  //   name: string, 
+  //   instrumentId: string, 
+  //   bpm: number, 
+  //   timeSignature: [number, number]
+  // ): Promise<void> {
+  //   try {
+  //     console.log(`MidiManager: Creating MIDI file for track ${trackId}`);
       
-      // Generate an empty MIDI file
-      const midiData = this.notesToMidi(trackId, [], bpm);
-      midiData.timeSignature = timeSignature;
-      const midiBlob = this.createMidiFile(midiData);
+  //     // Generate an empty MIDI file
+  //     const midiData = this.notesToMidi(trackId, [], bpm);
+  //     midiData.timeSignature = timeSignature;
+  //     const midiBlob = this.createMidiFile(midiData);
       
-      // Store in DB
-      await db.storeMidiTrackBlob(trackId, name, midiBlob, bpm, timeSignature, instrumentId);
+  //     // Store in DB
+  //     await db.storeMidiTrackBlob(trackId, name, midiBlob, bpm, timeSignature, instrumentId);
       
-      console.log(`MidiManager: Created MIDI file for track ${trackId}`);
-    } catch (error) {
-      console.error(`MidiManager: Error creating MIDI file for track ${trackId}:`, error);
-      throw error;
-    }
-  }
+  //     console.log(`MidiManager: Created MIDI file for track ${trackId}`);
+  //   } catch (error) {
+  //     console.error(`MidiManager: Error creating MIDI file for track ${trackId}:`, error);
+  //     throw error;
+  //   }
+  // }
 
   /**
    * Update MIDI file for a track
@@ -623,60 +623,60 @@ export class MidiManager {
    * @param timeSignature The time signature
    * @param trackName Optional track name
    */
-  private async updateMidiFileForTrack(
-    trackId: string, 
-    notes: Note[], 
-    bpm: number, 
-    timeSignature: [number, number],
-    trackName: string = `Midi Track`
-  ): Promise<void> {
-    try {
-      console.log(`MidiManager: Updating MIDI file for track ${trackId} with ${notes.length} notes`);
+  // private async updateMidiFileForTrack(
+  //   trackId: string, 
+  //   notes: Note[], 
+  //   bpm: number, 
+  //   timeSignature: [number, number],
+  //   trackName: string = `Midi Track`
+  // ): Promise<void> {
+  //   try {
+  //     console.log(`MidiManager: Updating MIDI file for track ${trackId} with ${notes.length} notes`);
       
-      // Generate MIDI data and blob
-      const midiData = this.notesToMidi(trackId, notes, bpm);
-      midiData.timeSignature = timeSignature;
-      const midiBlob = this.createMidiFile(midiData);
+  //     // Generate MIDI data and blob
+  //     const midiData = this.notesToMidi(trackId, notes, bpm);
+  //     midiData.timeSignature = timeSignature;
+  //     const midiBlob = this.createMidiFile(midiData);
       
-      // Store in DB
-      await db.storeMidiTrackBlob(trackId, trackName, midiBlob, bpm, timeSignature);
+  //     // Store in DB
+  //     await db.storeMidiTrackBlob(trackId, trackName, midiBlob, bpm, timeSignature);
       
-      console.log(`MidiManager: Updated MIDI file for track ${trackId}`);
-    } catch (error) {
-      console.error(`MidiManager: Error updating MIDI file for track ${trackId}:`, error);
-      throw error;
-    }
-  }
+  //     console.log(`MidiManager: Updated MIDI file for track ${trackId}`);
+  //   } catch (error) {
+  //     console.error(`MidiManager: Error updating MIDI file for track ${trackId}:`, error);
+  //     throw error;
+  //   }
+  // }
 
   /**
    * Export MIDI file from DB
    * @param trackId The track ID
    * @returns Blob containing the MIDI file, or null if not found
    */
-  async exportMidiFileFromDB(trackId: string): Promise<Blob | null> {
-    try {
-      console.log(`MidiManager: Exporting track ${trackId} from DB`);
+  // async exportMidiFileFromDB(trackId: string): Promise<Blob | null> {
+  //   try {
+  //     console.log(`MidiManager: Exporting track ${trackId} from DB`);
       
-      // Try to get from DB
-      const blob = await db.getMidiTrackBlob(trackId);
+  //     // Try to get from DB
+  //     const blob = await db.getMidiTrackBlob(trackId);
       
-      if (blob) {
-        return blob;
-      }
+  //     if (blob) {
+  //       return blob;
+  //     }
       
-      // If not in DB, create from in-memory notes
-      const notes = this.getTrackNotes(trackId);
-      if (notes && notes.length > 0) {
-        console.log(`MidiManager: Creating MIDI export from ${notes.length} in-memory notes`);
-        const midiData = this.notesToMidi(trackId, notes, this.currentBpm);
-        return this.createMidiFile(midiData);
-      }
+  //     // If not in DB, create from in-memory notes
+  //     const notes = this.getTrackNotes(trackId);
+  //     if (notes && notes.length > 0) {
+  //       console.log(`MidiManager: Creating MIDI export from ${notes.length} in-memory notes`);
+  //       const midiData = this.notesToMidi(trackId, notes, this.currentBpm);
+  //       return this.createMidiFile(midiData);
+  //     }
       
-      console.warn(`MidiManager: No data found for track ${trackId} to export`);
-      return null;
-    } catch (error) {
-      console.error(`MidiManager: Error exporting track ${trackId}:`, error);
-      return null;
-    }
-  }
+  //     console.warn(`MidiManager: No data found for track ${trackId} to export`);
+  //     return null;
+  //   } catch (error) {
+  //     console.error(`MidiManager: Error exporting track ${trackId}:`, error);
+  //     return null;
+  //   }
+  // }
 }

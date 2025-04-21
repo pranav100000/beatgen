@@ -31,7 +31,7 @@ import AddContextChip from './AddContextChip';
 import AssistantChatBubble from './AssistantChatBubble';
 import UserChatBubble from './UserChatBubble';
 import { GRID_CONSTANTS } from '../../constants/gridConstants';
-import { TrackState } from 'src/studio/core/types/track';
+import { TrackState } from '../../../types/track';
 import ReactMarkdown from 'react-markdown'
 
 interface Message {

@@ -29,6 +29,7 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
       const file = files[0];
       if (onFileUpload) onFileUpload(file, isSampler);
       onClose();
+      console.log('File uploaded');
     }
   };
   
