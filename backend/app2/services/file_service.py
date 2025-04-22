@@ -12,7 +12,7 @@ from app2.core.exceptions import ServiceException, NotFoundException, ForbiddenE
 from app2.repositories.track_repository import TrackRepository
 from app2.repositories.file_repository import FileRepository
 from app2.types.track_types import TrackType
-from app2.models.file_models.instrument_file import InstrumentFile, InstrumentFileRead
+from app2.models.public_models.instrument_file import InstrumentFile, InstrumentFileRead
 from app2.types.file_types import FileType
 
 logger = get_service_logger("file")

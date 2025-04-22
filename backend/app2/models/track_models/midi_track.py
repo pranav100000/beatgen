@@ -9,13 +9,13 @@ import uuid
 
 from app2.models.base import TimestampMixin, TrackBase, all_optional
 from app2.types.track_types import TrackType
-from app2.models.file_models.instrument_file import InstrumentFileRead
+from app2.models.public_models.instrument_file import InstrumentFileRead
 
 # Handle circular imports
 if TYPE_CHECKING:
     from app2.models.user import User
     from app2.models.project_track import ProjectTrack
-    from app2.models.file_models.instrument_file import InstrumentFile
+    from app2.models.public_models.instrument_file import InstrumentFile
 
 class MidiTrackBase(TrackBase):
     """Base model for MIDI tracks"""
@@ -28,6 +28,7 @@ class MidiTrack(MidiTrackBase, table=True):
     __tablename__ = "midi_tracks"
     
     # User relationship
+    id: uuid.UUID = Field(primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="users.id")
     user: Optional["User"] = Relationship(back_populates="midi_tracks")
     

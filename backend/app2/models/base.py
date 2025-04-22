@@ -2,16 +2,17 @@
 Base models for SQL database entities
 """
 from datetime import datetime
-from enum import Enum
-from typing import Optional, List, Type, TypeVar, get_type_hints
+from typing import Optional, Type
 import pydantic
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import SQLModel, Field
 from sqlalchemy import TIMESTAMP
-from pydantic import BaseModel, create_model, validator
+from pydantic import BaseModel, create_model
 import uuid
 
 from app2.types.track_types import TrackType
 from app2.types.file_types import FileType
+from app2.types.drum_sample_types import DrumSampleType
+from app2.types.genre_types import GenreType
 
 def all_optional(base_model: Type[BaseModel], name: str) -> Type[BaseModel]:
     """
@@ -50,7 +51,8 @@ class StandardBase(UUIDMixin, TimestampMixin):
     
 class FileBase(StandardBase):
     """Base model for files"""
-    name: str
+    file_name: str
+    display_name: str
     storage_key: str
     file_format: str
     file_size: int
@@ -72,35 +74,31 @@ class ProjectBase(StandardBase):
     
 class TrackBase(TimestampMixin):
     """Base model for tracks"""
-    id: uuid.UUID = Field(primary_key=True)
     name: str
-    type: TrackType
     
 class ProjectTrackBase(TimestampMixin):
     """Base model for project tracks"""
     name: str
-    volume: Optional[float] = 0.0
-    pan: Optional[float] = 0.0
-    mute: Optional[bool] = False
-    x_position: Optional[float] = 0.0
-    y_position: Optional[float] = 0.0
-    trim_start_ticks: Optional[int] = 0
-    trim_end_ticks: Optional[int] = 0
-    duration_ticks: Optional[int] = 0
-    track_number: Optional[int] = 0
+    volume: float
+    pan: float
+    mute: bool
+    x_position: float
+    y_position: float
+    trim_start_ticks: int
+    trim_end_ticks: int
+    duration_ticks: int
+    track_number: int
     
-class AudioFileBase(FileBase):
-    """Base model for audio files"""
-    duration: float
-    sample_rate: int
-    
-# class MidiFileBase(FileBase):
-#     """Base model for MIDI files"""
-#     pass
 
 class InstrumentFileBase(FileBase):
     """Base model for instruments"""
     category: str
     is_public: bool
     description: Optional[str] = None
-    
+
+class DrumSamplePublicBase(FileBase):
+    """Base model for drum samples"""
+    genre: GenreType
+    type: DrumSampleType
+    drum_kit_name: str
+    description: Optional[str] = None

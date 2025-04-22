@@ -14,6 +14,7 @@ from app2.types.track_types import TrackType
 if TYPE_CHECKING:
     from app2.models.user import User
     from app2.models.project_track import ProjectTrack
+    from app2.models.track_models.drum_track import DrumTrack
 
 class SamplerTrackBase(TrackBase):
     """Base model for sampler tracks"""
@@ -33,14 +34,15 @@ class SamplerTrack(SamplerTrackBase, table=True):
     """Sampler Track model for the database"""
     __tablename__ = "sampler_tracks"
     
-    # Basic track information
-    id: uuid.UUID = Field(primary_key=True)
-    name: str
-    type: TrackType = TrackType.SAMPLER
-    
+    # Explicitly define the primary key
+    id: uuid.UUID = Field(primary_key=True, foreign_key="project_tracks.track_id")
+
     # User relationship
     user_id: uuid.UUID = Field(foreign_key="users.id")
     user: Optional["User"] = Relationship(back_populates="sampler_tracks")
+    
+    drum_track_id: Optional[uuid.UUID] = Field(foreign_key="drum_tracks.id")
+    drum_track: Optional["DrumTrack"] = Relationship(back_populates="sampler_tracks")
     
     # Relationships to project tracks
     project_tracks: list["ProjectTrack"] = Relationship(
@@ -55,9 +57,15 @@ class SamplerTrack(SamplerTrackBase, table=True):
 # API Models
 class SamplerTrackRead(SamplerTrackBase):
     """API response model for sampler track data"""
+    id: uuid.UUID
+    drum_track_id: Optional[uuid.UUID]
 
 class SamplerTrackCreate(SamplerTrackBase):
     """API request model for creating a sampler track"""
+    id: uuid.UUID
+    drum_track_id: Optional[uuid.UUID]
     
 class SamplerTrackUpdate(all_optional(SamplerTrackBase, "SamplerTrackUpdate")):
     """API request model for updating a sampler track"""
+    id: uuid.UUID
+    drum_track_id: Optional[uuid.UUID]

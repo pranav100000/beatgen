@@ -27,6 +27,9 @@ class AudioTrack(AudioTrackBase, table=True):
     """Audio Track model for the database"""
     __tablename__ = "audio_tracks"
     
+    # Explicitly define the primary key
+    id: uuid.UUID = Field(primary_key=True)
+    
     # User relationship
     user_id: uuid.UUID = Field(foreign_key="users.id")
     user: Optional["User"] = Relationship(back_populates="audio_tracks")

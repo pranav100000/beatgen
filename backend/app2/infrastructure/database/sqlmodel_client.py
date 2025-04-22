@@ -13,7 +13,7 @@ from app2.models.track_models.audio_track import AudioTrack
 from app2.models.track_models.midi_track import MidiTrack
 from app2.models.track_models.sampler_track import SamplerTrack
 from app2.models.track_models.drum_track import DrumTrack
-from app2.models.file_models.instrument_file import InstrumentFile
+from app2.models.public_models.instrument_file import InstrumentFile
 
 logger = get_logger("beatgen.database.sqlmodel")
 

@@ -64,7 +64,7 @@ from app2.models.track import Track
 from app2.models.project_track import ProjectTrack
 from app2.models.file_models.audio_file import AudioFile
 from app2.models.file_models.midi_file import MidiFile
-from app2.models.file_models.instrument_file import InstrumentFile
+from backend.app2.models.public_models.instrument_file import InstrumentFile
 
 # In-memory SQLite engine for testing
 @pytest.fixture(scope="session")

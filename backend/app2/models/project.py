@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 class Project(ProjectBase, table=True):
     """Project model for the database"""
     __tablename__ = "projects"
-    
     # Relationships
     user_id: uuid.UUID = Field(foreign_key="users.id")
     user: Optional["User"] = Relationship(back_populates="projects")

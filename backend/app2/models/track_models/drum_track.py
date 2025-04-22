@@ -12,6 +12,7 @@ from app2.types.track_types import TrackType
 if TYPE_CHECKING:
     from app2.models.user import User
     from app2.models.project_track import ProjectTrack
+    from app2.models.track_models.sampler_track import SamplerTrack
 
 class DrumTrackBase(TrackBase):
     """Base model for drum tracks"""
@@ -22,6 +23,9 @@ class DrumTrack(DrumTrackBase, table=True):
     """Drum Track model for the database"""
     __tablename__ = "drum_tracks"
     
+    # Explicitly define the primary key
+    id: uuid.UUID = Field(primary_key=True)
+    
     # User relationship
     user_id: uuid.UUID = Field(foreign_key="users.id")
     user: Optional["User"] = Relationship(back_populates="drum_tracks")
@@ -29,6 +33,9 @@ class DrumTrack(DrumTrackBase, table=True):
     # Drum grid data can be added here if needed
     
     # Relationships to project tracks
+    sampler_tracks: list["SamplerTrack"] = Relationship(
+        back_populates="drum_track",
+    )
     project_tracks: list["ProjectTrack"] = Relationship(
         back_populates="drum_track",
         sa_relationship_kwargs={

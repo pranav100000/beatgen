@@ -12,7 +12,7 @@ import uuid
 from app2.core.exceptions import DatabaseException, NotFoundException, StorageException
 from app2.core.logging import get_repository_logger
 from app2.types.file_types import FileType
-from app2.models.file_models.instrument_file import InstrumentFile
+from app2.models.public_models.instrument_file import InstrumentFile
 from app2.infrastructure.storage.supabase_storage import SupabaseStorage
 
 # Generic type for file models

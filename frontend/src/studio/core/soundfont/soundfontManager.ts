@@ -101,7 +101,7 @@ class SoundfontManager {
       const soundfontFile: SoundfontFile = {
         id: soundfont.id,
         name: soundfont.name,
-        displayName: soundfont.display_name,
+        displayName: soundfont.name,
         category: soundfont.category,
         data,
         dateAdded: new Date(),

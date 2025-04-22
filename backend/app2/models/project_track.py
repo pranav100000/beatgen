@@ -4,9 +4,9 @@ Link table model for the many-to-many relationship between Projects and Track ty
 from typing import Optional, TYPE_CHECKING, Union, Literal
 import uuid
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column, ForeignKey
+from sqlalchemy import Column, ForeignKey, Enum as SAEnum
 
-from app2.models.base import ProjectTrackBase
+from app2.models.base import ProjectTrackBase, all_optional
 from app2.types.track_types import TrackType
 
 # Handle circular imports
@@ -39,11 +39,15 @@ class ProjectTrack(ProjectTrackBase, table=True):
         primary_key=True
     )
     
-    # Track type discriminator
-    track_type: TrackType
+    track_type: TrackType = Field(
+        sa_column=Column(SAEnum(TrackType), nullable=False)
+    )
     
     # Relationships
-    project: Optional["Project"] = Relationship(back_populates="project_tracks")
+    project: Optional["Project"] = Relationship(
+        back_populates="project_tracks",
+        sa_relationship_kwargs={"foreign_keys": "[ProjectTrack.project_id]"}
+    )
     
     # Define explicit join conditions for each track type relationship
     audio_track: Optional["AudioTrack"] = Relationship(
@@ -78,32 +82,19 @@ class ProjectTrack(ProjectTrackBase, table=True):
         }
     )
 
-    def __init__(self, **data):
-        super().__init__(**data)
-
 # API Models
-class ProjectTrackDTO(ProjectTrackBase):
+class ProjectTrackRead(ProjectTrackBase):
     """Base DTO for Project-Track relationships"""
-    track_type: TrackType
+    project_id: uuid.UUID
     track_id: uuid.UUID
-
-class ProjectTrackCreate(ProjectTrackDTO):
+    track_type: TrackType
+class ProjectTrackCreate(ProjectTrackBase):
     """Model for creating a new project-track relationship"""
     project_id: uuid.UUID
-    
-class ProjectTrackRead(ProjectTrackDTO):
-    """Model for reading project-track data"""
-    project_id: uuid.UUID
-
-class ProjectTrackUpdate(SQLModel):
+    track_id: uuid.UUID
+    track_type: TrackType
+class ProjectTrackUpdate(all_optional(ProjectTrackRead, "ProjectTrackUpdate")):
     """Model for updating project-track settings"""
-    name: Optional[str] = None
-    volume: Optional[float] = None
-    pan: Optional[float] = None
-    mute: Optional[bool] = None
-    x_position: Optional[float] = None
-    y_position: Optional[float] = None
-    trim_start_ticks: Optional[int] = None
-    trim_end_ticks: Optional[int] = None
-    duration_ticks: Optional[int] = None
-    track_number: Optional[int] = None
+    track_id: uuid.UUID
+    project_id: uuid.UUID
+    track_type: TrackType

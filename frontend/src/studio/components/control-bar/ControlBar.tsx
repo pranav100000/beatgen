@@ -15,7 +15,7 @@ import { TimeDisplay } from './TimeDisplay';
 import KeySelector from './KeySelector';
 import { ArrowBack, ChatBubbleOutlineRounded, ChatBubbleRounded } from '@mui/icons-material';
 import { SaveProjectButton } from './SaveProjectButton';
-import { useStudioStore } from '../../stores/useStudioStore';
+import { useStudioStore } from '../../stores/studioStore';
 
 interface StudioControlBarProps {
     canUndo: boolean;

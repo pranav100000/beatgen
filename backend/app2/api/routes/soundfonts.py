@@ -7,7 +7,7 @@ from datetime import datetime
 from app2.api.dependencies import get_current_user, get_file_service, get_track_service
 from app2.core.logging import get_api_logger
 from app2.services.track_service import FileType, TrackService
-from app2.models.file_models.instrument_file import InstrumentFile
+from app2.models.public_models.instrument_file import InstrumentFile
 from app2.services.file_service import FileService
 
 router = APIRouter()

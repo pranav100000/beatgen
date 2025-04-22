@@ -20,52 +20,320 @@ import { getPublicSoundfonts, getSoundfontDownloadUrl } from '../../../platform/
 import SoundfontManager from '../../core/soundfont/soundfontManager';
 import { db } from '../../core/db/dexie-client';
 import { InstrumentFileRead } from 'src/platform/types/project';
+import { SamplerTrack } from 'src/platform/types/track_models/sampler_track';
 
-interface Instrument {
+interface DrumKit {
     id: string;
     name: string;
-    icon: SvgIconComponent;
-    color: string;
+    samplers: SamplerTrack[];
 }
 
-const instruments: Instrument[] = [
-{
-    id: 'piano',
-    name: 'Grand Piano',
-    icon: PianoIcon,
-    color: '#2ECC71'
-},
-{
-    id: 'synth',
-    name: 'Synth Lead',
-    icon: MusicNoteIcon,
-    color: '#3498DB'
-},
-{
-    id: 'strings',
-    name: 'Strings',
-    icon: MusicNoteIcon,
-    color: '#9B59B6'
-},
-{
-    id: 'bass',
-    name: 'Bass',
-    icon: MusicNoteIcon,
-    color: '#E67E22'
-},
-{
-    id: 'organ',
-    name: 'Electric Organ',
-    icon: MusicNoteIcon,
-    color: '#E74C3C'
-},
-{
-    id: 'pad',
-    name: 'Ambient Pad',
-    icon: MusicNoteIcon,
-    color: '#1ABC9C'
-}
-];
+// Sample Drum Kits for 6 Common Music Genres
+// This code provides structured data for six common music genres with sample drum kits
+// Each drum kit includes common percussion elements with sample file paths
+
+const drumKits = {
+    // 1. Pop Drum Kit
+    pop: {
+      name: "Pop Essentials",
+      description: "Bright, punchy drums with a focus on clarity and impact",
+      elements: [
+        {
+          name: "Kick",
+          samples: [
+            { name: "Pop Kick Clean", path: "/samples/pop/kick_clean.wav" },
+            { name: "Pop Kick Processed", path: "/samples/pop/kick_processed.wav" },
+            { name: "Pop Kick Sub", path: "/samples/pop/kick_sub.wav" }
+          ]
+        },
+        {
+          name: "Snare",
+          samples: [
+            { name: "Pop Snare Standard", path: "/samples/pop/snare_standard.wav" },
+            { name: "Pop Snare Rimshot", path: "/samples/pop/snare_rimshot.wav" },
+            { name: "Pop Snare Processed", path: "/samples/pop/snare_processed.wav" }
+          ]
+        },
+        {
+          name: "Hi-Hat",
+          samples: [
+            { name: "Pop Hi-Hat Closed", path: "/samples/pop/hihat_closed.wav" },
+            { name: "Pop Hi-Hat Open", path: "/samples/pop/hihat_open.wav" },
+            { name: "Pop Hi-Hat Pedal", path: "/samples/pop/hihat_pedal.wav" }
+          ]
+        },
+        {
+          name: "Cymbals",
+          samples: [
+            { name: "Pop Crash", path: "/samples/pop/crash.wav" },
+            { name: "Pop Ride", path: "/samples/pop/ride.wav" }
+          ]
+        },
+        {
+          name: "Percussion",
+          samples: [
+            { name: "Pop Tambourine", path: "/samples/pop/tambourine.wav" },
+            { name: "Pop Shaker", path: "/samples/pop/shaker.wav" },
+            { name: "Pop Clap", path: "/samples/pop/clap.wav" }
+          ]
+        }
+      ]
+    },
+  
+    // 2. Rock Drum Kit
+    rock: {
+      name: "Rock Foundation",
+      description: "Powerful, room-heavy drums with natural ambience",
+      elements: [
+        {
+          name: "Kick",
+          samples: [
+            { name: "Rock Kick Deep", path: "/samples/rock/kick_deep.wav" },
+            { name: "Rock Kick Punchy", path: "/samples/rock/kick_punchy.wav" },
+            { name: "Rock Kick Resonant", path: "/samples/rock/kick_resonant.wav" }
+          ]
+        },
+        {
+          name: "Snare",
+          samples: [
+            { name: "Rock Snare Standard", path: "/samples/rock/snare_standard.wav" },
+            { name: "Rock Snare Rimshot", path: "/samples/rock/snare_rimshot.wav" },
+            { name: "Rock Snare Flam", path: "/samples/rock/snare_flam.wav" }
+          ]
+        },
+        {
+          name: "Toms",
+          samples: [
+            { name: "Rock Rack Tom", path: "/samples/rock/rack_tom.wav" },
+            { name: "Rock Floor Tom", path: "/samples/rock/floor_tom.wav" }
+          ]
+        },
+        {
+          name: "Hi-Hat",
+          samples: [
+            { name: "Rock Hi-Hat Closed", path: "/samples/rock/hihat_closed.wav" },
+            { name: "Rock Hi-Hat Open", path: "/samples/rock/hihat_open.wav" }
+          ]
+        },
+        {
+          name: "Cymbals",
+          samples: [
+            { name: "Rock Crash", path: "/samples/rock/crash.wav" },
+            { name: "Rock Ride", path: "/samples/rock/ride.wav" },
+            { name: "Rock Splash", path: "/samples/rock/splash.wav" }
+          ]
+        }
+      ]
+    },
+  
+    // 3. Hip-Hop/Rap Drum Kit
+    hiphop: {
+      name: "Hip-Hop Beats",
+      description: "Heavy, processed drums with deep kicks and crisp snares",
+      elements: [
+        {
+          name: "Kick",
+          samples: [
+            { name: "Hip-Hop Kick 808", path: "/samples/hiphop/kick_808.wav" },
+            { name: "Hip-Hop Kick Distorted", path: "/samples/hiphop/kick_distorted.wav" },
+            { name: "Hip-Hop Kick Clean", path: "/samples/hiphop/kick_clean.wav" }
+          ]
+        },
+        {
+          name: "Snare",
+          samples: [
+            { name: "Hip-Hop Snare Trap", path: "/samples/hiphop/snare_trap.wav" },
+            { name: "Hip-Hop Snare Classic", path: "/samples/hiphop/snare_classic.wav" },
+            { name: "Hip-Hop Snare Layered", path: "/samples/hiphop/snare_layered.wav" }
+          ]
+        },
+        {
+          name: "Hi-Hat",
+          samples: [
+            { name: "Hip-Hop Hi-Hat Closed", path: "/samples/hiphop/hihat_closed.wav" },
+            { name: "Hip-Hop Hi-Hat Open", path: "/samples/hiphop/hihat_open.wav" },
+            { name: "Hip-Hop Hi-Hat Roll", path: "/samples/hiphop/hihat_roll.wav" }
+          ]
+        },
+        {
+          name: "808s",
+          samples: [
+            { name: "Hip-Hop 808 Sub", path: "/samples/hiphop/808_sub.wav" },
+            { name: "Hip-Hop 808 Distorted", path: "/samples/hiphop/808_distorted.wav" },
+            { name: "Hip-Hop 808 Short", path: "/samples/hiphop/808_short.wav" }
+          ]
+        },
+        {
+          name: "FX",
+          samples: [
+            { name: "Hip-Hop Vinyl Scratch", path: "/samples/hiphop/vinyl_scratch.wav" },
+            { name: "Hip-Hop Vocal Shot", path: "/samples/hiphop/vocal_shot.wav" },
+            { name: "Hip-Hop Riser", path: "/samples/hiphop/riser.wav" }
+          ]
+        }
+      ]
+    },
+  
+    // 4. Electronic/Dance Drum Kit
+    electronic: {
+      name: "Electronic Pulse",
+      description: "Tight, synthetic drums designed for club environments",
+      elements: [
+        {
+          name: "Kick",
+          samples: [
+            { name: "Electronic Kick Four-on-Floor", path: "/samples/electronic/kick_4floor.wav" },
+            { name: "Electronic Kick Sidechained", path: "/samples/electronic/kick_sidechain.wav" },
+            { name: "Electronic Kick Layered", path: "/samples/electronic/kick_layered.wav" }
+          ]
+        },
+        {
+          name: "Snare/Clap",
+          samples: [
+            { name: "Electronic Snare", path: "/samples/electronic/snare.wav" },
+            { name: "Electronic Clap", path: "/samples/electronic/clap.wav" },
+            { name: "Electronic Snare/Clap Layer", path: "/samples/electronic/snareclap_layer.wav" }
+          ]
+        },
+        {
+          name: "Hi-Hat",
+          samples: [
+            { name: "Electronic Hi-Hat Closed", path: "/samples/electronic/hihat_closed.wav" },
+            { name: "Electronic Hi-Hat Open", path: "/samples/electronic/hihat_open.wav" }
+          ]
+        },
+        {
+          name: "Percussion",
+          samples: [
+            { name: "Electronic Percussion Stick", path: "/samples/electronic/perc_stick.wav" },
+            { name: "Electronic Percussion Tom", path: "/samples/electronic/perc_tom.wav" }
+          ]
+        },
+        {
+          name: "FX",
+          samples: [
+            { name: "Electronic White Noise", path: "/samples/electronic/white_noise.wav" },
+            { name: "Electronic Downlifter", path: "/samples/electronic/downlifter.wav" },
+            { name: "Electronic Impact", path: "/samples/electronic/impact.wav" },
+            { name: "Electronic Build-up", path: "/samples/electronic/buildup.wav" }
+          ]
+        }
+      ]
+    },
+  
+    // 5. R&B/Soul Drum Kit
+    rnb: {
+      name: "Soul Grooves",
+      description: "Warm, vintage-inspired drums with organic textures",
+      elements: [
+        {
+          name: "Kick",
+          samples: [
+            { name: "R&B Kick Warm", path: "/samples/rnb/kick_warm.wav" },
+            { name: "R&B Kick Tight", path: "/samples/rnb/kick_tight.wav" },
+            { name: "R&B Kick Vintage", path: "/samples/rnb/kick_vintage.wav" }
+          ]
+        },
+        {
+          name: "Snare",
+          samples: [
+            { name: "R&B Snare Crisp", path: "/samples/rnb/snare_crisp.wav" },
+            { name: "R&B Snare Brush", path: "/samples/rnb/snare_brush.wav" },
+            { name: "R&B Snare Rim", path: "/samples/rnb/snare_rim.wav" }
+          ]
+        },
+        {
+          name: "Hi-Hat",
+          samples: [
+            { name: "R&B Hi-Hat Closed", path: "/samples/rnb/hihat_closed.wav" },
+            { name: "R&B Hi-Hat Open", path: "/samples/rnb/hihat_open.wav" },
+            { name: "R&B Hi-Hat Shuffle", path: "/samples/rnb/hihat_shuffle.wav" }
+          ]
+        },
+        {
+          name: "Percussion",
+          samples: [
+            { name: "R&B Tambourine", path: "/samples/rnb/tambourine.wav" },
+            { name: "R&B Shaker", path: "/samples/rnb/shaker.wav" },
+            { name: "R&B Bongo", path: "/samples/rnb/bongo.wav" }
+          ]
+        },
+        {
+          name: "FX",
+          samples: [
+            { name: "R&B Vinyl Crackle", path: "/samples/rnb/vinyl_crackle.wav" },
+            { name: "R&B Room Noise", path: "/samples/rnb/room_noise.wav" }
+          ]
+        }
+      ]
+    },
+  
+    // 6. Country Drum Kit
+    country: {
+      name: "Nashville Sound",
+      description: "Natural, open drums with acoustic character",
+      elements: [
+        {
+          name: "Kick",
+          samples: [
+            { name: "Country Kick Standard", path: "/samples/country/kick_standard.wav" },
+            { name: "Country Kick Muted", path: "/samples/country/kick_muted.wav" },
+            { name: "Country Kick Brush", path: "/samples/country/kick_brush.wav" }
+          ]
+        },
+        {
+          name: "Snare",
+          samples: [
+            { name: "Country Snare Standard", path: "/samples/country/snare_standard.wav" },
+            { name: "Country Snare Rimshot", path: "/samples/country/snare_rimshot.wav" },
+            { name: "Country Snare Cross-Stick", path: "/samples/country/snare_crossstick.wav" }
+          ]
+        },
+        {
+          name: "Hi-Hat",
+          samples: [
+            { name: "Country Hi-Hat Closed Tight", path: "/samples/country/hihat_closed_tight.wav" },
+            { name: "Country Hi-Hat Closed Loose", path: "/samples/country/hihat_closed_loose.wav" },
+            { name: "Country Hi-Hat Open", path: "/samples/country/hihat_open.wav" }
+          ]
+        },
+        {
+          name: "Cymbals",
+          samples: [
+            { name: "Country Crash", path: "/samples/country/crash.wav" },
+            { name: "Country Ride", path: "/samples/country/ride.wav" },
+            { name: "Country Ride Bell", path: "/samples/country/ride_bell.wav" }
+          ]
+        },
+        {
+          name: "Percussion",
+          samples: [
+            { name: "Country Tambourine", path: "/samples/country/tambourine.wav" },
+            { name: "Country Shaker", path: "/samples/country/shaker.wav" },
+            { name: "Country Cowbell", path: "/samples/country/cowbell.wav" }
+          ]
+        }
+      ]
+    }
+  };
+  
+  // Usage example:
+  // 
+  // // Access a specific sample
+  // const popKickClean = drumKits.pop.elements[0].samples[0];
+  // console.log(`Loading sample: ${popKickClean.name} from ${popKickClean.path}`);
+  // 
+  // // Iterate through a genre's elements
+  // drumKits.hiphop.elements.forEach(element => {
+  //   console.log(`${drumKits.hiphop.name} ${element.name} samples:`);
+  //   element.samples.forEach(sample => console.log(`- ${sample.name}`));
+  // });
+  // 
+  // // Get all kick drums across genres
+  // const allKicks = Object.values(drumKits).map(kit => {
+  //   const kickElement = kit.elements.find(el => el.name === "Kick");
+  //   return kickElement ? kickElement.samples : [];
+  // }).flat();
 
 // Map of instrument categories to colors
 const categoryColors: Record<string, string> = {
