@@ -12,6 +12,7 @@ from app2.core.logging import get_logger
 from app2.core.exceptions import AppException
 from app2.api.routes import auth, users, projects, sounds, soundfonts
 from app2.infrastructure.database.sqlmodel_client import create_db_and_tables
+from app2.api.routes import assistant_streaming
 
 # Configure logging
 logger = get_logger("beatgen.main")
@@ -87,6 +88,7 @@ app.include_router(users.router, prefix=f"{settings.app.API_PREFIX}/users", tags
 app.include_router(projects.router, prefix=f"{settings.app.API_PREFIX}/projects", tags=["projects"])
 app.include_router(sounds.router, prefix=f"{settings.app.API_PREFIX}/sounds", tags=["sounds"])
 app.include_router(soundfonts.router, prefix=f"{settings.app.API_PREFIX}/soundfonts", tags=["soundfonts"])
+app.include_router(assistant_streaming.router, prefix=f"{settings.app.API_PREFIX}/assistant", tags=["assistant"])
 
 # Root endpoint
 @app.get("/")

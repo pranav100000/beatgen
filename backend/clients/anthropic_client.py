@@ -5,7 +5,7 @@ import asyncio
 from anthropic import Anthropic, AsyncAnthropic
 import logging
 
-from app.utils.sse_queue_manager import SSEQueueManager
+from app2.sse.sse_queue_manager import SSEQueueManager
 
 
 load_dotenv()

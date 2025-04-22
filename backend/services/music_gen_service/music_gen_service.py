@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional
 import anthropic
 from dotenv import load_dotenv
 import logging
-from app.utils.sse_queue_manager import SSEQueueManager
-from app.types.assistant_actions import AssistantAction, TrackType
+from app2.sse.sse_queue_manager import SSEQueueManager
+from app2.types.assistant_actions import AssistantAction, TrackType
 from services.music_gen_service.chord_progression_analysis import analyze_chord_progression
 from services.soundfont_service.soundfont_service import soundfont_service
 from clients.anthropic_client import AnthropicClient

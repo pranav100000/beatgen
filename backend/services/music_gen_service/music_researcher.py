@@ -9,8 +9,10 @@ from typing import Dict, Any, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
 import asyncio
+
+from app2.core.logging import get_api_logger
 # Set up detailed logging with DEBUG level
-logger = logging.getLogger(__name__)
+logger = get_api_logger("music_researcher")
 logger.setLevel(logging.DEBUG)
 
 # If no handlers, add one to ensure logs are visible

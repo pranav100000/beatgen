@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 import uuid
 
-from app.core.supabase import supabase
+from app2.infrastructure.storage.supabase_storage import supabase
 
 # Configure logger
 logger = logging.getLogger("beatgen.services.soundfont")
