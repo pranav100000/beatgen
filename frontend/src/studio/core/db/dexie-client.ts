@@ -2,45 +2,18 @@ import Dexie, { Table } from 'dexie';
 
 // Interface for audio file entries
 export interface AudioFile {
-    id?: number;
+    id: string;
     name: string;
     data: Blob;
     type: string;
     size: number;
     duration?: number;
+    sampleRate?: number;
+    format?: string;
     createdAt: Date;
     updatedAt: Date;
     tags?: string[];
 }
-
-// Interface for MIDI file entries
-export interface MidiFile {
-    id?: number;
-    name: string;
-    data: Blob;
-    type: string;
-    size: number;
-    trackId?: string;        // App track ID (UUID) to link with application tracks
-    instrumentId?: string;   // Instrument ID for this track
-    tempo?: number;          // BPM value 
-    timeSignature?: string;  // Format: "4/4"
-    createdAt: Date;
-    updatedAt: Date;
-    tags?: string[];
-}
-
-// Interface for Drum Machine entries
-export interface DrumMachineFile {
-    id?: number;
-    name: string;
-    trackId: string;
-    beatsPerMeasure: number;
-    stepsPerBeat: number;
-    createdAt: Date;
-    updatedAt: Date;
-    tags?: string[];
-}
-
 // Interface for Soundfont entries
 export interface SoundfontFile {
     id: string;           // Use the ID from the API
@@ -55,19 +28,15 @@ export interface SoundfontFile {
 
 // Database class
 export class BeatGenDB extends Dexie {
-    audioFiles!: Table<AudioFile, number>;
-    midiFiles!: Table<MidiFile, number>;
-    drumMachineFiles!: Table<DrumMachineFile, number>;
+    audioFiles!: Table<AudioFile, string>;
     soundfonts!: Table<SoundfontFile, string>; // Primary key is the string ID
 
     constructor() {
         super('BeatGenDB');
 
         this.version(1).stores({
-            audioFiles: '++id, name, type, createdAt, updatedAt, *tags',
-            midiFiles: '++id, name, type, trackId, createdAt, updatedAt, *tags',
-            drumMachineFiles: '++id, name, trackId, createdAt, updatedAt, *tags',
-            soundfonts: 'id, name, category, dateAdded'
+            audioFiles: 'id, name, type',
+            soundfonts: 'id, name, category'
         });
 
         // Log database open
@@ -81,19 +50,15 @@ export class BeatGenDB extends Dexie {
 
     private async logDbState() {
         const audioFiles = await this.audioFiles.toArray();
-        const midiFiles = await this.midiFiles.toArray();
-        const drumMachineFiles = await this.drumMachineFiles.toArray();
         const soundfonts = await this.soundfonts.toArray();
         console.log('📊 Current DB State:', {
             audioFiles: audioFiles,
-            midiFiles: midiFiles,
-            drumMachineFiles: drumMachineFiles,
             soundfonts: soundfonts
         });
     }
 
     // Utility function to create file metadata
-    private createFileMetadata(file: File, additionalData: Partial<AudioFile | MidiFile> = {}) {
+    private createFileMetadata(file: File, additionalData: Partial<AudioFile | SoundfontFile> = {}) {
         const metadata = {
             name: file.name,
             type: file.type,
@@ -113,20 +78,36 @@ export class BeatGenDB extends Dexie {
     }
 
     // Audio File Operations
-    async addAudioFile(file: File, duration?: number): Promise<number> {
+    async addAudioFile(id: string, file: File, duration?: number): Promise<string> {
+        console.log(`Adding audio file ${file.name} with id ${id}`);
         this.logOperation('Adding audio file', {
+            id: id,
             name: file.name,
             type: file.type,
             size: file.size,
-            duration
+            duration: duration
         });
-        const metadata = this.createFileMetadata(file, { duration });
-        const id = await this.audioFiles.add(metadata as AudioFile);
+        
+        // Get metadata, ensuring only AudioFile compatible props are added initially
+        const metadataBase = this.createFileMetadata(file, { duration });
+        
+        // Fix: Cast the result of createFileMetadata to ensure compatibility before adding id
+        const audioSpecificMetadata = metadataBase as Omit<AudioFile, 'id'>;
+
+        // Create the full object including the string id
+        const audioFileData: AudioFile = {
+            ...audioSpecificMetadata,
+            id: id // Explicitly set the string ID
+        };
+        
+        // Call add with just the object
+        await this.audioFiles.add(audioFileData); 
+        
         await this.logDbState();
         return id;
     }
 
-    async getAudioFile(id: number): Promise<AudioFile | undefined> {
+    async getAudioFile(id: string): Promise<AudioFile | undefined> {
         this.logOperation('Getting audio file', { id });
         const file = await this.audioFiles.get(id);
         this.logOperation('Retrieved audio file', {
@@ -147,7 +128,7 @@ export class BeatGenDB extends Dexie {
         return files;
     }
 
-    async updateAudioFile(id: number, updates: Partial<AudioFile>): Promise<number> {
+    async updateAudioFile(id: string, updates: Partial<AudioFile>): Promise<number> {
         this.logOperation('Updating audio file', { id, updates });
         updates.updatedAt = new Date();
         const count = await this.audioFiles.update(id, updates);
@@ -156,7 +137,7 @@ export class BeatGenDB extends Dexie {
         return count;
     }
 
-    async deleteAudioFile(id: number): Promise<void> {
+    async deleteAudioFile(id: string): Promise<void> {
         this.logOperation('Deleting audio file', { id });
         await this.audioFiles.delete(id);
         await this.logDbState();
@@ -343,21 +324,21 @@ export class BeatGenDB extends Dexie {
         return files;
     }
 
-    async searchMidiFiles(query: string): Promise<MidiFile[]> {
-        this.logOperation('Searching MIDI files', { query });
-        const files = await this.midiFiles
-            .where('name')
-            .startsWithIgnoreCase(query)
-            .or('tags')
-            .anyOfIgnoreCase(query)
-            .toArray();
-        this.logOperation('Search results for MIDI files', {
-            query,
-            count: files.length,
-            names: files.map(f => f.name)
-        });
-        return files;
-    }
+    // async searchMidiFiles(query: string): Promise<MidiFile[]> {
+    //     this.logOperation('Searching MIDI files', { query });
+    //     const files = await this.midiFiles
+    //         .where('name')
+    //         .startsWithIgnoreCase(query)
+    //         .or('tags')
+    //         .anyOfIgnoreCase(query)
+    //         .toArray();
+    //     this.logOperation('Search results for MIDI files', {
+    //         query,
+    //         count: files.length,
+    //         names: files.map(f => f.name)
+    //     });
+    //     return files;
+    // }
 
     // Utility function to get audio duration
     async getAudioDuration(file: File): Promise<number> {
@@ -393,10 +374,8 @@ export class BeatGenDB extends Dexie {
         this.logOperation('Clearing all files from database', {});
         
         try {
-            await this.transaction('rw', this.audioFiles, this.midiFiles, this.drumMachineFiles, this.soundfonts, async () => {
+            await this.transaction('rw', this.audioFiles, this.soundfonts, async () => {
                 await this.audioFiles.clear();
-                await this.midiFiles.clear();
-                await this.drumMachineFiles.clear();
                 await this.soundfonts.clear();
             });
             
@@ -408,62 +387,62 @@ export class BeatGenDB extends Dexie {
         }
     }
 
-    // Drum Machine Operations
-    async addDrumMachineTrack(trackId: string, name: string = 'Drum Machine'): Promise<number> {
-        this.logOperation('Adding drum machine track', {
-            name,
-            trackId
-        });
+    // // Drum Machine Operations
+    // async addDrumMachineTrack(trackId: string, name: string = 'Drum Machine'): Promise<number> {
+    //     this.logOperation('Adding drum machine track', {
+    //         name,
+    //         trackId
+    //     });
         
-        const metadata: DrumMachineFile = {
-            name,
-            trackId,
-            beatsPerMeasure: 4,  // Default to 4/4 time
-            stepsPerBeat: 4,     // Default to 16th notes
-            createdAt: new Date(),
-            updatedAt: new Date()
-        };
+    //     const metadata: DrumMachineFile = {
+    //         name,
+    //         trackId,
+    //         beatsPerMeasure: 4,  // Default to 4/4 time
+    //         stepsPerBeat: 4,     // Default to 16th notes
+    //         createdAt: new Date(),
+    //         updatedAt: new Date()
+    //     };
         
-        const id = await this.drumMachineFiles.add(metadata);
-        await this.logDbState();
-        return id;
-    }
+    //     const id = await this.drumMachineFiles.add(metadata);
+    //     await this.logDbState();
+    //     return id;
+    // }
+    // TODO: Implement drum machine track operations
+    // async getDrumMachineTrack(id: number): Promise<DrumMachineFile | undefined> {
+    //     this.logOperation('Getting drum machine track', { id });
+    //     const track = await this.drumMachineFiles.get(id);
+    //     this.logOperation('Retrieved drum machine track', {
+    //         id,
+    //         found: !!track,
+    //         name: track?.name
+    //     });
+    //     return track;
+    // }
 
-    async getDrumMachineTrack(id: number): Promise<DrumMachineFile | undefined> {
-        this.logOperation('Getting drum machine track', { id });
-        const track = await this.drumMachineFiles.get(id);
-        this.logOperation('Retrieved drum machine track', {
-            id,
-            found: !!track,
-            name: track?.name
-        });
-        return track;
-    }
+    // async getAllDrumMachineTracks(): Promise<DrumMachineFile[]> {
+    //     this.logOperation('Getting all drum machine tracks', {});
+    //     const tracks = await this.drumMachineFiles.toArray();
+    //     this.logOperation('Retrieved all drum machine tracks', {
+    //         count: tracks.length,
+    //         names: tracks.map(t => t.name)
+    //     });
+    //     return tracks;
+    // }
 
-    async getAllDrumMachineTracks(): Promise<DrumMachineFile[]> {
-        this.logOperation('Getting all drum machine tracks', {});
-        const tracks = await this.drumMachineFiles.toArray();
-        this.logOperation('Retrieved all drum machine tracks', {
-            count: tracks.length,
-            names: tracks.map(t => t.name)
-        });
-        return tracks;
-    }
+    // async updateDrumMachineTrack(id: number, updates: Partial<DrumMachineFile>): Promise<number> {
+    //     this.logOperation('Updating drum machine track', { id, updates });
+    //     updates.updatedAt = new Date();
+    //     const count = await this.drumMachineFiles.update(id, updates);
+    //     this.logOperation('Updated drum machine track', { id, success: count > 0 });
+    //     await this.logDbState();
+    //     return count;
+    // }
 
-    async updateDrumMachineTrack(id: number, updates: Partial<DrumMachineFile>): Promise<number> {
-        this.logOperation('Updating drum machine track', { id, updates });
-        updates.updatedAt = new Date();
-        const count = await this.drumMachineFiles.update(id, updates);
-        this.logOperation('Updated drum machine track', { id, success: count > 0 });
-        await this.logDbState();
-        return count;
-    }
-
-    async deleteDrumMachineTrack(id: number): Promise<void> {
-        this.logOperation('Deleting drum machine track', { id });
-        await this.drumMachineFiles.delete(id);
-        await this.logDbState();
-    }
+    // async deleteDrumMachineTrack(id: number): Promise<void> {
+    //     this.logOperation('Deleting drum machine track', { id });
+    //     await this.drumMachineFiles.delete(id);
+    //     await this.logDbState();
+    // }
 
     async getSoundfontFile(id: string): Promise<SoundfontFile | undefined> {
         return await this.soundfonts.get(id);

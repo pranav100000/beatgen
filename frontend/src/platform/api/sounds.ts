@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { AudioTrackRead } from '../types/project';
+import { AudioTrackRead, MidiTrackRead, SamplerTrackRead } from '../types/project';
 //import { SamplerTrack } from 'src/types/track';
 import { AudioTrackCreate } from '../types/track_models/audio_track';
 import { MidiTrackCreate } from '../types/track_models/midi_track';
@@ -59,7 +59,7 @@ export interface UploadUrlResponse {
 export const getUploadUrl = async (
   fileName: string, 
   id: string, 
-  fileType: 'audio' | 'midi',
+  fileType: 'audio' | 'soundfont',
   shouldOverwrite: boolean = false
 ): Promise<UploadUrlResponse> => {
   const response = await apiClient.post('/sounds/upload-url', { 
@@ -100,7 +100,7 @@ export const createSoundRecord = async (soundData: AudioTrackCreate): Promise<Au
  * @param midiData The MIDI track data with notes_json containing the note data
  * @returns The created MIDI track object
  */
-export const createMidiFileRecord = async (midiData: MidiTrackCreate): Promise<any> => {
+export const createMidiFileRecord = async (midiData: MidiTrackCreate): Promise<MidiTrackRead> => {
   console.log('Creating MIDI file and track records with data:', midiData);
   
   try {
@@ -122,7 +122,7 @@ export const createMidiFileRecord = async (midiData: MidiTrackCreate): Promise<a
  * @param samplerData The sampler track data
  * @returns The created sampler track object
  */
-export const createSamplerTrackRecord = async (samplerData: SamplerTrackCreate): Promise<any> => {
+export const createSamplerTrackRecord = async (samplerData: SamplerTrackCreate): Promise<SamplerTrackRead> => {
   console.log('Creating sampler track record with data:', samplerData);
   
   try {

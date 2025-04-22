@@ -1,20 +1,21 @@
+import { InstrumentFileRead } from '../types/project';
 import { apiClient } from './client';
 
-export interface Soundfont {
-  id: string;
-  name: string;
-  display_name: string;
-  category: string;
-  description?: string;
-  storage_key: string;
-}
+// export interface Soundfont {
+//   id: string;
+//   name: string;
+//   display_name: string;
+//   category: string;
+//   description?: string;
+//   storage_key: string;
+// }
 
 /**
  * Get all public soundfonts, optionally filtered by category
  * @param category Optional category filter
  * @returns Array of soundfonts
  */
-export const getPublicSoundfonts = async (category?: string): Promise<Soundfont[]> => {
+export const getPublicSoundfonts = async (category?: string): Promise<InstrumentFileRead[]> => {
   const params = category ? { category } : {};
   console.log('Getting public soundfonts with params:', params);
   const response = await apiClient.get('/soundfonts/public', { params });
@@ -26,7 +27,7 @@ export const getPublicSoundfonts = async (category?: string): Promise<Soundfont[
  * @param id The soundfont ID
  * @returns The soundfont object
  */
-export const getPublicSoundfont = async (id: string): Promise<Soundfont> => {
+export const getPublicSoundfont = async (id: string): Promise<InstrumentFileRead> => {
   const response = await apiClient.get(`/soundfonts/${id}`);
   return response.data;
 };

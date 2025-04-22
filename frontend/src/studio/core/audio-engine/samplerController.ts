@@ -275,7 +275,7 @@ export class SamplerController {
             if (!midiManager.hasTrack(trackId)) {
                 console.log(`Track ${trackId} not found in MidiManager, cannot set up sampler`);
                 midiManager.createTrack(trackId, "sampler");
-                throw new Error(`Track ${trackId} not found in MidiManager`);
+                //throw new Error(`Track ${trackId} not found in MidiManager`);
             }
             
             // Subscribe to future updates from MidiManager

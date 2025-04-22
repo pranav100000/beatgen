@@ -25,13 +25,14 @@ import { DrumTrack, DrumTrackCreate } from './track_models/drum_track';
 /**
  * Converts an API project model to the internal project model
  */
-export function apiProjectToInternal(project: ProjectWithTracks): InternalProject {
+export function apiProjectToInternal(project: ProjectWithTracks): Omit<ProjectWithTracks, 'user_id'> {
   return {
     id: project.id!,
     name: project.name,
-    tempo: project.bpm,
-    timeSignature: [project.time_signature_numerator, project.time_signature_denominator],
-    key: project.key_signature,
+    bpm: project.bpm,
+    time_signature_numerator: project.time_signature_numerator,
+    time_signature_denominator: project.time_signature_denominator,
+    key_signature: project.key_signature,
     tracks: project.tracks?.map(apiTrackToInternal) || []
   };
 }

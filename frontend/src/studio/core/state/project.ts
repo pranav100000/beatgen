@@ -1,43 +1,16 @@
-export interface Track {
-  id: string;
-  name: string;
-  type: 'audio' | 'midi' | 'drum' | 'sampler';
-  volume: number;
-  pan: number;
-  muted: boolean;
-  soloed: boolean;
-  instrumentId?: string;    // ID of the instrument (for MIDI/drum tracks)
-  instrumentName?: string;  // Display name of the instrument
-  instrumentStorageKey?: string; // Storage key for the instrument
-  baseMidiNote?: number;    // Base MIDI note for samplers (the note at which sample plays at original pitch)
-  grainSize?: number;       // Grain size for samplers (in seconds)
-  overlap?: number;         // Overlap amount for samplers (0-1)
-  sampleFile?: File;        // Sample file for samplers
-  audioFileId?: string;     // ID of the audio file for samplers
-  trimStartTicks?: number;  // Trim start ticks for samplers
-  trimEndTicks?: number;    // Trim end ticks for samplers
-  durationTicks?: number;   // Duration ticks for samplers
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  tempo: number;
-  timeSignature: [number, number];
-  key: string;
-  tracks: Track[];
-}
-
+import { CombinedTrack, Project, ProjectBase, ProjectWithTracks, TrackType } from "src/platform/types/project";
 export class ProjectManager {
-  private currentProject?: Project;
+  private currentProject?: ProjectWithTracks;
 
-  public createProject(name: string): Project {
+  public createProject(name: string): ProjectWithTracks {
     this.currentProject = {
       id: crypto.randomUUID(),
       name,
-      tempo: 120,
-      timeSignature: [4, 4],
-      key: 'C',
+      bpm: 120,
+      time_signature_numerator: 4,
+      time_signature_denominator: 4,
+      key_signature: 'C',
+      user_id: null,
       tracks: []
     };
     return this.currentProject;
@@ -49,130 +22,62 @@ export class ProjectManager {
     }
   }
 
-  public getCurrentProject(): Project | undefined {
+  public getCurrentProject(): ProjectWithTracks | undefined {
     return this.currentProject;
   }
 
-  public addTrack(name: string, type: Track['type'] = 'audio'): Track {
-    if (!this.currentProject) {
-      throw new Error('No project loaded');
-    }
+  // public addTrack(track: CombinedTrack): CombinedTrack {
+  //   if (!this.currentProject) {
+  //     throw new Error('No project loaded');
+  //   }
 
-    const track: Track = {
-      id: crypto.randomUUID(),
-      name,
-      type,
-      volume: 80,
-      pan: 0,
-      muted: false,
-      soloed: false
-    };
-
-    // Add default instrument properties for MIDI and drum tracks
-    if (type === 'midi') {
-      track.instrumentId = 'NULLVALUE'; // Default to piano
-      track.instrumentName = 'Grand Piano'; // Default name
-    } else if (type === 'drum') {
-      track.instrumentId = 'NULLVALUE'; // Default to drum kit
-      track.instrumentName = '808 Kit'; // Default name
-    }
-
-    this.currentProject.tracks.push(track);
-    return track;
-  }
+  //   this.currentProject.tracks.push(track);
+  //   return track;
+  // }
   
-  /**
-   * Add a track with a specific ID and properties (for loading saved projects)
-   * This ensures track IDs and settings are preserved across saves
-   */
-  public addTrackWithProperties(trackProps: {
-    id: string;
-    name: string;
-    type: Track['type'];
-    volume?: number;
-    pan?: number;
-    muted?: boolean;
-    soloed?: boolean;
-    instrumentId?: string;
-    instrumentName?: string;
-    instrumentStorageKey?: string;
-    baseMidiNote?: number;
-    grainSize?: number;
-    overlap?: number;
-    sampleFile?: File;
-  }): Track {
-    if (!this.currentProject) {
-      throw new Error('No project loaded');
-    }
 
-    const track: Track = {
-      id: trackProps.id,
-      name: trackProps.name,
-      type: trackProps.type,
-      volume: trackProps.volume ?? 80,
-      pan: trackProps.pan ?? 0,
-      muted: trackProps.muted ?? false,
-      soloed: trackProps.soloed ?? false
-    };
+  // public getTrackById(id: string): CombinedTrack | undefined {
+  //   return this.currentProject?.tracks.find(track => track.id === id);
+  // }
+
+  // public removeTrack(id: string): void {
+  //   if (!this.currentProject) return;
     
-    // Add instrument properties for MIDI and drum tracks
-    if ((trackProps.type === 'midi' || trackProps.type === 'drum') && trackProps.instrumentId) {
-      track.instrumentId = trackProps.instrumentId;
-      track.instrumentName = trackProps.instrumentName || 'Default Instrument';
-      track.instrumentStorageKey = trackProps.instrumentStorageKey;
-    }
-    
-    // Add sampler properties if this is a sampler track
-    if (trackProps.type === 'sampler') {
-      track.baseMidiNote = trackProps.baseMidiNote || 60; // Default to middle C
-      track.grainSize = trackProps.grainSize || 0.3;      // Default to 100ms
-      track.overlap = trackProps.overlap || 0.3;          // Default to 10% overlap
-      track.sampleFile = trackProps.sampleFile;           // Sample file
-    }
-
-    this.currentProject.tracks.push(track);
-    return track;
-  }
-
-  public getTrackById(id: string): Track | undefined {
-    return this.currentProject?.tracks.find(track => track.id === id);
-  }
-
-  public removeTrack(id: string): void {
-    if (!this.currentProject) return;
-    
-    this.currentProject.tracks = this.currentProject.tracks.filter(
-      track => track.id !== id
-    );
-  }
+  //   this.currentProject.tracks = this.currentProject.tracks.filter(
+  //     track => track.id !== id
+  //   );
+  // }
 
   public getTempo(): number {
-    return this.currentProject.tempo;
+    return this.currentProject.bpm;
   }
 
   public getTimeSignature(): [number, number] {
-    return this.currentProject.timeSignature;
+    return [this.currentProject.time_signature_numerator, this.currentProject.time_signature_denominator];
   }
 
   public getKey(): string {
-    return this.currentProject.key;
+    return this.currentProject.key_signature;
   }
 
   public setTempo(tempo: number): void {
     if (this.currentProject) {
-      this.currentProject.tempo = tempo;
+      this.currentProject.bpm = tempo;
     }
   }
 
   public setTimeSignature(numerator: number, denominator: number): void {
     if (this.currentProject) {
-      this.currentProject.timeSignature = [numerator, denominator];
+      this.currentProject.time_signature_numerator = numerator;
+      this.currentProject.time_signature_denominator = denominator;
     }
   }
 
   public setKey(key: string): void {
     if (this.currentProject) {
-      this.currentProject.key = key;
+      this.currentProject.key_signature = key;
     }
   }
 }
+
+export default ProjectManager;

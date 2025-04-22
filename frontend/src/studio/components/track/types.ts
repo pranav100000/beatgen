@@ -1,4 +1,4 @@
-import { TrackState } from '../../../types/track';
+import { CombinedTrack } from 'src/platform/types/project';
 
 /**
  * Common props interface shared by all track preview components.
@@ -12,7 +12,7 @@ export interface Position {
 
 export interface TrackPreviewProps {
   /** Track data including ID, type, and state */
-  track: TrackState;
+  track: CombinedTrack;
   
   /** Whether the track is currently playing */
   isPlaying: boolean;

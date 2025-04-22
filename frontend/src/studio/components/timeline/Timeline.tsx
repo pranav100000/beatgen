@@ -424,8 +424,12 @@ function TimelineContent({
           gridLineStyle={gridLineStyle}
           measureCount={GRID_CONSTANTS.measureCount}
           position={track.position}
-          onPositionChange={(newPosition, isDragEnd) => 
-          onTrackPositionChange(track.id, newPosition, isDragEnd)}
+          onPositionChange={(newPosition, isDragEnd) => {
+            console.log(`Timeline passing position change: trackId=${track.id}, isDragEnd=${isDragEnd}`, newPosition);
+            if (onTrackPositionChange) {
+              onTrackPositionChange(track.id, newPosition, isDragEnd);
+            }
+          }}
           bpm={bpm}
           duration={track.duration}
           _calculatedWidth={track._calculatedWidth}

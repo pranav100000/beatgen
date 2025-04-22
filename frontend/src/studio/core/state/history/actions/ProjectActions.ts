@@ -1,8 +1,9 @@
 import { Store } from '../../store';
 import * as Tone from 'tone';
-import { useStudioStore } from '../../../../stores/useStudioStore';
 import { calculateTrackWidth } from '../../../../constants/gridConstants';
 import { BaseAction } from './BaseAction';
+import { GetFn, RootState } from '../../../../stores/types';
+import { CombinedTrack } from 'src/platform/types/project';
 
 /**
  * Action for BPM changes without callbacks
@@ -14,57 +15,22 @@ export class BPMChangeAction extends BaseAction {
     private timeSignature: [number, number];
     
     constructor(
-        store: Store,
+        get: GetFn,
         oldBpm: number,
         newBpm: number,
         timeSignature: [number, number]
     ) {
-        super(store);
+        super(get);
         this.oldBpm = oldBpm;
         this.newBpm = newBpm;
         this.timeSignature = timeSignature;
     }
     
     private updateBPM(bpm: number): void {
-        // Update Tone.js transport BPM
         Tone.Transport.bpm.value = bpm;
-        
-        // Update global state
-        useStudioStore.setState(state => {
-            // First update BPM
-            const updatedState = { ...state, bpm };
-            
-            // Then recalculate track widths while preserving trim values
-            const updatedTracks = state.tracks.map(track => {
-                if (track.duration) {
-                    // Check if this track has trim values
-                    const hasTrimValues = 
-                        track.trimStartTicks !== undefined && 
-                        track.trimEndTicks !== undefined && 
-                        track.originalDurationTicks !== undefined;
-                    
-                    // Calculate width, considering trim values if available
-                    const newCalculatedWidth = calculateTrackWidth(
-                        track.duration, 
-                        bpm, 
-                        this.timeSignature,
-                        hasTrimValues ? {
-                            trimStartTicks: track.trimStartTicks,
-                            trimEndTicks: track.trimEndTicks,
-                            originalDurationTicks: track.originalDurationTicks
-                        } : undefined
-                    );
-                    
-                    return {
-                        ...track,
-                        _calculatedWidth: newCalculatedWidth
-                    };
-                }
-                return track;
-            });
-            
-            return { ...updatedState, tracks: updatedTracks };
-        });
+        this.store.getTransport().setTempo(bpm);
+        this.store.projectManager.setTempo(bpm);
+        this.get().setBpm(bpm);
     }
     
     async execute(): Promise<void> {
@@ -88,60 +54,21 @@ export class TimeSignatureAction extends BaseAction {
     private bpm: number;
     
     constructor(
-        store: Store,
+        get: GetFn,
         oldTimeSignature: [number, number],
         newTimeSignature: [number, number],
         bpm: number
     ) {
-        super(store);
+        super(get);
         this.oldTimeSignature = oldTimeSignature;
         this.newTimeSignature = newTimeSignature;
         this.bpm = bpm;
     }
     
     private updateTimeSignature(timeSignature: [number, number]): void {
-        // Update Tone.js transport time signature
         Tone.Transport.timeSignature = timeSignature;
-        
-        // Update store's project manager
         this.store.projectManager.setTimeSignature(timeSignature[0], timeSignature[1]);
-        
-        // Update global state
-        useStudioStore.setState(state => {
-            // First update time signature
-            const updatedState = { ...state, timeSignature };
-            
-            // Then recalculate track widths while preserving trim values
-            const updatedTracks = state.tracks.map(track => {
-                if (track.duration) {
-                    // Check if this track has trim values
-                    const hasTrimValues = 
-                        track.trimStartTicks !== undefined && 
-                        track.trimEndTicks !== undefined && 
-                        track.originalDurationTicks !== undefined;
-                    
-                    // Calculate width, considering trim values if available
-                    const newCalculatedWidth = calculateTrackWidth(
-                        track.duration, 
-                        this.bpm, 
-                        timeSignature,
-                        hasTrimValues ? {
-                            trimStartTicks: track.trimStartTicks,
-                            trimEndTicks: track.trimEndTicks,
-                            originalDurationTicks: track.originalDurationTicks
-                        } : undefined
-                    );
-                    
-                    return {
-                        ...track,
-                        _calculatedWidth: newCalculatedWidth
-                    };
-                }
-                return track;
-            });
-            
-            return { ...updatedState, tracks: updatedTracks };
-        });
+        this.get().setTimeSignature(timeSignature[0], timeSignature[1]);
     }
     
     async execute(): Promise<void> {
@@ -164,23 +91,21 @@ export class KeySignatureAction extends BaseAction {
     private newKeySignature: string;
     
     constructor(
-        store: Store,
+        get: GetFn,
         oldKeySignature: string,
         newKeySignature: string
     ) {
-        super(store);
+        super(get);
         this.oldKeySignature = oldKeySignature;
         this.newKeySignature = newKeySignature;
     }
     
     private updateKeySignature(keySignature: string): void {
-        // Update store's project manager if it has the method
         if (this.store.projectManager && typeof this.store.projectManager.setKey === 'function') {
             this.store.projectManager.setKey(keySignature);
         }
         
-        // Update global state
-        useStudioStore.setState({ keySignature });
+        this.get().setKeySignature(keySignature);
     }
     
     async execute(): Promise<void> {

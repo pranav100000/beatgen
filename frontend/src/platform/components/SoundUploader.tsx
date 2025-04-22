@@ -51,7 +51,7 @@ export default function SoundUploader({ onSoundUploaded, onCancel }: SoundUpload
     try {
       // 1. Generate UUID and get presigned URL
       const trackId = crypto.randomUUID();
-      const { id, upload_url, storage_key } = await getUploadUrl(file.name, trackId);
+      const { id, upload_url, storage_key } = await getUploadUrl(file.name, trackId, 'audio');
       
       // 2. Upload file with progress tracking
       await uploadFileWithProgress(

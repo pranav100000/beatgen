@@ -1,4 +1,6 @@
 import { Store } from '../../store';
+import { GetFn, RootState } from '../../../../stores/types';
+import { ActionType } from '.';
 
 export interface Action {
     execute(): Promise<void>;
@@ -10,11 +12,17 @@ export interface Action {
  * Base class for all direct actions that update state without callbacks
  */
 export abstract class BaseAction implements Action {
-    abstract type: string;
+    abstract type: ActionType;
+    protected get: GetFn;
     protected store: Store;
     
-    constructor(store: Store) {
-        this.store = store;
+    constructor(get: GetFn) {
+        this.get = get;
+        const storeInstance = this.get().store;
+        if (!storeInstance) {
+            throw new Error("Store instance not available when creating action!");
+        }
+        this.store = storeInstance;
     }
     
     /**
@@ -29,9 +37,9 @@ export abstract class BaseAction implements Action {
      * Synchronizes a track with the current transport state
      */
     protected syncTrackWithTransport(trackId: string, positionX: number): void {
-        const isPlaying = this.store.getTransport().isPlaying;
+        const isPlaying = this.get().isPlaying;
         
-        if (isPlaying) {
+        if (isPlaying && this.store.getTransport().handleTrackPositionChange) {
             console.log(`Playback active - syncing track ${trackId} with transport`);
             setTimeout(() => {
                 this.store.getTransport().handleTrackPositionChange(trackId, positionX);
@@ -49,8 +57,8 @@ export abstract class BaseAction implements Action {
 export abstract class TrackAction extends BaseAction {
     protected trackId: string;
     
-    constructor(store: Store, trackId: string) {
-        super(store);
+    constructor(get: GetFn, trackId: string) {
+        super(get);
         this.trackId = trackId;
     }
     
@@ -65,8 +73,8 @@ export abstract class NoteAction extends BaseAction {
     protected trackId: string;
     protected noteId: string;
     
-    constructor(store: Store, trackId: string, noteId: string) {
-        super(store);
+    constructor(get: GetFn, trackId: string, noteId: string) {
+        super(get);
         this.trackId = trackId;
         this.noteId = noteId;
     }

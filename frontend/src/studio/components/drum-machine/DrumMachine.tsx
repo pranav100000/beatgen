@@ -3,12 +3,12 @@ import { Rnd } from 'react-rnd';
 import PianoRoll from '../piano-roll2/PianoRoll';
 import CloseIcon from '@mui/icons-material/Close';
 import { IconButton, Tooltip } from '@mui/material';
-import { useStudioStore } from '../../stores/useStudioStore';
+import { useStudioStore } from '../../stores/studioStore';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
-import { TrackState } from 'src/platform/api/projects';
+import { CombinedTrack } from '../../../platform/types/project';
 
-export interface DrumTrackState extends TrackState {
+export interface DrumTrackState extends CombinedTrack {
   type: 'drum';
   drumPattern?: boolean[][];
   samplerTrackIds?: string[];

@@ -188,7 +188,11 @@ class TrackService:
             track_data["type"] = TrackType.AUDIO
             
             # Create the track
-            track = await self.audio_repository.create(track_data)
+            try:
+                track = await self.audio_repository.create(track_data)
+            except Exception as e:
+                logger.info(f"Audio track already with ID: {track_data['id']} exists. Updating track.")
+                track = await self.audio_repository.update(track_data["id"], track_data)
             
             logger.info(f"Created audio track with ID: {track.id} for user ID: {user_id}")
             return AudioTrackRead.model_validate(track)
@@ -223,7 +227,11 @@ class TrackService:
             
             # Create the track
             logger.info(f"Creating MIDI track with data: {midi_track_data}")
-            track = await self.midi_repository.create(midi_track_data)
+            try:
+                track = await self.midi_repository.create(midi_track_data)
+            except Exception as e:
+                logger.info(f"MIDI track already with ID: {midi_track_data['id']} exists. Updating track.")
+                track = await self.midi_repository.update(midi_track_data["id"], midi_track_data)
             
             logger.info(f"Created MIDI track with ID: {track.id} for user ID: {user_id}")
             return MidiTrackRead.model_validate(track)
@@ -258,7 +266,11 @@ class TrackService:
                 raise ValueError("Sampler tracks require audio_storage_key")
             
             # Create the track
-            track = await self.sampler_repository.create(track_data)
+            try:
+                track = await self.sampler_repository.create(track_data)
+            except Exception as e:
+                logger.info(f"Sampler track already with ID: {track_data['id']} exists. Updating track.")
+                track = await self.sampler_repository.update(track_data["id"], track_data)
             
             logger.info(f"Created sampler track with ID: {track.id} for user ID: {user_id}")
             return SamplerTrackRead.model_validate(track)

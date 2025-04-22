@@ -7,7 +7,7 @@ import TrackControlsSidebar from './components/sidebar/TrackControlsSidebar';
 import { Timeline, TimelineRef } from './components/timeline/Timeline';
 import AddTrackMenu from './components/sidebar/AddTrackMenu';
 import { GRID_CONSTANTS } from './constants/gridConstants';
-import { useStudioStore } from './stores/useStudioStore';
+import { useStudioStore } from './stores/studioStore';
 
 // Import piano roll components
 import PianoRollWindows from './components/piano-roll-new/PianoRollWindows';
@@ -30,6 +30,9 @@ interface StudioProps {
 
 // Main Studio Component
 function Studio({ projectId }: StudioProps) {
+  // Add console log here
+  console.log('>>> Studio Component Rendering <<<'); 
+
   // Initialize DB session management
   useStudioDBSession();
   

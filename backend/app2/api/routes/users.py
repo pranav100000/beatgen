@@ -48,7 +48,6 @@ async def get_current_user_profile(
     try:
         profile = await user_service.get_profile(current_user["id"])
         logger.info(f"Retrieved profile for user ID: {current_user['id']}")
-        logger.info(f"PPPPPPProfile: {profile}")
         return profile
     except NotFoundException:
         logger.error(f"Profile not found for user ID: {current_user['id']}")

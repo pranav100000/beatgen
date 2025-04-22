@@ -16,9 +16,10 @@ import PianoIcon from '@mui/icons-material/Piano';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { SvgIconComponent } from '@mui/icons-material';
-import { getPublicSoundfonts, getSoundfontDownloadUrl, Soundfont } from '../../../platform/api/soundfonts';
+import { getPublicSoundfonts, getSoundfontDownloadUrl } from '../../../platform/api/soundfonts';
 import SoundfontManager from '../../core/soundfont/soundfontManager';
 import { db } from '../../core/db/dexie-client';
+import { InstrumentFileRead } from 'src/platform/types/project';
 
 interface Instrument {
     id: string;
@@ -100,7 +101,7 @@ export interface VirtualInstrumentsModalProps {
 export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInstrumentsModalProps) => {
     const [loading, setLoading] = useState(false);
     const [downloading, setDownloading] = useState<string | null>(null);
-    const [soundfonts, setSoundfonts] = useState<Soundfont[]>([]);
+    const [soundfonts, setSoundfonts] = useState<InstrumentFileRead[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [expanded, setExpanded] = useState(false);
 
@@ -138,7 +139,7 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
         onClose();
     };
 
-    const handleSoundfontSelect = async (soundfont: Soundfont) => {
+    const handleSoundfontSelect = async (soundfont: InstrumentFileRead) => {
         try {
             setDownloading(soundfont.id);
             setError(null);
@@ -150,18 +151,18 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
             const isCached = await soundfontManager.isSoundfontCached(soundfont.id);
             
             if (!isCached) {
-                console.log(`Downloading soundfont: ${soundfont.display_name}`);
+                console.log(`Downloading soundfont: ${soundfont.name}`);
                 
                 // The getSoundfont method will download and store the soundfont if needed
                 await soundfontManager.getSoundfont(soundfont.id);
                 
-                console.log(`Soundfont ${soundfont.display_name} successfully stored`);
+                console.log(`Soundfont ${soundfont.name} successfully stored`);
             } else {
-                console.log(`Soundfont ${soundfont.display_name} already in cache`);
+                console.log(`Soundfont ${soundfont.name} already in cache`);
             }
             
             // Call onSelect with the soundfont ID, display name, and storage key
-            onSelect(soundfont.id, soundfont.display_name, soundfont.storage_key);
+            onSelect(soundfont.id, soundfont.name, soundfont.storage_key);
             onClose();
             
         } catch (err) {
@@ -333,7 +334,7 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
                             </Box>
                             <Box sx={{ textAlign: 'center' }}>
                             <Typography variant="subtitle1">
-                                {soundfont.display_name}
+                                {soundfont.name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                                 {soundfont.category}

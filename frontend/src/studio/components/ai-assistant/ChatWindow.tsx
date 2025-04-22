@@ -23,7 +23,7 @@ import {
   TrackData
 } from '../../../platform/api/assistant';
 import { historyManager } from '../../core/state/history/HistoryManager';
-import { useStudioStore } from '../../stores/useStudioStore';
+import { useStudioStore } from '../../stores/studioStore';
 import ChatModeMenu from './ChatModeMenu';
 import AddContextMenu from './AddContextMenu';
 import MenuChip from './MenuChip';
@@ -31,7 +31,7 @@ import AddContextChip from './AddContextChip';
 import AssistantChatBubble from './AssistantChatBubble';
 import UserChatBubble from './UserChatBubble';
 import { GRID_CONSTANTS } from '../../constants/gridConstants';
-import { TrackState } from '../../../types/track';
+import { CombinedTrack } from '../../../platform/types/project';
 import ReactMarkdown from 'react-markdown'
 
 interface Message {
@@ -62,7 +62,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
   const [modeAnchorEl, setModeAnchorEl] = useState<null | HTMLElement>(null);
   const [contextAnchorEl, setContextAnchorEl] = useState<null | HTMLElement>(null);
   const [cursorPosition, setCursorPosition] = useState<number>(0);
-  const [selectedTrack, setSelectedTrack] = useState<TrackState | null>(null);
+  const [selectedTrack, setSelectedTrack] = useState<CombinedTrack | null>(null);
   
   // Streaming state
   const [isStreaming, setIsStreaming] = useState(false);
@@ -565,7 +565,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             const existingTracks = useStudioStore.getState().tracks;
             const previousTrackStates = existingTracks.map(track => ({
               trackId: track.id,
-              wasMuted: track.muted
+              wasMuted: track.mute
             }));
             
             // Create an array of actions
@@ -573,7 +573,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             
             // First, create mute actions for existing tracks
             for (const track of existingTracks) {
-              if (!track.muted) {
+              if (!track.mute) {
                 actions.push({
                   execute: async () => {
                     console.log(`Muting existing track ${track.id}`);
@@ -623,8 +623,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             }
             
             // Create and execute the composite action
-            const compositeAction = new CompositeAction(actions, 'AI Assistant Generate');
-            await historyManager.executeAction(compositeAction);
+            //const compositeAction = new CompositeAction(actions, 'AI Assistant Generate');
+            //await historyManager.executeAction(compositeAction);
             
             // Update history UI state
             useStudioStore.setState({
