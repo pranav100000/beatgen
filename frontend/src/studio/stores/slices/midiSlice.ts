@@ -14,6 +14,7 @@ export interface MidiSlice {
   removeMidiNote: (trackId: string, noteId: number) => void;
   updateMidiNote: (trackId: string, note: NoteState) => void;
   getTrackNotes: (trackId: string) => Note[] | null;
+  removeSamplerNote: (trackId: string, tickPosition: number, midiRow: number) => Promise<void>;
 }
 
 // Create the slice function
@@ -67,6 +68,16 @@ export const createMidiSlice: StoreSliceCreator<MidiSlice> = (set, get) => {
         await executeHistoryAction(action);
     };
     await _withErrorHandling(removeLogic, 'removeMidiNote')();
+  };
+
+  const removeSamplerNote = async (trackId: string, tickPosition: number, midiRow: number): Promise<void> => {
+    const { store, _withErrorHandling, executeHistoryAction } = rootGet();
+    if (!store || !_withErrorHandling || !executeHistoryAction) { return; }
+    const notes = getTrackNotes(trackId);
+    if (!notes) { return; }
+    const noteToRemove = notes.find(n => n.column === tickPosition && n.row === midiRow);
+    if (!noteToRemove) { return; }
+    removeMidiNote(trackId, noteToRemove.id);
   };
 
   // Update an existing MIDI note and record history
@@ -142,5 +153,6 @@ export const createMidiSlice: StoreSliceCreator<MidiSlice> = (set, get) => {
     removeMidiNote,
     updateMidiNote,
     getTrackNotes,
+    removeSamplerNote,
   };
 };

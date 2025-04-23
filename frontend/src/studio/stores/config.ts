@@ -1,8 +1,6 @@
 import { Store } from '../core/state/store';
 import { TrackType, GetFn, AudioTrackOptions, MidiTrackOptions, SamplerTrackOptions, TrackOptions } from './types';
-import { calculateTrackWidth } from '../constants/gridConstants';
 import { db } from '../core/db/dexie-client';
-import SampleManager from '../core/samples/sampleManager';
 
 // Default configuration for samplers
 export const DEFAULT_SAMPLER_CONFIG = {

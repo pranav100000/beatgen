@@ -1,6 +1,5 @@
 import { Position } from '../components/track';
 import { CombinedTrack } from 'src/platform/types/project';
-import { NoteState } from '../components/drum-machine/DrumMachine';
 import { Note } from '../../types/note';
 import { Store } from '../core/state/store';
 import { Action } from '../core/state/history/actions/BaseAction';
@@ -16,6 +15,14 @@ import { DrumSamplePublicRead } from '../../platform/types/public_models/drum_sa
 // export type { ProjectWithTracks as ProjectStateData }; 
 
 // =================== SHARED TYPES ===================
+
+export interface NoteState {
+  id: number;        // Unique ID for the note instance
+  row: number;     // MIDI note number (0-127 typically, or specific range)
+  column: number;  // Start time in ticks (e.g., PPQN)
+  length: number;  // Duration in ticks
+  velocity?: number; // Optional velocity (0-127)
+}
 
 // Represents basic parameters adjustable for most tracks
 export type TrackParameter = {
@@ -94,6 +101,7 @@ export interface DrumTrackOptions extends BaseTrackOptions {
 // Specific options for Sampler Tracks
 export interface SamplerTrackOptions extends BaseTrackOptions {
   sampleFile?: File;
+  drum_track_id?: string;
   storage_key?: string;
   baseMidiNote?: number;
   grainSize?: number;
@@ -193,8 +201,16 @@ export interface RootState {
   updateMidiNote: (trackId: string, note: NoteState) => void;
   getTrackNotes: (trackId: string) => Note[] | null;
   setDrumPattern: (trackId: string, pattern: boolean[][]) => void;
-  addSamplerToDrumTrack: (drumTrackId: string, file: File) => Promise<CombinedTrack | null>;
-  removeSamplerFromDrumTrack: (drumTrackId: string, samplerTrackIdToDelete: string) => Promise<void>;
+  selectDrumTrackById: (trackId: string) => DrumTrackRead | undefined;
+  selectSamplerTracksForDrumTrack: (drumTrackId: string) => SamplerTrackRead[];
+
+  // New actions
+  removeSamplerTrack: (samplerTrackId: string) => Promise<void>;
+  addSamplerTrackToDrumTrack: (
+    drumTrackId: string,
+    sampleData: { id: string; display_name: string; storage_key: string; /* other needed fields? */ }
+  ) => Promise<CombinedTrack | null>;
+  removeSamplerNote: (trackId: string, tickPosition: number, midiRow: number) => Promise<void>;
   addEmptySamplerToDrumTrack: (drumTrackId: string, newSamplerName?: string) => Promise<string | null>;
   downloadSamplerTrack: (trackId: string) => Promise<{audioBlob?: Blob, trackName: string} | null>;
 

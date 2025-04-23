@@ -1,6 +1,6 @@
 import { CombinedTrack } from 'src/platform/types/project';
 import { Position } from '../../components/track';
-import { RootState, SetFn, GetFn, TrackParameter, TrackType, TrackOptions, AddTrackPayload, DrumTrackPayload, MidiTrackPayload, AudioTrackOptions, SamplerTrackOptions, MidiTrackOptions, AnyTrackRead, MidiTrack, AudioTrack, SamplerTrack, AudioTrackRead, MidiTrackRead, SamplerTrackRead, DrumTrackRead } from '../types';
+import { RootState, SetFn, GetFn, TrackParameter, TrackType, TrackOptions, AddTrackPayload, DrumTrackPayload, MidiTrackPayload, AudioTrackOptions, SamplerTrackOptions, MidiTrackOptions, AnyTrackRead, MidiTrack, AudioTrack, SamplerTrack, AudioTrackRead, MidiTrackRead, SamplerTrackRead, DrumTrackRead, DrumTrackOptions } from '../types';
 import { Store } from '../../core/state/store';
 import { Actions } from '../../core/state/history/actions'; 
 import { TRACK_CONFIG, DEFAULT_SAMPLER_CONFIG } from '../config';
@@ -46,12 +46,23 @@ export interface TracksSlice {
   handleTrackResizeEnd: (trackId: string, deltaPixels: number, resizeDirection: 'left' | 'right') => void;
 
   // Add missing action definitions
-  handleAddTrack: (type: TrackType, payload?: AddTrackPayload) => Promise<CombinedTrack | { mainDrumTrack: CombinedTrack | null, samplerTracks: (CombinedTrack | null)[] } | null>;
+  handleAddTrack: (type: TrackType, payload?: AddTrackPayload) => Promise<CombinedTrack | null>;
   handleInstrumentChange: (trackId: string, instrumentId: string, instrumentName: string, instrumentStorageKey: string) => Promise<void>; 
   replaceTrackAudioFile: (trackId: string, file: File) => Promise<void>;
 
   // Expose internal helper for nested updates
   _updateNestedTrackData: (trackId: string, nestedUpdates: Partial<AnyTrackRead>) => void; // Use AnyTrackRead
+
+  // --- Selectors --- 
+  selectDrumTrackById: (trackId: string) => DrumTrackRead | undefined;
+  selectSamplerTracksForDrumTrack: (drumTrackId: string) => SamplerTrackRead[];
+
+  // New actions
+  removeSamplerTrack: (samplerTrackId: string) => Promise<void>;
+  addSamplerTrackToDrumTrack: (
+    drumTrackId: string,
+    sampleData: { id: string; display_name: string; storage_key: string; /* other needed fields? */ }
+  ) => Promise<CombinedTrack | null>;
 }
 
 // Remove local type alias if it causes confusion
@@ -137,6 +148,25 @@ export const createTracksSlice = (set, get) => {
         return track; 
       })
     );
+  };
+
+  // --- Selectors Implementation --- 
+  const selectDrumTrackById = (trackId: string): DrumTrackRead | undefined => {
+    const track = findTrackById(trackId); // Use the slice's findTrackById
+    // Ensure track and track.track exist and type is correct
+    return (track && track.type === 'drum' && track.track) ? track.track as DrumTrackRead : undefined;
+  };
+
+  const selectSamplerTracksForDrumTrack = (drumTrackId: string): SamplerTrackRead[] => {
+    const tracks = rootGet().tracks; // Get current tracks from root state
+    return tracks
+      // Ensure track and track.track exist before filtering
+      .filter(t => 
+          t.type === 'sampler' && 
+          t.track && 
+          (t.track as SamplerTrackRead).drum_track_id === drumTrackId
+      )
+      .map(t => t.track as SamplerTrackRead); // Map to the nested track data
   };
 
   // --- TODO: Implement Core Track Operations (createTrackAndRegisterWithHistory, handleTrackDelete) --- 
@@ -245,6 +275,7 @@ export const createTracksSlice = (set, get) => {
               overlap: samplerOptions.overlap ?? DEFAULT_SAMPLER_CONFIG.overlap,
               audio_file_name: file?.name, // Get name from extracted file variable
               storage_key: samplerOptions.storage_key,
+              drum_track_id: samplerOptions.drum_track_id || null,
               // NO sampleFile property here
            }
       }
@@ -267,7 +298,7 @@ export const createTracksSlice = (set, get) => {
   };
 
   const handleTrackDelete = async (trackId: string) => {
-      const { tracks, executeHistoryAction, _withStore, _withErrorHandling } = rootGet();
+      const { executeHistoryAction, _withStore, _withErrorHandling } = rootGet();
       const storeInstance = rootGet().store; // Get the Store instance
       const trackToDelete = findTrackById(trackId);
 
@@ -276,50 +307,128 @@ export const createTracksSlice = (set, get) => {
           return;
       }
 
-      if (!storeInstance) {
-          console.error("_withStore not available for delete");
-          return;
-      }
-      if (!_withStore || !_withErrorHandling) {
+      if (!storeInstance || !_withStore || !_withErrorHandling) {
           console.error("_withStore or _withErrorHandling not available for delete");
           return;
       }
 
       const deleteLogic = async (passedStore: Store) => {
-          const action = new Actions.DeleteTrack(get, { ...trackToDelete }); 
-
-          // Update state first
-          rootGet()._updateState('tracks', (prevTracks) => prevTracks.filter(t => t.id !== trackId));
-          rootGet().updateTrackIndices(); 
-
-          // Remove from engine with error handling
-          try {
-            await passedStore.getAudioEngine().removeTrack(trackId);
-          } catch (engineError) {
-             console.error(`Error removing track ${trackId} from audio engine:`, engineError);
-             // Decide if failure here should prevent history action or state update rollback
+          // --- Modification: If deleting a DrumTrack, remove its samplers first --- 
+          if (trackToDelete.type === 'drum' && trackToDelete.track) {
+              const drumTrack = trackToDelete.track as DrumTrackRead;
+              const samplerIdsToRemove = drumTrack.sampler_track_ids ? [...drumTrack.sampler_track_ids] : []; // Iterate over a copy
+              
+              if (samplerIdsToRemove.length > 0) {
+                  console.log(`Drum track ${trackId} deleted, removing associated samplers:`, samplerIdsToRemove);
+                  // Sequentially remove samplers (await each one to avoid state race conditions if needed)
+                  for (const samplerId of samplerIdsToRemove) {
+                      try {
+                          // Use the new removeSamplerTrack function which handles parent update + history
+                          await get().removeSamplerTrack(samplerId); 
+                      } catch (samplerRemoveError) {
+                          console.error(`Error removing associated sampler ${samplerId} during drum track delete:`, samplerRemoveError);
+                          // Decide if we should continue or abort drum track deletion
+                      }
+                  }
+              }
           }
-          
-          // TODO: Disconnect logic (placeholders)
+          // --- End Modification ---
+
+          // Now delete the main track (or the non-drum track)
+          console.log(`Proceeding to delete track ${trackId} itself.`);
+          const action = new Actions.DeleteTrack(get, { ...trackToDelete });
+
+          // Update state before engine removal
+          rootGet()._updateState('tracks', (prevTracks) => prevTracks.filter(t => t.id !== trackId));
+          rootGet().updateTrackIndices();
+
+          try {
+              await passedStore.getAudioEngine().removeTrack(trackId);
+          } catch (engineError) {
+              console.error(`Error removing track ${trackId} from audio engine:`, engineError);
+          }
+
           try {
               if (trackToDelete.type === 'sampler') {
-                  // Remove potentially incorrect disconnect call
-                  // store.getTransport().getSamplerController()?.removeTrackSubscription(trackId);
                   console.log(`Placeholder: Disconnect/cleanup sampler track ${trackId} subscription`);
               }
               if (trackToDelete.type === 'midi') {
-                  // store.disconnectTrackFromSoundfont(trackId)? 
                   console.log(`Placeholder: Disconnect MIDI track ${trackId} from soundfont/manager`);
               }
           } catch (disconnectError) {
               console.error(`Error during track disconnection for ${trackId}:`, disconnectError);
           }
 
-          // Execute history action 
-          await rootGet().executeHistoryAction(action); // Use get() to call historySlice action
+          await executeHistoryAction(action);
+          console.log(`Finished deleting track ${trackId}.`);
       };
 
       await _withErrorHandling(async () => _withStore(deleteLogic)(), `handleTrackDelete: ${trackId}`)();
+  };
+
+  // --- New: removeSamplerTrack Action Implementation --- 
+  const removeSamplerTrack = async (samplerTrackId: string) => {
+    const { executeHistoryAction, _withErrorHandling } = rootGet();
+    const samplerTrack = findTrackById(samplerTrackId); // Use slice's findTrackById
+
+    // 1. Basic Validation
+    if (!samplerTrack || samplerTrack.type !== 'sampler' || !samplerTrack.track) {
+        console.error(`Sampler track ${samplerTrackId} not found or invalid.`);
+        return;
+    }
+    const drumTrackId = (samplerTrack.track as SamplerTrackRead)?.drum_track_id;
+    console.log(`Attempting to remove sampler ${samplerTrackId}, associated drum track: ${drumTrackId}`);
+
+    // 2. Delete the Sampler Track Itself (using the refactored handleTrackDelete)
+    // Note: We call handleTrackDelete, NOT Actions.DeleteTrack directly, 
+    // because handleTrackDelete includes engine removal and state updates.
+    // The history action for deleting the sampler itself is handled within handleTrackDelete.
+    await handleTrackDelete(samplerTrackId); 
+    console.log(`Deletion process initiated for sampler track ${samplerTrackId}`);
+
+    // 3. Update Parent Drum Track (if applicable)
+    if (drumTrackId) {
+        // Need to use _withErrorHandling or similar if accessing state after potential async operations
+        const updateParentLogic = async () => { // Wrap in async for safety
+            const parentDrumTrack = selectDrumTrackById(drumTrackId); // Use the selector
+
+            if (parentDrumTrack) {
+                const oldSamplerIds = parentDrumTrack.sampler_track_ids || [];
+                const newSamplerIds = oldSamplerIds.filter(id => id !== samplerTrackId);
+
+                if (oldSamplerIds.length !== newSamplerIds.length) {
+                    console.log(`Updating parent drum track ${drumTrackId} after removing sampler ${samplerTrackId}. New list:`, newSamplerIds);
+                    
+                    // Update parent state
+                    _updateNestedTrackData(drumTrackId, { sampler_track_ids: newSamplerIds } as Partial<DrumTrackRead>);
+
+                    // History action for the PARENT update
+                    const parentUpdateAction = new Actions.UpdateDrumTrackSamplers(
+                        get,
+                        drumTrackId,
+                        oldSamplerIds,
+                        newSamplerIds
+                    );
+                    await executeHistoryAction(parentUpdateAction); 
+                } else {
+                    console.log(`Sampler ${samplerTrackId} was not found in parent ${drumTrackId}'s list.`);
+                }
+            } else {
+                console.warn(`Parent drum track ${drumTrackId} not found after deleting sampler ${samplerTrackId}. Cannot update parent.`);
+            }
+        };
+        
+        // Wrap the parent update logic in error handling
+        if (_withErrorHandling) { 
+            await _withErrorHandling(updateParentLogic, `removeSamplerTrackParentUpdate: ${samplerTrackId}`)();
+        } else {
+            console.error("_withErrorHandling not available for parent update in removeSamplerTrack");
+            await updateParentLogic(); // Attempt without handler
+        }
+    } else {
+        console.log(`Sampler ${samplerTrackId} was not associated with a drum track.`);
+    }
+    console.log(`Finished removeSamplerTrack process for ${samplerTrackId}`);
   };
 
   // --- Parameter Change Handlers --- 
@@ -598,13 +707,13 @@ export const createTracksSlice = (set, get) => {
     _withErrorHandling(resizeLogic, 'handleTrackResizeEnd')();
   };
 
-  // --- Updated handleAddTrack Implementation --- 
+  // --- Simplified handleAddTrack Implementation --- 
   const handleAddTrack = async (
     type: TrackType, 
     payload?: AddTrackPayload
-  ): Promise<CombinedTrack | { mainDrumTrack: CombinedTrack | null, samplerTracks: (CombinedTrack | null)[] } | null> => {
+  ): Promise<CombinedTrack | null> => {
       const rootState = get(); 
-      // Access actions/state needed from the root state
+      // Simplified: Removed executeHistoryAction as it's handled within createTrack...
       const { createTrackAndRegisterWithHistory, openDrumMachine, _withErrorHandling } = rootState;
       
       if (!_withErrorHandling || !createTrackAndRegisterWithHistory) {
@@ -613,86 +722,54 @@ export const createTracksSlice = (set, get) => {
       }
 
       const addLogic = async () => {
-          // --- Drum Track Creation (Revised Logic) --- 
+          // --- Drum Track Creation (Simplified Logic) --- 
           if (type === 'drum') {
-              if (!openDrumMachine) {
-                console.error("handleAddTrack: Missing dependency for drum type (openDrumMachine)");
-                return null;
-              }
-              if (!payload || !('samples' in payload)) {
-                  console.error("handleAddTrack Error: Drum track requires a payload with samples.");
-                  return null;
-              }
-              const drumPayload = payload as DrumTrackPayload;
-              const selectedSamples = drumPayload.samples;
-              console.log("Creating drum track with selected samples:", selectedSamples);
-
-              // 1. Create individual sampler tracks for each selected sample
-              const samplerPromises = selectedSamples.map(async (sample) => {
-                  try {
-                      const samplerOptions: SamplerTrackOptions = {
-                          name: sample.display_name, 
-                          storage_key: sample.storage_key, 
-                          // Add other potential mappings here
-                      };
-                      console.log(`Creating sampler track for ${sample.display_name} with options:`, samplerOptions);
-                      const samplerTrack = await createTrackAndRegisterWithHistory('sampler', sample.display_name, samplerOptions);
-                      if (!samplerTrack) {
-                          console.error(`Failed to create sampler track for ${sample.display_name}`);
-                          return null;
-                      }
-                      console.log(`Created sampler track for ${sample.display_name}:`, samplerTrack.id);
-                      return samplerTrack;
-                  } catch (error) {
-                      console.error(`Error creating sampler track for ${sample.display_name}:`, error);
-                      return null;
-                  }
-              });
+              // Payload might still be needed if it contains other drum-specific options, but not samples
+              console.log("Creating main drum track (samplers added separately)");
               
-              const createdSamplerTracks = (await Promise.all(samplerPromises)).filter(Boolean) as CombinedTrack[];
-              const samplerTrackIds = createdSamplerTracks.map(track => track.id);
-              console.log("Created sampler tracks:", samplerTrackIds);
-              
-              // 2. Create the main drum track referencing the samplers
-              const count = rootState.tracks.length + createdSamplerTracks.length;
+              // 1. Create the main drum track only
+              const count = rootState.tracks.length + 1; 
               const mainDrumTrackName = TRACK_CONFIG.drum.getDefaultName(count, 'Drum Kit');
+              // Pass only relevant options, ensure sampler_track_ids defaults to [] internally
               const mainDrumTrack = await createTrackAndRegisterWithHistory('drum', mainDrumTrackName, {
                   instrumentName: 'Drum Sequencer', 
-                  samplerTrackIds: samplerTrackIds
+                  // No samplerTrackIds needed here; created empty by default or in createTrack... 
               });
+
+              if (!mainDrumTrack) {
+                  console.error("Failed to create main drum track");
+                  return null;
+              }
+              console.log(`Created main drum track ${mainDrumTrack.id}`);
               
-              // 3. Open UI
-              if (mainDrumTrack && openDrumMachine) {
+              // 2. Open UI (optional)
+              // We still might want to open the UI even if samplers are added later
+              if (openDrumMachine) {
                   console.log(`Opening drum machine UI for track: ${mainDrumTrack.id}`);
                   openDrumMachine(mainDrumTrack.id);
               }
-              return { mainDrumTrack, samplerTracks: createdSamplerTracks };
+
+              // Return only the created drum track
+              return mainDrumTrack;
           }
           
-          // --- Standard/MIDI Track Creation --- 
-          const count = rootState.tracks.length + 1;
-          let instrumentName: string | undefined;
-          let trackOptions: TrackOptions = {};
+          // --- Standard/MIDI Track Creation (Unchanged) --- 
+          const countStd = rootState.tracks.length + 1;
+          let instrumentNameStd: string | undefined;
+          let trackOptionsStd: TrackOptions = {};
 
-          // No need for `else if (type !== 'drum')` check here, 
-          // as the drum case is handled above and returns.
           if (type === 'midi' && payload && 'instrumentId' in payload) {
               const midiPayload = payload as MidiTrackPayload;
-              instrumentName = midiPayload.instrumentName;
-              trackOptions = { 
+              instrumentNameStd = midiPayload.instrumentName;
+              trackOptionsStd = { 
                   instrumentId: midiPayload.instrumentId,
                   instrumentName: midiPayload.instrumentName,
                   instrumentStorageKey: midiPayload.instrumentStorageKey
               };
-              console.log("Creating MIDI track with payload:", trackOptions);
-          } else {
-              // Handles 'audio' and 'sampler' types implicitly, 
-              // assuming payload isn't needed or handled by uploadAudioFile/createTrack flow
-              console.log(`Creating ${type} track without specific payload (or handled elsewhere).`);
           }
 
-          const trackName = TRACK_CONFIG[type]?.getDefaultName(count, instrumentName) || `Track ${count}`;
-          const trackData = await createTrackAndRegisterWithHistory(type, trackName, trackOptions);
+          const trackNameStd = TRACK_CONFIG[type]?.getDefaultName(countStd, instrumentNameStd) || `Track ${countStd}`;
+          const trackData = await createTrackAndRegisterWithHistory(type, trackNameStd, trackOptionsStd);
           return trackData;
       }
       
@@ -733,6 +810,74 @@ export const createTracksSlice = (set, get) => {
       // updateTrackState(trackId, updates);
   };
 
+  // --- New Action: Add Sampler to Drum Track --- 
+  const addSamplerTrackToDrumTrack = async (
+    drumTrackId: string,
+    sampleData: { id: string; display_name: string; storage_key: string; /* other needed fields? */ }
+  ): Promise<CombinedTrack | null> => {
+    const { createTrackAndRegisterWithHistory, executeHistoryAction, _withErrorHandling } = rootGet();
+    if (!createTrackAndRegisterWithHistory || !executeHistoryAction || !_withErrorHandling) {
+        console.error("addSamplerTrackToDrumTrack: Missing dependencies");
+        return null;
+    }
+
+    const addSamplerLogic = async (): Promise<CombinedTrack | null> => {
+        // 1. Prepare Sampler Options, linking to parent
+        const samplerOptions: SamplerTrackOptions = {
+            name: sampleData.display_name,          // Use sample name for track name initially
+            storage_key: sampleData.storage_key,    // Pass storage key
+            drum_track_id: drumTrackId,             // **Link to parent**
+            // Add any other relevant options derived from sampleData if needed
+            // e.g., baseMidiNote might be derived or default
+        };
+        const samplerTrackName = sampleData.display_name; // Or generate a more unique name
+
+        // 2. Create the Sampler Track (handles its own history for creation)
+        const newSamplerTrack = await createTrackAndRegisterWithHistory('sampler', samplerTrackName, samplerOptions);
+
+        if (!newSamplerTrack || !newSamplerTrack.id) {
+            console.error(`Failed to create sampler track for sample ${sampleData.display_name}`);
+            return null;
+        }
+        const newSamplerTrackId = newSamplerTrack.id;
+        console.log(`Created sampler track ${newSamplerTrackId} linked to drum track ${drumTrackId}`);
+
+        // 3. Update Parent Drum Track's State
+        const parentDrumTrack = selectDrumTrackById(drumTrackId); // Use the selector
+        if (!parentDrumTrack) {
+            console.error(`Parent drum track ${drumTrackId} not found in state after creating sampler.`);
+            // Potentially rollback sampler creation? Or just log error.
+            return newSamplerTrack; // Return sampler even if parent update fails?
+        }
+
+        const oldSamplerIds = parentDrumTrack.sampler_track_ids || [];
+        // Ensure no duplicates (though unlikely with UUIDs)
+        const newSamplerIds = [...new Set([...oldSamplerIds, newSamplerTrackId])];
+
+        console.log(`Updating parent drum track ${drumTrackId} sampler IDs from`, oldSamplerIds, `to`, newSamplerIds);
+        _updateNestedTrackData(drumTrackId, { sampler_track_ids: newSamplerIds } as Partial<DrumTrackRead>);
+
+        // 4. Add History Action for the Parent Update
+        // **ASSUMES Actions.UpdateDrumTrackSamplers exists and takes (get, drumTrackId, oldIds, newIds)**
+        try {
+            const parentUpdateAction = new Actions.UpdateDrumTrackSamplers(
+                get, 
+                drumTrackId, 
+                oldSamplerIds, 
+                newSamplerIds
+            );
+            await executeHistoryAction(parentUpdateAction);
+        } catch (historyError) {
+            console.error("Error executing history action for parent drum track update:", historyError);
+            // Consider if state needs rollback here
+        }
+
+        return newSamplerTrack;
+    };
+
+    return _withErrorHandling(addSamplerLogic, 'addSamplerTrackToDrumTrack')();
+  };
+
   // --- Initial State & Return --- 
   return {
     tracks: [],
@@ -770,7 +915,13 @@ export const createTracksSlice = (set, get) => {
 
     // Expose internal helper for nested updates
     _updateNestedTrackData,
+
+    // --- Selectors --- 
+    selectDrumTrackById,
+    selectSamplerTracksForDrumTrack,
+
+    // New actions
+    removeSamplerTrack,
+    addSamplerTrackToDrumTrack,
   };
 };
-
-// Helper type (add to types.ts ideally, or define locally for now)

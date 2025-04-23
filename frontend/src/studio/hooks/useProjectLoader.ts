@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getProject } from '../../platform/api/projects';
 import { Project as ApiProject } from '../../platform/types/project';
-import { Project as InternalProject } from '../core/state/project';
+import Project from '../core/state/project';
 import { apiProjectToInternal } from '../../platform/types/adapters';
 
 /**

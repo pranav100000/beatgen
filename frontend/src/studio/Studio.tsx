@@ -84,6 +84,10 @@ function Studio({ projectId }: StudioProps) {
     openDrumMachines,
     closeDrumMachine,
     setDrumPattern,
+    addSamplerTrackToDrumTrack,
+    removeSamplerTrack,
+    selectDrumTrackById,
+    selectSamplerTracksForDrumTrack,
     // Fetch MIDI actions
     addMidiNote,
     removeMidiNote,
@@ -388,14 +392,15 @@ function Studio({ projectId }: StudioProps) {
           .filter(([, isOpen]) => isOpen) 
           .map(([trackId]) => ( 
             <DrumMachine 
-              key={trackId} 
-              trackId={trackId} 
-              onClose={() => closeDrumMachine(trackId)} 
-              onPatternChange={setDrumPattern} 
+              key={trackId}
+              trackId={trackId}
+              onClose={() => closeDrumMachine(trackId)}
+              onPatternChange={setDrumPattern}
               // Pass MIDI actions
               onAddNote={addMidiNote}
               onRemoveNote={removeMidiNote}
-              onUpdateNote={updateMidiNote}
+              onUpdateNote={updateMidiNote} 
+              handleConfirmSelection={selectDrumTrackById}
             />
         ))}
 

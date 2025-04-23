@@ -13,6 +13,7 @@ import { AudioTrackOptions, GetFn, RootState, TrackOptions } from '../../../../s
 import { ActionType } from '.';
 // Fix: Import TRACK_CONFIG
 import { TRACK_CONFIG } from '../../../../stores/config'; 
+import { DrumTrackRead } from 'src/platform/types/track_models/drum_track';
 
 /**
  * Action for changing track position without callbacks
@@ -465,6 +466,45 @@ export class TrackResizeAction extends TrackAction {
         });
     }
 }
+    // Example structure - adjust based on your ActionBase and state access needs
+export class UpdateDrumTrackSamplers extends BaseAction {
+    readonly type = 'DRUM_TRACK_SAMPLER_UPDATE';
+    drumTrackId: string;
+    oldSamplerIds: string[];
+    newSamplerIds: string[];
+
+    constructor(
+        get: GetFn,
+        drumTrackId: string,
+        oldSamplerIds: string[],
+        newSamplerIds: string[]
+    ) {
+        super(get);
+        this.drumTrackId = drumTrackId;
+        this.oldSamplerIds = [...oldSamplerIds]; // Store copies
+        this.newSamplerIds = [...newSamplerIds];
+    }
+
+    async execute() {
+        console.log(`Applying UpdateDrumTrackSamplers for ${this.drumTrackId}`);
+        const { _updateNestedTrackData } = this.get();
+        if (_updateNestedTrackData) {
+            _updateNestedTrackData(this.drumTrackId, { sampler_track_ids: this.newSamplerIds } as Partial<DrumTrackRead>);
+        } else {
+            console.error("apply UpdateDrumTrackSamplers: _updateNestedTrackData not found");
+        }
+    }
+
+    async undo() {
+        console.log(`Reverting UpdateDrumTrackSamplers for ${this.drumTrackId}`);
+        const { _updateNestedTrackData } = this.get();
+        if (_updateNestedTrackData) {
+            _updateNestedTrackData(this.drumTrackId, { sampler_track_ids: this.oldSamplerIds } as Partial<DrumTrackRead>);
+        } else {
+            console.error("revert UpdateDrumTrackSamplers: _updateNestedTrackData not found");
+        }
+    }
+}
 
 /**
  * Export all track actions
@@ -474,5 +514,6 @@ export const TrackActions = {
     AddTrack: AddTrackAction, 
     DeleteTrack: DeleteTrackAction,
     ParameterChange: ParameterChangeAction,
-    TrackResize: TrackResizeAction
+    TrackResize: TrackResizeAction,
+    UpdateDrumTrackSamplers: UpdateDrumTrackSamplers
 };

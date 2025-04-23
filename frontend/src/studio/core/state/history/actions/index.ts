@@ -29,6 +29,9 @@ export const ACTION_TYPES = {
     NOTE_DELETE: 'NOTE_DELETE',
     NOTE_MOVE: 'NOTE_MOVE',
     NOTE_RESIZE: 'NOTE_RESIZE',
+
+    // Drum Track actions
+    DRUM_TRACK_SAMPLER_UPDATE: 'DRUM_TRACK_SAMPLER_UPDATE',
 } as const;
 
 // Export action type for type checking

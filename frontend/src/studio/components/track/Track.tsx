@@ -22,10 +22,11 @@ interface TrackProps {
 
 function Track(props: TrackProps) {
   const { id, index, gridLineStyle } = props;
-  console.log(`>>> Track Component Rendering - ID: ${id} <<<`); // Add render log
+  console.log(`>>> Track Component Rendering with props: ${JSON.stringify(props)} <<<`); // Add render log
 
   // Fix: Select tracks array individually
   const tracks = useStudioStore(state => state.tracks);
+  console.log(`>>> Track count: ${tracks.length} <<<`);
   // Select other state/actions individually
   const store = useStudioStore(state => state.store);
   const bpm = useStudioStore(state => state.bpm);

@@ -112,6 +112,9 @@ export const uploadSamplerTrack = async (track: CombinedTrack): Promise<void> =>
     return
   }
   const audioFile = await db.getAudioFile(samplerTrack.id);
+  if (!samplerTrack.audio_file_name) {
+    samplerTrack.audio_file_name = samplerTrack.name;
+  }
   if (!audioFile) {
     throw new Error(`Audio file not found for track ${samplerTrack.id}`);
   }

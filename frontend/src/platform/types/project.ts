@@ -103,6 +103,7 @@ export interface DrumTrackRead {
   updated_at?: string;
   id: string;
   name: string;
+  sampler_track_ids?: string[];
 }
 /**
  * Project model for the database
