@@ -204,6 +204,3 @@ export const downloadFile = async (storageKey: string): Promise<Blob> => {
     throw new Error(`Failed to download file: ${error.message}`);
   }
 };
-
-// Function to maintain compatibility with existing code until fully refactored
-export const downloadMidiFile = downloadFile;

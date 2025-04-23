@@ -11,6 +11,7 @@ import {
     SamplerTrackRead, 
     DrumTrackRead
 } from '../../platform/types/project';
+import { DrumSamplePublicRead } from '../../platform/types/public_models/drum_samples';
 // Remove the type re-export for now
 // export type { ProjectWithTracks as ProjectStateData }; 
 
@@ -31,7 +32,22 @@ export type TrackParameter = {
   y_position?: number; // Position components
 };
 
-export type TrackType = 'audio' | 'midi' | 'drum' | 'sampler';
+// Define Track Types
+export type TrackType = 'midi' | 'audio' | 'drum' | 'sampler';
+
+// Define Payload Types
+export interface MidiTrackPayload {
+  instrumentId: string;
+  instrumentName: string;
+  instrumentStorageKey?: string;
+}
+
+export interface DrumTrackPayload {
+  samples: DrumSamplePublicRead[]; // Assuming DrumSamplePublicRead is defined/imported here
+}
+
+// Union type for the payload for adding tracks
+export type AddTrackPayload = MidiTrackPayload | DrumTrackPayload | { file?: File; isSampler?: boolean } | null;
 
 // Options for creating tracks - base interface
 export interface BaseTrackOptions {
@@ -78,6 +94,7 @@ export interface DrumTrackOptions extends BaseTrackOptions {
 // Specific options for Sampler Tracks
 export interface SamplerTrackOptions extends BaseTrackOptions {
   sampleFile?: File;
+  storage_key?: string;
   baseMidiNote?: number;
   grainSize?: number;
   overlap?: number;
@@ -170,7 +187,7 @@ export interface RootState {
   uploadAudioFile: (file: File, isSampler?: boolean) => Promise<CombinedTrack | null>;
   replaceTrackAudioFile: (trackId: string, file: File) => Promise<void>;
   handleInstrumentChange: (trackId: string, instrumentId: string, instrumentName: string, instrumentStorageKey: string) => Promise<void>;
-  handleAddTrack: (type: TrackType, instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => Promise<any>;
+  handleAddTrack: (type: TrackType, payload?: AddTrackPayload) => Promise<any>;
   addMidiNote: (trackId: string, note: NoteState) => void;
   removeMidiNote: (trackId: string, noteId: number) => void;
   updateMidiNote: (trackId: string, note: NoteState) => void;
@@ -224,4 +241,22 @@ export interface RootState {
 
 // Helper type for creating slices that conform to RootState
 // Ensures that each slice only implements a portion of the RootState
-export type StoreSliceCreator<T> = (set: SetFn, get: GetFn) => T; 
+export type StoreSliceCreator<T> = (set: SetFn, get: GetFn) => T;
+
+// Re-export platform types if needed by other store files importing from here
+export type { AudioTrackRead, MidiTrackRead, SamplerTrackRead, DrumTrackRead };
+
+// Also define and export AnyTrackRead using the imported types
+export type AnyTrackRead = AudioTrackRead | MidiTrackRead | SamplerTrackRead | DrumTrackRead;
+
+// Define placeholder base types if they are actually needed and not imported elsewhere
+// If they *are* imported from somewhere else, add re-exports instead.
+export interface MidiTrack { id: string; /* ... other base props ... */ }
+export interface AudioTrack { id: string; /* ... other base props ... */ }
+export interface SamplerTrack { id: string; /* ... other base props ... */ }
+
+// Re-export CombinedTrack if imported from platform types
+export type { CombinedTrack };
+
+// OR if it's defined locally in types.ts, ensure it's exported:
+// export interface CombinedTrack { /* ... properties ... */ } 

@@ -1,14 +1,6 @@
 import { InstrumentFileRead } from '../types/project';
 import { apiClient } from './client';
 
-// export interface Soundfont {
-//   id: string;
-//   name: string;
-//   display_name: string;
-//   category: string;
-//   description?: string;
-//   storage_key: string;
-// }
 
 /**
  * Get all public soundfonts, optionally filtered by category

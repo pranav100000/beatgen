@@ -1,6 +1,6 @@
-import { create } from 'zustand';
+import { create, StoreApi } from 'zustand';
 import { Store } from '../core/state/store';
-import { RootState } from './types';
+import { RootState, TrackOperation, CombinedTrack } from './types';
 
 // Import all slice creators
 import { createCoreSlice, CoreSlice } from './slices/coreSlice';
@@ -36,34 +36,66 @@ export const useStudioStore = create<StudioStoreState>()((set, get) => {
     }));
   };
 
-  // Higher-order function to ensure store instance is available
+  // Fix _withStore to always return a Promise
   const _withStore = <T extends unknown[], R>(
-    fn: (store: Store, ...args: T) => R | Promise<R>
-  ) => (...args: T): R | Promise<R> | null => {
-      const { store } = get();
-      if (!store) {
-        console.error('Store instance is not available!');
-        // Depending on the function, returning null might be appropriate,
-        // or throwing an error might be better.
+    fn: (storeInstance: Store, ...args: T) => R | Promise<R> 
+  ) => async (...args: T): Promise<R | null> => { // Ensure the RETURNED function is async
+      const storeInstance = get().store; 
+      if (!storeInstance) {
+        console.error('_withStore Error: Store instance is not available in state!');
+        // No need for Promise.resolve here, async function handles it
         return null; 
       }
-      // Execute the function with the store instance
-      return fn(store, ...args);
+      try {
+        // Await the result, works even if fn returns non-promise R
+        const result = await fn(storeInstance, ...args);
+        return result; 
+      } catch (error) {
+        console.error('Error caught within _withStore execution:', error);
+        return null; 
+      }
     };
 
-  // Error handling wrapper for async slice actions
+  // Adjust _withErrorHandling to accept Promise<R | null>
   const _withErrorHandling = <T extends unknown[], R>(
-    fn: (...args: T) => Promise<R>, 
+    fn: (...args: T) => Promise<R | null>, // Accept Promise<R | null>
     actionName: string
-  ) => async (...args: T): Promise<R | null> => {
+  ) => async (...args: T): Promise<R | null> => { // Returns Promise<R | null>
     try {
-      // Execute the wrapped function
-      return await fn(...args);
+      return await fn(...args); // Await the result which might be null
     } catch (error) {
       console.error(`Error in action [${actionName}]:`, error);
-      // Return null to indicate failure, slices should handle this appropriately
-      return null; 
+      return null; // Return null on error
     }
+  };
+
+  // --- Placeholder for handleTrackOperation --- 
+  const handleTrackOperation = async (operation: TrackOperation): Promise<CombinedTrack | null | void> => {
+      console.warn("handleTrackOperation is not fully implemented yet.");
+      const { handleAddTrack, updateTrackState, handleTrackDelete, handleTrackParameterChange } = get(); // Get needed actions
+      
+      switch (operation.type) {
+          case 'create':
+              // Example delegation: Need to adapt AddTrackPayload structure from options
+              // return handleAddTrack(operation.trackType, /* adapt operation.options to payload */);
+              console.log("TODO: Implement create delegation in handleTrackOperation");
+              break;
+          case 'update':
+              // Example delegation: Need to handle potential complex updates
+              // updateTrackState(operation.trackId, operation.updates);
+              console.log("TODO: Implement update delegation in handleTrackOperation");
+              break;
+          case 'delete':
+              return handleTrackDelete(operation.trackId);
+          case 'param_change':
+              // Example delegation: handleTrackParameterChange expects specific types
+              // return handleTrackParameterChange(operation.trackId, operation.param, operation.value);
+              console.log("TODO: Implement param_change delegation in handleTrackOperation");
+              break;
+          default:
+              console.error("Unknown track operation type:", operation);
+      }
+      return Promise.resolve(); // Return void promise for unimplemented parts
   };
 
   // --- Combine Slices --- 
@@ -91,16 +123,16 @@ export const useStudioStore = create<StudioStoreState>()((set, get) => {
     ...createSamplerSlice(set, get),
     ...createDrumSlice(set, get),
     
-    // Implement the shared utilities directly in the root state
-    // so slices can access them via get()
+    // Add implementations/aliases for missing RootState properties
+    handleTrackOperation,
+    updateState: _updateState,
+
+    // Expose shared utilities (already present)
     _updateState,
     _withStore,
     _withErrorHandling,
     
-    // --- Initializations --- 
-    // Initialize the core Store instance after the store is created
-    // This might need adjustment depending on Store lifecycle requirements
-    // We override the initial null value set in coreSlice
+    // Initialize the store instance here, ensuring it matches the type expected by RootState.store
     store: new Store(), 
   };
 });

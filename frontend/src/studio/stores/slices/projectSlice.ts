@@ -16,6 +16,7 @@ import {
 import { GRID_CONSTANTS } from '../../constants/gridConstants';
 import { convertJsonToNotes, Note } from '../../../types/note';
 import { db } from '../../core/db/dexie-client'; // Import db instance
+import SampleManager from '../../core/samples/sampleManager';
 
 // Define the state properties for this slice
 export interface ProjectSlice {
@@ -238,7 +239,8 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
               if (storageKey) {
                   console.log(`Attempting to load audio for track ${finalCombinedTrack.id} from key ${storageKey}...`);
                   try {
-                      const audioBlob = await downloadFile(storageKey);
+                      const sampleManager = SampleManager.getInstance(db);
+                      const audioBlob = await sampleManager.getSampleBlob(finalCombinedTrack.id, storageKey, finalCombinedTrack.name);
                       if (audioBlob) {
                           const audioFile = new File([audioBlob], finalCombinedTrack.name || 'audio_track', { type: audioBlob.type });
                           await store.loadAudioFile(finalCombinedTrack.id, audioFile);
@@ -380,17 +382,13 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
         
         // File not in Dexie, download it
         console.log(`Cache miss for track ${track.id}, downloading key ${storageKey}...`);
-        const downloadedBlob = await downloadFile(storageKey);
+
+        const sampleManager = SampleManager.getInstance(db);
+        const audioBlob = await sampleManager.getSampleBlob(track.id, storageKey, track.name);
         
-        if (downloadedBlob) {
+        if (audioBlob) {
           // Convert Blob to File for metadata (name primarily)
           // Use track name or generate one if unavailable
-          const fileName = track.name || `${track.id}_${fileType}`;
-          // Infer type from blob or use a default if necessary
-          const fileObject = new File([downloadedBlob], fileName, { type: downloadedBlob.type || 'audio/mpeg' }); 
-          
-          // Add to Dexie using track.id as the key, duration is initially unknown
-          await db.addAudioFile(track.id, fileObject, undefined); 
           console.log(`Successfully downloaded and cached audio for track ${track.id}`);
           return { trackId: track.id, status: 'downloaded' };
         } else {

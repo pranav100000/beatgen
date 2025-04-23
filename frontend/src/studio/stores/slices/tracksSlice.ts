@@ -1,15 +1,13 @@
 import { CombinedTrack } from 'src/platform/types/project';
 import { Position } from '../../components/track';
-import { RootState, SetFn, GetFn, StoreSliceCreator, TrackParameter, TrackType, TrackOptions } from '../types';
+import { RootState, SetFn, GetFn, TrackParameter, TrackType, TrackOptions, AddTrackPayload, DrumTrackPayload, MidiTrackPayload, AudioTrackOptions, SamplerTrackOptions, MidiTrackOptions, AnyTrackRead, MidiTrack, AudioTrack, SamplerTrack, AudioTrackRead, MidiTrackRead, SamplerTrackRead, DrumTrackRead } from '../types';
 import { Store } from '../../core/state/store';
 import { Actions } from '../../core/state/history/actions'; 
 import { TRACK_CONFIG, DEFAULT_SAMPLER_CONFIG } from '../config';
 import { GRID_CONSTANTS, ticksToPixels, pixelsToTicks } from '../../constants/gridConstants';
 import { PULSES_PER_QUARTER_NOTE } from '../../utils/noteConversion';
-import { MidiTrack } from 'src/platform/types/track_models/midi_track';
-import { AudioTrackOptions, SamplerTrackOptions, MidiTrackOptions } from '../types';
-import { AudioTrackRead, MidiTrackRead, SamplerTrackRead, DrumTrackRead } from 'src/platform/types/project';
-import { AnyTrackRead } from 'src/types/track';
+import { StateCreator } from 'zustand';
+import { StoreApi } from 'zustand';
 
 // Define the state properties and actions for this slice
 export interface TracksSlice {
@@ -48,17 +46,22 @@ export interface TracksSlice {
   handleTrackResizeEnd: (trackId: string, deltaPixels: number, resizeDirection: 'left' | 'right') => void;
 
   // Add missing action definitions
-  handleAddTrack: (type: TrackType, instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => Promise<CombinedTrack | { mainDrumTrack: CombinedTrack | null, samplerTracks: (CombinedTrack | null)[] } | null>;
+  handleAddTrack: (type: TrackType, payload?: AddTrackPayload) => Promise<CombinedTrack | { mainDrumTrack: CombinedTrack | null, samplerTracks: (CombinedTrack | null)[] } | null>;
   handleInstrumentChange: (trackId: string, instrumentId: string, instrumentName: string, instrumentStorageKey: string) => Promise<void>; 
   replaceTrackAudioFile: (trackId: string, file: File) => Promise<void>;
 
   // Expose internal helper for nested updates
-  _updateNestedTrackData: (trackId: string, nestedUpdates: Partial<any>) => void; // Use Partial<any> for simplicity or define specific update types
+  _updateNestedTrackData: (trackId: string, nestedUpdates: Partial<AnyTrackRead>) => void; // Use AnyTrackRead
 }
 
-// Create the slice function
-export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
-  const rootGet = get as GetFn; // Helper to access root state with correct typing
+// Remove local type alias if it causes confusion
+// type TracksSliceCreator = StateCreator<RootState, [], [], TracksSlice>;
+
+// Revert to the simpler definition without explicit StateCreator and third argument
+export const createTracksSlice = (set, get) => { 
+  const rootGet = get as GetFn; 
+  // Get store instance via rootGet when needed inside functions
+  // const storeInstance = rootGet().store; // Don't get it here at the top level
 
   // Utility to set state within this slice or the root state
   const setTracksState = (partial: Partial<TracksSlice> | ((state: TracksSlice) => Partial<TracksSlice>)) => set(partial);
@@ -112,23 +115,24 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
   };
 
   // Internal helper to update the nested track object
-  const _updateNestedTrackData = (trackId: string, nestedUpdates: Partial<AudioTrackRead | MidiTrackRead | SamplerTrackRead | DrumTrackRead>) => {
+  const _updateNestedTrackData = (trackId: string, nestedUpdates: Partial<AnyTrackRead>) => {
     console.log(`_updateNestedTrackData called for ${trackId}`, nestedUpdates);
-    console.log(`_updateNestedTrackData: prevTracks`, rootGet().tracks);
-    updateRootState('tracks', (prevTracks) => 
+    const rootState = get(); // Use get() to access full state
+    console.log(`_updateNestedTrackData: prevTracks`, rootState.tracks);
+    rootState._updateState('tracks', (prevTracks) => 
       prevTracks.map((track) => {
         if (track.id === trackId) {
-          // Fix: Ensure base object includes required fields before merging updates
-          const baseNestedTrack = track.track || { id: track.id, name: track.name, type: track.type };
+          // Ensure base object includes required fields before merging updates
+          // Assuming track.track might be initially undefined or incomplete
+          // Omit 'type' from the fallback base object
+          const baseNestedTrack: Partial<AnyTrackRead> = track.track ? { ...track.track } : { id: track.id, name: track.name };
           const newNestedTrack = { 
-              // Spread base with guaranteed id/name/type
-              ...baseNestedTrack, 
-              // Apply the specific nested updates
+              ...baseNestedTrack,
               ...nestedUpdates        
           };
-          // Explicitly cast the final nested object if necessary, or ensure types match
           console.log(`_updateNestedTrackData: newNestedTrack`, newNestedTrack);
-          return { ...track, track: newNestedTrack as AnyTrackRead }; // Use a union type or cast
+          // Ensure the final object conforms to AnyTrackRead
+          return { ...track, track: newNestedTrack as AnyTrackRead }; 
         }
         return track; 
       })
@@ -141,15 +145,14 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
     name: string,
     options: TrackOptions = {}
   ): Promise<CombinedTrack | null> => {
-    // Access cross-slice state/actions via rootGet()
-    const { store, timeSignature, bpm, tracks, executeHistoryAction, _withStore, _withErrorHandling } = rootGet();
+    const { timeSignature, bpm, tracks, executeHistoryAction, _withStore, _withErrorHandling } = rootGet();
 
     if (!_withStore || !_withErrorHandling) {
         console.error("_withStore or _withErrorHandling not available");
         return null;
     }
 
-    const createLogic = async (store: Store): Promise<CombinedTrack | null> => {
+    const createLogic = async (passedStore: Store): Promise<CombinedTrack | null> => {
       const trackId = (options.id || options.trackId) ?? crypto.randomUUID(); 
       const tracksLength = rootGet().tracks.length;
       const position = options.position as Position || { x: 0, y: tracksLength * GRID_CONSTANTS.trackHeight };
@@ -174,7 +177,7 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
                    type === 'sampler' ? (options as SamplerTrackOptions).sampleFile : 
                    undefined;
 
-      await store.getAudioEngine().createTrack(trackId, name); 
+      await passedStore.getAudioEngine().createTrack(trackId, name); 
       
       // Calculate defaults
       const beatsPerBar = timeSignature[0]; 
@@ -263,8 +266,8 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
   };
 
   const handleTrackDelete = async (trackId: string) => {
-      // Access cross-slice action via rootGet()
-      const { store, tracks, executeHistoryAction, _withStore, _withErrorHandling } = rootGet();
+      const { tracks, executeHistoryAction, _withStore, _withErrorHandling } = rootGet();
+      const storeInstance = rootGet().store; // Get the Store instance
       const trackToDelete = findTrackById(trackId);
 
       if (!trackToDelete) {
@@ -272,12 +275,16 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
           return;
       }
 
+      if (!storeInstance) {
+          console.error("_withStore not available for delete");
+          return;
+      }
       if (!_withStore || !_withErrorHandling) {
           console.error("_withStore or _withErrorHandling not available for delete");
           return;
       }
 
-      const deleteLogic = async (store: Store) => {
+      const deleteLogic = async (passedStore: Store) => {
           const action = new Actions.DeleteTrack(get, { ...trackToDelete }); 
 
           // Update state first
@@ -286,7 +293,7 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
 
           // Remove from engine with error handling
           try {
-            await store.getAudioEngine().removeTrack(trackId);
+            await passedStore.getAudioEngine().removeTrack(trackId);
           } catch (engineError) {
              console.error(`Error removing track ${trackId} from audio engine:`, engineError);
              // Decide if failure here should prevent history action or state update rollback
@@ -320,86 +327,70 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
     paramName: K, 
     newValue: TrackParameter[K]
   ) => {
-    // Access cross-slice action via rootGet()
-    const { store, executeHistoryAction, _withStore, _withErrorHandling } = rootGet();
-
+    const { executeHistoryAction, _withStore, _withErrorHandling } = rootGet();
+    // Get store instance inside the handler if not using _withStore
+    const currentStoreInstance = rootGet().store; 
+    if (!currentStoreInstance) {
+      console.error("_withStore not available for parameter change");
+      return;
+    }
     if (!_withStore || !_withErrorHandling) {
       console.error("_withStore or _withErrorHandling not available for parameter change");
       return;
     }
 
-    const changeLogic = (store: Store) => {
-      const track = findTrackById(trackId);
-      if (!track) {
+    // Make changeLogic async to ensure it returns a Promise
+    const changeLogic = async (passedStore: Store) => { // _withStore still provides it
+      const track = findTrackById(trackId); 
+      if (!track) { 
         console.error(`Track with ID ${trackId} not found in handleTrackParameterChange`);
-        return;
+        return; 
       }
-      
-      // Fix 1: Cast track to any for indexed access based on K
-      const oldValue = (track as any)[paramName]; 
-      // Skip if value hasn't changed (handle object comparison for position separately)
+      const oldValue = (track as any)[paramName];
       if (paramName !== 'position' && oldValue === newValue) return;
-      
-      // Prepare update object, handling potential differences between TrackParameter keys and CombinedTrack keys
+
+      // Prepare update object
       const updateObj: Partial<CombinedTrack & TrackParameter> = {};
       let engineUpdateNeeded = true;
       let historyParamName = paramName as string;
 
       if (paramName === 'muted') {
-        updateObj.mute = newValue as boolean; // Update 'mute' property in CombinedTrack
-        updateObj.muted = newValue as boolean; // Also update 'muted' if it exists as a separate param
+        updateObj.mute = newValue as boolean; 
+        updateObj.muted = newValue as boolean; 
       } else if (paramName === 'name') {
         updateObj.name = newValue as string;
-        engineUpdateNeeded = false; // Name change doesn't affect audio engine directly
-      } else if (paramName === 'position') {
-         // Position is handled by handleTrackPositionChange
-         console.warn("Direct position change via handleTrackParameterChange is discouraged. Use handleTrackPositionChange.");
+        engineUpdateNeeded = false; 
+      } else if (paramName === 'position' || paramName === 'soloed') {
+         // Should be handled by specific handlers, exit here
+         console.warn(`Direct change via handleTrackParameterChange is discouraged for ${paramName}.`);
          engineUpdateNeeded = false;
-         return; // Exit early
-      } else if (paramName === 'soloed') {
-         // Solo is handled by handleTrackSoloToggle
-         console.warn("Direct solo change via handleTrackParameterChange is discouraged. Use handleTrackSoloToggle.");
-         engineUpdateNeeded = false;
-         return; // Exit early
+         return;
       } else {
-        // For volume, pan, etc., the key names should match
         (updateObj as any)[paramName] = newValue;
       }
-      
-      // --- Update State --- 
+
+      // Update State
       updateTrackState(trackId, updateObj);
       
-      // --- Update Audio Engine --- 
+      // Update Audio Engine 
       if (engineUpdateNeeded) {
-        const audioEngine = store.getAudioEngine();
+        const audioEngine = passedStore.getAudioEngine();
         switch (paramName) {
-          case 'volume':
-            audioEngine.setTrackVolume(trackId, newValue as number);
-            break;
-          case 'pan':
-            audioEngine.setTrackPan(trackId, newValue as number);
-            break;
-          case 'muted':
-            audioEngine.setTrackMute(trackId, newValue as boolean);
-            break;
-          // Position handled separately
-          // Solo handled separately
+          case 'volume': audioEngine.setTrackVolume(trackId, newValue as number); break;
+          case 'pan': audioEngine.setTrackPan(trackId, newValue as number); break;
+          // Mute/Solo handled by specific handlers
         }
       }
       
-      // --- Create and Execute History Action --- 
-      // Fix 1: Robust conversion to number for history action values
+      // Create and Execute History Action
       const convertToActionValue = (val: any): number => {
-        if (typeof val === 'boolean') return val ? 1 : 0;
-        if (typeof val === 'number') return val;
-        // Default non-numeric/non-boolean types to 0 for ParameterChange action
-        // This might need refinement based on how ParameterChange handles strings/objects
+        if (typeof val === 'boolean' ) return val ? 1 : 0;
+        if (typeof val === 'number' ) return val;
         return 0; 
       };
       const oldActionValue = convertToActionValue(oldValue);
       const newActionValue = convertToActionValue(newValue);
       
-      // Use Actions.ParameterChange
       const action = new Actions.ParameterChange(
         get,
         trackId,
@@ -408,17 +399,21 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
         newActionValue
       );
       
-      executeHistoryAction(action);
+      await executeHistoryAction(action); // Await the history action
     };
 
-    // Wrap the logic
-    _withErrorHandling(async () => _withStore(changeLogic)(), `handleTrackParameterChange: ${String(paramName)}`)();
+    // Pass the _withStore HOF result to _withErrorHandling
+    _withErrorHandling(async () => _withStore(changeLogic)(), `handleTrackParameterChange: ${String(paramName)}`)(); 
   };
 
   const handleTrackPositionChange = (trackId: string, newPosition: Position, isDragEnd: boolean) => {
-    // Access cross-slice state/actions via rootGet()
-    const { store, bpm, timeSignature, isPlaying, executeHistoryAction, _withErrorHandling } = rootGet();
+    const { bpm, timeSignature, isPlaying, executeHistoryAction, _withErrorHandling } = rootGet();
+    const storeInstance = rootGet().store; // Get the Store instance
 
+    if (!storeInstance) {
+        console.error("_withErrorHandling is not available in handleTrackPositionChange");
+        return;
+    }
     if (!_withErrorHandling) {
         console.error("_withErrorHandling is not available in handleTrackPositionChange");
         return;
@@ -426,7 +421,7 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
 
     // Fix 3: Make changeLogic async
     const changeLogic = async () => {
-        if (!store) {
+        if (!storeInstance) {
             console.error('Store not available in handleTrackPositionChange');
             return;
         }
@@ -458,7 +453,7 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
         });
         
         // Update audio engine
-        store.getAudioEngine().setTrackPosition(trackId, newPosition.x, newPosition.y);
+        storeInstance.getAudioEngine().setTrackPosition(trackId, newPosition.x, newPosition.y);
         
         if (isDragEnd) {
             // Use Actions.TrackPosition
@@ -470,8 +465,8 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
             );
             await executeHistoryAction(action);
             
-            if (isPlaying && store.getTransport().handleTrackPositionChange) {
-              store.getTransport().handleTrackPositionChange(trackId, newPosition.x);
+            if (isPlaying && storeInstance.getTransport()?.handleTrackPositionChange) {
+              storeInstance.getTransport().handleTrackPositionChange(trackId, newPosition.x);
             }
         }
     };
@@ -480,15 +475,19 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
   };
 
   const handleTrackSoloToggle = (trackId: string, soloed: boolean) => {
-    // Access cross-slice action via rootGet()
-    const { store, tracks, executeHistoryAction, _withStore, _withErrorHandling } = rootGet();
+    const { tracks, executeHistoryAction, _withStore, _withErrorHandling } = rootGet();
+    const storeInstance = rootGet().store; // Get the Store instance
 
+    if (!storeInstance) {
+      console.error("_withStore or _withErrorHandling not available for solo toggle");
+      return;
+    }
     if (!_withStore || !_withErrorHandling) {
       console.error("_withStore or _withErrorHandling not available for solo toggle");
       return;
     }
 
-    const soloLogic = (store: Store) => {
+    const soloLogic = (passedStore: Store) => {
         updateTrackState(trackId, { soloed: soloed, solo: soloed }); // Use local helper
 
         const currentTracks = rootGet().tracks;
@@ -498,7 +497,7 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
         // Re-evaluate solo status based on the *current* state of all tracks
         const isAnyTrackSoloed = currentTracks.some(t => (t as any).soloed); 
 
-        const audioEngine = store.getAudioEngine();
+        const audioEngine = passedStore.getAudioEngine();
         const historyActions = [];
 
         for (const track of currentTracks) {
@@ -557,9 +556,9 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
 
   // Handles track resize end event, creates history action
   const handleTrackResizeEnd = (trackId: string, deltaPixels: number, resizeDirection: 'left' | 'right'): void => {
-    const { store, tracks, bpm, timeSignature, executeHistoryAction, _withErrorHandling } = rootGet();
+    const { bpm, timeSignature, executeHistoryAction, _withErrorHandling } = rootGet();
     const fullTrack = findTrackById(trackId);
-    if (!fullTrack || !store || !executeHistoryAction || !_withErrorHandling) { return; }
+    if (!fullTrack || !_withErrorHandling) { return; }
 
     const resizeLogic = async () => {
         const oldTrimStartTicks = fullTrack.trim_start_ticks || 0;
@@ -598,74 +597,104 @@ export const createTracksSlice: StoreSliceCreator<TracksSlice> = (set, get) => {
     _withErrorHandling(resizeLogic, 'handleTrackResizeEnd')();
   };
 
-  // Add Track - Implemented
+  // --- Updated handleAddTrack Implementation --- 
   const handleAddTrack = async (
     type: TrackType, 
-    instrumentId?: string, 
-    instrumentName?: string, 
-    instrumentStorageKey?: string
+    payload?: AddTrackPayload
   ): Promise<CombinedTrack | { mainDrumTrack: CombinedTrack | null, samplerTracks: (CombinedTrack | null)[] } | null> => {
-      // Use _withErrorHandling and access needed actions via get()
-      const { tracks, createTrackAndRegisterWithHistory, openDrumMachine, _withErrorHandling } = rootGet();
+      const rootState = get(); 
+      // Access actions/state needed from the root state
+      const { createTrackAndRegisterWithHistory, openDrumMachine, _withErrorHandling } = rootState;
       
-      if (!_withErrorHandling || !createTrackAndRegisterWithHistory || (type === 'drum' && !openDrumMachine) ) {
-          console.error("handleAddTrack: Missing dependencies");
+      if (!_withErrorHandling || !createTrackAndRegisterWithHistory) {
+          console.error("handleAddTrack: Missing dependencies (_withErrorHandling, createTrackAndRegisterWithHistory)");
           return null;
       }
 
       const addLogic = async () => {
-          // Special handling for drum tracks (copied from original store)
+          // --- Drum Track Creation (Revised Logic) --- 
           if (type === 'drum') {
-            // Create default samplers for drum track
-            const defaultSamplerNames = ['Kick', 'Snare', 'Clap', 'Hi-Hat'];
-            // Use createTrackAndRegisterWithHistory from the store
-            const samplerPromises = defaultSamplerNames.map(name => 
-                createTrackAndRegisterWithHistory('sampler', name, { /* Default sampler options? */ }) 
-            );
-            
-            const createdSamplerTracks = (await Promise.all(samplerPromises)).filter(Boolean) as CombinedTrack[];
-            const samplerTrackIds = createdSamplerTracks.map(track => track.id);
-            
-            // Create main drum track with references to samplers
-            const count = rootGet().tracks.length + 1; // Get current track count
-            const mainDrumTrackName = TRACK_CONFIG.drum.getDefaultName(count, instrumentName);
-            
-            const mainDrumTrack = await createTrackAndRegisterWithHistory('drum', mainDrumTrackName, {
-                instrumentName: 'Drum Sequencer', // Or pass provided name?
-                samplerTrackIds: samplerTrackIds
-            });
-            
-            // Open UI for the main drum track
-            if (mainDrumTrack && openDrumMachine) {
-                openDrumMachine(mainDrumTrack.id);
-            }
-            
-            // Return structure specific to drum track creation
-            return { mainDrumTrack, samplerTracks: createdSamplerTracks };
+              if (!openDrumMachine) {
+                console.error("handleAddTrack: Missing dependency for drum type (openDrumMachine)");
+                return null;
+              }
+              if (!payload || !('samples' in payload)) {
+                  console.error("handleAddTrack Error: Drum track requires a payload with samples.");
+                  return null;
+              }
+              const drumPayload = payload as DrumTrackPayload;
+              const selectedSamples = drumPayload.samples;
+              console.log("Creating drum track with selected samples:", selectedSamples);
+
+              // 1. Create individual sampler tracks for each selected sample
+              const samplerPromises = selectedSamples.map(async (sample) => {
+                  try {
+                      const samplerOptions: SamplerTrackOptions = {
+                          name: sample.display_name, 
+                          storage_key: sample.storage_key, 
+                          // Add other potential mappings here
+                      };
+                      console.log(`Creating sampler track for ${sample.display_name} with options:`, samplerOptions);
+                      const samplerTrack = await createTrackAndRegisterWithHistory('sampler', sample.display_name, samplerOptions);
+                      if (!samplerTrack) {
+                          console.error(`Failed to create sampler track for ${sample.display_name}`);
+                          return null;
+                      }
+                      console.log(`Created sampler track for ${sample.display_name}:`, samplerTrack.id);
+                      return samplerTrack;
+                  } catch (error) {
+                      console.error(`Error creating sampler track for ${sample.display_name}:`, error);
+                      return null;
+                  }
+              });
+              
+              const createdSamplerTracks = (await Promise.all(samplerPromises)).filter(Boolean) as CombinedTrack[];
+              const samplerTrackIds = createdSamplerTracks.map(track => track.id);
+              console.log("Created sampler tracks:", samplerTrackIds);
+              
+              // 2. Create the main drum track referencing the samplers
+              const count = rootState.tracks.length + createdSamplerTracks.length;
+              const mainDrumTrackName = TRACK_CONFIG.drum.getDefaultName(count, 'Drum Kit');
+              const mainDrumTrack = await createTrackAndRegisterWithHistory('drum', mainDrumTrackName, {
+                  instrumentName: 'Drum Sequencer', 
+                  samplerTrackIds: samplerTrackIds
+              });
+              
+              // 3. Open UI
+              if (mainDrumTrack && openDrumMachine) {
+                  console.log(`Opening drum machine UI for track: ${mainDrumTrack.id}`);
+                  openDrumMachine(mainDrumTrack.id);
+              }
+              return { mainDrumTrack, samplerTracks: createdSamplerTracks };
           }
           
-          // --- Standard track creation --- 
-          const count = rootGet().tracks.length + 1; // Get current track count
-          // Ensure TRACK_CONFIG is accessible or imported
+          // --- Standard/MIDI Track Creation --- 
+          const count = rootState.tracks.length + 1;
+          let instrumentName: string | undefined;
+          let trackOptions: TrackOptions = {};
+
+          // No need for `else if (type !== 'drum')` check here, 
+          // as the drum case is handled above and returns.
+          if (type === 'midi' && payload && 'instrumentId' in payload) {
+              const midiPayload = payload as MidiTrackPayload;
+              instrumentName = midiPayload.instrumentName;
+              trackOptions = { 
+                  instrumentId: midiPayload.instrumentId,
+                  instrumentName: midiPayload.instrumentName,
+                  instrumentStorageKey: midiPayload.instrumentStorageKey
+              };
+              console.log("Creating MIDI track with payload:", trackOptions);
+          } else {
+              // Handles 'audio' and 'sampler' types implicitly, 
+              // assuming payload isn't needed or handled by uploadAudioFile/createTrack flow
+              console.log(`Creating ${type} track without specific payload (or handled elsewhere).`);
+          }
+
           const trackName = TRACK_CONFIG[type]?.getDefaultName(count, instrumentName) || `Track ${count}`;
-          
-          // Use createTrackAndRegisterWithHistory from the store
-          console.log("Creating track with options:", {
-            instrumentId,
-            instrumentName,
-            instrumentStorageKey
-          });
-          const trackData = await createTrackAndRegisterWithHistory(type, trackName, {
-            instrumentId,
-            instrumentName,
-            instrumentStorageKey
-            // Pass other relevant options if available/needed
-          });
-          
-          return trackData; // Return the single created track
+          const trackData = await createTrackAndRegisterWithHistory(type, trackName, trackOptions);
+          return trackData;
       }
       
-      // Wrap the logic with error handling
       return _withErrorHandling(addLogic, 'handleAddTrack')();
   };
 
