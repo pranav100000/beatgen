@@ -373,9 +373,6 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
   // Track the next available note ID
   const [nextNoteId, setNextNoteId] = useState<number>(1);
   
-  // Default drum types for new rows
-  const defaultDrumTypes = ['Kick', 'Snare', 'Clap', 'Hat', 'Tom', 'Crash', 'Ride', 'Perc'];
-  
   // Calculate row height (cell size + gap)
   const rowHeight = CELL_SIZE + GAP_SIZE;
   
@@ -471,7 +468,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
       const newHeight = Math.max(200, (numRows * rowHeight) + 60); // Base height + rows + header/padding
       setContainerSize(prev => ({ ...prev, height: newHeight }));
       if (rndRef.current) {
-         rndRef.current.updateSize({ width: containerSize.width, height: newHeight });
+          rndRef.current.updateSize({ width: containerSize.width, height: newHeight });
       }
 
     } else {
@@ -626,20 +623,29 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
   // Refactored toggleCell
   const toggleCell = (samplerTrackId: string, colIndex: number) => {
     const rowIndex = samplerTracks.findIndex(t => t.id === samplerTrackId);
-    if (rowIndex === -1) return; 
+    // Add safety check for grid row existence
+    if (rowIndex === -1 || !grid || !grid[rowIndex]) {
+        console.error(`Invalid state for toggleCell: rowIndex=${rowIndex}, grid exists=${!!grid}`);
+        return;
+    }
 
-    // Optimistic UI update for local pattern state
-    let currentCellValue = false;
-    setGrid(prevGrid => 
-        prevGrid.map((row, rIdx) => { 
+    // 1. Determine the CURRENT value and the NEW value BEFORE updating state
+    const currentCellValue = grid[rowIndex][colIndex] ?? false; // Read from current grid state
+    const newCellValue = !currentCellValue;
+    console.log(`Toggling cell: row=${rowIndex}, col=${colIndex}, current=${currentCellValue}, new=${newCellValue}`);
+
+    // 2. Update the local pattern state optimistically using the calculated new value
+    setGrid(prevGrid =>
+        prevGrid.map((row, rIdx) => {
             if (rIdx === rowIndex) {
-                currentCellValue = row[colIndex] ?? false;
-                return row.map((cell, cIdx) => cIdx === colIndex ? !cell : cell);
+                // Create a new row array for immutability
+                const newRow = [...row];
+                newRow[colIndex] = newCellValue; // Set the determined new value
+                return newRow;
             }
             return row;
         })
     );
-    const newCellValue = !currentCellValue;
 
     const samplerTrack = samplerTracks[rowIndex]; 
     if (!samplerTrack) return; 
@@ -648,6 +654,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
     const noteLength = TICKS_PER_STEP; 
     const midiNoteValue = samplerTrack.base_midi_note || 60; 
 
+    console.log(`>>> DrumMachine (${trackId}): toggleCell - samplerTrackId: ${samplerTrackId}, colIndex: ${colIndex}, newCellValue: ${newCellValue} <<<`);
     if (newCellValue) {
       // Create note object WITH an ID
       const currentId = nextNoteId; 

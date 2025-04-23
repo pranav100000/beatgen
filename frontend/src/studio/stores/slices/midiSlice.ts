@@ -71,6 +71,7 @@ export const createMidiSlice: StoreSliceCreator<MidiSlice> = (set, get) => {
   };
 
   const removeSamplerNote = async (trackId: string, tickPosition: number, midiRow: number): Promise<void> => {
+    console.log(`>>> removeSamplerNote: trackId: ${trackId}, tickPosition: ${tickPosition}, midiRow: ${midiRow} <<<`);
     const { store, _withErrorHandling, executeHistoryAction } = rootGet();
     if (!store || !_withErrorHandling || !executeHistoryAction) { return; }
     const notes = getTrackNotes(trackId);
