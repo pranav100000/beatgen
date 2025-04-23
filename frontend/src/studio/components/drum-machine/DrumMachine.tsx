@@ -587,7 +587,6 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
     
     setIsLoading(true);
     try {
-    return
       if (!removeSamplerTrack) {
           console.error("removeSamplerTrack action is not available!");
           return;
@@ -714,6 +713,17 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
     }
     // Include drumNames and the callback itself in the dependency array
   }, [drumNotes, selectedSound, drumNames, onDisplayNotesChange]);
+
+  // *** ADDED: Effect to dispatch pattern changes ***
+  useEffect(() => {
+    // Only dispatch if grid is not empty, to avoid initial dispatch on mount if grid starts empty
+    if (grid && grid.length > 0) { 
+      console.log(`DrumMachine (${trackId}): Grid state changed. Dispatching drumPatternChanged event with pattern.`);
+      document.dispatchEvent(new CustomEvent('drumPatternChanged', { 
+        detail: { trackId: trackId, pattern: grid } 
+      }));
+    }
+  }, [grid, trackId]); // Depend on grid and trackId
 
   // Calculate initial positions for multiple piano rolls
   const calculatePianoRollPosition = (index: number) => {
