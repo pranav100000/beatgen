@@ -1,6 +1,7 @@
 import { create, StoreApi } from 'zustand';
 import { Store } from '../core/state/store';
 import { RootState, TrackOperation, CombinedTrack } from './types';
+import { immer } from 'zustand/middleware/immer';
 
 // Import all slice creators
 import { createCoreSlice, CoreSlice } from './slices/coreSlice';
@@ -19,21 +20,29 @@ export type StudioStoreState = RootState; // Assuming RootState in types.ts is c
   // If not, define it here: 
   // export type StudioStoreState = CoreSlice & ProjectSlice & TracksSlice & TransportSlice & HistorySlice & UISlice & MidiSlice & SamplerSlice & DrumSlice;
 
-export const useStudioStore = create<StudioStoreState>()((set, get) => {
+export const useStudioStore = create<StudioStoreState>()(immer((set, get) => {
   
   // --- Shared Utility Functions --- 
 
-  // Generic state updater (implementation for slices to use via get()._updateState)
+  // _updateState can likely be removed or simplified when using Immer
+  // as slices can use set(produce(draft => { ... })) directly.
+  // Keeping it for now for compatibility, but it modifies the draft directly.
   const _updateState = <K extends keyof StudioStoreState>(
     key: K, 
     value: StudioStoreState[K] | ((prev: StudioStoreState[K]) => StudioStoreState[K])
   ) => {
-    set((state) => ({ 
-        [key]: typeof value === 'function' 
-            // @ts-ignore - Zustand allows function updates
-            ? value(state[key]) 
-            : value 
-    }));
+    // Immer's set function automatically handles draft state
+    set((state) => {
+        // If value is a function, apply it to the draft state for that key
+        if (typeof value === 'function') {
+            // @ts-ignore - Immer allows direct mutation on draft
+            state[key] = value(state[key]); 
+        } else {
+            // @ts-ignore - Immer allows direct mutation on draft
+            state[key] = value;
+        }
+        // No need to return anything, Immer handles immutability
+    });
   };
 
   // Fix _withStore to always return a Promise
@@ -100,19 +109,8 @@ export const useStudioStore = create<StudioStoreState>()((set, get) => {
 
   // --- Combine Slices --- 
   
-  // Create an object containing the implementations of the shared utilities
-  // These will be passed implicitly via the get() function within each slice
-  const sharedUtilities = {
-      _updateState,
-      _withStore,
-      _withErrorHandling
-  };
-
-  // Note: We are not explicitly passing sharedUtilities to each slice creator.
-  // The slices access them via get()._utilityName, so they need to be part of the returned object.
-
-  return {
-    // Spread the results of each slice creator
+  // Slices now receive Immer-enhanced set/get
+  const slices = {
     ...createCoreSlice(set, get),
     ...createProjectSlice(set, get),
     ...createTracksSlice(set, get),
@@ -122,20 +120,28 @@ export const useStudioStore = create<StudioStoreState>()((set, get) => {
     ...createMidiSlice(set, get),
     ...createSamplerSlice(set, get),
     ...createDrumSlice(set, get),
-    
-    // Add implementations/aliases for missing RootState properties
-    handleTrackOperation,
-    updateState: _updateState,
+  };
 
-    // Expose shared utilities (already present)
-    _updateState,
+  return {
+    // Spread slices
+    ...slices,
+    
+    // Add implementations/aliases directly accessible on the root state
+    handleTrackOperation,
+    // Expose _updateState if slices rely on it, otherwise it can be removed
+    _updateState, 
+    updateState: _updateState, // Alias if needed
+
+    // Expose other utilities if needed at the root level
     _withStore,
     _withErrorHandling,
     
-    // Initialize the store instance here, ensuring it matches the type expected by RootState.store
+    // Initialize the store instance
     store: new Store(), 
+    // isInitialized might be part of CoreSlice now?
+    isInitialized: false, 
   };
-});
+}));
 
 // --- Post-Creation Initialization --- 
 // Example: Initialize history state after store creation

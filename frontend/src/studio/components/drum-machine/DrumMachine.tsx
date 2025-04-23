@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, JSX } from 'react';
 import { Rnd } from 'react-rnd';
-import PianoRoll from '../piano-roll2/PianoRoll';
 import CloseIcon from '@mui/icons-material/Close';
-import { IconButton, Tooltip } from '@mui/material';
+import { IconButton, Tooltip, Box, CircularProgress } from '@mui/material';
 import { useStudioStore } from '../../stores/studioStore';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
-import { CombinedTrack } from '../../../platform/types/project';
+import { CombinedTrack, DrumTrackRead, SamplerTrackRead } from '../../../platform/types/project';
+import { DrumMachineModal, DrumMachineModalProps } from '../modals/drum-machine/DrumMachineModal';
+import { DrumSamplePublicRead } from 'src/platform/types/public_models/drum_samples';
 
 export interface DrumTrackState extends CombinedTrack {
   type: 'drum';
@@ -324,15 +325,12 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
   onDisplayNotesChange,
 }) => {
   // Get the action to add an empty sampler track
-  const addEmptySamplerToDrumTrack = useStudioStore(state => state.addEmptySamplerToDrumTrack);
-  // Get all tracks to find sampler names later in useEffect
-  const allTracks = useStudioStore(state => state.tracks);
 
 
   const [selectedSound, setSelectedSound] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rndRef = useRef<Rnd>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
   
   // Replace single boolean with a Set to track multiple open piano rolls
   const [openPianoRolls, setOpenPianoRolls] = useState<Set<number>>(new Set());
@@ -404,16 +402,23 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
   // Fetch the associated sampler track IDs from the store using useState and useEffect
   const [samplerTrackIds, setSamplerTrackIds] = useState<string[]>([]);
   
-  // Use effect to fetch the sampler track IDs when tracks change
+  // ** New Modal State **
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); 
+  
+  // Effect to fetch the sampler track IDs when tracks change
   useEffect(() => {
-    const mainTrack = allTracks.find(t => t.id === trackId && t.type === 'drum') as DrumTrackState | undefined;
-    if (mainTrack?.samplerTrackIds) {
-      console.log(`Drum track ${trackId} has samplers:`, mainTrack.samplerTrackIds);
-      setSamplerTrackIds(mainTrack.samplerTrackIds);
-    } else {
-      console.log(`Drum track ${trackId} has no samplers or is not found`);
-    }
-  }, [trackId, allTracks]);
+    const mainTrack = [].find(t => t.id === trackId && t.type === 'drum') as DrumTrackState | undefined;
+    const currentIds = mainTrack?.samplerTrackIds || [];
+    // Only update if the IDs actually change to prevent loops
+    setSamplerTrackIds(prevIds => {
+        if (JSON.stringify(prevIds) !== JSON.stringify(currentIds)) {
+            console.log(`Updating samplerTrackIds for ${trackId}:`, currentIds);
+            return currentIds;
+        }
+        return prevIds;
+    });
+  }, []);
   
   // Effect to initialize and synchronize grid/names/notes based on samplerTrackIds
   useEffect(() => {
@@ -423,7 +428,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
 
       // Fetch names for the sampler tracks
       const newNames = samplerTrackIds.map((id, i) => {
-        const track = allTracks.find(t => t.id === id);
+        const track = [].find(t => t.id === id);
         return track ? track.name : `Sampler ${i + 1}`; // Use index as fallback
       });
 
@@ -481,7 +486,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
       }
     }
   // Depend on samplerTrackIds and allTracks (for names)
-  }, [samplerTrackIds, allTracks, trackId]); // Added trackId for logging clarity
+  }, [ trackId]); // Added trackId for logging clarity
   
   // Existing function to close INTERNAL piano roll
   const closeInternalPianoRoll = (drumIndex: number) => {
@@ -553,74 +558,61 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
     return newNote;
   };
   
-  // Add a new row
-  const addRow = (): void => {
-    console.log(`DrumMachine (${trackId}): Add Row button clicked. Calling addEmptySamplerToDrumTrack.`);
-    // Call the store action to create a new sampler and link it
-    addEmptySamplerToDrumTrack(trackId).then(newSamplerId => {
-      if (newSamplerId) {
-        console.log(`DrumMachine (${trackId}): Successfully added sampler ${newSamplerId} via store action.`);
-        // The useEffect hook reacting to samplerTrackIds will handle UI updates.
-      } else {
-        console.error(`DrumMachine (${trackId}): Failed to add sampler via store action.`);
-      }
-    });
-    
-    // Removed manual state updates (setDrumNames, setGrid, setDrumNotes)
-    // Removed resizing logic (setContainerSize, rndRef.current.updateSize)
+  // Renamed from addRow: Opens modal
+  const handleAddRow = (): void => {
+    console.log(`DrumMachine (${trackId}): Add Row button clicked. Opening modal.`);
+    setIsModalOpen(true);
   };
   
-  // Delete a row
-  const deleteRow = (index: number): void => {
-    if (drumNames.length <= 1) return; // Don't allow deleting the last row
-    
-    // Update drum names
-    const newDrumNames = [...drumNames];
-    newDrumNames.splice(index, 1);
-    setDrumNames(newDrumNames);
-    
-    // Update grid
-    const newGrid = [...grid];
-    newGrid.splice(index, 1);
-    setGrid(newGrid);
-    
-    // Update drum notes
-    const newDrumNotes = [...drumNotes];
-    newDrumNotes.splice(index, 1);
-    setDrumNotes(newDrumNotes);
-    
-    // Close piano roll for this drum if it's open
-    if (openPianoRolls.has(index)) {
-      closeInternalPianoRoll(index);
-    }
-    
-    // Update any open piano roll indices that are greater than the deleted index
-    const newOpenPianoRolls = new Set<number>();
-    openPianoRolls.forEach(rollIndex => {
-      if (rollIndex < index) {
-        newOpenPianoRolls.add(rollIndex);
-      } else if (rollIndex > index) {
-        newOpenPianoRolls.add(rollIndex - 1);
+  // New Modal Handlers
+  const handleModalClose = () => setIsModalOpen(false);
+  const handleConfirmSelection = async (selectedSamples: DrumSamplePublicRead[]) => { 
+    setIsLoading(true);
+    console.log(`DrumMachine (${trackId}): Samples confirmed:`, selectedSamples.map(s=>s.display_name));
+    try {
+      if (!addSamplerTrackToDrumTrack) {
+          console.error("addSamplerTrackToDrumTrack action is not available!");
+          return;
       }
-    });
-    setOpenPianoRolls(newOpenPianoRolls);
+      for (const sample of selectedSamples) {
+          await addSamplerTrackToDrumTrack(trackId, sample); // Calls store action
+      }
+      // Let the useEffect syncing from samplerTrackIds update the local state
+    } catch (error) { console.error(`DrumMachine (${trackId}): Error adding sampler tracks:`, error); }
+    finally { setIsLoading(false); handleModalClose(); }
+  };
+
+  // Modified Delete Row: Calls store action, then updates local state
+  const deleteRow = async (index: number): Promise<void> => { // Accepts index
+    if (index < 0 || index >= samplerTrackIds.length) return;
+    const samplerTrackIdToDelete = samplerTrackIds[index]; // Get ID from local state
+    console.log(`DrumMachine (${trackId}): Deleting sampler row index ${index}, ID: ${samplerTrackIdToDelete}`);
     
-    // Update selected sound if it's now out of bounds
-    if (selectedSound >= newDrumNames.length) {
-      setSelectedSound(newDrumNames.length - 1);
-    } else if (selectedSound === index) {
-      // If we deleted the selected sound, select the next one or the last one
-      setSelectedSound(Math.min(index, newDrumNames.length - 1));
+    setIsLoading(true);
+    try {
+    return
+      if (!removeSamplerTrack) {
+          console.error("removeSamplerTrack action is not available!");
+          return;
+      }
+      // Call store action first
+      await removeSamplerTrack(samplerTrackIdToDelete);
+      console.log(`DrumMachine (${trackId}): removeSamplerTrack store action finished.`);
+      
+      // THEN update local state (keep existing logic from reset file)
+      // This part assumes the reset file had this logic based on index
+      const newDrumNames = [...drumNames]; newDrumNames.splice(index, 1); setDrumNames(newDrumNames);
+      const newGrid = [...grid]; newGrid.splice(index, 1); setGrid(newGrid);
+      const newDrumNotes = [...drumNotes]; newDrumNotes.splice(index, 1); setDrumNotes(newDrumNotes);
+      if (openPianoRolls.has(index)) closeInternalPianoRoll(index); // Keep if reset had internal rolls
+      const newOpenPianoRolls = new Set<number>(); openPianoRolls.forEach(rollIndex => { if (rollIndex < index) newOpenPianoRolls.add(rollIndex); else if (rollIndex > index) newOpenPianoRolls.add(rollIndex - 1); }); setOpenPianoRolls(newOpenPianoRolls);
+      if (selectedSound >= newDrumNames.length) setSelectedSound(newDrumNames.length - 1); else if (selectedSound === index) setSelectedSound(Math.min(index, newDrumNames.length - 1));
+      // Resizing will be handled by the useEffect watching samplerTrackIds
+      
+    } catch (error) { 
+        console.error(`DrumMachine (${trackId}): Error deleting sampler track ${samplerTrackIdToDelete}:`, error); 
     }
-    
-    // Resize the container to account for the removed row
-    const newHeight = Math.max(200, containerSize.height - rowHeight); // Ensure minimum height
-    setContainerSize(prev => ({ ...prev, height: newHeight }));
-    
-    // Update the Rnd component size if it exists
-    if (rndRef.current) {
-      rndRef.current.updateSize({ width: containerSize.width, height: newHeight });
-    }
+    finally { setIsLoading(false); }
   };
   
   // Update container size when resized
@@ -862,7 +854,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
             className="drag-handle" 
             style={headerStyle}
           >
-            <h1 style={titleStyle}>DRUM-RND 808</h1>
+            <h1 style={titleStyle}>{[].find(t=>t.id===trackId)?.name || 'Drum Machine'}</h1>
             {onClose && (
               <Tooltip title="Close Drum Machine" arrow>
                 <IconButton 
@@ -886,14 +878,14 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
               <div ref={containerRef} style={drumGridStyle}>
                 {drumNames.map((name, rowIdx) => (
                   <Row
-                    key={`row-${rowIdx}`}
+                    key={`row-${rowIdx}-${samplerTrackIds[rowIdx] || rowIdx}`}
                     name={name}
                     rowIndex={rowIdx}
                     cellSize={CELL_SIZE}
                     gapSize={GAP_SIZE}
                     maxColumns={MAX_COLUMNS}
                     isSelected={selectedSound === rowIdx}
-                    rowData={grid[rowIdx]}
+                    rowData={grid[rowIdx] || []}
                     onSelectDrum={() => setSelectedSound(rowIdx)}
                     onToggleCell={(colIdx) => toggleCell(rowIdx, colIdx)}
                     onDeleteRow={() => deleteRow(rowIdx)}
@@ -901,13 +893,9 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
                   />
                 ))}
                 
-                {/* Add new row button */}
                 <div style={addButtonContainerStyle}>
-                  <div 
-                    style={addButtonStyle}
-                    onClick={addRow}
-                  >
-                    +
+                  <div style={addButtonStyle} onClick={handleAddRow} title="Add Drum Sample">
+                    {isLoading ? <CircularProgress size={20} color="inherit"/> : '+'}
                   </div>
                 </div>
               </div>
@@ -915,6 +903,12 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
           </div>
         </div>
       </Rnd>
+
+      <DrumMachineModal
+        open={isModalOpen}
+        onClose={handleModalClose}
+        onConfirmSelection={handleConfirmSelection} 
+      />
     </>
   );
 };

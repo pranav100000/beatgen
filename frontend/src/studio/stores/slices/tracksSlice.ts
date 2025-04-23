@@ -6,8 +6,11 @@ import { Actions } from '../../core/state/history/actions';
 import { TRACK_CONFIG, DEFAULT_SAMPLER_CONFIG } from '../config';
 import { GRID_CONSTANTS, ticksToPixels, pixelsToTicks } from '../../constants/gridConstants';
 import { PULSES_PER_QUARTER_NOTE } from '../../utils/noteConversion';
+import { produce } from 'immer';
 import { StateCreator } from 'zustand';
 import { StoreApi } from 'zustand';
+import SampleManager from '../../core/samples/sampleManager';
+import { db } from '../../core/db/dexie-client';
 
 // Define the state properties and actions for this slice
 export interface TracksSlice {
@@ -69,7 +72,7 @@ export interface TracksSlice {
 // type TracksSliceCreator = StateCreator<RootState, [], [], TracksSlice>;
 
 // Revert to the simpler definition without explicit StateCreator and third argument
-export const createTracksSlice = (set, get) => { 
+export const createTracksSlice = (set: SetFn, get: GetFn): TracksSlice => { 
   const rootGet = get as GetFn; 
   // Get store instance via rootGet when needed inside functions
   // const storeInstance = rootGet().store; // Don't get it here at the top level
@@ -93,61 +96,59 @@ export const createTracksSlice = (set, get) => {
 
   // Find a track by ID (local helper)
   const findTrackById = (trackId: string): CombinedTrack | undefined => {
-    return rootGet().tracks.find((t: CombinedTrack) => t.id === trackId);
+    // !! IMPORTANT: Ensure CombinedTrack type includes `track_number?: number;` !!
+    return rootGet().tracks.find((t) => t.id === trackId);
   };
 
   // Update a specific track's state in the tracks array
   const updateTrackState = (trackId: string, updates: Partial<CombinedTrack & TrackParameter>) => {
-    updateRootState('tracks', (prevTracks) =>
-      prevTracks.map((track) =>
-        track.id === trackId ? { ...track, ...updates } : track
-      )
-    );
+    set(produce((draft: RootState) => {
+        const trackIndex = draft.tracks.findIndex(t => t.id === trackId);
+        if (trackIndex !== -1) {
+            Object.assign(draft.tracks[trackIndex], updates);
+        }
+    }));
   };
 
   // Update all tracks and recalculate indices
   const updateTracks = (newTracks: CombinedTrack[]) => {
-    // Directly set the new tracks array
-    set({ tracks: newTracks });
-    // Fix: Remove automatic index update. Let other parts call it explicitly.
-    // get().updateTrackIndices(); 
-    console.log("updateTracks called, set new tracks array reference."); // Add log
+      set(produce((draft: RootState) => {
+          draft.tracks = newTracks; 
+      }));
   };
 
   // Action to recalculate and add/update the index property for UI ordering
   const updateTrackIndices = () => {
-    console.log("updateTrackIndices called"); // Add log
-    updateRootState('tracks', (prevTracks) => 
-      prevTracks.map((track, index) => ({
-        ...track,
-        index // Add/update the index property
-      }))
-    );
+    set(produce((draft: RootState) => {
+        draft.tracks.forEach((track, index) => {
+            // Mutate draft directly
+            // !! IMPORTANT: Ensure CombinedTrack has track_number !!
+            track.track_number = index; 
+        });
+    }));
   };
 
-  // Internal helper to update the nested track object
+  // Internal helper to update the nested track object using Immer
   const _updateNestedTrackData = (trackId: string, nestedUpdates: Partial<AnyTrackRead>) => {
-    console.log(`_updateNestedTrackData called for ${trackId}`, nestedUpdates);
-    const rootState = get(); // Use get() to access full state
-    console.log(`_updateNestedTrackData: prevTracks`, rootState.tracks);
-    rootState._updateState('tracks', (prevTracks) => 
-      prevTracks.map((track) => {
-        if (track.id === trackId) {
-          // Ensure base object includes required fields before merging updates
-          // Assuming track.track might be initially undefined or incomplete
-          // Omit 'type' from the fallback base object
-          const baseNestedTrack: Partial<AnyTrackRead> = track.track ? { ...track.track } : { id: track.id, name: track.name };
-          const newNestedTrack = { 
-              ...baseNestedTrack,
-              ...nestedUpdates        
-          };
-          console.log(`_updateNestedTrackData: newNestedTrack`, newNestedTrack);
-          // Ensure the final object conforms to AnyTrackRead
-          return { ...track, track: newNestedTrack as AnyTrackRead }; 
+    set(produce((draft: RootState) => {
+        const trackIndex = draft.tracks.findIndex(t => t.id === trackId);
+        if (trackIndex !== -1 && draft.tracks[trackIndex].track) {
+            Object.assign(draft.tracks[trackIndex].track, nestedUpdates);
+        } else {
+            console.warn(`_updateNestedTrackData: Track or track.track not found for ID ${trackId}`);
         }
-        return track; 
-      })
-    );
+    }));
+  };
+
+  // Explicitly define setTracks within the slice scope
+  const setTracks = (newTracks: CombinedTrack[]) => {
+      set(produce((draft: RootState) => {
+          draft.tracks = newTracks;
+          draft.tracks.forEach((track, index) => { 
+              // !! IMPORTANT: Ensure CombinedTrack has track_number !!
+              track.track_number = index; 
+          });
+      }), true);
   };
 
   // --- Selectors Implementation --- 
@@ -313,34 +314,31 @@ export const createTracksSlice = (set, get) => {
       }
 
       const deleteLogic = async (passedStore: Store) => {
-          // --- Modification: If deleting a DrumTrack, remove its samplers first --- 
+          // --- Recursive delete for drum track --- 
           if (trackToDelete.type === 'drum' && trackToDelete.track) {
               const drumTrack = trackToDelete.track as DrumTrackRead;
-              const samplerIdsToRemove = drumTrack.sampler_track_ids ? [...drumTrack.sampler_track_ids] : []; // Iterate over a copy
-              
+              const samplerIdsToRemove = drumTrack.sampler_track_ids ? [...drumTrack.sampler_track_ids] : []; 
               if (samplerIdsToRemove.length > 0) {
-                  console.log(`Drum track ${trackId} deleted, removing associated samplers:`, samplerIdsToRemove);
-                  // Sequentially remove samplers (await each one to avoid state race conditions if needed)
                   for (const samplerId of samplerIdsToRemove) {
-                      try {
-                          // Use the new removeSamplerTrack function which handles parent update + history
-                          await get().removeSamplerTrack(samplerId); 
-                      } catch (samplerRemoveError) {
-                          console.error(`Error removing associated sampler ${samplerId} during drum track delete:`, samplerRemoveError);
-                          // Decide if we should continue or abort drum track deletion
-                      }
+                      // Use the slice action which uses Immer internally now
+                      await removeSamplerTrack(samplerId); 
                   }
               }
           }
-          // --- End Modification ---
-
-          // Now delete the main track (or the non-drum track)
-          console.log(`Proceeding to delete track ${trackId} itself.`);
+          
+          // Create history action BEFORE modifying state
           const action = new Actions.DeleteTrack(get, { ...trackToDelete });
 
-          // Update state before engine removal
-          rootGet()._updateState('tracks', (prevTracks) => prevTracks.filter(t => t.id !== trackId));
-          rootGet().updateTrackIndices();
+          set(produce((draft: RootState) => {
+              const initialLength = draft.tracks.length;
+              draft.tracks = draft.tracks.filter(t => t.id !== trackId);
+              if (draft.tracks.length < initialLength) { // Only re-index if deletion occurred
+                  draft.tracks.forEach((track, index) => { 
+                      // !! IMPORTANT: Ensure CombinedTrack has track_number !!
+                      track.track_number = index; 
+                  }); 
+              }
+          }));
 
           try {
               await passedStore.getAudioEngine().removeTrack(trackId);
@@ -359,8 +357,8 @@ export const createTracksSlice = (set, get) => {
               console.error(`Error during track disconnection for ${trackId}:`, disconnectError);
           }
 
+          // Execute history action AFTER state change (or consider order)
           await executeHistoryAction(action);
-          console.log(`Finished deleting track ${trackId}.`);
       };
 
       await _withErrorHandling(async () => _withStore(deleteLogic)(), `handleTrackDelete: ${trackId}`)();
@@ -399,7 +397,7 @@ export const createTracksSlice = (set, get) => {
                 if (oldSamplerIds.length !== newSamplerIds.length) {
                     console.log(`Updating parent drum track ${drumTrackId} after removing sampler ${samplerTrackId}. New list:`, newSamplerIds);
                     
-                    // Update parent state
+                    // Update parent state using Immer via _updateNestedTrackData
                     _updateNestedTrackData(drumTrackId, { sampler_track_ids: newSamplerIds } as Partial<DrumTrackRead>);
 
                     // History action for the PARENT update
@@ -641,8 +639,10 @@ export const createTracksSlice = (set, get) => {
         const trackType: TrackType = isSampler ? 'sampler' : 'audio';
         
         const options: TrackOptions = isSampler 
-            ? { sampleFile: file, ...DEFAULT_SAMPLER_CONFIG } 
-            : { audioFile: file };
+            ? { id: crypto.randomUUID(), sampleFile: file, ...DEFAULT_SAMPLER_CONFIG } 
+            : { id: crypto.randomUUID(), audioFile: file };
+
+        await SampleManager.getInstance(db).putSampleBlob(options.id, file, 'sample', trackName);
         
         // Call the main track creation function (already handles history)
         // Assuming createTrackAndRegisterWithHistory is available via get()
@@ -883,7 +883,7 @@ export const createTracksSlice = (set, get) => {
     tracks: [],
 
     // Basic state manipulation
-    setTracks: (newTracks) => set({ tracks: newTracks }),
+    setTracks,
     updateTracks,
     updateTrackState,
     findTrackById,

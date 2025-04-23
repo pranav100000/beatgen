@@ -43,14 +43,6 @@ export const TRACK_CONFIG: Record<TrackType, {
 
       console.log(`TRACK_CONFIG[audio].initEngine: Metadata for ${trackId}:`, { duration, sampleRate, format, size });
 
-      try {
-        await db.addAudioFile(trackId, file, duration);
-        console.log(`TRACK_CONFIG[audio].initEngine: Saved audio file to Dexie for track ${trackId}`);
-      } catch (dbError) {
-        console.error(`TRACK_CONFIG[audio].initEngine: Failed to save audio file to Dexie for track ${trackId}:`, dbError);
-        return;
-      }
-
       const { _updateNestedTrackData } = get(); 
       
       if (_updateNestedTrackData) {

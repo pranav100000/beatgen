@@ -38,6 +38,18 @@ class SampleManager {
     return SampleManager.instance;
   }
 
+  public async putSampleBlob(id: string, file: File, type: 'audio_track' | 'sample', name?: string): Promise<void> {
+    await this.db.audioFiles.put({
+      id: id,
+      name: name || id,
+      data: file,
+      type: type,
+      size: file.size,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
   /**
    * Retrieves the Blob data for a sample, using cache if available,
    * otherwise fetching and caching it.
