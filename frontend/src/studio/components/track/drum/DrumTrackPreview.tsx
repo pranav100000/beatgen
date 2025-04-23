@@ -3,7 +3,6 @@ import { Box } from '@mui/material';
 import { useGridStore } from '../../../core/state/gridStore';
 import { GRID_CONSTANTS, getTrackColor } from '../../../constants/gridConstants';
 import { calculateMidiTrackWidth } from '../../../utils/trackWidthCalculators';
-import { useStudioStore } from '../../../stores/useStudioStore';
 import MidiNotesPreview from '../../piano-roll/components/MidiNotesPreview';
 import BaseTrackPreview from '../base/BaseTrackPreview';
 import { TrackPreviewProps } from '../types';

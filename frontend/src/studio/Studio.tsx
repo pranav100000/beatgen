@@ -22,6 +22,8 @@ import { useHistorySync } from './hooks/useHistorySync';
 import StudioControlBar from './components/control-bar/ControlBar';
 import { DEFAULT_MEASURE_WIDTH, useGridStore } from './core/state/gridStore';
 import ChatWindow from './components/ai-assistant/ChatWindow';
+import DrumMachineWindows from './components/drum-machine/DrumMachineWindows';
+// import DrumMachineWindows from './components/drum-machine/DrumMachineWindows';
 
 // Studio Component Props
 interface StudioProps {
@@ -385,24 +387,8 @@ function Studio({ projectId }: StudioProps) {
         />
         
         {/* Render the new piano roll windows directly in Studio */}
-        {<PianoRollWindows />}
-        
-        {/* Render open Drum Machine instances */}
-        {Object.entries(openDrumMachines || {})
-          .filter(([, isOpen]) => isOpen) 
-          .map(([trackId]) => ( 
-            <DrumMachine 
-              key={trackId}
-              trackId={trackId}
-              onClose={() => closeDrumMachine(trackId)}
-              onPatternChange={setDrumPattern}
-              // Pass MIDI actions
-              onAddNote={addMidiNote}
-              onRemoveNote={removeMidiNote}
-              onUpdateNote={updateMidiNote} 
-              handleConfirmSelection={selectDrumTrackById}
-            />
-        ))}
+        <PianoRollWindows />
+        <DrumMachineWindows />
 
       </Box>
       

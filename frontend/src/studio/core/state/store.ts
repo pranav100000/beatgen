@@ -8,7 +8,7 @@ import { SoundfontEngineController } from '../audio-engine/soundfontEngineContro
 import { SamplerController } from '../audio-engine/samplerController';
 import { Note } from '../../../types/note'; // Added for Note type
 import { NoteActions } from './history/actions/NoteActions'; // Added for NoteActions
-import { historyManager } from './history/HistoryManager'; // Added for historyManager
+import { HistoryManager, historyManager } from './history/HistoryManager'; // Added for historyManager
 import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
 import { DEFAULT_MEASURE_WIDTH, useGridStore } from './gridStore';
 import { CombinedTrack } from 'src/platform/types/project';

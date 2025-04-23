@@ -1,5 +1,5 @@
 import { Store } from '../../core/state/store';
-import { RootState, SetFn, GetFn, StoreSliceCreator, TrackOptions, TrackType } from '../types';
+import { RootState, SetFn, GetFn, StoreSliceCreator, TrackOptions, TrackType, DrumTrackRead } from '../types';
 import { CombinedTrack } from 'src/platform/types/project';
 import { SamplerTrackBase, SamplerTrackRead } from 'src/platform/types/track_models/sampler_track'; // Added SamplerTrackRead
 import { downloadAudioTrackFile } from '../../../platform/api/sounds'; // Adjust path as needed
@@ -9,6 +9,7 @@ import { Note } from '../../../types/note';
 import { convertJsonToNotes } from '../../../types/note'; 
 // Import Tone.js MIDI library
 import { Midi } from '@tonejs/midi'; 
+import { produce } from 'immer';
 
 // Define the actions for this slice
 export interface SamplerSlice {
@@ -62,51 +63,43 @@ const convertNotesToMidiBlob = async (notes: Note[], trackName: string): Promise
 export const createSamplerSlice: StoreSliceCreator<SamplerSlice> = (set, get) => {
   const rootGet = get as GetFn; // Helper for root state access
 
-  // Helper for updating a drum track's sampler references
-  // This directly modifies the tracks array via updateRootState
-  const updateDrumTrackSamplers = (drumTrackId: string, operation: 'add' | 'remove', samplerIds: string[]): CombinedTrack | null => {
-    const { tracks, _updateState } = rootGet(); // Use _updateState instead of updateTrackState
-    
-    // Ensure the utility function exists
-    if (!_updateState) {
-        console.error("_updateState utility is not available in updateDrumTrackSamplers");
-        return null;
-    }
-
-    const drumTrackIndex = tracks.findIndex(t => t.id === drumTrackId && t.type === 'drum');
-    
-    if (drumTrackIndex === -1) {
-      console.error(`Drum track ${drumTrackId} not found for sampler update.`);
-      return null;
-    }
-
-    const drumTrack = tracks[drumTrackIndex];
-    const currentSamplerIds = (drumTrack as any).samplerTrackIds || [];
-    if (!Array.isArray(currentSamplerIds)) {
-        console.error(`Drum track ${drumTrackId} has invalid samplerTrackIds property.`);
-        return null;
-    } 
-
-    const updatedSamplerIds = operation === 'add'
-      ? [...currentSamplerIds, ...samplerIds.filter(id => !currentSamplerIds.includes(id))] 
-      : currentSamplerIds.filter(id => !samplerIds.includes(id));
-    
-    // Fix: Directly update the tracks array using updateRootState
-    let updatedDrumTrack: CombinedTrack | null = null;
-    _updateState('tracks', (currentTracks) => 
-      currentTracks.map((track, index) => {
-        if (index === drumTrackIndex) {
-          updatedDrumTrack = {
-            ...track,
-            samplerTrackIds: updatedSamplerIds, 
-          } as CombinedTrack;
-          return updatedDrumTrack;
+  // Refactored Helper using Immer
+  const updateDrumTrackSamplers = (drumTrackId: string, operation: 'add' | 'remove', samplerIds: string[]): void => {
+    set(produce((draft: RootState) => {
+        const drumTrackIndex = draft.tracks.findIndex(t => t.id === drumTrackId && t.type === 'drum');
+        if (drumTrackIndex === -1) {
+          console.error(`Drum track ${drumTrackId} not found for sampler update.`);
+          return; // Exit draft modification
         }
-        return track;
-      })
-    );
+    
+        // Ensure the track property exists and has samplerTrackIds (or initialize)
+        const drumTrack = draft.tracks[drumTrackIndex];
+        if (!drumTrack.track) {
+            console.error(`Drum track ${drumTrackId} has no nested track data.`);
+            return;
+        }
+        // Initialize if undefined
+        if (!(drumTrack.track as DrumTrackRead).sampler_track_ids) {
+            (drumTrack.track as DrumTrackRead).sampler_track_ids = [];
+        }
+        
+        const currentSamplerIds = (drumTrack.track as DrumTrackRead).sampler_track_ids;
+        let updatedSamplerIds: string[];
 
-    return updatedDrumTrack; // Return the modified track object
+        if (operation === 'add') {
+            // Create a set to efficiently handle potential duplicates
+            const idSet = new Set([...currentSamplerIds, ...samplerIds]);
+            updatedSamplerIds = Array.from(idSet);
+        } else { // remove
+            updatedSamplerIds = currentSamplerIds.filter(id => !samplerIds.includes(id));
+        }
+        
+        // Mutate the draft directly
+        // Use type assertion assuming samplerTrackIds exists after initialization
+        (drumTrack.track as DrumTrackRead).sampler_track_ids = updatedSamplerIds; 
+
+        console.log(`Updated drum track ${drumTrackId} samplers via Immer:`, updatedSamplerIds);
+    })); // Removed action name argument
   };
 
   // Action to add a new sampler (from file) to a drum track
@@ -127,13 +120,7 @@ export const createSamplerSlice: StoreSliceCreator<SamplerSlice> = (set, get) =>
       }
       
       // 2. Add reference to the drum track
-      const updatedDrumTrack = updateDrumTrackSamplers(drumTrackId, 'add', [newSamplerTrack.id]);
-      if (!updatedDrumTrack) {
-        console.warn(`Drum track ${drumTrackId} not found or invalid. Sampler ${newSamplerTrack.id} created but not linked.`);
-        // Potentially delete the orphaned sampler track here? Depends on desired behavior.
-        // await rootGet().handleTrackDelete(newSamplerTrack.id);
-        // throw new Error(`Drum track ${drumTrackId} not found or invalid.`);
-      }
+      updateDrumTrackSamplers(drumTrackId, 'add', [newSamplerTrack.id]);
       
       console.log(`Added sampler ${newSamplerTrack.id} to drum track ${drumTrackId}`);
       return newSamplerTrack; // Return the newly created sampler track
@@ -156,10 +143,7 @@ export const createSamplerSlice: StoreSliceCreator<SamplerSlice> = (set, get) =>
       await handleTrackDelete(samplerTrackIdToDelete);
       
       // 2. Remove reference from the drum track
-      const updatedDrumTrack = updateDrumTrackSamplers(drumTrackId, 'remove', [samplerTrackIdToDelete]);
-      if (!updatedDrumTrack) {
-        console.warn(`Drum track ${drumTrackId} not found or invalid after removing sampler ${samplerTrackIdToDelete}. Cannot unlink.`);
-      }
+      updateDrumTrackSamplers(drumTrackId, 'remove', [samplerTrackIdToDelete]);
       console.log(`Removed sampler ${samplerTrackIdToDelete} from drum track ${drumTrackId}`);
     };
     
@@ -194,12 +178,15 @@ export const createSamplerSlice: StoreSliceCreator<SamplerSlice> = (set, get) =>
       }
       
       // 2. Add reference to the drum track
-      const updatedDrumTrack = updateDrumTrackSamplers(drumTrackId, 'add', [samplerTrack.id]);
-      if (!updatedDrumTrack) {
-        console.warn(`Drum track ${drumTrackId} not found or invalid. Rolling back sampler creation.`);
-        // Rollback: Delete the created sampler if linking failed
-        await handleTrackDelete(samplerTrack.id);
-        return null; // Indicate failure
+      updateDrumTrackSamplers(drumTrackId, 'add', [samplerTrack.id]);
+      
+      // Check if linking failed (e.g., drum track was deleted concurrently? Unlikely but possible)
+      // Re-fetch drum track state AFTER update attempt
+      const updatedDrumTrackState = rootGet().tracks.find(t => t.id === drumTrackId);
+      if (!updatedDrumTrackState || !(updatedDrumTrackState.track as DrumTrackRead).sampler_track_ids?.includes(samplerTrack.id)) {
+          console.warn(`Drum track ${drumTrackId} link failed or track deleted. Rolling back sampler creation.`);
+          await handleTrackDelete(samplerTrack.id);
+          return null; 
       }
       
       console.log(`Added empty sampler ${samplerTrack.id} to drum track ${drumTrackId}`);

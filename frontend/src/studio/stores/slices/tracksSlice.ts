@@ -707,57 +707,79 @@ export const createTracksSlice = (set: SetFn, get: GetFn): TracksSlice => {
     _withErrorHandling(resizeLogic, 'handleTrackResizeEnd')();
   };
 
-  // --- Simplified handleAddTrack Implementation --- 
+  // --- handleAddTrack Implementation (Restoring sampler creation loop) --- 
   const handleAddTrack = async (
     type: TrackType, 
     payload?: AddTrackPayload
-  ): Promise<CombinedTrack | null> => {
+  ): Promise<CombinedTrack | null> => { // Return only the main track created
       const rootState = get(); 
-      // Simplified: Removed executeHistoryAction as it's handled within createTrack...
-      const { createTrackAndRegisterWithHistory, openDrumMachine, _withErrorHandling } = rootState;
+      // Get necessary actions from root state
+      const { createTrackAndRegisterWithHistory, addSamplerTrackToDrumTrack, openDrumMachine, _withErrorHandling } = rootState;
       
-      if (!_withErrorHandling || !createTrackAndRegisterWithHistory) {
-          console.error("handleAddTrack: Missing dependencies (_withErrorHandling, createTrackAndRegisterWithHistory)");
+      // Ensure actions exist
+      if (!_withErrorHandling || !createTrackAndRegisterWithHistory || (type === 'drum' && !addSamplerTrackToDrumTrack)) {
+          console.error("handleAddTrack: Missing dependencies");
           return null;
       }
 
       const addLogic = async () => {
-          // --- Drum Track Creation (Simplified Logic) --- 
+          // --- Drum Track Creation with Samplers --- 
           if (type === 'drum') {
-              // Payload might still be needed if it contains other drum-specific options, but not samples
-              console.log("Creating main drum track (samplers added separately)");
-              
-              // 1. Create the main drum track only
+              // 1. Create the main drum track first
               const count = rootState.tracks.length + 1; 
               const mainDrumTrackName = TRACK_CONFIG.drum.getDefaultName(count, 'Drum Kit');
-              // Pass only relevant options, ensure sampler_track_ids defaults to [] internally
               const mainDrumTrack = await createTrackAndRegisterWithHistory('drum', mainDrumTrackName, {
                   instrumentName: 'Drum Sequencer', 
-                  // No samplerTrackIds needed here; created empty by default or in createTrack... 
               });
 
-              if (!mainDrumTrack) {
-                  console.error("Failed to create main drum track");
-                  return null;
+              if (!mainDrumTrack || !mainDrumTrack.id) {
+                  console.error("Failed to create main drum track record");
+                  return null; // Return null if main track creation fails
               }
-              console.log(`Created main drum track ${mainDrumTrack.id}`);
+              const mainDrumTrackId = mainDrumTrack.id;
+              console.log(`Created main drum track ${mainDrumTrackId}`);
+
+              // 2. Check for samples payload and add corresponding Sampler Tracks
+              if (payload && 'samples' in payload && Array.isArray(payload.samples)) {
+                  const drumPayload = payload as DrumTrackPayload;
+                  console.log(`Adding ${drumPayload.samples.length} sampler tracks to drum track ${mainDrumTrackId}...`);
+                  
+                  // Sequentially add sampler tracks using the dedicated action
+                  for (const sample of drumPayload.samples) {
+                      try {
+                          // Prepare sampleData for the action (ensure fields match)
+                          const sampleDataForAction = {
+                              id: sample.id, // Assuming DrumSamplePublicRead has id
+                              display_name: sample.display_name, // Assuming DrumSamplePublicRead has display_name
+                              storage_key: sample.storage_key, // Assuming DrumSamplePublicRead has storage_key
+                              // Add other necessary fields if addSamplerTrackToDrumTrack expects them
+                          };
+                          // Call action to create sampler and link it (handles history)
+                          await addSamplerTrackToDrumTrack(mainDrumTrackId, sampleDataForAction);
+                      } catch (error) {
+                          console.error(`Failed to add sampler track for sample ${sample.display_name} to drum track ${mainDrumTrackId}:`, error);
+                          // Decide whether to continue or stop if one sampler fails
+                      }
+                  }
+                  console.log(`Finished adding sampler tracks for ${mainDrumTrackId}.`);
+              } else {
+                  console.log(`No initial samples provided for drum track ${mainDrumTrackId}.`);
+              }
               
-              // 2. Open UI (optional)
-              // We still might want to open the UI even if samplers are added later
+              // 3. Open UI (optional)
               if (openDrumMachine) {
-                  console.log(`Opening drum machine UI for track: ${mainDrumTrack.id}`);
-                  openDrumMachine(mainDrumTrack.id);
+                  openDrumMachine(mainDrumTrackId);
               }
 
-              // Return only the created drum track
-              return mainDrumTrack;
+              // Return the main drum track object after attempting sampler additions
+              // Fetch the latest state in case samplers modified it (though unlikely here)
+              return rootState.findTrackById(mainDrumTrackId); 
           }
           
-          // --- Standard/MIDI Track Creation (Unchanged) --- 
+          // --- Standard/MIDI/Sampler Track Creation (Unchanged) --- 
           const countStd = rootState.tracks.length + 1;
           let instrumentNameStd: string | undefined;
           let trackOptionsStd: TrackOptions = {};
-
           if (type === 'midi' && payload && 'instrumentId' in payload) {
               const midiPayload = payload as MidiTrackPayload;
               instrumentNameStd = midiPayload.instrumentName;
@@ -767,7 +789,6 @@ export const createTracksSlice = (set: SetFn, get: GetFn): TracksSlice => {
                   instrumentStorageKey: midiPayload.instrumentStorageKey
               };
           }
-
           const trackNameStd = TRACK_CONFIG[type]?.getDefaultName(countStd, instrumentNameStd) || `Track ${countStd}`;
           const trackData = await createTrackAndRegisterWithHistory(type, trackNameStd, trackOptionsStd);
           return trackData;

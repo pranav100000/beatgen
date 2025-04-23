@@ -16,6 +16,7 @@ import { GRID_CONSTANTS } from '../../constants/gridConstants';
 import { convertJsonToNotes, Note } from '../../../types/note';
 import { db } from '../../core/db/dexie-client'; // Import db instance
 import SampleManager from '../../core/samples/sampleManager';
+import { produce } from 'immer'; // Import produce
 
 // Define the state properties for this slice
 export interface ProjectSlice {
@@ -23,61 +24,55 @@ export interface ProjectSlice {
   bpm: number;
   timeSignature: [number, number];
   keySignature: string;
-  setProjectTitle: (title: string) => void;
-  setBpm: (bpm: number) => void;
-  setTimeSignature: (numerator: number, denominator: number) => void;
-  setKeySignature: (keySignature: string) => void;
   loadProject: (projectId: string) => Promise<ProjectWithTracks | null>;
+  handleProjectParamChange: (param: ProjectParam, value: any) => void;
 }
 
 // Create the slice function
 export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) => {
-  const setProjectState = (partial: Partial<ProjectSlice> | ((state: ProjectSlice) => Partial<ProjectSlice>)) => set(partial);
   const rootGet = get as GetFn; // Define rootGet once for convenience
 
-  // Helper to handle project parameter changes (extracted from original store)
+  // Refactored helper using Immer
   const handleProjectParamChange = (param: ProjectParam, value: any) => {
-    const { store, bpm: oldBpm, timeSignature: oldTimeSignature, keySignature: oldKeySignature, executeHistoryAction, _withStore } = rootGet();
-
-    if (!store) {
-      console.warn("Store not available in handleProjectParamChange");
-      return;
-    }
-
+    const { store, executeHistoryAction, _withStore } = rootGet();
     const oldValue = rootGet()[param];
+    
     if (oldValue === value) return;
 
-    // Update local slice state
-    setProjectState({ [param]: value } as any);
+    // Update state using Immer (no action name)
+    set(produce((draft: RootState) => {
+        (draft as any)[param] = value;
+    })); 
 
-    // Update core engine state and history based on parameter type
+    if (!store) { console.warn("Store not available in handleProjectParamChange"); return; }
     switch (param) {
       case 'projectTitle':
-        if (store.projectManager.getCurrentProject()) {
-          store.projectManager.setProjectName(value as string);
-        }
+        store.projectManager.setProjectName(value as string);
         break;
       case 'bpm':
-        const bpmValue = value as number;
-        store.projectManager.setTempo(bpmValue);
-        Tone.Transport.bpm.value = bpmValue;
-        store.getTransport().setTempo(bpmValue);
-        
-        const bpmAction = new Actions.BPMChange(get, oldValue as number, bpmValue, rootGet().timeSignature);
-        executeHistoryAction(bpmAction);
+        store.projectManager.setTempo(value as number);
+        Tone.Transport.bpm.value = value as number;
+        store.getTransport().setTempo(value as number);
+        if (executeHistoryAction) {
+            const bpmAction = new Actions.BPMChange(get, oldValue as number, value as number, rootGet().timeSignature);
+            executeHistoryAction(bpmAction);
+        }
         break;
       case 'timeSignature':
         const [numerator, denominator] = value as [number, number];
         store.projectManager.setTimeSignature(numerator, denominator);
         Tone.Transport.timeSignature = value as [number, number];
-        
-        const timeAction = new Actions.TimeSignature(get, oldValue as [number, number], value as [number, number], rootGet().bpm);
-        executeHistoryAction(timeAction);
+        if (executeHistoryAction) {
+            const timeAction = new Actions.TimeSignature(get, oldValue as [number, number], value as [number, number], rootGet().bpm);
+            executeHistoryAction(timeAction);
+        }
         break;
       case 'keySignature':
         const keySigValue = value as string;
-        const keyAction = new Actions.KeySignature(get, oldValue as string, keySigValue);
-        executeHistoryAction(keyAction);
+        if (executeHistoryAction) {
+            const keyAction = new Actions.KeySignature(get, oldValue as string, keySigValue);
+            executeHistoryAction(keyAction);
+        }
         break;
     }
   };
@@ -94,41 +89,50 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
     return _withErrorHandling(fetchData, 'fetchProjectData')();
   };
 
-  // Helper to initialize project settings (extracted)
+  // Helper to initialize project settings using Immer
   const initializeProjectSettings = async (projectData: ProjectWithTracks) => {
      const { _withStore, store } = rootGet();
-     const initSettings = (store: Store, projectData: ProjectWithTracks) => {
-        setProjectState({
-          projectTitle: projectData.name,
-          bpm: projectData.bpm,
-          timeSignature: [
-            projectData.time_signature_numerator,
-            projectData.time_signature_denominator
-          ],
-          keySignature: projectData.key_signature
-        });
+     const initSettings = (passedStore: Store, projectData: ProjectWithTracks) => {
+        // Update state using Immer
+        set(produce((draft: RootState) => {
+            draft.projectTitle = projectData.name;
+            draft.bpm = projectData.bpm;
+            draft.timeSignature = [ projectData.time_signature_numerator, projectData.time_signature_denominator ];
+            draft.keySignature = projectData.key_signature;
+        }));
         
-        const currentProject = store.projectManager.getCurrentProject();
-        const projectToUse = currentProject && projectData.id && currentProject.id === projectData.id 
-                             ? currentProject 
-                             : store.projectManager.createProject(projectData.name);
-
-        store.projectManager.setTempo(projectData.bpm);
-        store.projectManager.setTimeSignature(
-          projectData.time_signature_numerator,
-          projectData.time_signature_denominator
-        );
+        // 1. Ensure project exists in the manager
+        const projectManager = passedStore.getProjectManager();
+        let currentProjectInstance = projectManager.getCurrentProject();
+        if (!currentProjectInstance || (projectData.id && currentProjectInstance.id !== projectData.id)) {
+             // If no current project or ID mismatch, create/set the new one
+             console.log("Creating/Setting project in manager:", projectData.name);
+             // Assuming createProject sets the created project as current
+             passedStore.projectManager.createProject(projectData.name); 
+             // Re-fetch the instance AFTER creation/setting
+             currentProjectInstance = passedStore.projectManager.getCurrentProject();
+        } 
         
+        // 2. Call methods on the manager's instance
+        if (currentProjectInstance) {
+            // Assuming currentProjectInstance is the correct class type with methods
+            projectManager.setTempo(projectData.bpm);
+            projectManager.setTimeSignature(projectData.time_signature_numerator, projectData.time_signature_denominator);
+            projectManager.setProjectName(projectData.name); 
+        } else {
+            console.error("Failed to get valid project instance in initSettings after create/get");
+        }
+        
+        // 3. Update Tone.js Transport
         Tone.Transport.bpm.value = projectData.bpm;
-        Tone.Transport.timeSignature = [
-          projectData.time_signature_numerator,
-          projectData.time_signature_denominator
-        ];
+        Tone.Transport.timeSignature = [ projectData.time_signature_numerator, projectData.time_signature_denominator ];
         
-        return projectToUse;
+        // Return the instance obtained from the manager
+        return currentProjectInstance; // Return the instance we retrieved/created
      }
      if (!_withStore) return null;
-     return _withStore(initSettings)(projectData); 
+     // Pass projectData correctly
+     return _withStore((storeInstance) => initSettings(storeInstance, projectData))(); 
   };
 
   // Refined processTrack for loading state (no history)
@@ -452,10 +456,7 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
     bpm: 120,
     timeSignature: [4, 4],
     keySignature: "C major",
-    setProjectTitle: (title) => handleProjectParamChange('projectTitle', title),
-    setBpm: (bpm) => handleProjectParamChange('bpm', bpm),
-    setTimeSignature: (numerator, denominator) => handleProjectParamChange('timeSignature', [numerator, denominator]),
-    setKeySignature: (key) => handleProjectParamChange('keySignature', key),
     loadProject,
+    handleProjectParamChange,
   };
 };

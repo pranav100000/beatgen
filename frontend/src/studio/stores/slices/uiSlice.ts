@@ -1,4 +1,5 @@
 import { RootState, SetFn, GetFn, StoreSliceCreator } from '../types';
+import { produce } from 'immer'; // Import produce
 
 // Define the state properties and actions for this slice
 export interface UISlice {
@@ -19,9 +20,6 @@ export interface UISlice {
 // Create the slice function
 export const createUISlice: StoreSliceCreator<UISlice> = (set, get) => {
   
-  // Utility to set state within this slice
-  const setUIState = (partial: Partial<UISlice> | ((state: UISlice) => Partial<UISlice>)) => set(partial);
-
   return {
     // Initial state
     zoomLevel: 1,
@@ -29,23 +27,20 @@ export const createUISlice: StoreSliceCreator<UISlice> = (set, get) => {
     addMenuAnchor: null,
     openDrumMachines: {},
 
-    // Actions implementations
-    setZoomLevel: (zoomLevel) => setUIState({ zoomLevel }),
-    setMeasureCount: (measureCount) => setUIState({ measureCount }),
-    setAddMenuAnchor: (el) => setUIState({ addMenuAnchor: el }),
+    // Actions implementations using Immer
+    setZoomLevel: (zoomLevel) => set(produce((draft: RootState) => { draft.zoomLevel = zoomLevel; })),
+    setMeasureCount: (measureCount) => set(produce((draft: RootState) => { draft.measureCount = measureCount; })),
+    setAddMenuAnchor: (el) => set(produce((draft: RootState) => { draft.addMenuAnchor = el; })),
     
-    openDrumMachine: (drumTrackId) => setUIState((state) => ({
-      openDrumMachines: { 
-        ...state.openDrumMachines,
-        [drumTrackId]: true 
-      }
+    openDrumMachine: (drumTrackId) => set(produce((draft: RootState) => {
+        if (!draft.openDrumMachines) { draft.openDrumMachines = {}; }
+        draft.openDrumMachines[drumTrackId] = true; 
     })),
     
-    closeDrumMachine: (drumTrackId) => setUIState((state) => ({
-      openDrumMachines: { 
-        ...state.openDrumMachines, 
-        [drumTrackId]: false 
-      }
+    closeDrumMachine: (drumTrackId) => set(produce((draft: RootState) => {
+        if (draft.openDrumMachines) { 
+            draft.openDrumMachines[drumTrackId] = false; 
+        }
     })),
     // Optional toggle function:
     // toggleDrumMachine: (drumTrackId) => setUIState((state) => ({
