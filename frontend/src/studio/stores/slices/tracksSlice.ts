@@ -243,7 +243,8 @@ export const createTracksSlice = (set, get) => {
               baseMidiNote: samplerOptions.baseMidiNote ?? DEFAULT_SAMPLER_CONFIG.baseMidiNote,
               grainSize: samplerOptions.grainSize ?? DEFAULT_SAMPLER_CONFIG.grainSize,
               overlap: samplerOptions.overlap ?? DEFAULT_SAMPLER_CONFIG.overlap,
-              audio_file_name: file?.name // Get name from extracted file variable
+              audio_file_name: file?.name, // Get name from extracted file variable
+              storage_key: samplerOptions.storage_key,
               // NO sampleFile property here
            }
       }

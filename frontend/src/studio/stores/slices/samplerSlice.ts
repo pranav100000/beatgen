@@ -2,7 +2,7 @@ import { Store } from '../../core/state/store';
 import { RootState, SetFn, GetFn, StoreSliceCreator, TrackOptions, TrackType } from '../types';
 import { CombinedTrack } from 'src/platform/types/project';
 import { SamplerTrackBase, SamplerTrackRead } from 'src/platform/types/track_models/sampler_track'; // Added SamplerTrackRead
-import { downloadFile } from '../../../platform/api/sounds'; // Adjust path as needed
+import { downloadAudioTrackFile } from '../../../platform/api/sounds'; // Adjust path as needed
 import { DEFAULT_SAMPLER_CONFIG } from '../config';
 // Import note types and conversion utility
 import { Note } from '../../../types/note'; 
@@ -237,7 +237,7 @@ export const createSamplerSlice: StoreSliceCreator<SamplerSlice> = (set, get) =>
         if (audioStorageKey) {
           console.log(`Attempting download for sampler ${trackId} using key ${audioStorageKey}`);
           try {
-            audioBlob = await downloadFile(audioStorageKey);
+            audioBlob = await downloadAudioTrackFile(audioStorageKey);
             console.log(`Downloaded audio for sampler ${trackId}`);
           } catch (error) {
             console.error(`Failed to download audio for sampler track ${trackId}:`, error);

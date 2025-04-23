@@ -12,6 +12,8 @@ import { historyManager } from './history/HistoryManager'; // Added for historyM
 import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
 import { DEFAULT_MEASURE_WIDTH, useGridStore } from './gridStore';
 import { CombinedTrack } from 'src/platform/types/project';
+import { BeatGenDB, db } from '../db/dexie-client'; // Import BeatGenDB and db instance
+import SampleManager from '../samples/sampleManager'; // Import SampleManager
 /**
  * Interface for a drum pad in the drum machine grid
  */
@@ -40,9 +42,7 @@ export class Store implements StoreInterface {
   private initialized: boolean = false;
   private midiManager: MidiManager;
   private instrumentManager: InstrumentManager;
-  // Removed _tracks array
-  // Removed _listeners array
-
+  private sampleManager: SampleManager; // Add sampleManager property
   // Map to store runtime data associated with track IDs
   private runtimeTrackData: Map<string, { channel: Tone.Channel; player?: Tone.Player; /* Add other runtime-specific state here if needed */ }> = new Map();
 
@@ -50,8 +50,9 @@ export class Store implements StoreInterface {
     this.projectManager = new ProjectManager();
     this.midiManager = new MidiManager();
     this.instrumentManager = new InstrumentManager();
+    // Initialize SampleManager with the db instance
+    this.sampleManager = SampleManager.getInstance(db); 
     
-    // Create TransportController
     this.transportController = new TransportController();
   }
 
@@ -469,5 +470,10 @@ export class Store implements StoreInterface {
     const ticksPerPixel = this.getTicksPerPixel();
     // Return the inverse of ticks per pixel
     return 1 / ticksPerPixel;
+  }
+
+  // Add getter for SampleManager
+  public getSampleManager(): SampleManager {
+    return this.sampleManager;
   }
 }

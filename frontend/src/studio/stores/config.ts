@@ -1,7 +1,8 @@
 import { Store } from '../core/state/store';
-import { TrackType, GetFn } from './types';
+import { TrackType, GetFn, AudioTrackOptions, MidiTrackOptions, SamplerTrackOptions, TrackOptions } from './types';
 import { calculateTrackWidth } from '../constants/gridConstants';
 import { db } from '../core/db/dexie-client';
+import SampleManager from '../core/samples/sampleManager';
 
 // Default configuration for samplers
 export const DEFAULT_SAMPLER_CONFIG = {
@@ -17,12 +18,13 @@ export const DEFAULT_SAMPLER_CONFIG = {
 export const TRACK_CONFIG: Record<TrackType, {
     getDefaultName: (count: number, instrumentName?: string) => string;
     initTrack: (id: string, file?: File) => Record<string, any>;
-    initEngine: (store: Store, trackId: string, get: GetFn, file?: File, instrumentId?: string) => Promise<any>;
+    initEngine: (store: Store, trackId: string, get: GetFn, options?: TrackOptions) => Promise<any>;
 }> = {
   audio: {
     getDefaultName: (count: number, instrumentName?: string) => instrumentName || `Audio Track ${count}`,
     initTrack: (id: string, file?: File) => ({ type: 'audio' as const, audioFile: file }),
-    initEngine: async (store: Store, trackId: string, get: GetFn, file?: File) => {
+    initEngine: async (store: Store, trackId: string, get: GetFn, options?: TrackOptions) => {
+      const file = options && (options as AudioTrackOptions).audioFile;
       if (!file) return Promise.resolve();
       
       console.log(`TRACK_CONFIG[audio].initEngine: Loading file for track ${trackId}...`);
@@ -70,8 +72,10 @@ export const TRACK_CONFIG: Record<TrackType, {
   midi: {
     getDefaultName: (count: number, instrumentName?: string) => instrumentName || `MIDI Track ${count}`,
     initTrack: (id: string) => ({ type: 'midi' as const }),
-    initEngine: async (store: Store, trackId: string, get: GetFn, _?: File, instrumentId?: string) => 
-      instrumentId ? store.connectTrackToSoundfont(trackId, instrumentId) : Promise.resolve(),
+    initEngine: async (store: Store, trackId: string, get: GetFn, options?: TrackOptions) => {
+      const instrumentId = options && (options as MidiTrackOptions).instrumentId;
+      return instrumentId ? store.connectTrackToSoundfont(trackId, instrumentId) : Promise.resolve();
+    },
   },
   drum: {
     getDefaultName: (count: number, instrumentName?: string) => instrumentName || `Drum Sequencer ${count}`,
@@ -79,26 +83,42 @@ export const TRACK_CONFIG: Record<TrackType, {
       type: 'drum' as const, 
       drumPattern: Array(4).fill(null).map(() => Array(64).fill(false)) 
     }),
-    initEngine: async (store: Store, trackId: string, get: GetFn) => Promise.resolve(),
+    initEngine: async (store: Store, trackId: string, get: GetFn, options?: TrackOptions) => Promise.resolve(),
   },
   sampler: {
     getDefaultName: (count: number, instrumentName?: string) => instrumentName || `Sampler ${count}`,
     initTrack: (id: string, file?: File) => ({ 
       type: 'sampler' as const, 
-      sampleFile: file,
       baseMidiNote: DEFAULT_SAMPLER_CONFIG.baseMidiNote,
       grainSize: DEFAULT_SAMPLER_CONFIG.grainSize,
       overlap: DEFAULT_SAMPLER_CONFIG.overlap
     }),
-    initEngine: async (store: Store, trackId: string, get: GetFn, file?: File) => {
-      if (file) {
-        console.log(`TRACK_CONFIG[sampler].initEngine: File provided for ${trackId}. Saving to Dexie...`);
-        try {
-          await db.addAudioFile(trackId, file, undefined); 
-          console.log(`TRACK_CONFIG[sampler].initEngine: Saved audio file to Dexie for track ${trackId}`);
-        } catch (dbError) {
-          console.error(`TRACK_CONFIG[sampler].initEngine: Failed to save audio file to Dexie for track ${trackId}:`, dbError);
-        }
+    initEngine: async (store: Store, trackId: string, get: GetFn, options?: SamplerTrackOptions) => {
+      const sampleManager = store.getSampleManager();
+      if (!sampleManager) {
+        console.error(`SampleManager not available on Store instance for sampler initEngine (track: ${trackId})`);
+        return Promise.resolve();
+      }
+
+      const storageKey = options?.storage_key;
+      const trackName = options?.name;
+
+      if (!storageKey) {
+          console.warn(`TRACK_CONFIG[sampler].initEngine: No storage_key provided in options for track ${trackId}. Cannot load sample.`);
+          const existingBlob = await sampleManager.getSampleBlob(trackId, '', 'sample');
+          if (!existingBlob) {
+              console.error(`Failed to get blob via ID ${trackId} either.`);
+              return Promise.resolve();
+          }
+          console.log(`Found cached blob for ID ${trackId} despite missing storageKey in options.`);
+      }
+      
+      console.log(`TRACK_CONFIG[sampler].initEngine: Getting sample blob for track ${trackId} (storageKey: ${storageKey})`);
+      const sampleFile = await sampleManager.getSampleBlob(trackId, storageKey!, 'sample', trackName);
+
+      if (!sampleFile) {
+        console.error(`TRACK_CONFIG[sampler].initEngine: Failed to get sample blob for track ${trackId} using storageKey ${storageKey}`);
+        return Promise.resolve();
       }
 
       const samplerController = store.getTransport().getSamplerController();
@@ -109,12 +129,13 @@ export const TRACK_CONFIG: Record<TrackType, {
       }
       
       const trackData = get().findTrackById(trackId);
-      const baseMidiNote = (trackData?.track as any)?.baseMidiNote ?? DEFAULT_SAMPLER_CONFIG.baseMidiNote;
-      const grainSize = (trackData?.track as any)?.grainSize ?? DEFAULT_SAMPLER_CONFIG.grainSize;
-      const overlap = (trackData?.track as any)?.overlap ?? DEFAULT_SAMPLER_CONFIG.overlap;
+      const baseMidiNote = options?.baseMidiNote ?? (trackData?.track as any)?.baseMidiNote ?? DEFAULT_SAMPLER_CONFIG.baseMidiNote;
+      const grainSize = options?.grainSize ?? (trackData?.track as any)?.grainSize ?? DEFAULT_SAMPLER_CONFIG.grainSize;
+      const overlap = options?.overlap ?? (trackData?.track as any)?.overlap ?? DEFAULT_SAMPLER_CONFIG.overlap;
 
       try {
-        console.log(`Connecting sampler ${trackId} to controller (file provided: ${!!file})`);
+        console.log(`Connecting sampler ${trackId} to controller using retrieved blob`);
+        const file = new File([sampleFile.data], trackName || sampleFile.name, { type: sampleFile.type });
         await samplerController.connectTrackToSampler(
           trackId,
           file,

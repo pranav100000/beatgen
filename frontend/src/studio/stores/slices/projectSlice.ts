@@ -2,7 +2,6 @@ import * as Tone from 'tone';
 import { Store } from '../../core/state/store';
 import { ProjectWithTracks, CombinedTrack, AudioTrackRead, MidiTrackRead, SamplerTrackRead, DrumTrackRead } from 'src/platform/types/project';
 import { getProject } from '../../../platform/api/projects';
-import { downloadFile } from '../../../platform/api/sounds';
 import { Actions } from '../../core/state/history/actions';
 import { DEFAULT_SAMPLER_CONFIG, TRACK_CONFIG } from '../config';
 import { 
@@ -240,9 +239,9 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
                   console.log(`Attempting to load audio for track ${finalCombinedTrack.id} from key ${storageKey}...`);
                   try {
                       const sampleManager = SampleManager.getInstance(db);
-                      const audioBlob = await sampleManager.getSampleBlob(finalCombinedTrack.id, storageKey, finalCombinedTrack.name);
+                      const audioBlob = await sampleManager.getSampleBlob(finalCombinedTrack.id, storageKey, 'audio_track', finalCombinedTrack.name);
                       if (audioBlob) {
-                          const audioFile = new File([audioBlob], finalCombinedTrack.name || 'audio_track', { type: audioBlob.type });
+                          const audioFile = new File([audioBlob.data], finalCombinedTrack.name || 'audio_track', { type: audioBlob.type });
                           await store.loadAudioFile(finalCombinedTrack.id, audioFile);
                           console.log(`Called store.loadAudioFile for track ${finalCombinedTrack.id}`);
                       } else {
@@ -384,7 +383,7 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
         console.log(`Cache miss for track ${track.id}, downloading key ${storageKey}...`);
 
         const sampleManager = SampleManager.getInstance(db);
-        const audioBlob = await sampleManager.getSampleBlob(track.id, storageKey, track.name);
+        const audioBlob = await sampleManager.getSampleBlob(track.id, storageKey, 'audio_track', track.name);
         
         if (audioBlob) {
           // Convert Blob to File for metadata (name primarily)

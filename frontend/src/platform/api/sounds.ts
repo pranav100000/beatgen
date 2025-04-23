@@ -12,43 +12,6 @@ export interface UploadUrlResponse {
   upload_url: string;
   storage_key: string;
 }
-
-// API request interfaces - these extend the generated types with API-specific fields
-// export interface AudioTrackCreateRequest extends  {
-//   type: 'audio';
-//   audio_file_id: string;
-//   file_format: string;
-//   duration: number;
-//   file_size: number;
-//   sample_rate: number;
-//   waveform_data: number[];
-//   storage_key: string;
-// }
-
-// export interface MidiFileCreateRequest extends TrackCreate {
-//   type: 'midi';
-//   midi_file_id: string;
-//   file_format: string;
-//   file_size?: number;      // Optional now
-//   storage_key?: string;    // Optional now
-//   instrument_id?: string;
-//   midi_notes_json: Record<string, any>; // Required
-// }
-
-// export interface SamplerTrackCreateRequest extends TrackCreate {
-//   type: 'sampler';
-//   audio_storage_key: string;
-//   audio_file_format: string;
-//   audio_file_size: number;
-//   audio_file_name: string;
-//   base_midi_note?: number;
-//   grain_size?: number;
-//   overlap?: number;
-//   audio_file_duration: number;
-//   audio_file_sample_rate: number;
-//   midi_notes_json: Record<string, any>; // Required
-// }
-
 /**
  * Get a presigned URL for uploading a file (audio or MIDI)
  * @param fileName The name of the file to upload
@@ -177,30 +140,49 @@ export const deleteSound = async (id: string): Promise<void> => {
 };
 
 /**
- * Download a file from cloud storage
+ * Private helper function to download a file from cloud storage.
+ * @param prefix The storage path prefix (e.g., 'storage/v1/object/public/tracks')
  * @param storageKey The storage key of the file
  * @returns The file as a Blob
  */
-export const downloadFile = async (storageKey: string): Promise<Blob> => {
+const downloadFile = async (prefix: string, storageKey: string): Promise<Blob> => {
+  const baseUrlString = process.env.REACT_APP_SUPABASE_URL || 'https://fmpafpwdkegazcerrnso.supabase.co';
+
+  // Construct the full URL path
+  const storageUrl = new URL(`/${prefix}/${storageKey}`, baseUrlString).toString();
+
   try {
-    // Construct the public URL
-    const baseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://fmpafpwdkegazcerrnso.supabase.co';
-    const storageUrl = `${baseUrl}/storage/v1/object/public/tracks/${storageKey}`;
-    
-    // Fetch the file
+    // Fetch the file using the constructed URL
     const response = await fetch(storageUrl, {
-      mode: 'cors',
-      credentials: 'same-origin'
+      mode: 'cors', // Ensure CORS is handled correctly if accessing from a different origin
     });
-    
+
     if (!response.ok) {
-      throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+      // Throw a more informative error if the fetch fails
+      throw new Error(`HTTP error ${response.status}: ${response.statusText} for URL ${storageUrl}`);
     }
-    
-    // Return as blob
+
+    // Return the file content as a Blob
     return await response.blob();
   } catch (error) {
-    console.error('Error downloading file:', error);
-    throw new Error(`Failed to download file: ${error.message}`);
+    // Log the error and re-throw a more specific error message
+    console.error(`Error downloading file from ${storageUrl}:`, error);
+    throw new Error(`Failed to download file (${storageKey}): ${error.message}`);
   }
+};
+
+/**
+ * Download an audio track file from cloud storage
+ * @param storageKey The storage key of the file
+ * @returns The file as a Blob
+ */
+export const downloadAudioTrackFile = async (storageKey: string): Promise<Blob> => {
+  // Define the specific prefix for audio tracks
+  const prefix = 'storage/v1/object/public/tracks'; 
+  return downloadFile(prefix, storageKey);
+};
+
+export const downloadDrumSampleFile = async (storageKey: string): Promise<Blob> => {
+  const prefix = 'storage/v1/object/public/assets/drum_samples_public';
+  return downloadFile(prefix, storageKey);
 };

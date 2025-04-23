@@ -9,7 +9,7 @@ import { Position } from '../../../../components/track';
 // Fix TrackState: Use CombinedTrack from platform types
 import { CombinedTrack } from 'src/platform/types/project'; 
 // Fix GetFn import path
-import { GetFn, RootState } from '../../../../stores/types'; 
+import { AudioTrackOptions, GetFn, RootState, TrackOptions } from '../../../../stores/types'; 
 import { ActionType } from '.';
 // Fix: Import TRACK_CONFIG
 import { TRACK_CONFIG } from '../../../../stores/config'; 
@@ -134,7 +134,32 @@ export class AddTrackAction extends BaseAction {
         try {
             console.log(`AddTrackAction: Calling initEngine for ${this.trackData.id} (type: ${this.trackData.type})`);
             // Pass the stored file object (or undefined)
-            await typeConfig.initEngine(this.store, this.trackData.id, this.get, fileToLoad, instrumentId); 
+            let options: TrackOptions;
+            switch (this.trackData.type) {
+                case 'audio':
+                    options = {
+                        ...this.trackData.track,
+                        audioFile: fileToLoad,
+                    };
+                    break;
+                case 'sampler':
+                    options = {
+                        ...this.trackData.track,
+                        sampleFile: fileToLoad,
+                    };
+                    break;
+                case 'midi':
+                    options = {
+                        ...this.trackData.track,
+                        instrumentId: instrumentId,
+                    };
+                    break;
+                default:
+                    options = {
+                        ...this.trackData.track,
+                    };
+            }
+            await typeConfig.initEngine(this.store, this.trackData.id, this.get, options); 
             console.log(`AddTrackAction: initEngine completed for ${this.trackData.id}`);
         } catch (engineInitError) {
             console.error(`AddTrackAction: Error during initEngine for ${this.trackData.id}:`, engineInitError);
