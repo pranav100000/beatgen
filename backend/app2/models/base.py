@@ -2,10 +2,11 @@
 Base models for SQL database entities
 """
 from datetime import datetime
-from typing import Optional, Type
+from typing import Optional, Type, List, Any
 import pydantic
 from sqlmodel import SQLModel, Field
-from sqlalchemy import TIMESTAMP
+from sqlalchemy import TIMESTAMP, Column
+from sqlalchemy.dialects.postgresql import JSONB
 from pydantic import BaseModel, create_model
 import uuid
 
@@ -37,7 +38,7 @@ class TimestampMixin(SQLModel):
         sa_column=TIMESTAMP(timezone=True)
     )
 
-class UUIDMixin(SQLModel):
+class DefaultUUIDMixin(SQLModel):
     """Mixin that adds UUID primary key"""
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
@@ -45,10 +46,21 @@ class UUIDMixin(SQLModel):
         index=True
     )
 
-class StandardBase(UUIDMixin, TimestampMixin):
-    """Base model with UUID primary key and timestamp fields"""
+class UUIDMixin(SQLModel):
+    """Mixin that adds UUID primary key"""
+    id: uuid.UUID = Field(
+        primary_key=True,
+        index=True
+    )
+
+class DefaultUUIDStandardBase(DefaultUUIDMixin, TimestampMixin):
+    """Base model with default UUID primary key and default timestamp fields"""
     pass
     
+class StandardBase(UUIDMixin, TimestampMixin):
+    """Base model with UUID primary key with mandatory provided UUID and default timestamp fields"""
+    pass
+
 class FileBase(StandardBase):
     """Base model for files"""
     file_name: str
@@ -57,14 +69,14 @@ class FileBase(StandardBase):
     file_format: str
     file_size: int
     
-class UserBase(StandardBase):
+class UserBase(DefaultUUIDStandardBase):
     """Base model for users"""
     email: str = Field(unique=True, index=True)
     username: Optional[str] = Field(default=None, unique=True, index=True)
     display_name: Optional[str] = Field(default=None)
     avatar_url: Optional[str] = Field(default=None)
     
-class ProjectBase(StandardBase):
+class ProjectBase(DefaultUUIDStandardBase):
     """Base model for projects"""
     name: str
     bpm: float
@@ -72,7 +84,7 @@ class ProjectBase(StandardBase):
     time_signature_denominator: int
     key_signature: str
     
-class TrackBase(TimestampMixin):
+class TrackBase(StandardBase):
     """Base model for tracks"""
     name: str
     
@@ -99,6 +111,7 @@ class InstrumentFileBase(FileBase):
 class DrumSamplePublicBase(FileBase):
     """Base model for drum samples"""
     genre: GenreType
-    type: DrumSampleType
-    drum_kit_name: str
+    category: DrumSampleType
+    kit_name: str
     description: Optional[str] = None
+    waveform_data: Optional[List[float]] = Field(default=None, sa_column=Column(JSONB))

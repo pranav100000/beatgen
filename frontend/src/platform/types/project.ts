@@ -18,7 +18,6 @@ export interface AudioTrackRead {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   audio_file_storage_key: string;
   audio_file_format: string;
   audio_file_size: number;
@@ -51,7 +50,6 @@ export interface MidiTrackRead {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   instrument_id: string;
   midi_notes_json?: {
     [k: string]: unknown;
@@ -64,8 +62,9 @@ export interface MidiTrackRead {
 export interface InstrumentFileRead {
   created_at?: string;
   updated_at?: string;
-  id?: string;
-  name: string;
+  id: string;
+  file_name: string;
+  display_name: string;
   storage_key: string;
   file_format: string;
   file_size: number;
@@ -82,7 +81,6 @@ export interface SamplerTrackRead {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   base_midi_note: number;
   grain_size: number;
   overlap: number;
@@ -95,6 +93,7 @@ export interface SamplerTrackRead {
   midi_notes_json?: {
     [k: string]: unknown;
   };
+  drum_track_id?: string | null;
 }
 /**
  * API response model for drum track data
@@ -104,7 +103,6 @@ export interface DrumTrackRead {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
 }
 /**
  * Project model for the database
@@ -167,38 +165,38 @@ export interface ProjectTrack {
   created_at?: string;
   updated_at?: string;
   name: string;
-  volume?: number | null;
-  pan?: number | null;
-  mute?: boolean | null;
-  x_position?: number | null;
-  y_position?: number | null;
-  trim_start_ticks?: number | null;
-  trim_end_ticks?: number | null;
-  duration_ticks?: number | null;
-  track_number?: number | null;
+  volume: number;
+  pan: number;
+  mute: boolean;
+  x_position: number;
+  y_position: number;
+  trim_start_ticks: number;
+  trim_end_ticks: number;
+  duration_ticks: number;
+  track_number: number;
   project_id?: string;
   track_id?: string;
   track_type: TrackType;
 }
 /**
- * Model for reading project-track data
+ * Base DTO for Project-Track relationships
  */
 export interface ProjectTrackRead {
   created_at?: string;
   updated_at?: string;
   name: string;
-  volume?: number | null;
-  pan?: number | null;
-  mute?: boolean | null;
-  x_position?: number | null;
-  y_position?: number | null;
-  trim_start_ticks?: number | null;
-  trim_end_ticks?: number | null;
-  duration_ticks?: number | null;
-  track_number?: number | null;
-  track_type: TrackType;
-  track_id: string;
+  volume: number;
+  pan: number;
+  mute: boolean;
+  x_position: number;
+  y_position: number;
+  trim_start_ticks: number;
+  trim_end_ticks: number;
+  duration_ticks: number;
+  track_number: number;
   project_id: string;
+  track_id: string;
+  track_type: TrackType;
 }
 /**
  * API request model for updating a project

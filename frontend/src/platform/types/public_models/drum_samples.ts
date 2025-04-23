@@ -16,7 +16,8 @@ export type DrumSampleType =
   | "tom"
   | "rim"
   | "clap"
-  | "cymbal";
+  | "cymbal"
+  | "eight_o_eight";
 
 /**
  * Drum sample model
@@ -31,9 +32,10 @@ export interface DrumSamplePublic {
   file_format: string;
   file_size: number;
   genre: GenreType;
-  type: DrumSampleType;
-  drum_kit_name: string;
+  category: DrumSampleType;
+  kit_name: string;
   description?: string | null;
+  waveform_data?: number[] | null;
 }
 /**
  * Base model for drum samples
@@ -41,16 +43,17 @@ export interface DrumSamplePublic {
 export interface DrumSamplePublicBase {
   created_at?: string;
   updated_at?: string;
-  id?: string;
+  id: string;
   file_name: string;
   display_name: string;
   storage_key: string;
   file_format: string;
   file_size: number;
   genre: GenreType;
-  type: DrumSampleType;
-  drum_kit_name: string;
+  category: DrumSampleType;
+  kit_name: string;
   description?: string | null;
+  waveform_data?: number[] | null;
 }
 /**
  * Drum sample create model
@@ -58,16 +61,17 @@ export interface DrumSamplePublicBase {
 export interface DrumSamplePublicCreate {
   created_at?: string;
   updated_at?: string;
-  id?: string;
+  id: string;
   file_name: string;
   display_name: string;
   storage_key: string;
   file_format: string;
   file_size: number;
   genre: GenreType;
-  type: DrumSampleType;
-  drum_kit_name: string;
+  category: DrumSampleType;
+  kit_name: string;
   description?: string | null;
+  waveform_data?: number[] | null;
 }
 /**
  * Drum sample delete model
@@ -88,9 +92,10 @@ export interface DrumSamplePublicRead {
   file_format: string;
   file_size: number;
   genre: GenreType;
-  type: DrumSampleType;
-  drum_kit_name: string;
+  category: DrumSampleType;
+  kit_name: string;
   description?: string | null;
+  waveform_data?: number[] | null;
 }
 /**
  * Drum sample update model
@@ -105,8 +110,9 @@ export interface DrumSamplePublicUpdate {
   file_format?: string;
   file_size?: number;
   genre?: GenreType;
-  type: DrumSampleType;
-  drum_kit_name?: string;
+  category?: DrumSampleType;
+  kit_name?: string;
   description?: string | null;
+  waveform_data?: number[] | null;
 }
 export interface SQLModel {}

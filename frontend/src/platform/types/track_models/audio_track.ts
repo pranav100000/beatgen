@@ -6,11 +6,6 @@
 */
 
 /**
- * Enum for track types
- */
-export type TrackType = "midi" | "audio" | "sampler" | "drum";
-
-/**
  * Audio Track model for the database
  */
 export interface AudioTrack {
@@ -18,7 +13,6 @@ export interface AudioTrack {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   audio_file_storage_key: string;
   audio_file_format: string;
   audio_file_size: number;
@@ -34,7 +28,6 @@ export interface AudioTrackBase {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   audio_file_storage_key: string;
   audio_file_format: string;
   audio_file_size: number;
@@ -49,7 +42,6 @@ export interface AudioTrackCreate {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   audio_file_storage_key: string;
   audio_file_format: string;
   audio_file_size: number;
@@ -68,7 +60,6 @@ export interface AudioTrackRead {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   audio_file_storage_key: string;
   audio_file_format: string;
   audio_file_size: number;
@@ -83,22 +74,21 @@ export interface AudioTrackUpdate {
   updated_at?: string;
   id: string;
   name?: string;
-  type: TrackType;
   audio_file_storage_key?: string;
   audio_file_format?: string;
   audio_file_size?: number;
   audio_file_duration?: number;
   audio_file_sample_rate?: number;
 }
-export interface SQLModel {}
 /**
- * Base model with UUID primary key and timestamp fields
+ * Base model with default UUID primary key and default timestamp fields
  */
-export interface StandardBase {
+export interface DefaultUUIDStandardBase {
   created_at?: string;
   updated_at?: string;
   id?: string;
 }
+export interface SQLModel {}
 /**
  * Mixin that adds created_at and updated_at fields to models
  */
@@ -114,5 +104,4 @@ export interface TrackBase {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
 }

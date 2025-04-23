@@ -41,7 +41,7 @@ class SamplerTrack(SamplerTrackBase, table=True):
     user_id: uuid.UUID = Field(foreign_key="users.id")
     user: Optional["User"] = Relationship(back_populates="sampler_tracks")
     
-    drum_track_id: Optional[uuid.UUID] = Field(foreign_key="drum_tracks.id")
+    drum_track_id: Optional[uuid.UUID] = Field(foreign_key="drum_tracks.id", default=None)
     drum_track: Optional["DrumTrack"] = Relationship(back_populates="sampler_tracks")
     
     # Relationships to project tracks
@@ -58,14 +58,14 @@ class SamplerTrack(SamplerTrackBase, table=True):
 class SamplerTrackRead(SamplerTrackBase):
     """API response model for sampler track data"""
     id: uuid.UUID
-    drum_track_id: Optional[uuid.UUID]
+    drum_track_id: Optional[uuid.UUID] = Field(default=None)
 
 class SamplerTrackCreate(SamplerTrackBase):
     """API request model for creating a sampler track"""
     id: uuid.UUID
-    drum_track_id: Optional[uuid.UUID]
+    drum_track_id: Optional[uuid.UUID] = Field(default=None)
     
 class SamplerTrackUpdate(all_optional(SamplerTrackBase, "SamplerTrackUpdate")):
     """API request model for updating a sampler track"""
     id: uuid.UUID
-    drum_track_id: Optional[uuid.UUID]
+    drum_track_id: Optional[uuid.UUID] = Field(default=None)

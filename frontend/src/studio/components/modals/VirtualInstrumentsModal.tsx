@@ -164,7 +164,7 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
             }
             
             // Call onSelect with the soundfont ID, display name, and storage key
-            onSelect(soundfont.id, soundfont.name, soundfont.storage_key);
+            onSelect(soundfont.id, soundfont.display_name, soundfont.storage_key);
             onClose();
             
         } catch (err) {
@@ -336,7 +336,7 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
                             </Box>
                             <Box sx={{ textAlign: 'center' }}>
                             <Typography variant="subtitle1">
-                                {soundfont.name}
+                                {soundfont.display_name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                                 {soundfont.category}

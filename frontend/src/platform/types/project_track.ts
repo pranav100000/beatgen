@@ -18,15 +18,15 @@ export interface ProjectTrack {
   created_at?: string;
   updated_at?: string;
   name: string;
-  volume?: number | null;
-  pan?: number | null;
-  mute?: boolean | null;
-  x_position?: number | null;
-  y_position?: number | null;
-  trim_start_ticks?: number | null;
-  trim_end_ticks?: number | null;
-  duration_ticks?: number | null;
-  track_number?: number | null;
+  volume: number;
+  pan: number;
+  mute: boolean;
+  x_position: number;
+  y_position: number;
+  trim_start_ticks: number;
+  trim_end_ticks: number;
+  duration_ticks: number;
+  track_number: number;
   project_id?: string;
   track_id?: string;
   track_type: TrackType;
@@ -38,15 +38,15 @@ export interface ProjectTrackBase {
   created_at?: string;
   updated_at?: string;
   name: string;
-  volume?: number | null;
-  pan?: number | null;
-  mute?: boolean | null;
-  x_position?: number | null;
-  y_position?: number | null;
-  trim_start_ticks?: number | null;
-  trim_end_ticks?: number | null;
-  duration_ticks?: number | null;
-  track_number?: number | null;
+  volume: number;
+  pan: number;
+  mute: boolean;
+  x_position: number;
+  y_position: number;
+  trim_start_ticks: number;
+  trim_end_ticks: number;
+  duration_ticks: number;
+  track_number: number;
 }
 /**
  * Model for creating a new project-track relationship
@@ -55,71 +55,57 @@ export interface ProjectTrackCreate {
   created_at?: string;
   updated_at?: string;
   name: string;
-  volume?: number | null;
-  pan?: number | null;
-  mute?: boolean | null;
-  x_position?: number | null;
-  y_position?: number | null;
-  trim_start_ticks?: number | null;
-  trim_end_ticks?: number | null;
-  duration_ticks?: number | null;
-  track_number?: number | null;
-  track_type: TrackType;
-  track_id: string;
+  volume: number;
+  pan: number;
+  mute: boolean;
+  x_position: number;
+  y_position: number;
+  trim_start_ticks: number;
+  trim_end_ticks: number;
+  duration_ticks: number;
+  track_number: number;
   project_id: string;
+  track_id: string;
+  track_type: TrackType;
 }
 /**
  * Base DTO for Project-Track relationships
- */
-export interface ProjectTrackDTO {
-  created_at?: string;
-  updated_at?: string;
-  name: string;
-  volume?: number | null;
-  pan?: number | null;
-  mute?: boolean | null;
-  x_position?: number | null;
-  y_position?: number | null;
-  trim_start_ticks?: number | null;
-  trim_end_ticks?: number | null;
-  duration_ticks?: number | null;
-  track_number?: number | null;
-  track_type: TrackType;
-  track_id: string;
-}
-/**
- * Model for reading project-track data
  */
 export interface ProjectTrackRead {
   created_at?: string;
   updated_at?: string;
   name: string;
-  volume?: number | null;
-  pan?: number | null;
-  mute?: boolean | null;
-  x_position?: number | null;
-  y_position?: number | null;
-  trim_start_ticks?: number | null;
-  trim_end_ticks?: number | null;
-  duration_ticks?: number | null;
-  track_number?: number | null;
-  track_type: TrackType;
-  track_id: string;
+  volume: number;
+  pan: number;
+  mute: boolean;
+  x_position: number;
+  y_position: number;
+  trim_start_ticks: number;
+  trim_end_ticks: number;
+  duration_ticks: number;
+  track_number: number;
   project_id: string;
+  track_id: string;
+  track_type: TrackType;
 }
 /**
  * Model for updating project-track settings
  */
 export interface ProjectTrackUpdate {
-  name?: string | null;
-  volume?: number | null;
-  pan?: number | null;
-  mute?: boolean | null;
-  x_position?: number | null;
-  y_position?: number | null;
-  trim_start_ticks?: number | null;
-  trim_end_ticks?: number | null;
-  duration_ticks?: number | null;
-  track_number?: number | null;
+  created_at?: string;
+  updated_at?: string;
+  name?: string;
+  volume?: number;
+  pan?: number;
+  mute?: boolean;
+  x_position?: number;
+  y_position?: number;
+  trim_start_ticks?: number;
+  trim_end_ticks?: number;
+  duration_ticks?: number;
+  track_number?: number;
+  project_id: string;
+  track_id: string;
+  track_type: TrackType;
 }
 export interface SQLModel {}

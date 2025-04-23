@@ -11,4 +11,5 @@ class DrumSampleType(str, Enum):
     RIM = "rim"
     CLAP = "clap"
     CYMBAL = "cymbal"
+    EIGHT_O_EIGHT = "eight_o_eight"
     

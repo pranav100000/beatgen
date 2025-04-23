@@ -5,11 +5,6 @@
 /* Do not modify it by hand - just update the pydantic models and then re-run the script
 */
 
-/**
- * Enum for track types
- */
-export type TrackType = "midi" | "audio" | "sampler" | "drum";
-
 export interface SQLModel {}
 /**
  * Sampler Track model for the database
@@ -19,7 +14,6 @@ export interface SamplerTrack {
   updated_at?: string;
   id: string;
   name: string;
-  type?: TrackType & string;
   base_midi_note: number;
   grain_size: number;
   overlap: number;
@@ -33,6 +27,7 @@ export interface SamplerTrack {
     [k: string]: unknown;
   };
   user_id: string;
+  drum_track_id?: string | null;
 }
 /**
  * Base model for sampler tracks
@@ -42,7 +37,6 @@ export interface SamplerTrackBase {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   base_midi_note: number;
   grain_size: number;
   overlap: number;
@@ -64,7 +58,6 @@ export interface SamplerTrackCreate {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   base_midi_note: number;
   grain_size: number;
   overlap: number;
@@ -77,6 +70,7 @@ export interface SamplerTrackCreate {
   midi_notes_json?: {
     [k: string]: unknown;
   };
+  drum_track_id?: string | null;
 }
 /**
  * API response model for sampler track data
@@ -86,7 +80,6 @@ export interface SamplerTrackRead {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   base_midi_note: number;
   grain_size: number;
   overlap: number;
@@ -99,6 +92,7 @@ export interface SamplerTrackRead {
   midi_notes_json?: {
     [k: string]: unknown;
   };
+  drum_track_id?: string | null;
 }
 /**
  * API request model for updating a sampler track
@@ -108,7 +102,6 @@ export interface SamplerTrackUpdate {
   updated_at?: string;
   id: string;
   name?: string;
-  type: TrackType;
   base_midi_note?: number;
   grain_size?: number;
   overlap?: number;
@@ -121,6 +114,7 @@ export interface SamplerTrackUpdate {
   midi_notes_json?: {
     [k: string]: unknown;
   };
+  drum_track_id?: string | null;
 }
 /**
  * Mixin that adds created_at and updated_at fields to models
@@ -137,5 +131,4 @@ export interface TrackBase {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
 }

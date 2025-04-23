@@ -25,6 +25,8 @@ from app2.services.user_service import UserService
 from app2.services.project_service import ProjectService
 from app2.services.track_service import TrackService
 from app2.services.file_service import FileService
+from app2.repositories.drum_sample_public_repository import DrumSamplePublicRepository
+from app2.services.drum_sample_service import DrumSampleService
 
 logger = get_logger("beatgen.api.dependencies")
 
@@ -66,6 +68,10 @@ def get_drum_track_repository(session: SessionDep) -> DrumTrackRepository:
 def get_project_track_repository(session: SessionDep) -> ProjectTrackRepository:
     """Get the project-track repository instance"""
     return ProjectTrackRepository(session)
+
+def get_drum_sample_public_repository(session: SessionDep) -> DrumSamplePublicRepository:
+    """Get the drum sample public repository instance"""
+    return DrumSamplePublicRepository(session)
     
 # Service instances
 def get_auth_service(
@@ -115,6 +121,12 @@ def get_file_service(
 ) -> FileService:
     """Get the file service instance"""
     return FileService(file_repository)
+
+def get_drum_sample_service(
+    drum_sample_repository: Annotated[DrumSamplePublicRepository, Depends(get_drum_sample_public_repository)]
+) -> DrumSampleService:
+    """Get the drum sample service instance"""
+    return DrumSampleService(drum_sample_repository)
     
 # Auth dependency
 async def get_current_user(

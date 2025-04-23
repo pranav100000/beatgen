@@ -11,7 +11,7 @@
 export interface InstrumentFile {
   created_at?: string;
   updated_at?: string;
-  id?: string;
+  id: string;
   file_name: string;
   display_name: string;
   storage_key: string;
@@ -27,7 +27,7 @@ export interface InstrumentFile {
 export interface InstrumentFileBase {
   created_at?: string;
   updated_at?: string;
-  id?: string;
+  id: string;
   file_name: string;
   display_name: string;
   storage_key: string;
@@ -43,7 +43,7 @@ export interface InstrumentFileBase {
 export interface InstrumentFileRead {
   created_at?: string;
   updated_at?: string;
-  id?: string;
+  id: string;
   file_name: string;
   display_name: string;
   storage_key: string;

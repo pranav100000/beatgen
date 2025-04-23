@@ -6,18 +6,14 @@
 */
 
 /**
- * Enum for track types
- */
-export type TrackType = "midi" | "audio" | "sampler" | "drum";
-
-/**
  * API response model for instrument file data
  */
 export interface InstrumentFileRead {
   created_at?: string;
   updated_at?: string;
-  id?: string;
-  name: string;
+  id: string;
+  file_name: string;
+  display_name: string;
   storage_key: string;
   file_format: string;
   file_size: number;
@@ -33,7 +29,6 @@ export interface MidiTrack {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   instrument_id: string;
   midi_notes_json?: {
     [k: string]: unknown;
@@ -48,7 +43,6 @@ export interface MidiTrackBase {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   instrument_id: string;
   midi_notes_json?: {
     [k: string]: unknown;
@@ -62,7 +56,6 @@ export interface MidiTrackCreate {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   instrument_id: string;
   midi_notes_json?: {
     [k: string]: unknown;
@@ -76,7 +69,6 @@ export interface MidiTrackRead {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   instrument_id: string;
   midi_notes_json?: {
     [k: string]: unknown;
@@ -91,7 +83,6 @@ export interface MidiTrackUpdate {
   updated_at?: string;
   id: string;
   name?: string;
-  type: TrackType;
   instrument_id?: string;
   midi_notes_json?: {
     [k: string]: unknown;
@@ -113,5 +104,4 @@ export interface TrackBase {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
 }

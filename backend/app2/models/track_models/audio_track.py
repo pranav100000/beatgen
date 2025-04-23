@@ -5,7 +5,7 @@ from typing import Optional, TYPE_CHECKING, List
 from sqlmodel import SQLModel, Field, Relationship
 import uuid
 
-from app2.models.base import StandardBase, TimestampMixin, TrackBase, all_optional
+from app2.models.base import DefaultUUIDStandardBase, TimestampMixin, TrackBase, all_optional
 from app2.types.track_types import TrackType
 
 # Handle circular imports

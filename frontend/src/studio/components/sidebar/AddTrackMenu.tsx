@@ -5,6 +5,7 @@ import AudioFileIcon from '@mui/icons-material/AudioFile';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import { VirtualInstrumentsModal } from '../modals/VirtualInstrumentsModal';
+import { DrumMachineModal } from '../modals/drum-machine/DrumMachineModal';
 
 interface AddTrackMenuProps {
   isOpen: boolean;
@@ -22,7 +23,7 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
   onFileUpload 
 }) => {
   const [isVirtualInstrumentModalOpen, setIsVirtualInstrumentModalOpen] = useState(false);
-
+  const [isDrumMachineModalOpen, setIsDrumMachineModalOpen] = useState(false);
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, isSampler: boolean = false) => {
     const files = event.target.files;
     if (files && files.length > 0) {
@@ -59,7 +60,10 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
           <ListItemText primary="Virtual Instrument" />
         </MenuItem>
         
-        <MenuItem onClick={() => { onAddTrack('drum'); onClose(); }}
+        <MenuItem onClick={() => { 
+          setIsDrumMachineModalOpen(true);
+          onClose(); 
+        }}
           sx={{ 
             fontSize: '13px',
             py: 1,
@@ -120,6 +124,14 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
         onSelect={(instrumentId: string, displayName: string, storageKey?: string) => {
           onAddTrack('midi', instrumentId, displayName, storageKey);
           setIsVirtualInstrumentModalOpen(false);
+        }}
+      />
+      <DrumMachineModal
+        open={isDrumMachineModalOpen}
+        onClose={() => setIsDrumMachineModalOpen(false)}
+        onSelect={(instrumentId: string, displayName: string, storageKey?: string) => {
+          onAddTrack('drum', instrumentId, displayName, storageKey);
+          setIsDrumMachineModalOpen(false);
         }}
       />
     </>

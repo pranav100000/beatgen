@@ -83,14 +83,13 @@ export const uploadAudioTrack = async (track: CombinedTrack): Promise<void> => {
   const audioMetadata = track.track as AudioTrackRead;
 
   await createSoundRecord({
-    id,
+    id: audioTrack.id,
     name: track.name,
     audio_file_format: audioMetadata.audio_file_format,
     audio_file_duration: audioMetadata.audio_file_duration,
     audio_file_size: audioMetadata.audio_file_size,
     audio_file_sample_rate: audioMetadata.audio_file_sample_rate,
     audio_file_storage_key: storage_key,
-    type: 'audio'
   })
 }
 
@@ -98,7 +97,6 @@ export const uploadMidiTrack = async (track: CombinedTrack): Promise<void> => {
   console.log("Uploading MIDI track:", track);
   const midiTrack = track.track as MidiTrack;
   await createMidiFileRecord({
-    type: 'midi',
     id: midiTrack.id,
     name: midiTrack.name,
     instrument_id: midiTrack.instrument_id,
@@ -125,7 +123,6 @@ export const uploadSamplerTrack = async (track: CombinedTrack): Promise<void> =>
   // Process the file to get metadata
   const metadata = await processAudioFile(file);
   await createSamplerTrackRecord({
-    type: 'sampler',
     id: samplerTrack.id,
     name: samplerTrack.name,
     audio_storage_key: storage_key,

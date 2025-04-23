@@ -6,10 +6,13 @@
 */
 
 /**
- * Enum for track types
+ * Base model with default UUID primary key and default timestamp fields
  */
-export type TrackType = "midi" | "audio" | "sampler" | "drum";
-
+export interface DefaultUUIDStandardBase {
+  created_at?: string;
+  updated_at?: string;
+  id?: string;
+}
 /**
  * Drum Track model for the database
  */
@@ -18,7 +21,6 @@ export interface DrumTrack {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
   user_id: string;
 }
 /**
@@ -29,7 +31,6 @@ export interface DrumTrackBase {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
 }
 /**
  * API request model for creating a drum track
@@ -39,7 +40,6 @@ export interface DrumTrackCreate {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
 }
 /**
  * API response model for drum track data
@@ -49,7 +49,6 @@ export interface DrumTrackRead {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
 }
 /**
  * API request model for updating a drum track
@@ -59,17 +58,8 @@ export interface DrumTrackUpdate {
   updated_at?: string;
   id: string;
   name?: string;
-  type: TrackType;
 }
 export interface SQLModel {}
-/**
- * Base model with UUID primary key and timestamp fields
- */
-export interface StandardBase {
-  created_at?: string;
-  updated_at?: string;
-  id?: string;
-}
 /**
  * Mixin that adds created_at and updated_at fields to models
  */
@@ -85,5 +75,4 @@ export interface TrackBase {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
 }

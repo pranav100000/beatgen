@@ -100,8 +100,8 @@ class SoundfontManager {
       // Store in IndexedDB with storage_key
       const soundfontFile: SoundfontFile = {
         id: soundfont.id,
-        name: soundfont.name,
-        displayName: soundfont.name,
+        name: soundfont.file_name,
+        displayName: soundfont.display_name,
         category: soundfont.category,
         data,
         dateAdded: new Date(),

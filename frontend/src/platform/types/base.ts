@@ -5,24 +5,51 @@
 /* Do not modify it by hand - just update the pydantic models and then re-run the script
 */
 
-/**
- * Enum for track types
- */
-export type TrackType = "midi" | "audio" | "sampler" | "drum";
+export type GenreType = "pop" | "rock" | "jazz" | "blues" | "country" | "hip_hop" | "rap" | "electronic";
+export type DrumSampleType =
+  | "kick"
+  | "snare"
+  | "closed_hh"
+  | "open_hh"
+  | "crash"
+  | "ride"
+  | "tom"
+  | "rim"
+  | "clap"
+  | "cymbal"
+  | "eight_o_eight";
 
 /**
- * Base model for audio files
+ * Mixin that adds UUID primary key
  */
-export interface AudioFileBase {
+export interface DefaultUUIDMixin {
+  id?: string;
+}
+/**
+ * Base model with default UUID primary key and default timestamp fields
+ */
+export interface DefaultUUIDStandardBase {
   created_at?: string;
   updated_at?: string;
   id?: string;
-  name: string;
+}
+/**
+ * Base model for drum samples
+ */
+export interface DrumSamplePublicBase {
+  created_at?: string;
+  updated_at?: string;
+  id: string;
+  file_name: string;
+  display_name: string;
   storage_key: string;
   file_format: string;
   file_size: number;
-  duration: number;
-  sample_rate: number;
+  genre: GenreType;
+  category: DrumSampleType;
+  kit_name: string;
+  description?: string | null;
+  waveform_data?: number[] | null;
 }
 /**
  * Base model for files
@@ -30,8 +57,9 @@ export interface AudioFileBase {
 export interface FileBase {
   created_at?: string;
   updated_at?: string;
-  id?: string;
-  name: string;
+  id: string;
+  file_name: string;
+  display_name: string;
   storage_key: string;
   file_format: string;
   file_size: number;
@@ -42,8 +70,9 @@ export interface FileBase {
 export interface InstrumentFileBase {
   created_at?: string;
   updated_at?: string;
-  id?: string;
-  name: string;
+  id: string;
+  file_name: string;
+  display_name: string;
   storage_key: string;
   file_format: string;
   file_size: number;
@@ -71,24 +100,24 @@ export interface ProjectTrackBase {
   created_at?: string;
   updated_at?: string;
   name: string;
-  volume?: number | null;
-  pan?: number | null;
-  mute?: boolean | null;
-  x_position?: number | null;
-  y_position?: number | null;
-  trim_start_ticks?: number | null;
-  trim_end_ticks?: number | null;
-  duration_ticks?: number | null;
-  track_number?: number | null;
+  volume: number;
+  pan: number;
+  mute: boolean;
+  x_position: number;
+  y_position: number;
+  trim_start_ticks: number;
+  trim_end_ticks: number;
+  duration_ticks: number;
+  track_number: number;
 }
 export interface SQLModel {}
 /**
- * Base model with UUID primary key and timestamp fields
+ * Base model with UUID primary key with mandatory provided UUID and default timestamp fields
  */
 export interface StandardBase {
   created_at?: string;
   updated_at?: string;
-  id?: string;
+  id: string;
 }
 /**
  * Mixin that adds created_at and updated_at fields to models
@@ -105,13 +134,12 @@ export interface TrackBase {
   updated_at?: string;
   id: string;
   name: string;
-  type: TrackType;
 }
 /**
  * Mixin that adds UUID primary key
  */
 export interface UUIDMixin {
-  id?: string;
+  id: string;
 }
 /**
  * Base model for users
