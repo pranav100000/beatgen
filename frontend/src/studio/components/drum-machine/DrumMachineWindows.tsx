@@ -48,14 +48,16 @@ const DrumMachineWindows: React.FC = () => {
 
                 // Derive associated sampler tracks with safer type check
                 const associatedSamplerTracks = tracks
-                    .filter((t): t is CombinedTrack & { track: SamplerTrackRead } => 
-                        t.type === 'sampler' && 
-                        // Explicitly check if track is an object before accessing properties
-                        typeof t.track === 'object' && 
-                        t.track !== null && 
-                        'drum_track_id' in t.track && // Ensure property exists
-                        t.track.drum_track_id === trackId
-                    )
+                    .filter((t): t is CombinedTrack & { track: SamplerTrackRead } => {
+                        return (
+                            t.type === 'sampler' && 
+                            // Explicitly check if track is an object before accessing properties
+                            typeof t.track === 'object' && 
+                            t.track !== null && 
+                            'drum_track_id' in t.track && // Ensure property exists
+                            t.track.drum_track_id === trackId
+                        );
+                    })
                     .map(t => t.track as SamplerTrackRead); 
 
                 // Add null checks for actions before passing down

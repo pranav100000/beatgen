@@ -295,7 +295,6 @@ const Row: React.FC<RowProps> = ({
 
 // Add at the top of the file after the import statements and interface declarations
 interface DrumMachineProps {
-  scaleNotes?: number[]; // Same prop as in PianoRoll component, optional array of scale notes (0-11)
   onClose?: () => void;
   trackId: string;
   onPatternChange?: (trackId: string, pattern: boolean[][]) => void;
@@ -321,7 +320,6 @@ const TICKS_PER_STEP = TICKS_PER_BEAT / 16; // 4 steps per beat, 240 ticks per s
 
 // Modify the component definition to remove forwardRef
 const DrumMachine: React.FC<DrumMachineProps> = ({
-  scaleNotes = [], 
   onClose, 
   trackId,
   onPatternChange,
@@ -340,6 +338,8 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
   addNote,
   removeSamplerNote,
 }) => {
+  // Log relevant props instead of non-existent 'props' object
+  console.log(`>>> DrumMachine rerendered - trackId: ${trackId}, samplerTracks count: ${samplerTracks.length} <<<`);
   const [selectedSound, setSelectedSound] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rndRef = useRef<Rnd>(null);
@@ -413,35 +413,22 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
   const { openPianoRoll: openExternalPianoRoll } = usePianoRollStore();
   
   // Fetch the associated sampler track IDs from the store using useState and useEffect
-  const [samplerTrackIds, setSamplerTrackIds] = useState<string[]>([]);
   
   // ** New Modal State **
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false); 
   
   // Effect to fetch the sampler track IDs when tracks change
-  useEffect(() => {
-    const mainTrack = [].find(t => t.id === trackId && t.type === 'drum') as DrumTrackState | undefined;
-    const currentIds = mainTrack?.samplerTrackIds || [];
-    // Only update if the IDs actually change to prevent loops
-    setSamplerTrackIds(prevIds => {
-        if (JSON.stringify(prevIds) !== JSON.stringify(currentIds)) {
-            console.log(`Updating samplerTrackIds for ${trackId}:`, currentIds);
-            return currentIds;
-        }
-        return prevIds;
-    });
-  }, [trackId]);
   
   // Effect to initialize and synchronize grid/names/notes based on samplerTrackIds
   useEffect(() => {
-    const numRows = samplerTrackIds.length;
+    const numRows = samplerTracks.length;
+    console.log(`>>> DrumMachine (${trackId}): Syncing state with ${numRows} samplerTracks:`, samplerTracks);
     if (numRows > 0) {
-      console.log(`DrumMachine (${trackId}): Syncing state with ${numRows} samplerTrackIds:`, samplerTrackIds);
+      console.log(`DrumMachine (${trackId}): Syncing state with ${numRows} samplerTracks:`, samplerTracks);
 
       // Fetch names for the sampler tracks
-      const newNames = samplerTrackIds.map((id, i) => {
-        const track = [].find(t => t.id === id);
+      const newNames = samplerTracks.map((track, i) => {
         return track ? track.name : `Sampler ${i + 1}`; // Use index as fallback
       });
 
@@ -499,7 +486,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
       }
     }
   // Depend on samplerTrackIds and allTracks (for names)
-  }, [ trackId]); // Added trackId for logging clarity
+  }, [ samplerTracks ]); // Added trackId for logging clarity
   
   // Existing function to close INTERNAL piano roll
   const closeInternalPianoRoll = (drumIndex: number) => {
@@ -510,8 +497,8 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
 
   // NEW function to handle opening the EXTERNAL piano roll for a specific sampler track
   const handleOpenSamplerPianoRoll = (rowIndex: number) => {
-      if (rowIndex < samplerTrackIds.length) {
-          const targetSamplerId = samplerTrackIds[rowIndex];
+      if (rowIndex < samplerTracks.length) {
+          const targetSamplerId = samplerTracks[rowIndex].id;
           console.log(`DrumMachine: Opening Piano Roll for Sampler Track ID: ${targetSamplerId}`);
           openExternalPianoRoll(targetSamplerId);
       } else {
@@ -597,8 +584,8 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
 
   // Modified Delete Row: Calls store action, then updates local state
   const deleteRow = async (index: number): Promise<void> => { // Accepts index
-    if (index < 0 || index >= samplerTrackIds.length) return;
-    const samplerTrackIdToDelete = samplerTrackIds[index]; // Get ID from local state
+    if (index < 0 || index >= samplerTracks.length) return;
+    const samplerTrackIdToDelete = samplerTracks[index].id; // Get ID from local state
     console.log(`DrumMachine (${trackId}): Deleting sampler row index ${index}, ID: ${samplerTrackIdToDelete}`);
     
     setIsLoading(true);
@@ -638,7 +625,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
   
   // Refactored toggleCell
   const toggleCell = (samplerTrackId: string, colIndex: number) => {
-    const rowIndex = samplerTrackIds.findIndex(id => id === samplerTrackId);
+    const rowIndex = samplerTracks.findIndex(t => t.id === samplerTrackId);
     if (rowIndex === -1) return; 
 
     // Optimistic UI update for local pattern state
@@ -872,7 +859,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
               <div ref={containerRef} style={drumGridStyle}>
                 {drumNames.map((name, rowIdx) => (
                   <Row
-                    key={`row-${rowIdx}-${samplerTrackIds[rowIdx] || rowIdx}`}
+                    key={`row-${rowIdx}-${samplerTracks[rowIdx].id || rowIdx}`}
                     name={name}
                     rowIndex={rowIdx}
                     cellSize={CELL_SIZE}
@@ -881,7 +868,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
                     isSelected={selectedSound === rowIdx}
                     rowData={grid[rowIdx] || []}
                     onSelectDrum={() => setSelectedSound(rowIdx)}
-                    onToggleCell={(colIdx) => toggleCell(samplerTrackIds[rowIdx], colIdx)}
+                    onToggleCell={(colIdx) => toggleCell(samplerTracks[rowIdx].id, colIdx)}
                     onDeleteRow={() => deleteRow(rowIdx)}
                     onOpenPianoRoll={() => handleOpenSamplerPianoRoll(rowIdx)}
                   />

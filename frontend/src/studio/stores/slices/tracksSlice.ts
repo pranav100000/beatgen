@@ -852,15 +852,20 @@ export const createTracksSlice = (set: SetFn, get: GetFn): TracksSlice => {
             // e.g., baseMidiNote might be derived or default
         };
         const samplerTrackName = sampleData.display_name; // Or generate a more unique name
+        console.log(`   Action Step 1: Prepared sampler options for ${samplerTrackName}`, samplerOptions);
+
 
         // 2. Create the Sampler Track (handles its own history for creation)
         const newSamplerTrack = await createTrackAndRegisterWithHistory('sampler', samplerTrackName, samplerOptions);
+        console.log(`   Action Step 2: Calling createTrackAndRegisterWithHistory for sampler...`);
 
         if (!newSamplerTrack || !newSamplerTrack.id) {
             console.error(`Failed to create sampler track for sample ${sampleData.display_name}`);
             return null;
         }
         const newSamplerTrackId = newSamplerTrack.id;
+        console.log(`   Action Step 2: Sampler track CREATED with ID: ${newSamplerTrackId}`);
+
         console.log(`Created sampler track ${newSamplerTrackId} linked to drum track ${drumTrackId}`);
 
         // 3. Update Parent Drum Track's State
@@ -874,9 +879,13 @@ export const createTracksSlice = (set: SetFn, get: GetFn): TracksSlice => {
         const oldSamplerIds = parentDrumTrack.sampler_track_ids || [];
         // Ensure no duplicates (though unlikely with UUIDs)
         const newSamplerIds = [...new Set([...oldSamplerIds, newSamplerTrackId])];
+        console.log(`   Action Step 3: Updating parent ${drumTrackId} with new IDs:`, newSamplerIds);
+
 
         console.log(`Updating parent drum track ${drumTrackId} sampler IDs from`, oldSamplerIds, `to`, newSamplerIds);
         _updateNestedTrackData(drumTrackId, { sampler_track_ids: newSamplerIds } as Partial<DrumTrackRead>);
+        console.log(`   Action Step 3: Called _updateNestedTrackData for parent.`);
+
 
         // 4. Add History Action for the Parent Update
         // **ASSUMES Actions.UpdateDrumTrackSamplers exists and takes (get, drumTrackId, oldIds, newIds)**
@@ -888,10 +897,14 @@ export const createTracksSlice = (set: SetFn, get: GetFn): TracksSlice => {
                 newSamplerIds
             );
             await executeHistoryAction(parentUpdateAction);
+            console.log(`   Action Step 4: History action executed.`);
+
         } catch (historyError) {
             console.error("Error executing history action for parent drum track update:", historyError);
             // Consider if state needs rollback here
         }
+
+        console.log(`<<< addSamplerTrackToDrumTrack ACTION END for sample ${sampleData.display_name}`);
 
         return newSamplerTrack;
     };
