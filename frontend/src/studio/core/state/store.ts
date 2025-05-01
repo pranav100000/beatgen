@@ -2,7 +2,7 @@ import { ProjectManager } from './project';
 import { TransportController } from './transport';
 import { MidiManager } from '../midi/MidiManagerNew';
 import { InstrumentManager } from '../instruments/InstrumentManager';
-import AudioEngine from '../audio-engine/audioEngine';
+import AudioFilePlayer from '../audio-engine/audioFilePlayer/audioEngine';
 import * as Tone from 'tone';
 import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
 import { SamplerController } from '../audio-engine/samplerController';
@@ -234,7 +234,7 @@ export class Store implements StoreInterface {
   //   // Note: No need to notify listeners here, UI should react to ProjectManager changes
   // }
 
-  public getAudioEngine(): AudioEngine {
+  public getAudioEngine(): AudioFilePlayer {
     return this.getTransport().getAudioEngine();
   }
 

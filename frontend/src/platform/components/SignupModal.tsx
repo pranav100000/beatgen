@@ -6,11 +6,13 @@ import {
   Button,
   IconButton,
   CircularProgress,
-  Alert
+  Alert,
+  Divider
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import GoogleIcon from '@mui/icons-material/Google';
 import { useState } from 'react';
-import { useAuth } from '../core/auth/auth-context';
+import { useAuth } from '../auth/auth-context';
 
 const style = {
   position: 'absolute',
@@ -35,11 +37,12 @@ export default function SignupModal({ open, onClose, onLoginClick }: SignupModal
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string>('Registration successful! Please check your email to confirm your account.');
   
-  const { signUp } = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +76,21 @@ export default function SignupModal({ open, onClose, onLoginClick }: SignupModal
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    setError(null);
+    setSuccess(false);
+    
+    try {
+      await signInWithGoogle();
+      // Will redirect to Google
+    } catch (err) {
+      setError('Failed to connect to Google');
+      console.error(err);
+      setIsGoogleLoading(false);
     }
   };
   
@@ -144,7 +162,7 @@ export default function SignupModal({ open, onClose, onLoginClick }: SignupModal
           <Button 
             variant="contained" 
             type="submit"
-            disabled={isLoading || success}
+            disabled={isLoading || isGoogleLoading || success}
             sx={{ 
               mt: 2,
               bgcolor: '#1a237e',
@@ -154,6 +172,28 @@ export default function SignupModal({ open, onClose, onLoginClick }: SignupModal
             }}
           >
             {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Sign Up'}
+          </Button>
+          
+          <Divider sx={{ my: 2 }}>or</Divider>
+          
+          <Button 
+            variant="outlined" 
+            startIcon={<GoogleIcon />}
+            onClick={handleGoogleSignIn}
+            disabled={isGoogleLoading || isLoading || success}
+            fullWidth
+            data-oauth-provider="google"
+            sx={{ 
+              mt: 1,
+              borderColor: '#1a237e',
+              color: '#1a237e',
+              '&:hover': {
+                borderColor: '#000051',
+                bgcolor: 'rgba(26, 35, 126, 0.04)'
+              }
+            }}
+          >
+            {isGoogleLoading ? <CircularProgress size={24} color="inherit" /> : 'Continue with Google'}
           </Button>
 
           <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>

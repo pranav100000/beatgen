@@ -1,9 +1,10 @@
 import { apiClient } from './client';
-import { AudioTrackRead, MidiTrackRead, SamplerTrackRead } from '../types/project';
+import { AudioTrackRead, DrumTrackRead, MidiTrackRead, SamplerTrackRead } from '../types/project';
 //import { SamplerTrack } from 'src/types/track';
 import { AudioTrackCreate } from '../types/track_models/audio_track';
 import { MidiTrackCreate } from '../types/track_models/midi_track';
 import { SamplerTrackCreate } from '../types/track_models/sampler_track';
+import { DrumTrackCreate } from '../types/track_models/drum_track';
 
 // Keep using the Sound interface from studio for now until we can fully migrate
 
@@ -101,6 +102,35 @@ export const createSamplerTrackRecord = async (samplerData: SamplerTrackCreate):
     
     const response = await apiClient.post('/sounds/sampler', transformedData);
     console.log('Sampler track record created successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating sampler track record:', error);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    throw error;
+  }
+};
+
+/**
+ * Create a drum track record
+ * @param drumData The drum track data
+ * @returns The created drum track object
+ */
+export const createDrumTrackRecord = async (drumData: DrumTrackCreate): Promise<DrumTrackRead> => {
+  console.log('Creating drum track record with data:', drumData);
+  
+  try {
+    // Transform the data to match backend expectations
+    const transformedData = {
+      ...drumData,
+    };
+    
+    console.log('Transformed drum track data:', transformedData);
+    
+    const response = await apiClient.post('/sounds/drum', transformedData);
+    console.log('Drum track record created successfully:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error creating sampler track record:', error);

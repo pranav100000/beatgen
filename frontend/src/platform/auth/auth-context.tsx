@@ -4,7 +4,8 @@ import {
   signUp as apiSignUp, 
   getUserProfile, 
   LoginResponse,
-  UserProfile
+  UserProfile,
+  signInWithGoogle
 } from '../api/auth';
 
 interface User {
@@ -26,6 +27,7 @@ type AuthContextType = {
     success: boolean;
     message?: string;
   }>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -45,54 +47,95 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for existing token on load
+  // Check for existing token on load or token in URL fragment
   useEffect(() => {
-    const loadUser = async () => {
+    const processToken = async (token: string) => {
+      console.log('Processing token...');
+      localStorage.setItem('access_token', token);
+      const decodedToken = parseJwt(token);
+      console.log('Decoded token:', decodedToken ? 'Valid JSON' : 'Invalid token format');
+
+      if (decodedToken && decodedToken.exp * 1000 > Date.now()) {
+        console.log('Token is valid and not expired');
+        setUser({
+          id: decodedToken.sub || 'unknown',
+          email: decodedToken.email || decodedToken.sub || '',
+        });
+        try {
+          console.log('Loading user profile...');
+          const userProfile = await getUserProfile();
+          console.log('Profile loaded successfully:', userProfile);
+          setProfile(userProfile);
+        } catch (error) {
+          console.error('Failed to load user profile:', error);
+          // Consider sign out or specific error handling if profile load fails after login
+          localStorage.removeItem('access_token'); // Remove token if profile load fails?
+          setUser(null);
+          setProfile(null);
+        }
+      } else {
+        console.warn('Token is expired or invalid, removing');
+        localStorage.removeItem('access_token');
+        setUser(null);
+        setProfile(null);
+      }
+      setLoading(false); // Ensure loading is set to false after processing
+    };
+
+    const initializeAuth = async () => {
+      setLoading(true); // Start loading
       try {
-        console.log('Checking for authentication token...');
-        const token = localStorage.getItem('access_token');
-        
-        if (token) {
-          console.log('Token found, validating...');
-          const decodedToken = parseJwt(token);
-          console.log('Decoded token:', decodedToken ? 'Valid JSON' : 'Invalid token format');
-          
-          if (decodedToken && decodedToken.exp * 1000 > Date.now()) {
-            // Token is valid
-            console.log('Token is valid and not expired');
-            setUser({
-              id: decodedToken.sub || 'unknown',
-              email: decodedToken.email || decodedToken.sub || '', // Email might not be in the token
-            });
-            
-            // Load user profile
-            try {
-              console.log('Loading user profile...');
-              const userProfile = await getUserProfile();
-              console.log('Profile loaded successfully:', userProfile);
-              setProfile(userProfile);
-            } catch (error) {
-              console.error('Failed to load user profile:', error);
-              // Don't remove token just because profile fetch failed
-            }
+        // 1. Check URL Fragment for OAuth Token
+        if (window.location.hash.includes('#access_token=')) {
+          console.log('Access token found in URL fragment.');
+          const hash = window.location.hash.substring(1); // Remove #
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get('access_token');
+
+          if (accessToken) {
+            await processToken(accessToken);
+            // Clean the URL fragment
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            console.log('URL fragment cleaned.');
+            return; // Exit early, token processed
           } else {
-            // Token expired or invalid
-            console.warn('Token is expired or invalid, removing');
-            localStorage.removeItem('access_token');
+            console.warn('Found #access_token= but failed to parse token from fragment.');
+            // Clean the URL fragment even if parsing failed
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
           }
         } else {
-          console.log('No authentication token found');
+           console.log('No access token found in URL fragment.');
         }
+
+        // 2. Check Local Storage (if no token in fragment)
+        console.log('Checking for authentication token in local storage...');
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          console.log('Token found in local storage, validating...');
+          await processToken(token); // Use the same processing logic
+        } else {
+          console.log('No authentication token found in local storage.');
+          setLoading(false); // No token anywhere, stop loading
+        }
+
       } catch (error) {
-        console.error('Error loading user:', error);
-      } finally {
-        console.log('Auth initialization complete');
-        setLoading(false);
+        console.error('Error during auth initialization:', error);
+        localStorage.removeItem('access_token'); // Clear token on error
+        setUser(null);
+        setProfile(null);
+        setLoading(false); // Stop loading on error
       }
     };
 
-    loadUser();
-  }, []);
+    initializeAuth();
+
+    // // Original local storage saving logic (commented out as it's handled by the sign-in flow now)
+    // if (typeof window !== 'undefined') {
+    //   const saveRedirectPath = () => { ... };
+    //   document.addEventListener('click', (e) => { ... });
+    // }
+
+  }, []); // Run only once on mount
 
   const handleAuthResponse = (response: LoginResponse): User | null => {
     console.log('Processing auth response:', response);
@@ -269,12 +312,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   };
 
+  const googleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+      // The redirect will happen, so we don't need to do anything else here
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
+    }
+  };
+
   const value = {
     user,
     profile,
     loading,
     signUp,
     signIn,
+    signInWithGoogle: googleSignIn,
     signOut,
   };
 

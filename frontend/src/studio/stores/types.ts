@@ -56,6 +56,24 @@ export interface DrumTrackPayload {
 // Union type for the payload for adding tracks
 export type AddTrackPayload = MidiTrackPayload | DrumTrackPayload | { file?: File; isSampler?: boolean } | null;
 
+export enum KeySignature {
+  C_MAJOR = "C Major",
+  G_MAJOR = "G Major",
+  D_MAJOR = "D Major",
+  A_MAJOR = "A Major",
+  E_MAJOR = "E Major",
+  B_MAJOR = "B Major",
+  F_SHARP_MAJOR = "F# Major",
+  C_SHARP_MAJOR = "C# Major",
+  F_MAJOR = "F Major",
+  B_FLAT_MAJOR = "Bb Major",
+  E_FLAT_MAJOR = "Eb Major",
+  A_FLAT_MAJOR = "Ab Major",
+  D_FLAT_MAJOR = "Db Major",
+  G_FLAT_MAJOR = "Gb Major",
+  C_FLAT_MAJOR = "Cb Major",
+} 
+
 // Options for creating tracks - base interface
 export interface BaseTrackOptions {
   id?: string;

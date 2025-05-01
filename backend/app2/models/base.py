@@ -39,7 +39,7 @@ class TimestampMixin(SQLModel):
     )
 
 class DefaultUUIDMixin(SQLModel):
-    """Mixin that adds UUID primary key"""
+    """Mixin that adds UUID primary key (generates default value)"""
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
         primary_key=True,
@@ -47,7 +47,7 @@ class DefaultUUIDMixin(SQLModel):
     )
 
 class UUIDMixin(SQLModel):
-    """Mixin that adds UUID primary key"""
+    """Mixin that adds UUID primary key (needs to be provided)"""
     id: uuid.UUID = Field(
         primary_key=True,
         index=True
@@ -69,7 +69,7 @@ class FileBase(StandardBase):
     file_format: str
     file_size: int
     
-class UserBase(DefaultUUIDStandardBase):
+class UserBase(StandardBase):
     """Base model for users"""
     email: str = Field(unique=True, index=True)
     username: Optional[str] = Field(default=None, unique=True, index=True)

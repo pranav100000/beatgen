@@ -1,7 +1,7 @@
 import { uploadFileWithProgress } from '../../studio/utils/audioProcessing';
 import { processAudioFile } from '../../studio/utils/audioProcessing';
 import { apiClient } from './client';
-import { createMidiFileRecord, createSamplerTrackRecord, createSoundRecord, getUploadUrl } from './sounds';
+import { createDrumTrackRecord, createMidiFileRecord, createSamplerTrackRecord, createSoundRecord, getUploadUrl } from './sounds';
 import { 
   Project as ApiProject, 
   ProjectCreate, 
@@ -15,6 +15,7 @@ import { AudioTrack, AudioTrackRead } from '../types/track_models/audio_track';
 import { SamplerTrack } from '../types/track_models/sampler_track';
 import { MidiTrack } from '../types/track_models/midi_track';
 import { db } from '../../studio/core/db/dexie-client';
+import { DrumTrack } from '../types/track_models/drum_track';
 
 export const getProjects = async (): Promise<Project[]> => {
   const response = await apiClient.get('/projects');
@@ -137,7 +138,16 @@ export const uploadSamplerTrack = async (track: CombinedTrack): Promise<void> =>
     audio_file_name: samplerTrack.audio_file_name,
     audio_file_duration: metadata.duration,
     audio_file_sample_rate: metadata.sampleRate,
-    midi_notes_json: samplerTrack.midi_notes_json
+    midi_notes_json: samplerTrack.midi_notes_json,
+    drum_track_id: samplerTrack.drum_track_id ? samplerTrack.drum_track_id : null
+  })
+}
+
+export const uploadDrumTrack = async (track: CombinedTrack): Promise<void> => {
+  const drumTrack = track.track as DrumTrack;
+  await createDrumTrackRecord({
+    id: drumTrack.id,
+    name: drumTrack.name,
   })
 }
 
@@ -157,6 +167,9 @@ export const saveProjectWithSounds = async (
         break;
       case 'sampler':
         await uploadSamplerTrack(track);
+        break;
+      case 'drum':
+        await uploadDrumTrack(track);
         break;
     }
   }

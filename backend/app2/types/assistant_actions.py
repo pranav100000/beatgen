@@ -3,6 +3,8 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, validator
 from abc import ABC
 
+from app2.models.public_models.drum_samples import DrumSamplePublicRead
+
 class TrackType(str, Enum):
     AUDIO = "audio"
     MIDI = "midi"
@@ -44,6 +46,7 @@ class ActionType(str, Enum):
     CHANGE_KEY = "change_key"
     CHANGE_TIME_SIGNATURE = "change_time_signature"
     ADD_TRACK = "add_track"
+    ADD_DRUM_TRACK = "add_drum_track"
     ADJUST_VOLUME = "adjust_volume"
     ADJUST_PAN = "adjust_pan"
     TOGGLE_MUTE = "toggle_mute"
@@ -75,6 +78,15 @@ class TrackData(ActionData):
     type: TrackType
     instrument_id: str = Field(..., description="The instrument ID")
     notes: List[dict] = Field(..., description="The notes to add to the track")
+
+class SingleDrumTrackData(ActionData):
+    type: TrackType
+    sample: DrumSamplePublicRead = Field(..., description="The sample to add to the track")
+    notes: List[dict] = Field(..., description="The notes to add to the track")
+
+class DrumTrackData(ActionData):
+    type: TrackType
+    tracks: List[SingleDrumTrackData] = Field(..., description="The tracks to add to the drum track")
 
 class VolumeData(ActionData):
     track_id: str = Field(..., description="The track ID")
@@ -117,6 +129,13 @@ class AssistantAction(BaseModel):
         return cls(
             action_type=ActionType.ADD_TRACK,
             data=TrackData(type=type, instrument_id=instrument_id, notes=notes)
+        )
+        
+    @classmethod
+    def add_drum_track(cls, type: TrackType, tracks: List[SingleDrumTrackData]) -> "AssistantAction":
+        return cls(
+            action_type=ActionType.ADD_DRUM_TRACK,
+            data=DrumTrackData(type=type, tracks=tracks)
         )
 
     @classmethod

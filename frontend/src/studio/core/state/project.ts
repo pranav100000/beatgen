@@ -1,4 +1,6 @@
 import { CombinedTrack, Project, ProjectBase, ProjectWithTracks, TrackType } from "src/platform/types/project";
+import { getMidiNotesForKey } from "../../../utils/music_utils";
+
 export class ProjectManager {
   private currentProject?: ProjectWithTracks;
 
@@ -58,6 +60,10 @@ export class ProjectManager {
 
   public getKey(): string {
     return this.currentProject.key_signature;
+  }
+
+  public getKeyNotes(): number[] {
+    return getMidiNotesForKey(this.currentProject.key_signature);
   }
 
   public setTempo(tempo: number): void {

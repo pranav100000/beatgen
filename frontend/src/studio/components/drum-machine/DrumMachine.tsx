@@ -198,7 +198,6 @@ const Cell: React.FC<CellProps> = ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.1s ease',
     boxSizing: 'border-box'
   };
 
@@ -316,7 +315,7 @@ interface DrumMachineProps {
 
 // Constants from PianoRoll to maintain consistency
 const TICKS_PER_BEAT = MUSIC_CONSTANTS.pulsesPerQuarterNote; // Standard MIDI ticks per beat (quarter note)
-const TICKS_PER_STEP = TICKS_PER_BEAT / 16; // 4 steps per beat, 240 ticks per step
+const TICKS_PER_STEP = TICKS_PER_BEAT / 4; // 4 steps per beat, 240 ticks per step
 
 // Modify the component definition to remove forwardRef
 const DrumMachine: React.FC<DrumMachineProps> = ({
@@ -805,7 +804,6 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
     fontSize: '20px',
     fontWeight: 'bold',
     border: `1px dashed ${DARK_THEME.border}`,
-    transition: 'all 0.2s ease',
   };
 
   const addButtonContainerStyle: React.CSSProperties = {
@@ -874,7 +872,7 @@ const DrumMachine: React.FC<DrumMachineProps> = ({
           <div style={contentStyle}>
             <div style={scrollContainerStyle}>
               <div ref={containerRef} style={drumGridStyle}>
-                {drumNames.map((name, rowIdx) => (
+                {samplerTracks.length > 0 && drumNames.map((name, rowIdx) => (
                   <Row
                     key={`row-${rowIdx}-${samplerTracks[rowIdx].id || rowIdx}`}
                     name={name}

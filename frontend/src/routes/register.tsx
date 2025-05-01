@@ -13,8 +13,10 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
-  Link
+  Link,
+  Divider
 } from '@mui/material'
+import GoogleIcon from '@mui/icons-material/Google'
 
 // Registration route - this will render at the path '/register'
 export const Route = createFileRoute('/register')({
@@ -25,13 +27,14 @@ export const Route = createFileRoute('/register')({
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +101,24 @@ function RegisterPage() {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const handleGoogleSignUp = async () => {
+    setIsGoogleLoading(true);
+    setError(null);
+    
+    try {
+      // Save current location for redirect after Google auth
+      localStorage.setItem('auth_redirect', '/home');
+      
+      // Redirect to Google OAuth
+      await signInWithGoogle();
+      // This will redirect the user to Google's login page
+    } catch (err) {
+      console.error('Google signup error:', err);
+      setError('Failed to connect to Google authentication service.');
+      setIsGoogleLoading(false);
     }
   };
   
@@ -183,7 +204,7 @@ function RegisterPage() {
               type="submit"
               fullWidth
               variant="contained"
-              disabled={isLoading}
+              disabled={isLoading || isGoogleLoading}
               sx={{ mt: 3, mb: 2, position: 'relative' }}
             >
               {isLoading ? (
@@ -202,6 +223,46 @@ function RegisterPage() {
                 </>
               ) : (
                 'Sign Up'
+              )}
+            </Button>
+            
+            <Divider sx={{ my: 2 }}>or</Divider>
+            
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<GoogleIcon />}
+              onClick={handleGoogleSignUp}
+              disabled={isLoading || isGoogleLoading}
+              data-oauth-provider="google"
+              sx={{ 
+                mb: 2, 
+                position: 'relative',
+                bgcolor: 'rgba(255, 255, 255, 0.08)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.12)',
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                }
+              }}
+            >
+              {isGoogleLoading ? (
+                <>
+                  <CircularProgress
+                    size={24}
+                    sx={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      marginTop: '-12px',
+                      marginLeft: '-12px',
+                    }}
+                  />
+                  Connecting...
+                </>
+              ) : (
+                'Continue with Google'
               )}
             </Button>
             

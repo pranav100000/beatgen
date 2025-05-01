@@ -41,13 +41,14 @@ class DrumTrack(DrumTrackBase, table=True):
         sa_relationship_kwargs={
             "primaryjoin": "and_(ProjectTrack.track_id == DrumTrack.id, ProjectTrack.track_type == 'drum')",
             "foreign_keys": "[ProjectTrack.track_id]",
-            "overlaps": "project_tracks"
+            "overlaps": "audio_track,midi_track,project_tracks,sampler_track"
         }
     )
 
 # API Models
 class DrumTrackRead(DrumTrackBase):
     """API response model for drum track data"""
+    sampler_track_ids: list[uuid.UUID] = Field(default_factory=list)
 
 class DrumTrackCreate(DrumTrackBase):
     """API request model for creating a drum track"""

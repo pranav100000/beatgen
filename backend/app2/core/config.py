@@ -10,6 +10,8 @@ class AppConfig(BaseModel):
     """Base application configuration"""
     PROJECT_NAME: str = "BeatGen API"
     API_PREFIX: str = "/api"
+    BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
+    FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     DEBUG: bool = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
     
 class SupabaseConfig(BaseModel):

@@ -78,7 +78,8 @@ class ProjectTrack(ProjectTrackBase, table=True):
         back_populates="project_tracks",
         sa_relationship_kwargs={
             "primaryjoin": "and_(ProjectTrack.track_id == DrumTrack.id, ProjectTrack.track_type == 'drum')",
-            "foreign_keys": "[ProjectTrack.track_id]"
+            "foreign_keys": "[ProjectTrack.track_id]",
+            "overlaps": "audio_track,midi_track,project_tracks,sampler_track"
         }
     )
 

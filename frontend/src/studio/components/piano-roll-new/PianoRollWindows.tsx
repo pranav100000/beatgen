@@ -18,6 +18,7 @@ const PianoRollWindows: React.FC = memo(() => {
   const addMidiNote = useStudioStore(state => state.addMidiNote);
   const removeMidiNote = useStudioStore(state => state.removeMidiNote);
   const updateMidiNote = useStudioStore(state => state.updateMidiNote);
+  const getKeyNotes = useStudioStore(state => state.getKeyNotes);
   
   const [prevNotesByTrack, setPrevNotesByTrack] = useState<Record<string, NoteState[]>>({});
   
@@ -125,7 +126,7 @@ const PianoRollWindows: React.FC = memo(() => {
               initialHeight={500}
               contentWidth={5000} 
               keyboardWidth={60} 
-              scaleNotes={[0, 2, 4, 5, 7, 9, 11]} 
+              scaleNotes={[]} 
               onClose={() => closePianoRoll(trackId)}
             />
           </div>

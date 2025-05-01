@@ -16,7 +16,7 @@ import uuid
 from typing import Dict, List, Any, Optional, AsyncGenerator, Literal
 import traceback
 
-from app2.api.dependencies import get_current_user
+from app2.api.dependencies import get_current_user, SessionDep
 from app2.models.user import User
 from app2.models.assistant import (
     AssistantRequest, AssistantResponse, 
@@ -28,12 +28,16 @@ from app2.sse.request_manager import request_manager, RequestStatus
 from app2.sse.sse import SSEManager
 from app2.sse.sse_queue_manager import SSEQueueManager
 from app2.types.assistant_actions import TrackType
+from app2.core.logging import get_api_logger
 from services.music_gen_service.music_gen_service import music_gen_service
 from services.music_gen_service.midi import get_clean_track_data
 from pydantic import BaseModel
+from app2.infrastructure.database.sqlmodel_client import engine
+from sqlmodel import Session
 
 # Set up logger
 logger = logging.getLogger("beatgen.assistant_streaming")
+logger=get_api_logger("assistant_streaming")
 
 # Create router
 router = APIRouter()
@@ -239,33 +243,40 @@ async def process_assistant_request(request_id: str):
         logger.error(f"SSE queue not found for request: {request_id}")
         return
     
+    # Get a database session for this background task
+    # Note: We need a way to get a session outside of a request dependency
+    # Option 1: Create a new session context manually (simplest for background task)
+    session = None # Initialize session to None
     try:
-        # Log start of processing
-        logger.info(f"Processing assistant request: {request_id}, mode: {context.mode}")
-        
-        # Send initial events using SSEEventQueue helper methods
-        await sse_queue.start_stream()
-        
-        await sse_queue.stage(
-            name="initializing", 
-            description=f"Setting up {context.mode} process"
-        )
-        
-        await sse_queue.status(
-            message=f"Processing your {context.mode} request", 
-            details=f"Prompt: {context.prompt}"
-        )
-        
-        # Process based on mode
-        if context.mode == "generate":
-            await process_generate_request(request_id, context, sse_queue)
-        elif context.mode == "edit":
-            await process_edit_request(request_id, context, sse_queue)
-        else:  # chat
-            await process_chat_request(request_id, context, sse_queue)
-        
-        # Mark request as completed
-        request_manager.update_request_status(request_id, RequestStatus.COMPLETED)
+        with Session(engine) as session: # Create a new session for this task
+            # Log start of processing
+            logger.info(f"Processing assistant request: {request_id}, mode: {context.mode} with session: {session}")
+            
+            # Send initial events using SSEEventQueue helper methods
+            await sse_queue.start_stream()
+            
+            await sse_queue.stage(
+                name="initializing", 
+                description=f"Setting up {context.mode} process"
+            )
+            
+            await sse_queue.status(
+                message=f"Processing your {context.mode} request", 
+                details=f"Prompt: {context.prompt}"
+            )
+            
+            # Process based on mode, passing the session
+            if context.mode == "generate":
+                await process_generate_request(request_id, context, sse_queue, session)
+            elif context.mode == "edit":
+                # If process_edit_request needs a session, pass it here
+                await process_edit_request(request_id, context, sse_queue)
+            else:  # chat
+                # If process_chat_request needs a session, pass it here
+                await process_chat_request(request_id, context, sse_queue)
+            
+            # Mark request as completed
+            request_manager.update_request_status(request_id, RequestStatus.COMPLETED)
         
     except asyncio.CancelledError:
         # Task was cancelled - no need to do anything as request_manager handles cleanup
@@ -296,13 +307,16 @@ async def process_assistant_request(request_id: str):
     finally:
         # Clean up request after a short delay to allow events to be consumed
         asyncio.create_task(delayed_request_cleanup(request_id))
+        # Session is automatically closed by the 'with' statement
+        if session:
+            logger.info(f"Session closed for request {request_id}")
 
 async def delayed_request_cleanup(request_id: str, delay_seconds: int = 10):
     """Cleanup request after a delay to ensure events are consumed"""
     await asyncio.sleep(delay_seconds)
     request_manager.remove_request(request_id)
 
-async def process_generate_request(request_id: str, context, sse_queue: SSEQueueManager):
+async def process_generate_request(request_id: str, context, sse_queue: SSEQueueManager, session: Session):
     """Process a generate mode request"""
     # Stream fake AI response chunks (for now)
     full_response = ""
@@ -320,9 +334,9 @@ async def process_generate_request(request_id: str, context, sse_queue: SSEQueue
         full_response += chunk
     
     
-    # Generate music with music_gen_service
+    # Generate music with music_gen_service, passing the session
     try:
-        response = await music_gen_service.compose_music(context.prompt, sse_queue)
+        response = await music_gen_service.compose_music(context.prompt, sse_queue, session)
         logger.info(f"Music generation complete: {len(response.get('instruments', []))} instruments")
         logger.info(f"Response: {response}")
         # Extract first instrument

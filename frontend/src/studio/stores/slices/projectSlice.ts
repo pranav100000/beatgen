@@ -26,6 +26,7 @@ export interface ProjectSlice {
   keySignature: string;
   loadProject: (projectId: string) => Promise<ProjectWithTracks | null>;
   handleProjectParamChange: (param: ProjectParam, value: any) => void;
+  handleKeySignatureChange: (keySignature: string) => void;
 }
 
 // Create the slice function
@@ -76,6 +77,12 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
         break;
     }
   };
+
+  const handleKeySignatureChange = (keySignature: string) => {
+    handleProjectParamChange('keySignature', keySignature);
+  }
+
+  
 
   // Helper to fetch data (extracted)
   const fetchProjectData = async (projectId: string): Promise<ProjectWithTracks | null> => {
@@ -166,7 +173,7 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
               x_position: position.x,
               y_position: position.y,
               trim_start_ticks: apiTrack.trim_start_ticks ?? 0,
-              trim_end_ticks: apiTrack.trim_end_ticks ?? null, 
+              trim_end_ticks: apiTrack.trim_end_ticks ?? 0, 
               duration_ticks: apiTrack.duration_ticks ?? 0,
           };
 
@@ -200,15 +207,15 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
                        nestedTrackData = { ...nestedTrackData, ...(apiTrackData as DrumTrackRead) };
                        // Ensure essential drum properties exist
                        nestedTrackData.drumPattern = (apiTrackData as any).drumPattern || Array(4).fill(null).map(() => Array(64).fill(false)); 
-                       nestedTrackData.samplerTrackIds = (apiTrackData as any).samplerTrackIds || [];
+                       nestedTrackData.sampler_track_ids = (apiTrackData as any).sampler_track_ids || [];
                        break;
                   case 'sampler':
-                      nestedTrackData = { ...nestedTrackData, ...(apiTrackData as SamplerTrackRead) };
+                      const samplerTrackData = apiTrackData as SamplerTrackRead
+                      nestedTrackData = { ...nestedTrackData, ...samplerTrackData };
                       nestedTrackData.baseMidiNote = (apiTrackData as any).base_midi_note ?? DEFAULT_SAMPLER_CONFIG.baseMidiNote;
                       nestedTrackData.grainSize = (apiTrackData as any).grain_size ?? DEFAULT_SAMPLER_CONFIG.grainSize;
                       nestedTrackData.overlap = (apiTrackData as any).overlap ?? DEFAULT_SAMPLER_CONFIG.overlap;
-                      // Process midiNotesJson for sampler if it exists
-                      if ((apiTrackData as SamplerTrackRead).midi_notes_json) {
+                      if (samplerTrackData.midi_notes_json) {
                            console.log(`Processing midiNotesJson for sampler track ${apiTrack.id}`);
                            try {
                               // Cast to unknown then to string
@@ -428,6 +435,35 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
         }
         const tracksToProcess = projectDataWithTracks.tracks || [];
 
+        // Associate sampler tracks with drum tracks
+        tracksToProcess.forEach((track) => {
+          if (track.type === 'sampler' && track.track && 'drum_track_id' in track.track) {
+            console.log(`Processing sampler track ${track.id} with drum_track_id ${track.track.drum_track_id}`);
+            const samplerTrackData = track.track as SamplerTrackRead; // Cast for type safety
+            const drumTrackId = samplerTrackData.drum_track_id;
+            const samplerTrackId = track.id;
+
+            if (drumTrackId) {
+              const drumTrack = tracksToProcess.find(t => t.id === drumTrackId && t.type === 'drum');
+              // Explicitly check if the found track is a drum track before accessing drum-specific properties
+              if (drumTrack && drumTrack.type === 'drum' && drumTrack.track) {
+                 const drumTrackData = drumTrack.track as DrumTrackRead; // Now safe to cast
+                 // Ensure samplerTrackIds array exists
+                 if (!drumTrackData.sampler_track_ids) {
+                    drumTrackData.sampler_track_ids = [];
+                 }
+                 // Add sampler track ID if it's not already there
+                 if (!drumTrackData.sampler_track_ids.includes(samplerTrackId)) {
+                    drumTrackData.sampler_track_ids.push(samplerTrackId);
+                    console.log(`Associated sampler track ${samplerTrackId} with drum track ${drumTrackId}`);
+                 }
+              } else {
+                console.warn(`Drum track with ID ${drumTrackId} not found or is not a drum track for sampler ${samplerTrackId}`);
+              }
+            }
+          }
+        });
+
         // 2. Download and Cache Audio Files (NEW STEP)
         await downloadAndCacheAudioFiles(tracksToProcess);
 
@@ -458,5 +494,6 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
     keySignature: "C major",
     loadProject,
     handleProjectParamChange,
+    handleKeySignatureChange,
   };
 };

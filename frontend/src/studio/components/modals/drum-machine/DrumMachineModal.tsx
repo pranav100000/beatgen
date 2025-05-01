@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Box, 
     Modal, 
@@ -10,13 +10,20 @@ import {
     AccordionDetails,
     CircularProgress,
     Alert,
-    Button
+    Button,
+    TextField,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    SelectChangeEvent
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { getPublicDrumSamples } from '../../../../platform/api/drum_samples';
 import { DrumSamplePublicRead } from 'src/platform/types/public_models/drum_samples';
 import { DrumSampleCard } from './DrumMachineModalCard';
+import { prettyPrint } from '../../../../utils/pretty_print';
 
 // --- DrumMachineModal Component --- //
 
@@ -29,14 +36,28 @@ export interface DrumMachineModalProps {
 export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMachineModalProps) => {
     const [loading, setLoading] = useState(false);
     const [drumSamples, setDrumSamples] = useState<DrumSamplePublicRead[]>([]);
+    const [filteredDrumSamples, setFilteredDrumSamples] = useState<DrumSamplePublicRead[]>([]);
     const [selectedSampleIds, setSelectedSampleIds] = useState<Set<string>>(new Set());
     const [error, setError] = useState<string | null>(null);
     const [expanded, setExpanded] = useState(true);
 
+    // Filter and Search State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedKit, setSelectedKit] = useState<string>('All');
+    const [selectedGenre, setSelectedGenre] = useState<string>('All');
+    const [selectedType, setSelectedType] = useState<string>('All');
+
+    // --- Fetching --- //
+
     useEffect(() => {
         if (open) {
             fetchDrumSamples();
+            // Reset state when modal opens
             setSelectedSampleIds(new Set());
+            setSearchQuery('');
+            setSelectedKit('All');
+            setSelectedGenre('All');
+            setSelectedType('All');
         }
     }, [open]);
 
@@ -47,6 +68,7 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
             
             const data = await getPublicDrumSamples();
             setDrumSamples(data);
+            setFilteredDrumSamples(data); // Initialize filtered list
             console.log('Fetched drum samples:', data);
         } catch (err) {
             console.error('Error fetching drum samples:', err);
@@ -55,6 +77,45 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
             setLoading(false);
         }
     };
+
+    // --- Filtering Logic --- //
+
+    const uniqueKits = useMemo(() => ['All', ...new Set(drumSamples.map(s => prettyPrint(s.kit_name || 'Unknown')))], [drumSamples]);
+    const uniqueGenres = useMemo(() => ['All', ...new Set(drumSamples.map(s => prettyPrint(s.genre || 'Unknown')))], [drumSamples]);
+    const uniqueTypes = useMemo(() => ['All', ...new Set(drumSamples.map(s => prettyPrint(s.category || 'Unknown')))], [drumSamples]);
+
+    useEffect(() => {
+        let filtered = [...drumSamples];
+
+        // Filter by Search Query (case-insensitive)
+        if (searchQuery) {
+            const lowerCaseQuery = searchQuery.toLowerCase();
+            filtered = filtered.filter(sample => 
+                sample.display_name.toLowerCase().includes(lowerCaseQuery) ||
+                (sample.kit_name && sample.kit_name.toLowerCase().includes(lowerCaseQuery))
+            );
+        }
+
+        // Filter by Kit
+        if (selectedKit !== 'All') {
+            filtered = filtered.filter(sample => (sample.kit_name || 'Unknown') === selectedKit);
+        }
+
+        // Filter by Genre
+        if (selectedGenre !== 'All') {
+            filtered = filtered.filter(sample => (sample.genre || 'Unknown') === selectedGenre);
+        }
+
+        // Filter by Type
+        if (selectedType !== 'All') {
+            filtered = filtered.filter(sample => (sample.category || 'Unknown') === selectedType);
+        }
+
+        setFilteredDrumSamples(filtered);
+
+    }, [searchQuery, selectedKit, selectedGenre, selectedType, drumSamples]);
+
+    // --- Handlers --- //
 
     const handleToggleSelect = (sample: DrumSamplePublicRead) => {
         setSelectedSampleIds(prevSelectedIds => {
@@ -69,6 +130,7 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
     };
 
     const handleConfirmSelection = () => {
+        // Confirm based on the original list, using the selected IDs
         const selectedSamples = drumSamples.filter(sample => selectedSampleIds.has(sample.id));
         if (selectedSamples.length > 0) {
             console.log('Confirming selection:', selectedSamples);
@@ -78,6 +140,17 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
             console.warn('Confirm button clicked with no selection.');
         }
     };
+
+    const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchQuery(event.target.value);
+    };
+
+    const handleFilterChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (event: SelectChangeEvent<string>) => {
+        setter(event.target.value);
+    };
+
+
+    // --- Rendering --- //
 
     return (
         <Modal
@@ -91,44 +164,47 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
         >
             <Box
                 sx={{
-                    bgcolor: '#1A1A1A',
+                    bgcolor: '#1A1A1A', // Dark background
                     color: 'white',
                     borderRadius: 2,
                     p: 3,
-                    maxWidth: '900px',
+                    maxWidth: '900px', // Increased max width
                     width: '90%',
                     maxHeight: '90vh',
                     display: 'flex',
                     flexDirection: 'column',
-                    overflow: 'hidden'
+                    overflow: 'hidden' // Prevent modal overflow
                 }}
             >
+                {/* Header */}
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexShrink: 0 }}>
                     <Typography variant="h6">Choose Drum Sample(s)</Typography>
                     <IconButton
                         onClick={onClose}
-                        sx={{ color: 'white' }}
+                        sx={{ color: 'white' }} // Ensure icon is visible on dark background
                     >
                         <CloseIcon />
                     </IconButton>
                 </Box>
                 
+                {/* Error Alert */}
                 {error && (
                     <Alert severity="error" sx={{ mb: 2, flexShrink: 0 }}>
                         {error}
                     </Alert>
                 )}
                 
+                {/* Main Content Area (Scrollable) */}
                 <Box sx={{ overflowY: 'auto', flexGrow: 1, mb: 2 }}>
                     <Accordion 
                         expanded={expanded}
                         onChange={() => setExpanded(!expanded)}
                         sx={{ 
-                            bgcolor: 'rgba(255, 255, 255, 0.03)', 
+                            bgcolor: 'rgba(255, 255, 255, 0.03)', // Slightly lighter dark background
                             color: 'white',
                             boxShadow: 'none',
                             '&:before': {
-                                display: 'none',
+                                display: 'none', // Remove default top border
                             },
                             borderRadius: 2,
                         }}
@@ -138,30 +214,109 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
                             sx={{ 
                                 borderRadius: 2,
                                 '&:hover': {
-                                    bgcolor: 'rgba(255, 255, 255, 0.05)'
+                                    bgcolor: 'rgba(255, 255, 255, 0.05)' // Subtle hover effect
                                 }
                             }}
                         >
                             <Typography variant="subtitle1">Explore Drum Sample Library</Typography>
                         </AccordionSummary>
                         <AccordionDetails sx={{ p: { xs: 1, sm: 2 } }}>
+                            {/* Filter and Search Section */}
+                            <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+                                <TextField
+                                    label="Search Samples"
+                                    variant="outlined"
+                                    size="small"
+                                    value={searchQuery}
+                                    onChange={handleSearchChange}
+                                    sx={{ 
+                                        flexGrow: 1, 
+                                        minWidth: '200px',
+                                        '& .MuiOutlinedInput-root': {
+                                            '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.3)' },
+                                            '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.5)' },
+                                            '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+                                        },
+                                        '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.7)' },
+                                        '& .MuiInputBase-input': { color: 'white' }
+                                    }}
+                                />
+                                <FormControl size="small" sx={{ minWidth: 120 }}>
+                                    <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Kit</InputLabel>
+                                    <Select
+                                        value={selectedKit}
+                                        label="Kit"
+                                        onChange={handleFilterChange(setSelectedKit)}
+                                        sx={{ 
+                                            color: 'white',
+                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.3)' },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.5)' },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
+                                            '& .MuiSvgIcon-root': { color: 'white' }
+                                        }}
+                                        MenuProps={{ PaperProps: { sx: { bgcolor: '#2a2a2a', color: 'white' } } }}
+                                    >
+                                        {uniqueKits.map(kit => <MenuItem key={kit} value={kit}>{kit}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                                <FormControl size="small" sx={{ minWidth: 120 }}>
+                                    <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Genre</InputLabel>
+                                    <Select
+                                        value={selectedGenre}
+                                        label="Genre"
+                                        onChange={handleFilterChange(setSelectedGenre)}
+                                        sx={{ 
+                                            color: 'white',
+                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.3)' },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.5)' },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
+                                            '& .MuiSvgIcon-root': { color: 'white' }
+                                        }}
+                                        MenuProps={{ PaperProps: { sx: { bgcolor: '#2a2a2a', color: 'white' } } }}
+                                    >
+                                        {uniqueGenres.map(genre => <MenuItem key={genre} value={genre}>{genre}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                                <FormControl size="small" sx={{ minWidth: 120 }}>
+                                    <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Type</InputLabel>
+                                    <Select
+                                        value={selectedType}
+                                        label="Type"
+                                        onChange={handleFilterChange(setSelectedType)}
+                                        sx={{ 
+                                            color: 'white',
+                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.3)' },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.5)' },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
+                                            '& .MuiSvgIcon-root': { color: 'white' }
+                                        }}
+                                        MenuProps={{ PaperProps: { sx: { bgcolor: '#2a2a2a', color: 'white' } } }}
+                                    >
+                                        {uniqueTypes.map(type => <MenuItem key={type} value={type}>{type}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </Box>
+
+                            {/* Sample Grid */}
                             {loading ? (
                                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                                     <CircularProgress size={40} />
                                 </Box>
-                            ) : drumSamples.length === 0 ? (
+                            ) : filteredDrumSamples.length === 0 ? (
                                 <Typography variant="body2" color="text.secondary" align="center" sx={{ p: 2 }}>
-                                    No drum samples found in the library
+                                    {drumSamples.length === 0 ? 'No drum samples found in the library' : 'No samples match the current filters.'}
                                 </Typography>
                             ) : (
                                 <Grid container spacing={2}>
-                                    {drumSamples.map((sample) => (
+                                    {filteredDrumSamples.map((sample) => (
                                         <Grid item xs={12} sm={6} md={4} key={sample.id}>
                                             <DrumSampleCard 
                                                 sample={sample}
                                                 onToggleSelect={handleToggleSelect}
                                                 isSelected={selectedSampleIds.has(sample.id)}
-                                                isLoading={loading}
+                                                // Pass loading state if needed by the card itself, 
+                                                // otherwise the parent handles overall loading display
+                                                isLoading={loading} 
                                             />
                                         </Grid>
                                     ))}
@@ -171,11 +326,12 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
                     </Accordion>
                 </Box>
                 
+                {/* Footer Actions */}
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)', flexShrink: 0 }}>
                     <Button
                         variant="contained"
                         onClick={handleConfirmSelection}
-                        disabled={selectedSampleIds.size === 0 || loading}
+                        disabled={selectedSampleIds.size === 0 || loading} // Disable confirm if nothing selected or still loading initial data
                     >
                         Confirm Selection ({selectedSampleIds.size})
                     </Button>

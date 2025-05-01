@@ -94,8 +94,6 @@ class AnthropicClient:
         # For debugging
         event_types_seen = set()
         
-        print("response", response)
-        
         # Asynchronously iterate through the stream
         async for data in response:
             # For debugging - log the type of event

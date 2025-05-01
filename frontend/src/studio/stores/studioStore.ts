@@ -21,7 +21,7 @@ export type StudioStoreState = RootState; // Assuming RootState in types.ts is c
   // If not, define it here: 
   // export type StudioStoreState = CoreSlice & ProjectSlice & TracksSlice & TransportSlice & HistorySlice & UISlice & MidiSlice & SamplerSlice & DrumSlice;
 
-export const useStudioStore = create<StudioStoreState>()(devtools(immer((set, get) => {
+export const useStudioStore = create<StudioStoreState>()(immer((set, get) => {
   
   // --- Shared Utility Functions --- 
 
@@ -142,7 +142,7 @@ export const useStudioStore = create<StudioStoreState>()(devtools(immer((set, ge
     // isInitialized might be part of CoreSlice now?
     isInitialized: false, 
   };
-})));
+}));
 
 // --- Post-Creation Initialization --- 
 // Example: Initialize history state after store creation

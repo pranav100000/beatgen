@@ -13,8 +13,10 @@ import {
   Container,
   Snackbar,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Divider
 } from '@mui/material'
+import GoogleIcon from '@mui/icons-material/Google'
 
 // Login route - this will render at the path '/login'
 export const Route = createFileRoute('/login')({
@@ -25,11 +27,12 @@ export const Route = createFileRoute('/login')({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +89,24 @@ function LoginPage() {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const handleGoogleLogin = async () => {
+    setIsGoogleLoading(true);
+    setError(null);
+    
+    try {
+      // Save current location for redirect after Google auth
+      localStorage.setItem('auth_redirect', '/home');
+      
+      // Redirect to Google OAuth
+      await signInWithGoogle();
+      // This will redirect the user to Google's login page
+    } catch (err) {
+      console.error('Google login error:', err);
+      setError('Failed to connect to Google authentication service.');
+      setIsGoogleLoading(false);
     }
   };
   
@@ -150,7 +171,7 @@ function LoginPage() {
               type="submit"
               fullWidth
               variant="contained"
-              disabled={isLoading}
+              disabled={isLoading || isGoogleLoading}
               sx={{ mt: 3, mb: 2, position: 'relative' }}
             >
               {isLoading ? (
@@ -169,6 +190,46 @@ function LoginPage() {
                 </>
               ) : (
                 'Sign In'
+              )}
+            </Button>
+            
+            <Divider sx={{ my: 2 }}>or</Divider>
+            
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<GoogleIcon />}
+              onClick={handleGoogleLogin}
+              disabled={isLoading || isGoogleLoading}
+              data-oauth-provider="google"
+              sx={{ 
+                mb: 2, 
+                position: 'relative',
+                bgcolor: 'rgba(255, 255, 255, 0.08)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.12)',
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                }
+              }}
+            >
+              {isGoogleLoading ? (
+                <>
+                  <CircularProgress
+                    size={24}
+                    sx={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      marginTop: '-12px',
+                      marginLeft: '-12px',
+                    }}
+                  />
+                  Connecting...
+                </>
+              ) : (
+                'Continue with Google'
               )}
             </Button>
             

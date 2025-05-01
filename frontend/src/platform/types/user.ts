@@ -12,7 +12,7 @@ export interface SQLModel {}
 export interface User {
   created_at?: string;
   updated_at?: string;
-  id?: string;
+  id: string;
   email: string;
   username?: string | null;
   display_name?: string | null;
@@ -24,7 +24,7 @@ export interface User {
 export interface UserBase {
   created_at?: string;
   updated_at?: string;
-  id?: string;
+  id: string;
   email: string;
   username?: string | null;
   display_name?: string | null;

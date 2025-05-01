@@ -33,7 +33,7 @@ import UserChatBubble from './UserChatBubble';
 import { GRID_CONSTANTS } from '../../constants/gridConstants';
 import { CombinedTrack } from '../../../platform/types/project';
 import ReactMarkdown from 'react-markdown'
-
+import { MidiTrackPayload } from '../../stores/types';
 interface Message {
   text: string;
   isUser: boolean;
@@ -476,7 +476,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
               execute: async () => {
                 // Add track with the soundfont
                 console.log(`Adding generated track with instrumentId: ${instrumentId}`);
-                const newTrack = await handleAddTrack('midi', instrumentId, undefined, storageKey);
+                const payload: MidiTrackPayload = {
+                  instrumentId: instrumentId,
+                  instrumentName: "instrumentName",
+                  instrumentStorageKey: storageKey
+                }
+                const newTrack = await handleAddTrack('midi', payload);
                 
                 // Get notes directly from the action data if available
                 const notesFromAction = actionData.notes || [];
@@ -607,7 +612,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
               actions.push({
                 execute: async () => {
                   console.log(`Adding AI track: ${trackName}`);
-                  await handleAddTrack('midi', undefined, trackName);
+                  const payload: MidiTrackPayload = {
+                    instrumentId: "instrumentId",
+                    instrumentName: trackName,
+                    instrumentStorageKey: "instrumentStorageKey"
+                  }
+                  await handleAddTrack('midi', payload);
                 },
                 undo: async () => {
                   const tracks = useStudioStore.getState().tracks;

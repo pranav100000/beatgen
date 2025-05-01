@@ -10,6 +10,7 @@ export type ActionType =
   | "change_key"
   | "change_time_signature"
   | "add_track"
+  | "add_drum_track"
   | "adjust_volume"
   | "adjust_pan"
   | "toggle_mute"

@@ -14,6 +14,7 @@ from app2.services.file_service import FileService
 from app2.models.track_models.audio_track import AudioTrackRead, AudioTrackCreate
 from app2.models.track_models.midi_track import MidiTrackRead, MidiTrackCreate
 from app2.models.track_models.sampler_track import SamplerTrackRead, SamplerTrackCreate
+from app2.models.track_models.drum_track import DrumTrackCreate, DrumTrackRead
 
 router = APIRouter()
 logger = get_api_logger("sounds")
@@ -143,6 +144,31 @@ async def create_sampler_track(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create sampler track: {str(e)}"
         )
+
+@router.post("/drum", response_model=DrumTrackRead)
+async def create_drum_track(
+    track_data: DrumTrackCreate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service)
+) -> DrumTrackRead:
+    """
+    Create a new drum track
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Creating drum track '{track_data.name}' for user: {user_id}")
+    try:
+        # Create the track
+        drum_track = await track_service.create_drum_track(user_id, track_data.model_dump())
+        
+        logger.info(f"Created drum track with ID: {drum_track.id}")
+        return drum_track
+    except Exception as e:
+        logger.error(f"Error creating drum track: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create drum track: {str(e)}"
+        )
+        
 
 @router.get("/audio", response_model=List[AudioTrackRead])
 async def get_audio_tracks(

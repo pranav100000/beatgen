@@ -8,19 +8,24 @@ import anthropic
 from dotenv import load_dotenv
 import logging
 from app2.sse.sse_queue_manager import SSEQueueManager
+from app2.core.logging import get_api_logger
 from app2.types.assistant_actions import AssistantAction, TrackType
+from app2.api.dependencies import get_drum_sample_service, get_drum_sample_public_repository
+from app2.models.public_models.drum_samples import DrumSamplePublicRead
 from services.music_gen_service.chord_progression_analysis import analyze_chord_progression
 from services.soundfont_service.soundfont_service import soundfont_service
 from clients.anthropic_client import AnthropicClient
 from services.music_gen_service.midi import transform_bars_to_instrument_format, transform_chord_progression_to_instrument_format
 from services.music_gen_service.music_utils import get_mode_intervals
-from services.music_gen_service.music_gen_tools import CREATE_MELODY_TOOL, DETERMINE_MUSICAL_PARAMETERS_TOOL, SELECT_INSTRUMENTS_TOOL
+from services.music_gen_service.music_gen_tools import CREATE_MELODY_TOOL, DETERMINE_MUSICAL_PARAMETERS_TOOL, SELECT_DRUM_SOUNDS_TOOL, SELECT_INSTRUMENTS_TOOL, CREATE_DRUM_BEAT_TOOL
 from services.music_gen_service.prompt_utils import get_ai_composer_agent_initial_system_prompt, get_melody_create_prompt
 from services.music_gen_service.music_researcher import MusicResearcher
 import re
+from sqlmodel import Session
+from uuid import UUID
 
 load_dotenv()
-logger = logging.getLogger(__name__)
+logger = get_api_logger("music_gen_service")
 
 @dataclass
 class Instrument:
@@ -58,6 +63,7 @@ class MusicalParams:
     chords: Optional[Any] = None
     melody_instrument: Optional[Instrument] = None
     chords_instrument: Optional[Instrument] = None
+    drum_sounds: Optional[List[DrumSamplePublicRead]] = None
 
 class MusicGenService:
     def __init__(self):
@@ -70,30 +76,39 @@ class MusicGenService:
         self.musical_params = MusicalParams()
         self.available_soundfonts = []
         self.selected_instruments: List[Instrument] = []
+        self.drum_sounds: List[DrumSamplePublicRead] = []
 
-    async def compose_music(self, prompt: str, queue: SSEQueueManager):
-        
+    async def compose_music(self, prompt: str, queue: SSEQueueManager, session: Session):
+        _drum_file_repository = get_drum_sample_public_repository(session)
+        drum_sample_service = get_drum_sample_service(_drum_file_repository)
+
         await queue.stage("Starting research...", "Doing research online to find the best musical parameters...")
-        # Run research and soundfont fetching concurrently
         research_result, chord_research_result, self.available_soundfonts = await asyncio.gather(
             self.researcher.enhance_description(prompt),
             self.researcher.research_chord_progression(prompt),
-            soundfont_service.get_public_soundfonts()
+            soundfont_service.get_public_soundfonts(),
         )
+        
+        self.drum_sounds = await drum_sample_service.get_all_samples()
 
-        # Determine musical parameters
         await self._determine_musical_parameters(prompt, research_result, chord_research_result, queue)
 
-        # Select instruments
         await self._select_instruments_via_llm(queue)
 
-        # Generate chord progression
         await self._generate_chords(queue)
 
         # Generate melody
         await self._generate_melody(prompt, queue)
 
-        # Build the final response
+        # Get drum sounds
+        drum_result = await self.researcher.research_drum_sounds(prompt)
+        logger.info(f"Drum result: {drum_result}")
+        
+        await self._select_drum_sounds(drum_result, queue)
+
+        # Generate drum beat *after* selecting sounds
+        await self._generate_drum_beat(queue)
+
         instruments = []
         if self.musical_params.melody:
             instruments.append(self.musical_params.melody)
@@ -109,6 +124,13 @@ class MusicGenService:
             "instruments": instruments,
             "chord_progression": self.musical_params.chord_progression
         }
+        
+    async def _get_drum_sounds(self, prompt: str, queue: SSEQueueManager):
+        """Gets the drum sounds using an LLM."""
+        logger.debug("Getting drum sounds...")
+        drum_result = await self.researcher.research_drum_sounds(prompt)
+        logger.info(f"Drum result: {drum_result}")
+        return drum_result
 
     async def _determine_musical_parameters(self, prompt: str, research_result: str, chord_research_result: str, queue: SSEQueueManager):
         """Determines key, mode, BPM, chord progression, and suggested instruments using an LLM."""
@@ -135,10 +157,8 @@ After you've explained your choices, use the determine_musical_parameters tool t
 Here is some research we've done on the description: {research_result} 
 And here is some research we've done on the chord progression: {chord_research_result}"""
         
-        # Ask for reasoning first
         await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[])
         
-        # Ask for tool use
         message = """
         Now use the "determine_musical_parameters" tool to set the musical parameters based on your previous reasoning.
         """
@@ -152,20 +172,68 @@ And here is some research we've done on the chord progression: {chord_research_r
             tool_use_json.get("mode"), 
             tool_use_json.get("chord_progression"), 
             tool_use_json.get("tempo"),
-            tool_use_json.get("melody_instrument"), # Store suggested names/types for now
+            tool_use_json.get("melody_instrument"),
             tool_use_json.get("chords_instrument")
         )
         logger.info(f"Determined Musical Params: {self.musical_params}")
         await queue.action(AssistantAction.change_bpm(value=self.musical_params.bpm))
-        # Optionally send key/mode change action here if needed by frontend immediately
-        # await queue.action(AssistantAction.change_key(value=(self.musical_params.key + self.musical_params.mode)))
+
+    async def _select_drum_sounds(self, drum_research_result: str, queue: SSEQueueManager):
+        """Selects specific drum sounds using an LLM based on available drum sounds."""
+        logger.debug("Selecting drum sounds...")
+        # Ensure self.drum_sounds is populated and contains DrumSamplePublicRead objects
+        if not self.drum_sounds or not isinstance(self.drum_sounds[0], DrumSamplePublicRead):
+             logger.error("Available drum sounds list is empty or contains invalid data.")
+             self.musical_params.drum_sounds = []
+             return
+
+        # Create a list of names and a mapping for easy lookup
+        drum_sample_names = [ds.display_name for ds in self.drum_sounds]
+        drum_sound_map = {ds.display_name: ds for ds in self.drum_sounds}
+        
+        message = f"""Now we need to select specific drum sounds for the composition. 
+
+Look through this list of available drum sounds and select specific ones that fit the overall style and the description provided earlier. 
+Available Drum Sounds: {drum_sample_names} 
+
+Consider the genre of the description and select the most appropriate drum sounds (typically 4-5, like kick, snare, hi-hat, crash). Consider this research: {drum_research_result}
+
+Explain your choices briefly for each drum sound you select.
+
+After explaining, use the select_drum_sounds tool to finalize your choices."""
+
+        await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[])
+
+        message = "Now use the select_drum_sounds tool to confirm your drum sound selections based on your reasoning."
+        _, tool_use_json = await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[SELECT_DRUM_SOUNDS_TOOL])
+        
+        if not tool_use_json:
+             logger.error("LLM did not use the select_drum_sounds tool.")
+             self.musical_params.drum_sounds = []
+             return
+             
+        selected_names = tool_use_json.get("drum_sounds", [])
+        if not selected_names:
+             logger.warning("LLM tool use did not specify any drum sounds.")
+             self.musical_params.drum_sounds = []
+             return
+
+        selected_drums = []
+        for name in selected_names:
+            if name in drum_sound_map:
+                selected_drums.append(drum_sound_map[name])
+                logger.info(f"Selected drum sound: {name}")
+            else:
+                logger.warning(f"LLM selected drum sound '{name}' which is not in the available list.")
+                
+        self.musical_params.drum_sounds = selected_drums
+        logger.info(f"Final selected drums ({len(self.musical_params.drum_sounds)}): {[ds.display_name for ds in self.musical_params.drum_sounds]}")
 
     async def _select_instruments_via_llm(self, queue: SSEQueueManager):
         """Selects specific soundfonts using an LLM based on available soundfonts and desired roles."""
         logger.debug("Selecting instruments via LLM...")
         soundfont_names = [sf["name"] for sf in self.available_soundfonts]
         
-        # Prepare message with suggested roles from initial parameter determination
         melody_suggestion = f"The suggested melody instrument type is: {self.musical_params.melody_instrument_suggestion}" if self.musical_params.melody_instrument_suggestion else ""
         chords_suggestion = f"The suggested chords instrument type is: {self.musical_params.chords_instrument_suggestion}" if self.musical_params.chords_instrument_suggestion else ""
         
@@ -181,10 +249,8 @@ Explain your choices briefly for each role. You should select at least one instr
 
 After explaining, use the select_instruments tool to finalize your choices."""
 
-        # Ask for reasoning
         await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[])
 
-        # Ask for tool use
         message = "Now use the select_instruments tool to confirm your instrument selections."
         _, tool_use_json = await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[SELECT_INSTRUMENTS_TOOL])
         
@@ -199,17 +265,15 @@ After explaining, use the select_instruments tool to finalize your choices."""
         instrument_selections = tool_use_args.get("instrument_selections", [])
         if not instrument_selections:
             logger.warning("LLM did not select any instruments.")
-            # Basic fallback: Assign first available soundfont to melody and second to chords if available
             if len(self.available_soundfonts) >= 1:
                  self._add_selected_instrument(self.available_soundfonts[0], "melody", "Fallback selection")
             if len(self.available_soundfonts) >= 2:
                  self._add_selected_instrument(self.available_soundfonts[1], "chords", "Fallback selection")
             return
 
-        # Create a lookup map for faster access
         soundfont_map = {sf["name"]: sf for sf in self.available_soundfonts}
 
-        self.selected_instruments = [] # Clear previous selections if any
+        self.selected_instruments = []
         for selection in instrument_selections:
             instrument_name = selection.get("instrument_name")
             role = selection.get("role")
@@ -221,25 +285,21 @@ After explaining, use the select_instruments tool to finalize your choices."""
             else:
                 logger.warning(f"LLM selected instrument '{instrument_name}' not found in available soundfonts.")
                 
-        # Ensure we have at least one melody and one chord instrument if possible
         has_melody = any(inst.role == "melody" for inst in self.selected_instruments)
         has_chords = any(inst.role == "chords" for inst in self.selected_instruments)
 
         if not has_melody and self.available_soundfonts:
              logger.warning("No melody instrument selected, assigning fallback.")
-             # Assign first available that isn't already assigned to chords
              fallback_melody = next((sf for sf in self.available_soundfonts if sf['name'] not in [inst.name for inst in self.selected_instruments if inst.role == 'chords']), self.available_soundfonts[0])
              self._add_selected_instrument(fallback_melody, "melody", "Fallback for missing melody role")
         
         if not has_chords and self.available_soundfonts:
              logger.warning("No chords instrument selected, assigning fallback.")
-             # Assign first available that isn't already assigned to melody
              fallback_chords = next((sf for sf in self.available_soundfonts if sf['name'] not in [inst.name for inst in self.selected_instruments if inst.role == 'melody']), self.available_soundfonts[0])
              self._add_selected_instrument(fallback_chords, "chords", "Fallback for missing chords role")
 
     def _add_selected_instrument(self, soundfont_data: Dict[str, Any], role: str, description: str):
         """Adds a selected instrument to the list, avoiding duplicates."""
-        # Check if an instrument with the same name is already added
         if any(inst.name == soundfont_data["name"] for inst in self.selected_instruments):
              logger.debug(f"Instrument '{soundfont_data['name']}' already selected, skipping duplicate add.")
              return
@@ -248,7 +308,7 @@ After explaining, use the select_instruments tool to finalize your choices."""
             id=soundfont_data["id"],
             name=soundfont_data["name"],
             description=description,
-            soundfont_name=soundfont_data["name"], # Redundant? name should suffice
+            soundfont_name=soundfont_data["name"],
             storage_key=soundfont_data["storage_key"],
             role=role
         )
@@ -266,9 +326,92 @@ After explaining, use the select_instruments tool to finalize your choices."""
                 logger.warning("Chord generation did not return results.")
         except Exception as e:
             logger.error(f"Error generating chord progression: {str(e)}", exc_info=True)
-            # Decide if we should raise or continue without chords
-            # For now, we log and continue, the final result will lack chords.
             self.musical_params.chords = None 
+
+    async def _generate_drum_beat(self, queue: SSEQueueManager):
+        """Generates the drum beat MIDI data."""
+        logger.debug("Generating drum beat...")
+        await queue.stage("Generating drum beat...", "Asking the AI composer to create drum patterns...")
+
+        selected_drums = self.musical_params.drum_sounds
+        if not selected_drums:
+            logger.warning("No drum sounds selected, skipping drum beat generation.")
+            return
+
+        # Convert UUID to string for JSON serialization
+        drum_info = [{'id': str(ds.id), 'name': ds.display_name} for ds in selected_drums]
+        drum_names = [ds['name'] for ds in drum_info]
+
+        message = f"""We need to create drum patterns for the composition.
+Key: {self.musical_params.key} {self.musical_params.mode}
+Tempo: {self.musical_params.bpm} BPM
+Style based on original prompt.
+
+Selected Drum Sounds: {drum_names}
+
+For EACH of the following drum sounds, create a rhythmic pattern:
+{json.dumps(drum_info, indent=2)}
+
+Each pattern MUST be a JSON array of exactly 32 boolean values (true/false), representing 16th notes over 2 bars (in 4/4 time).
+'true' means the drum hits on that 16th note step, 'false' means silence.
+
+Describe the overall feel of the drum beat you are creating and explain the role of each drum sound's pattern (e.g., kick provides the main pulse, snare hits on 2 and 4, hi-hat provides 16th note rhythm).
+
+After your explanation, use the 'create_drum_beat' tool to provide the patterns.
+"""
+
+        try:
+            # Send message asking for reasoning + tool use prompt
+            await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[])
+
+            # Send message explicitly asking for the tool use
+            tool_prompt = f"Now, use the 'create_drum_beat' tool to generate the 32-step boolean patterns for each of the selected drum sounds: {drum_names}. Ensure each pattern is exactly 32 booleans long."
+            _, tool_use_json = await self.anthropic_client2.send_message_async(tool_prompt, queue, stream=True, tools=[CREATE_DRUM_BEAT_TOOL])
+
+            if not tool_use_json or 'drum_beats' not in tool_use_json:
+                logger.error("Failed to get valid drum beat patterns from LLM tool use.")
+                raise ValueError("LLM response did not contain valid JSON for drum beats using the tool.")
+
+            drum_patterns = tool_use_json['drum_beats']
+            logger.info(f"Received {len(drum_patterns)} drum patterns from LLM.")
+            
+            # Create a map of string IDs to drum samples for easier lookup
+            drum_sound_map = {str(ds.id): ds for ds in selected_drums}
+
+            logger.info(f"Drum patterns: {drum_patterns}")
+            logger.info(f"Drum sound map keys: {list(drum_sound_map.keys())}")
+            for beat_data in drum_patterns:
+                drum_sound_id = beat_data.get('drum_sound_id')
+                pattern = beat_data.get('pattern')
+
+                if not drum_sound_id or not isinstance(pattern, list) or len(pattern) != 32:
+                    logger.warning(f"Invalid drum beat data received: {beat_data}, skipping.")
+                    continue
+                    
+                if not all(isinstance(p, bool) for p in pattern):
+                    logger.warning(f"Invalid pattern format (non-boolean values) for drum sound ID {drum_sound_id}, skipping.")
+                    continue
+
+                # Check if the ID exists in our map (already as string)
+                if drum_sound_id in drum_sound_map:
+                    drum_sample = drum_sound_map[drum_sound_id]
+                    logger.info(f"Adding drum track for {drum_sample.display_name} (ID: {drum_sound_id})")
+                    await queue.action(AssistantAction.add_track(
+                        type=TrackType.DRUM,
+                        instrument_id=drum_sound_id, # Use the drum sample's ID as string
+                        pattern=pattern,
+                        name=f"{drum_sample.display_name} Beat" # Optional: Give the track a name
+                    ))
+                else:
+                    logger.warning(f"Drum sound ID '{drum_sound_id}' from LLM response not found in selected drums.")
+
+            logger.info("Successfully processed and added drum tracks.")
+
+        except Exception as e:
+            logger.error(f"Error during drum beat generation: {str(e)}")
+            logger.error(f"Stack trace: {traceback.format_exc()}")
+            # Optionally send an error status via SSE
+            await queue.error("Failed to generate drum beat.")
 
     async def _generate_melody(self, prompt: str, queue: SSEQueueManager):
         """Generates the melody MIDI data using an LLM."""
@@ -277,22 +420,17 @@ After explaining, use the select_instruments tool to finalize your choices."""
         melody_instrument = next((inst for inst in self.selected_instruments if inst.role == "melody"), None)
         if not melody_instrument:
              logger.error("Cannot generate melody: No melody instrument selected.")
-             # Potentially raise an error or handle gracefully
              return
 
-        # Ask LLM to describe the melody first (optional but good practice)
         message = f"""Describe a suitable melody for the following description: '{prompt}'.
 Consider the key ({self.musical_params.key} {self.musical_params.mode}), tempo ({self.musical_params.bpm} BPM), chord progression ({self.musical_params.chord_progression}), and the chosen melody instrument ({melody_instrument.name}). 
 Describe the melody in terms of: mood, rhythm, musical style, and overall character.
 Then, use the create_melody tool to generate the notes."""
         
-        # Ask for description and tool use in one go? Or separate? Let's try separate for clarity.
         await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[]) 
         
-        # Ask for tool use
         message = f"Now use the create_melody tool to generate the melody notes based on your description and the established musical parameters (Key: {self.musical_params.key} {self.musical_params.mode}, Tempo: {self.musical_params.bpm} BPM, Chord Progression: {self.musical_params.chord_progression}, Melody Instrument: {melody_instrument.name})."
         
-        # Send message to Anthropic to get melody parameters via tool
         _, tool_use_json = await self.anthropic_client2.send_message_async(message, queue, stream=True, tools=[CREATE_MELODY_TOOL])
 
         if not tool_use_json:
@@ -303,7 +441,6 @@ Then, use the create_melody tool to generate the notes."""
             logger.info("Successfully generated melody.")
         except Exception as e:
             logger.error(f"Error generating melody: {str(e)}", exc_info=True)
-            # Decide if we should raise or continue without melody
             self.musical_params.melody = None
             
     async def _handle_create_chords(self, args: Dict[str, Any] = None, queue: SSEQueueManager = None) -> Optional[Dict[str, Any]]:
@@ -320,32 +457,22 @@ Then, use the create_melody tool to generate the notes."""
         """
         key = self.musical_params.key
         mode = self.musical_params.mode
-        tempo = self.musical_params.bpm # Not directly used in transform, but good context
+        tempo = self.musical_params.bpm
         chord_progression = self.musical_params.chord_progression
         
         if not all([key, mode, tempo, chord_progression]):
              logger.error("Cannot generate chords: Missing key, mode, tempo, or chord progression.")
              return None
 
-        # Find an appropriate instrument for chords from selected instruments
         chord_instrument = next((inst for inst in self.selected_instruments if inst.role == "chords"), None)
                 
         if not chord_instrument:
             logger.error("No 'chords' role instrument selected for chord progression")
-            # Fallback: Use the first selected instrument if available? Or fail? Let's fail for now.
-            # If needed, uncomment below:
-            # if self.selected_instruments:
-            #    chord_instrument = self.selected_instruments[0]
-            #    logger.warning(f"No dedicated chord instrument, using fallback: {chord_instrument.name}")
-            # else:
-            #    logger.error("No instruments selected at all.")
-            #    return None
-            return None # Fail if no chord instrument explicitly selected/assigned
+            return None
 
         logger.info(f"Generating chord progression: '{chord_progression}' in {key} {mode} using {chord_instrument.name}")
         
         try:
-            # Standardize chord progression format (replace spaces/commas with hyphens)
             if isinstance(chord_progression, str):
                  processed_chord_progression = re.sub(r'[,\s]+', '-', chord_progression).strip('-')
             else:
@@ -354,18 +481,16 @@ Then, use the create_melody tool to generate the notes."""
 
             result = transform_chord_progression_to_instrument_format(
                 chord_progression=processed_chord_progression,
-                instrument=chord_instrument, # Pass the Instrument object
+                instrument=chord_instrument,
                 key=key
             )
             
-            # Check if result is valid and contains notes
             if not result or 'notes' not in result or not result['notes']:
                  logger.error(f"Chord transformation returned empty or invalid result for progression '{processed_chord_progression}'")
                  return None
 
-            self.musical_params.chords = result # Store the generated chord data
+            self.musical_params.chords = result
             
-            # Add metadata for the client/frontend
             result["part_type"] = "chords"
             result["description"] = f"Chord progression {processed_chord_progression} in {key} {mode}"
             
@@ -381,50 +506,42 @@ Then, use the create_melody tool to generate the notes."""
         except Exception as e:
             logger.error(f"Error during chord transformation/MIDI generation: {str(e)}")
             logger.error(f"Stack trace: {traceback.format_exc()}")
-            # Raise? Or return None? Returning None for now to potentially allow melody generation still.
             return None
     
     async def _handle_create_melody(self, args: Dict[str, Any], queue: SSEQueueManager) -> Optional[Dict[str, Any]]:
         """Handles the melody generation process based on LLM tool output and musical parameters."""
         
-        # Extract parameters from the LLM tool call results (args)
-        # These might describe the desired melody characteristics
-        instrument_name_llm = args.get("instrument_name", "") # LLM might suggest an instrument name again
+        instrument_name_llm = args.get("instrument_name", "")
         description = args.get("description", "")
-        duration_beats = args.get("duration_beats", self.musical_params.duration_beats) # Use class default if not provided
-        duration_bars = args.get("duration_bars", self.musical_params.duration_bars) # Use class default if not provided
+        duration_beats = args.get("duration_beats", self.musical_params.duration_beats)
+        duration_bars = args.get("duration_bars", self.musical_params.duration_bars)
         mood = args.get("mood", "")
-        tempo_character = args.get("tempo_character", "") # e.g., "driving", "relaxed"
-        rhythm_type = args.get("rhythm_type", "") # e.g., "syncopated", "straight"
-        musical_style = args.get("musical_style", "") # e.g., "jazzy", "classical"
-        melodic_character = args.get("melodic_character", "") # e.g., "angular", "smooth"
+        tempo_character = args.get("tempo_character", "")
+        rhythm_type = args.get("rhythm_type", "")
+        musical_style = args.get("musical_style", "")
+        melodic_character = args.get("melodic_character", "")
 
-        # Get core parameters from the service state
         key = self.musical_params.key
         mode = self.musical_params.mode
         tempo = self.musical_params.bpm
-        allowed_intervals = self.musical_params.allowed_intervals # Already calculated in _set_musical_params
+        allowed_intervals = self.musical_params.allowed_intervals
         chord_progression = self.musical_params.chord_progression
         
         if not all([key, mode, tempo, chord_progression]):
              logger.error("Cannot generate melody: Missing key, mode, tempo, or chord progression.")
              return None
 
-        # Find the actual selected melody instrument object
         melody_instrument = next((inst for inst in self.selected_instruments if inst.role == "melody"), None)
         if not melody_instrument:
              logger.error("Cannot generate melody: No 'melody' role instrument selected.")
              return None
 
-        # Log the effective instrument being used
         logger.info(f"Using instrument '{melody_instrument.name}' for melody generation.")
         if instrument_name_llm and instrument_name_llm != melody_instrument.name:
              logger.warning(f"LLM suggested melody instrument '{instrument_name_llm}' in create_melody tool, but using selected instrument '{melody_instrument.name}'.")
 
-        # Build a comprehensive description for the melody generation prompt
         detailed_description = f"Generate a melody for the instrument '{melody_instrument.name}'. "
-        detailed_description += description # Add LLM's description
-        # Append structured parameters
+        detailed_description += description
         structured_params = {
             "key": key, "mode": mode, "tempo": f"{tempo} BPM", "mood": mood,
             "tempo_character": tempo_character, "rhythm_type": rhythm_type,
@@ -435,14 +552,9 @@ Then, use the create_melody tool to generate the notes."""
         detailed_description += f". The duration should be approximately {duration_bars} bars ({duration_beats} beats)."
         detailed_description += f". Adhere strictly to the key ({key} {mode}) and follow the chord progression ({chord_progression}) closely."
 
-        # Log the input for debugging
         logger.info(f"Requesting melody generation with description: {detailed_description[:150]}...")
         
-        # Ensure Anthropic client is available (already checked in compose_music conceptually)
-        # if not self.anthropic_client: ... (handled by AnthropicClient init likely)
-
         try:
-            # Prepare context for the melody generation LLM (e.g., system prompt, note probabilities)
             allowed_intervals_string = ", ".join(map(str, allowed_intervals))
             
             system_prompt = get_melody_create_prompt(
@@ -452,19 +564,16 @@ Then, use the create_melody tool to generate the notes."""
             )
             self.melody_composer.set_system_prompt(system_prompt)
             
-            # Chord analysis for note probabilities
             try:
                  chord_progression_list = re.split(r'[-,\s]+', chord_progression)
-                 # Basic cleaning, might need more robust parsing depending on expected format
                  chord_progression_list = [chord.strip().replace("b", "-") for chord in chord_progression_list if chord.strip()] 
                  note_probabilities = analyze_chord_progression(chord_progression_list, key)
-                 note_probabilities_string = json.dumps(note_probabilities, indent=2) # Use 2 spaces for compactness
+                 note_probabilities_string = json.dumps(note_probabilities, indent=2)
                  logger.debug(f"Note probabilities calculated for chords: {chord_progression_list}")
             except Exception as analysis_err:
                  logger.error(f"Failed to analyze chord progression for note probabilities: {analysis_err}", exc_info=True)
-                 note_probabilities_string = "{}" # Provide empty object if analysis fails
+                 note_probabilities_string = "{}"
 
-            # Construct the final message for the melody generation LLM
             message = f"""Create the musical notes for a melody based on the following:
 Description: {detailed_description}
 Use this note probability data derived from the chord progression to guide note selection: 
@@ -486,14 +595,11 @@ Example JSON structure (adapt as needed for your expected format):
 
 Generate the JSON output now."""
 
-            # Call the LLM to generate the melody JSON
             await queue.stage("Generating melody notes...", "Asking the AI composer to write the melody...")
             content_text, _ = await self.melody_composer.send_message_async(message, queue, stream=True, thinking=True)
             
-            # Log the raw response for debugging
             logger.debug(f"Raw melody LLM response (first 500 chars): {content_text[:500]}")
             
-            # Extract and parse the JSON melody data
             melody_data = self._extract_json_from_text(content_text)
             if not melody_data:
                  logger.error("Failed to extract valid JSON melody data from the LLM response.")
@@ -502,20 +608,17 @@ Generate the JSON output now."""
             logger.info(f"Successfully parsed melody JSON data.")
             logger.debug(f"Parsed Melody Data (snippet): {json.dumps(melody_data)[:200]}...")
             
-            # Transform the melody data into the required instrument format
             result = transform_bars_to_instrument_format(melody_data, melody_instrument, key)
             
             if not result or 'notes' not in result or not result['notes']:
                  logger.error("Melody transformation returned empty or invalid result.")
                  return None
                  
-            self.musical_params.melody = result # Store the generated melody data
+            self.musical_params.melody = result
             
-            # Add metadata for the client/frontend
             result["part_type"] = "melody"
             result["description"] = f"Melody for {melody_instrument.name} in {key} {mode}"
             
-            # Send action to frontend
             await queue.action(AssistantAction.add_track(
                 type=TrackType.MIDI,
                 instrument_id=melody_instrument.id,
@@ -528,7 +631,6 @@ Generate the JSON output now."""
         except Exception as e:
             logger.error(f"Error during melody generation: {str(e)}")
             logger.error(f"Stack trace: {traceback.format_exc()}")
-            # Raise? Or return None? Returning None for now.
             return None
             
     def _extract_json_from_text(self, text: str) -> Optional[Dict[str, Any]]:
@@ -538,15 +640,12 @@ Generate the JSON output now."""
         """
         logger.debug(f"Attempting to extract JSON from text (length {len(text)})...")
         
-        # 1. Try finding JSON within markdown code blocks (```json ... ``` or ``` ... ```)
         json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', text, re.DOTALL | re.IGNORECASE)
         if json_match:
             json_content = json_match.group(1)
             logger.debug("Found JSON within markdown code block.")
             try:
-                # Basic cleaning within the block (remove potential leading/trailing non-JSON chars)
                 json_content = json_content.strip()
-                # Attempt parsing
                 parsed_json = json.loads(json_content)
                 logger.info("Successfully parsed JSON from markdown block.")
                 return parsed_json
@@ -554,7 +653,6 @@ Generate the JSON output now."""
                 logger.warning(f"Failed to parse JSON from markdown block: {e}. Content: {json_content[:100]}...")
                 # Fall through to other methods
 
-        # 2. Try finding the first brace `{` and last brace `}` and parsing content between them
         first_brace = text.find('{')
         last_brace = text.rfind('}')
         if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
@@ -568,16 +666,11 @@ Generate the JSON output now."""
                 logger.warning(f"Failed to parse JSON between first/last braces: {e}. Content: {potential_json[:100]}...")
                 # Fall through
 
-        # 3. Try a more robust regex to find JSON object (might be slower)
-        # This looks for balanced braces. Caution: Can be computationally expensive on very large texts.
-        # json_regex_match = re.search(r'\{(?:[^{}]|(?R))*\}', text) # Recursive regex - might be slow/complex
-        # A simpler greedy approach might suffice for many cases:
         json_regex_match = re.search(r'({[\s\S]*})', text) 
         if json_regex_match:
              potential_json = json_regex_match.group(1)
              logger.debug("Attempting to parse JSON found via greedy regex.")
              try:
-                 # Clean comments just in case (though prompt asks not to include them)
                  potential_json = re.sub(r'//.*?\n|/\*.*?\*/', '', potential_json, flags=re.DOTALL)
                  parsed_json = json.loads(potential_json)
                  logger.info("Successfully parsed JSON via greedy regex.")
@@ -586,39 +679,34 @@ Generate the JSON output now."""
                  logger.warning(f"Failed to parse JSON from greedy regex match: {e}. Content: {potential_json[:100]}...")
                  # Fall through
                  
-        # 4. If all else fails
         logger.error("Could not find or parse valid JSON in the provided text.")
         return None
         
     
     def _set_musical_params(self, key, mode, chord_progression, bpm, melody_instrument_suggestion, chords_instrument_suggestion):
         """Sets the core musical parameters."""
-        self.musical_params.key = key or "C" # Default if not provided
-        self.musical_params.mode = mode or "major" # Default if not provided
-        self.musical_params.chord_progression = chord_progression or "I-V-vi-IV" # Default
+        self.musical_params.key = key or "C"
+        self.musical_params.mode = mode or "major"
+        self.musical_params.chord_progression = chord_progression or "I-V-vi-IV"
         try:
-             self.musical_params.bpm = int(bpm) if bpm else 120 # Default
+             self.musical_params.bpm = int(bpm) if bpm else 120
         except (ValueError, TypeError):
              logger.warning(f"Invalid BPM value received: {bpm}. Defaulting to 120.")
              self.musical_params.bpm = 120
              
-        # Calculate allowed intervals based on mode
         try:
             self.musical_params.allowed_intervals = get_mode_intervals(self.musical_params.mode)
         except ValueError as e:
              logger.warning(f"Could not determine intervals for mode '{self.musical_params.mode}': {e}. Using major scale intervals.")
-             self.musical_params.allowed_intervals = get_mode_intervals("major") # Default to major
+             self.musical_params.allowed_intervals = get_mode_intervals("major")
 
-        # Store the *suggestions* for instruments, actual selection happens later
         self.musical_params.melody_instrument_suggestion = melody_instrument_suggestion
         self.musical_params.chords_instrument_suggestion = chords_instrument_suggestion
         
-        # Reset generated parts - they will be created later
         self.musical_params.melody = None
         self.musical_params.chords = None
-        self.musical_params.counter_melody = None # Reset counter melody too
+        self.musical_params.counter_melody = None
         
-        # Reset selected instruments list - selection happens after this step
         self.selected_instruments = []
 
     @staticmethod   
@@ -650,12 +738,10 @@ Generate the JSON output now."""
     def _parse_tool_use_data(tool_use_data) -> dict:
         full_json = ""
         for data in tool_use_data:
-            # Only process RawContentBlockDeltaEvent events that have delta attribute
             if hasattr(data, 'delta') and hasattr(data.delta, 'partial_json'):
                 full_json += data.delta.partial_json
         
         try:
-            # Parse the accumulated JSON string into a Python dict
             if full_json:
                 return json.loads(full_json)
             return None

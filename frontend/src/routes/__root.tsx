@@ -1,7 +1,8 @@
 import { createRootRoute, Outlet, useRouter } from '@tanstack/react-router'
-import React from 'react'
+import React, { useEffect } from 'react'
 import Navbar from '../platform/components/Navbar'
 import { useAuth } from '../platform/auth/auth-context'
+import { handleOAuthCallback } from '../platform/api/auth'
 
 // Root Layout Component - this wraps all routes
 export const Route = createRootRoute({
@@ -52,6 +53,42 @@ function RootLayout() {
   // This is more reliable than router state during transitions
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
   const isStudioRoute = currentUrl.includes('/studio');
+  
+  // Handle OAuth callbacks
+  useEffect(() => {
+    const handleOAuth = async () => {
+      // Check if this is an OAuth callback
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const isGoogleCallback = window.location.pathname.includes('/api/auth/callback/google');
+        
+        if (code && isGoogleCallback) {
+          try {
+            console.log('Processing Google OAuth callback');
+            const result = await handleOAuthCallback('google', code);
+            
+            if (result.access_token) {
+              // Store the token
+              localStorage.setItem('access_token', result.access_token);
+              console.log('OAuth authentication successful, token stored');
+              
+              // Redirect to home or requested page
+              const redirectTo = localStorage.getItem('auth_redirect') || '/';
+              localStorage.removeItem('auth_redirect'); // Clear redirect
+              window.location.href = redirectTo;
+            }
+          } catch (error) {
+            console.error('OAuth callback processing failed:', error);
+            // Redirect to login page on error
+            window.location.href = '/login?error=oauth_failed';
+          }
+        }
+      }
+    };
+    
+    handleOAuth();
+  }, []);
   
   if (loading) {
     return (

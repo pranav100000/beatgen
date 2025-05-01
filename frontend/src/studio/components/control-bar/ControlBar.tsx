@@ -73,8 +73,11 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
 }) => {
     return (
         <Box sx={{
-            display: 'flex',
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
             alignItems: 'center',
+            width: '100%',
+            gap: 2,
             p: 1,
             borderBottom: '1px solid #333',
             position: 'relative',
@@ -82,12 +85,11 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
         }}>
             {/* Left section */}
             <Box sx={{ 
-                display: 'flex', 
+                justifySelf: 'start',
+                display: 'flex',
                 alignItems: 'center',
                 gap: 2,
-                flex: '1 1 0',
-                minWidth: 0,
-                maxWidth: '40%', // Prevent left section from taking too much space
+                
             }}>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <Tooltip title="Go back to Projects" arrow>
@@ -165,12 +167,6 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
 
             {/* Center section - Project Title */}
             <Box sx={{
-                flex: '0 0 250px', // Slightly reduced fixed width
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                px: 3, // Increased padding
-                mx: 2, // Added margin
             }}>
                 <TextField
                     variant="standard"
@@ -183,7 +179,6 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                             textAlign: 'center',
                             fontSize: '1rem',
                             fontWeight: 500,
-                            padding: '4px 8px',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             '&:hover': {
@@ -205,13 +200,8 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
 
             {/* Right section */}
             <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                flex: '1 1 0',
-                justifyContent: 'flex-end',
-                minWidth: 0,
-                maxWidth: '40%', // Prevent right section from taking too much space
+                justifySelf: 'end',
+                paddingRight: 2,
             }}>
                 <Box sx={{
                     display: 'flex',

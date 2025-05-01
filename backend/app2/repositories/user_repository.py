@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 import traceback
 import uuid
 
-from app2.models.user import User
+from app2.models.user import User, UserCreate
 from app2.core.exceptions import DatabaseException, NotFoundException
 from .base_repository import BaseRepository
 
@@ -77,50 +77,60 @@ class UserRepository(BaseRepository[User]):
             
     async def create_profile(self, user_id: uuid.UUID, email: str, username: Optional[str] = None, display_name: Optional[str] = None) -> User:
         """
-        Create a new user profile
+        Create a new user profile using the Supabase Auth ID as the primary key.
+        If a profile with this ID already exists, return it.
         
         Args:
-            user_id: The ID of the user
-            email: The user's email
-            username: The user's username (optional)
-            display_name: The user's display name (optional)
+            user_id: The Supabase Auth ID to use as the primary key.
+            email: The user's email.
+            username: The user's username (optional).
+            display_name: The user's display name (optional).
             
         Returns:
-            The created profile as User object
+            The created or existing profile as User object.
             
         Raises:
-            DatabaseException: If the operation fails
+            DatabaseException: If the operation fails (e.g., email unique constraint violation).
         """
-        self.logger.info(f"Creating profile for user {user_id}")
+        self.logger.info(f"Attempting to create/ensure profile for User ID (PK) {user_id}")
+        
+        # Check if a profile already exists with this ID (as primary key)
         try:
-            # Check if profile already exists
-            try:
-                existing_profile = await self.find_by_id(str(user_id))
-                self.logger.info(f"Profile already exists for user {user_id}")
-                return existing_profile
-            except NotFoundException:
-                # Profile doesn't exist, proceed with creation
-                pass
-                
-            profile_data = {
-                "id": user_id,
-                "email": email,
-                "username": username,
-                "display_name": display_name,
-                "avatar_url": None
-            }
+            existing_profile = await self.find_by_id(user_id) 
+            if existing_profile:
+                 self.logger.info(f"Profile already exists for User ID (PK) {user_id}. Returning existing profile.")
+                 return existing_profile
+            # If find_by_id returns None (should raise NotFoundException based on BaseRepo)
+        except NotFoundException:
+            # This is expected if the profile doesn't exist yet. Proceed to create.
+            self.logger.info(f"No profile found for User ID (PK) {user_id}. Proceeding with creation.")
+            pass 
+        except Exception as find_err: # Catch other potential errors during find
+             self.logger.error(f"Error checking for existing profile {user_id}: {find_err}", exc_info=True)
+             raise DatabaseException(f"Failed to check for existing profile: {find_err}")
+
+        # No profile with this ID found, proceed with creation logic
+        profile_data = {
+            "id": user_id, # Set the primary key to the Supabase Auth ID
+            "email": email,
+            "username": username,
+            "display_name": display_name,
+            "avatar_url": None 
+        }
+        profile_data_cleaned = {k: v for k, v in profile_data.items() if v is not None}
+        if 'id' not in profile_data_cleaned: profile_data_cleaned['id'] = user_id
+        if 'email' not in profile_data_cleaned: profile_data_cleaned['email'] = email
             
-            result = await self.create(profile_data)
-            self.logger.info(f"Created profile for user {user_id}")
-            return result
+        try:
+             # Actual creation attempt
+             created_profile = await self.create(profile_data_cleaned)
+             self.logger.info(f"Successfully created profile with PK {created_profile.id}")
+             return created_profile
         except Exception as e:
-            if isinstance(e, NotFoundException):
-                # This means we're creating a new profile, so we can ignore this exception
-                pass
-            self.logger.error(f"Error creating user profile: {str(e)}")
-            self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to create user profile: {str(e)}")
-            
+             # Any error here (including unique email violation) is treated as a failure
+             self.logger.error(f"Database error creating profile for User ID (PK) {user_id}: {str(e)}", exc_info=True)
+             raise DatabaseException(f"Failed to create profile record: {str(e)}")
+
     async def find_by_email(self, email: str) -> Optional[User]:
         """
         Find a user by email

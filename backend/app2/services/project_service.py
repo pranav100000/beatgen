@@ -172,65 +172,65 @@ class ProjectService:
             project = await self.project_repository.create(project_data)
             logger.info(f"Created project with ID: {project.id} for user ID: {user_id}")
             
-            # Add tracks to the project if provided
-            if tracks_data and isinstance(tracks_data, list):
-                logger.info(f"Adding {len(tracks_data)} tracks to project {project.id}")
+            # # Add tracks to the project if provided
+            # if tracks_data and isinstance(tracks_data, list):
+            #     logger.info(f"Adding {len(tracks_data)} tracks to project {project.id}")
                 
-                for track_idx, track_data in enumerate(tracks_data):
-                    if isinstance(track_data, dict) and "type" in track_data:
-                        # Set track number if not provided
-                        if "track_number" not in track_data:
-                            track_data["track_number"] = track_idx
+            #     for track_idx, track_data in enumerate(tracks_data):
+            #         if isinstance(track_data, dict) and "type" in track_data:
+            #             # Set track number if not provided
+            #             if "track_number" not in track_data:
+            #                 track_data["track_number"] = track_idx
                             
-                        # Get track type
-                        track_type = TrackType(track_data["type"])
+            #             # Get track type
+            #             track_type = TrackType(track_data["type"])
                         
-                        # Extract project-track settings
-                        project_track_settings = {
-                            "name": track_data.get("name", "Unnamed Track"),
-                            "track_id": track_data.get("id"),
-                            "volume": track_data.get("volume", 1.0),
-                            "pan": track_data.get("pan", 0.0),
-                            "mute": track_data.get("mute", False),
-                            "x_position": track_data.get("x_position", 0.0),
-                            "y_position": track_data.get("y_position", 0.0),
-                            "trim_start_ticks": track_data.get("trim_start_ticks", 0),
-                            "trim_end_ticks": track_data.get("trim_end_ticks", 0),
-                            "duration_ticks": track_data.get("duration_ticks", 0),
-                            "track_number": track_data.get("track_number", 0)
-                        }
+            #             # Extract project-track settings
+            #             project_track_settings = {
+            #                 "name": track_data.get("name", "Unnamed Track"),
+            #                 "track_id": track_data.get("id"),
+            #                 "volume": track_data.get("volume", 1.0),
+            #                 "pan": track_data.get("pan", 0.0),
+            #                 "mute": track_data.get("mute", False),
+            #                 "x_position": track_data.get("x_position", 0.0),
+            #                 "y_position": track_data.get("y_position", 0.0),
+            #                 "trim_start_ticks": track_data.get("trim_start_ticks", 0),
+            #                 "trim_end_ticks": track_data.get("trim_end_ticks", 0),
+            #                 "duration_ticks": track_data.get("duration_ticks", 0),
+            #                 "track_number": track_data.get("track_number", 0)
+            #             }
                         
-                        # Extract track-specific data
-                        track_specific_data = {k: v for k, v in track_data.items() 
-                                            if k not in project_track_settings.keys() and k != "type"}
-                        track_specific_data["id"] = track_data.get("id")
+            #             # Extract track-specific data
+            #             track_specific_data = {k: v for k, v in track_data.items() 
+            #                                 if k not in project_track_settings.keys() and k != "type"}
+            #             track_specific_data["id"] = track_data.get("id")
                         
-                        logger.info(f"Track specific data: {track_specific_data}")
+            #             logger.info(f"Track specific data: {track_specific_data}")
                         
-                        # Create track based on type
-                        track_id = None
-                        if track_type == TrackType.AUDIO:
-                            created_track = await self.track_service.create_audio_track(user_id, track_specific_data)
-                            track_id = created_track.id
-                        elif track_type == TrackType.MIDI:
-                            created_track = await self.track_service.create_midi_track(user_id, track_specific_data)
-                            track_id = created_track.id
-                        elif track_type == TrackType.SAMPLER:
-                            created_track = await self.track_service.create_sampler_track(user_id, track_specific_data)
-                            track_id = created_track.id
-                        elif track_type == TrackType.DRUM:
-                            created_track = await self.track_service.create_drum_track(user_id, track_specific_data)
-                            track_id = created_track.id
+            #             # Create track based on type
+            #             track_id = None
+            #             if track_type == TrackType.AUDIO:
+            #                 created_track = await self.track_service.create_audio_track(user_id, track_specific_data)
+            #                 track_id = created_track.id
+            #             elif track_type == TrackType.MIDI:
+            #                 created_track = await self.track_service.create_midi_track(user_id, track_specific_data)
+            #                 track_id = created_track.id
+            #             elif track_type == TrackType.SAMPLER:
+            #                 created_track = await self.track_service.create_sampler_track(user_id, track_specific_data)
+            #                 track_id = created_track.id
+            #             elif track_type == TrackType.DRUM:
+            #                 created_track = await self.track_service.create_drum_track(user_id, track_specific_data)
+            #                 track_id = created_track.id
                             
-                        # Add track to project
-                        if track_id:
-                            await self.track_service.add_track_to_project(
-                                project_id=project.id,
-                                track_type=track_type,
-                                track_id=track_id,
-                                user_id=user_id,
-                                settings=project_track_settings
-                            )
+            #             # Add track to project
+            #             if track_id:
+            #                 await self.track_service.add_track_to_project(
+            #                     project_id=project.id,
+            #                     track_type=track_type,
+            #                     track_id=track_id,
+            #                     user_id=user_id,
+            #                     settings=project_track_settings
+            #                 )
             
             # Get the project with its tracks
             project_with_tracks = await self.get_project(project.id, user_id)
@@ -272,6 +272,8 @@ class ProjectService:
             
             # Extract tracks data if present
             tracks_data = project_data.pop("tracks", None)
+            
+            logger.info(f"Tracks data: {tracks_data}")
             
             # Filter out fields that cannot be updated
             safe_data = {k: v for k, v in project_data.items() if k not in ["id", "user_id", "created_at"]}

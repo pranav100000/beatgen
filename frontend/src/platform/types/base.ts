@@ -20,7 +20,7 @@ export type DrumSampleType =
   | "eight_o_eight";
 
 /**
- * Mixin that adds UUID primary key
+ * Mixin that adds UUID primary key (generates default value)
  */
 export interface DefaultUUIDMixin {
   id?: string;
@@ -136,7 +136,7 @@ export interface TrackBase {
   name: string;
 }
 /**
- * Mixin that adds UUID primary key
+ * Mixin that adds UUID primary key (needs to be provided)
  */
 export interface UUIDMixin {
   id: string;
@@ -147,7 +147,7 @@ export interface UUIDMixin {
 export interface UserBase {
   created_at?: string;
   updated_at?: string;
-  id?: string;
+  id: string;
   email: string;
   username?: string | null;
   display_name?: string | null;
