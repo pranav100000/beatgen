@@ -1,14 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Box } from '@mui/material';
+import { useStudioStore } from '../../../stores/studioStore';
+import { RootState, CombinedTrack, SamplerTrackRead, NoteState } from '../../../stores/types';
 import { useGridStore } from '../../../core/state/gridStore';
 import { GRID_CONSTANTS, getTrackColor } from '../../../constants/gridConstants';
 import { calculateMidiTrackWidth } from '../../../utils/trackWidthCalculators';
-import { useStudioStore } from '../../../stores/useStudioStore';
-import MidiNotesPreview from '../../piano-roll/components/MidiNotesPreview';
 import BaseTrackPreview from '../base/BaseTrackPreview';
 import { TrackPreviewProps } from '../types';
 import DrumGridPreview from './DrumGridPreview';
-import { DrumTrackState } from '../../../core/types/track';
+import { MUSIC_CONSTANTS } from '../../../constants/musicConstants';
+
+const TICKS_PER_STEP = MUSIC_CONSTANTS.pulsesPerQuarterNote / 4;
+const MAX_COLUMNS = 64;
 
 /**
  * DrumTrackPreview is a specialized track component for drum tracks.
@@ -28,37 +31,64 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     ...restProps
   } = props;
   
+  const tracks = useStudioStore((state: RootState) => state.tracks);
+
   const midiMeasureWidth = useGridStore(state => state.midiMeasurePixelWidth);
   const trackColor = providedTrackColor || getTrackColor(trackIndex);
   
-  // Type guard to ensure this is a drum track
   if (track.type !== 'drum') {
     console.error('DrumTrackPreview received non-drum track:', track);
-    return null; // Or render a placeholder error
+    return null;
   }
   
-  // Explicitly cast track to DrumTrackState after the guard
-  const drumTrack = track as DrumTrackState;
+  const drumTrackId = track.id;
+
+  const associatedSamplerTracks = useMemo(() => {
+    if (!Array.isArray(tracks)) return [];
+    return tracks
+      .filter((t): t is CombinedTrack & { track: SamplerTrackRead } => 
+          t.type === 'sampler' && 
+          typeof t.track === 'object' && 
+          t.track !== null && 
+          'drum_track_id' in t.track && 
+          t.track.drum_track_id === drumTrackId
+      )
+      .map(t => t.track as SamplerTrackRead);
+  }, [tracks, drumTrackId]);
+
+  const [localPattern, setLocalPattern] = useState<boolean[][]>([]);
+
+  useEffect(() => {
+    const handlePatternChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ trackId: string; pattern: boolean[][] }>; 
+      if (customEvent.detail?.trackId === drumTrackId && customEvent.detail.pattern) {
+        console.log(`DrumTrackPreview (${drumTrackId}): Received pattern from event.`);
+        setLocalPattern(customEvent.detail.pattern);
+      }
+    };
+
+    document.addEventListener('drumPatternChanged', handlePatternChange);
+    console.log(`DrumTrackPreview (${drumTrackId}): Added drumPatternChanged listener.`);
+
+    return () => {
+      document.removeEventListener('drumPatternChanged', handlePatternChange);
+      console.log(`DrumTrackPreview (${drumTrackId}): Removed drumPatternChanged listener.`);
+    };
+  }, [drumTrackId]);
+
+  const derivedPattern = useMemo(() => localPattern, [localPattern]);
   
-  // Get the drum pattern directly from the casted track state
-  const drumPattern = drumTrack.drumPattern;
-  
-  // Calculate display width for the track container (viewport)
   const trackWidth = useMemo(() => {
-    // If a width is explicitly provided, use it - this is critical for resize operations
     if (providedTrackWidth && providedTrackWidth > 0) {
       return providedTrackWidth;
     }
     
-    // Otherwise, calculate width equivalent to 4 measures (default for new tracks)
     const measures = 4;
     const beatsPerMeasure = timeSignature[0];
     const beatWidth = midiMeasureWidth / beatsPerMeasure;
     return measures * beatsPerMeasure * beatWidth;
   }, [timeSignature, midiMeasureWidth, providedTrackWidth]);
   
-  // Calculate full content width - this should NEVER change due to trimming
-  // This is the standard full width for drum patterns (4 measures)
   const fullContentWidth = useMemo(() => {
     const measures = 4;
     const beatsPerMeasure = timeSignature[0];
@@ -66,28 +96,23 @@ export const DrumTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     return measures * beatsPerMeasure * beatWidth;
   }, [timeSignature, midiMeasureWidth]);
   
-  // Drum-specific track content rendering
   const renderTrackContent = () => {
     return (
-      <>
-        {/* DrumGridPreview is always rendered at full content width, 
-            but only part of it is visible through the trimmed container */}
-        <DrumGridPreview 
-          pattern={drumPattern}
-          width={fullContentWidth} // Always use the full content width
-          height={GRID_CONSTANTS.trackHeight - 6}
-          trackColor={trackColor}
-        />
-      </>
+      <DrumGridPreview 
+        pattern={derivedPattern}
+        width={fullContentWidth}
+        height={GRID_CONSTANTS.trackHeight - 6}
+        trackColor={trackColor}
+      />
     );
   };
   
-  console.log(`DrumTrackPreview: Rendering for track ${track.id}, pattern:`, drumPattern);
+  console.log(`DrumTrackPreview (${track.id}): Rendering with derived pattern:`, derivedPattern);
   
   return (
     <BaseTrackPreview
       {...restProps}
-      track={drumTrack}
+      track={track}
       trackWidth={trackWidth}
       contentWidth={fullContentWidth}
       trackColor={trackColor}

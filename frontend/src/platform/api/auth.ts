@@ -16,6 +16,10 @@ export interface UserProfile {
   updated_at: string;
 }
 
+export interface OAuthRedirectResponse {
+  url: string;
+}
+
 export const signUp = async (email: string, password: string): Promise<LoginResponse> => {
   const response = await apiClient.post('/auth/signup', { email, password });
   return response.data;
@@ -64,4 +68,14 @@ export const changePassword = async (currentPassword: string, newPassword: strin
     current_password: currentPassword,
     new_password: newPassword
   });
+};
+
+export const signInWithGoogle = async (): Promise<void> => {
+  const response = await apiClient.get<OAuthRedirectResponse>('/auth/login/google');
+  window.location.href = response.data.url;
+};
+
+export const handleOAuthCallback = async (provider: string, code: string): Promise<LoginResponse> => {
+  const response = await apiClient.get<LoginResponse>(`/auth/callback/${provider}?code=${code}`);
+  return response.data;
 };

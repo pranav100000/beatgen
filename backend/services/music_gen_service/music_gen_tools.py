@@ -119,17 +119,51 @@ SELECT_INSTRUMENTS_TOOL = {
     }
 }
 
-SELECT_INSTRUMENTS_TOOL_old = {
-    "name": "select_instruments",
-    "description": "Selects the instruments that fit the beat we are trying to make. These instruments will be used to create melody, chords, and countermelody. Select the instruments that most accurately fit the description. You should select 2-3 instruments. IMPORTANT: The instruments you select must be out of the list of available instruments.",
+SELECT_DRUM_SOUNDS_TOOL = {
+    "name": "select_drum_sounds",
+    "description": "Selects the drum sounds that fit the beat we are trying to make. These drum sounds will be used to create the beat. Select the drum sounds that most accurately fit the description. You should select 4-5 drum sounds. IMPORTANT: The drum sounds you select must be out of the list of available drum sounds.",
     "input_schema": {
         "type": "object",
         "properties": {
-            "instrument_names": {
+            "drum_sounds": {
                 "type": "array",
-                "description": "List of instrument names (e.g., ['Piano', 'Violin'])"
+                "description": "List of drum sounds (e.g., ['Metro Kick Drum', 'Snare Drum'])"
             }
         },
-        "required": ["instrument_names"]
+        "required": ["drum_sounds"]
+    }
+}
+
+CREATE_DRUM_BEAT_TOOL = {
+    "name": "create_drum_beat",
+    "description": "Creates drum beat patterns for selected drum sounds. Each pattern should be a list of 32 booleans representing 16th notes over 2 bars (4/4 time).",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "drum_beats": {
+                "type": "array",
+                "description": "A list of drum beat patterns, one for each selected drum sound.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "drum_sound_id": {
+                            "type": "string",
+                            "description": "The ID of the drum sound this pattern is for."
+                        },
+                        "pattern": {
+                            "type": "array",
+                            "description": "A list of 32 booleans. True means the drum hits on that 16th note, False means silence. This covers 2 bars.",
+                            "items": {
+                                "type": "boolean"
+                            },
+                            "minItems": 32,
+                            "maxItems": 32
+                        }
+                    },
+                    "required": ["drum_sound_id", "pattern"]
+                }
+            }
+        },
+        "required": ["drum_beats"]
     }
 }

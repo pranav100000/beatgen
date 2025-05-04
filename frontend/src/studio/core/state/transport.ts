@@ -1,5 +1,5 @@
 import * as Tone from 'tone';
-import AudioEngine from '../audio-engine/audioEngine';
+import AudioFilePlayer from '../audio-engine/audioFilePlayer/audioEngine';
 import { convertVolumeToDecibels } from '../../utils/audioProcessing';
 import { calculatePositionTime } from '../../constants/gridConstants';
 import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
@@ -18,7 +18,7 @@ export interface Transport {
 }
 
 export class TransportController implements Transport {
-    private audioEngine: AudioEngine;
+    private audioEngine: AudioFilePlayer;
     private soundfontController: SoundfontEngineController;
     private samplerController: SamplerController;
     private isStarting: boolean = false;
@@ -26,7 +26,7 @@ export class TransportController implements Transport {
     private static FADE_TIME = 0.01; // 10ms fade
 
     constructor() {
-        this.audioEngine = AudioEngine.getInstance();
+        this.audioEngine = AudioFilePlayer.getInstance();
         Tone.getTransport().bpm.value = 120;
         this.soundfontController = new SoundfontEngineController();
         this.samplerController = new SamplerController();
@@ -55,7 +55,7 @@ export class TransportController implements Transport {
         return this.samplerController;
     }
 
-    getAudioEngine(): AudioEngine {
+    getAudioEngine(): AudioFilePlayer {
         return this.audioEngine;
     }
     
@@ -540,8 +540,9 @@ export class TransportController implements Transport {
         // Find the track
         const track = this.audioEngine.getAllTracks().find(t => t.id === trackId);
         if (!track || !track.player) {
-            console.log(`Track ${trackId} not found or has no player`);
-            return;
+            // Log a warning instead of just returning silently
+            console.warn(`Track ${trackId} or its player not found during position change while playing. Skipping sync for now.`);
+            return; // Continue to return, but log the warning
         }
         
         console.log(`Handling position change for track ${trackId} to x:${newPositionXTicks} ticks during playback`);

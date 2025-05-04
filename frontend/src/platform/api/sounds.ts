@@ -1,23 +1,18 @@
 import { apiClient } from './client';
-import { Sound } from '../../studio/core/types/sound';
+import { AudioTrackRead, DrumTrackRead, MidiTrackRead, SamplerTrackRead } from '../types/project';
+//import { SamplerTrack } from 'src/types/track';
+import { AudioTrackCreate } from '../types/track_models/audio_track';
+import { MidiTrackCreate } from '../types/track_models/midi_track';
+import { SamplerTrackCreate } from '../types/track_models/sampler_track';
+import { DrumTrackCreate } from '../types/track_models/drum_track';
+
+// Keep using the Sound interface from studio for now until we can fully migrate
 
 export interface UploadUrlResponse {
   id: string;
   upload_url: string;
   storage_key: string;
 }
-
-export interface SoundCreateRequest {
-  id: string;
-  name: string;
-  file_format: string;
-  duration: number;
-  file_size: number;
-  sample_rate: number;
-  waveform_data: number[];
-  storage_key: string;
-}
-
 /**
  * Get a presigned URL for uploading a file (audio or MIDI)
  * @param fileName The name of the file to upload
@@ -28,7 +23,7 @@ export interface SoundCreateRequest {
 export const getUploadUrl = async (
   fileName: string, 
   id: string, 
-  fileType: 'audio' | 'midi' = 'audio',
+  fileType: 'audio' | 'soundfont',
   shouldOverwrite: boolean = false
 ): Promise<UploadUrlResponse> => {
   const response = await apiClient.post('/sounds/upload-url', { 
@@ -45,18 +40,100 @@ export const getUploadUrl = async (
  * @param soundData The sound data including metadata
  * @returns The created sound object
  */
-export const createSoundRecord = async (soundData: SoundCreateRequest): Promise<Sound> => {
-  console.log('Creating sound record with data:', {
+export const createSoundRecord = async (soundData: AudioTrackCreate): Promise<AudioTrackRead> => {
+  console.log('Creating audio file and track records with data:', {
     ...soundData,
-    waveform_data: soundData.waveform_data ? `[${soundData.waveform_data.length} points]` : 'none'
   });
   
   try {
-    const response = await apiClient.post('/sounds', soundData);
-    console.log('Sound record created successfully:', response.data);
+    const response = await apiClient.post('/sounds/audio', soundData);
+    console.log('Audio record created successfully:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error creating sound record:', error);
+    console.error('Error creating audio record:', error);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    throw error;
+  }
+};
+
+/**
+ * Create a MIDI track record with notes data
+ * @param midiData The MIDI track data with notes_json containing the note data
+ * @returns The created MIDI track object
+ */
+export const createMidiFileRecord = async (midiData: MidiTrackCreate): Promise<MidiTrackRead> => {
+  console.log('Creating MIDI file and track records with data:', midiData);
+  
+  try {
+    const response = await apiClient.post('/sounds/midi', midiData);
+    console.log('MIDI file record created successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating MIDI file record:', error);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    throw error;
+  }
+};
+
+/**
+ * Create a sampler track record after successful upload of both audio and MIDI files
+ * @param samplerData The sampler track data
+ * @returns The created sampler track object
+ */
+export const createSamplerTrackRecord = async (samplerData: SamplerTrackCreate): Promise<SamplerTrackRead> => {
+  console.log('Creating sampler track record with data:', samplerData);
+  
+  try {
+    // Transform the data to match backend expectations
+    const transformedData = {
+      ...samplerData,
+      // Map the fields that need renaming
+      duration: samplerData.audio_file_duration,
+      sample_rate: samplerData.audio_file_sample_rate,
+    };
+    
+    console.log('Transformed sampler track data:', transformedData);
+    
+    const response = await apiClient.post('/sounds/sampler', transformedData);
+    console.log('Sampler track record created successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating sampler track record:', error);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    throw error;
+  }
+};
+
+/**
+ * Create a drum track record
+ * @param drumData The drum track data
+ * @returns The created drum track object
+ */
+export const createDrumTrackRecord = async (drumData: DrumTrackCreate): Promise<DrumTrackRead> => {
+  console.log('Creating drum track record with data:', drumData);
+  
+  try {
+    // Transform the data to match backend expectations
+    const transformedData = {
+      ...drumData,
+    };
+    
+    console.log('Transformed drum track data:', transformedData);
+    
+    const response = await apiClient.post('/sounds/drum', transformedData);
+    console.log('Drum track record created successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating sampler track record:', error);
     if (error.response) {
       console.error('Response status:', error.response.status);
       console.error('Response data:', error.response.data);
@@ -69,7 +146,7 @@ export const createSoundRecord = async (soundData: SoundCreateRequest): Promise<
  * Get all sounds for the current user
  * @returns Array of sounds
  */
-export const getSounds = async (): Promise<Sound[]> => {
+export const getSounds = async (): Promise<AudioTrackRead[]> => {
   const response = await apiClient.get('/sounds');
   return response.data;
 };
@@ -79,7 +156,7 @@ export const getSounds = async (): Promise<Sound[]> => {
  * @param id The sound ID
  * @returns The sound object
  */
-export const getSound = async (id: string): Promise<Sound> => {
+export const getSound = async (id: string): Promise<AudioTrackRead> => {
   const response = await apiClient.get(`/sounds/${id}`);
   return response.data;
 };
@@ -93,33 +170,49 @@ export const deleteSound = async (id: string): Promise<void> => {
 };
 
 /**
- * Download a file from cloud storage
+ * Private helper function to download a file from cloud storage.
+ * @param prefix The storage path prefix (e.g., 'storage/v1/object/public/tracks')
  * @param storageKey The storage key of the file
  * @returns The file as a Blob
  */
-export const downloadFile = async (storageKey: string): Promise<Blob> => {
+const downloadFile = async (prefix: string, storageKey: string): Promise<Blob> => {
+  const baseUrlString = process.env.REACT_APP_SUPABASE_URL || 'https://fmpafpwdkegazcerrnso.supabase.co';
+
+  // Construct the full URL path
+  const storageUrl = new URL(`/${prefix}/${storageKey}`, baseUrlString).toString();
+
   try {
-    // Construct the public URL
-    const baseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://fmpafpwdkegazcerrnso.supabase.co';
-    const storageUrl = `${baseUrl}/storage/v1/object/public/tracks/${storageKey}`;
-    
-    // Fetch the file
+    // Fetch the file using the constructed URL
     const response = await fetch(storageUrl, {
-      mode: 'cors',
-      credentials: 'same-origin'
+      mode: 'cors', // Ensure CORS is handled correctly if accessing from a different origin
     });
-    
+
     if (!response.ok) {
-      throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+      // Throw a more informative error if the fetch fails
+      throw new Error(`HTTP error ${response.status}: ${response.statusText} for URL ${storageUrl}`);
     }
-    
-    // Return as blob
+
+    // Return the file content as a Blob
     return await response.blob();
   } catch (error) {
-    console.error('Error downloading file:', error);
-    throw new Error(`Failed to download file: ${error.message}`);
+    // Log the error and re-throw a more specific error message
+    console.error(`Error downloading file from ${storageUrl}:`, error);
+    throw new Error(`Failed to download file (${storageKey}): ${error.message}`);
   }
 };
 
-// Function to maintain compatibility with existing code until fully refactored
-export const downloadMidiFile = downloadFile;
+/**
+ * Download an audio track file from cloud storage
+ * @param storageKey The storage key of the file
+ * @returns The file as a Blob
+ */
+export const downloadAudioTrackFile = async (storageKey: string): Promise<Blob> => {
+  // Define the specific prefix for audio tracks
+  const prefix = 'storage/v1/object/public/tracks'; 
+  return downloadFile(prefix, storageKey);
+};
+
+export const downloadDrumSampleFile = async (storageKey: string): Promise<Blob> => {
+  const prefix = 'storage/v1/object/public/assets/drum_samples_public';
+  return downloadFile(prefix, storageKey);
+};

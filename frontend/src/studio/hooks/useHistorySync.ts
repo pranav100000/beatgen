@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { historyManager } from '../core/state/history/HistoryManager';
-import { useStudioStore } from '../stores/useStudioStore';
+import { useStudioStore } from '../stores/studioStore';
 
 /**
  * Custom hook to sync HistoryManager state with StudioStore

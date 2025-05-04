@@ -54,7 +54,11 @@ const Navbar = () => {
   const userMenuOpen = Boolean(userMenuAnchor);
   
   return (
-    <AppBar position="static" sx={{ bgcolor: 'rgba(0, 0, 0, 0.9)' }}>
+    <AppBar 
+      position="static" 
+      color="inherit" 
+      elevation={1}
+    >
       <Toolbar>
         {/* Logo */}
         <Typography
@@ -65,7 +69,7 @@ const Navbar = () => {
             flexGrow: 1,
             fontWeight: 'bold',
             textDecoration: 'none',
-            color: 'white',
+            color: 'inherit',
             display: 'flex',
             alignItems: 'center'
           }}
@@ -168,9 +172,15 @@ const Navbar = () => {
         PaperProps={{
           sx: {
             width: 220,
-            bgcolor: '#111',
-            color: 'white',
-            boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.15))',
+            mt: 1.5,
+            '& .MuiAvatar-root': {
+              width: 32,
+              height: 32,
+              ml: -0.5,
+              mr: 1,
+            },
           },
         }}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
@@ -185,27 +195,27 @@ const Navbar = () => {
           </Typography>
         </Box>
         
-        <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+        <Divider />
         
         <MenuItem component={RouterLink} to="/profile" onClick={handleUserMenuClose}>
           <ListItemIcon>
-            <PersonIcon fontSize="small" color="primary" />
+            <PersonIcon fontSize="small" sx={{ color: 'text.secondary' }} />
           </ListItemIcon>
           Profile
         </MenuItem>
         
         <MenuItem component={RouterLink} to="/settings" onClick={handleUserMenuClose}>
           <ListItemIcon>
-            <SettingsIcon fontSize="small" color="primary" />
+            <SettingsIcon fontSize="small" sx={{ color: 'text.secondary' }} />
           </ListItemIcon>
           Settings
         </MenuItem>
         
-        <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+        <Divider />
         
         <MenuItem onClick={handleLogout}>
           <ListItemIcon>
-            <LogoutIcon fontSize="small" color="error" />
+            <LogoutIcon fontSize="small" sx={{ color: 'error.main' }} /> 
           </ListItemIcon>
           Logout
         </MenuItem>

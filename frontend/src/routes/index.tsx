@@ -20,8 +20,9 @@ function LandingPage() {
         display: 'flex', 
         flexDirection: 'column',
         py: 4,
-        bgcolor: '#000',
-        color: 'white'
+        // Removed hardcoded bgcolor and color to allow theme to apply
+        // bgcolor: '#000', 
+        // color: 'white'
       }}>
       <Box 
         sx={{ 

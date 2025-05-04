@@ -1,21 +1,23 @@
-import { ProjectManager, Track } from './project';
+import { ProjectManager } from './project';
 import { TransportController } from './transport';
 import { MidiManager } from '../midi/MidiManagerNew';
 import { InstrumentManager } from '../instruments/InstrumentManager';
-import AudioEngine from '../audio-engine/audioEngine';
-import { TrackState } from '../types/track';
+import AudioFilePlayer from '../audio-engine/audioFilePlayer/audioEngine';
 import * as Tone from 'tone';
 import { SoundfontEngineController } from '../audio-engine/soundfontEngineController';
 import { SamplerController } from '../audio-engine/samplerController';
-import { Note } from '../types/note'; // Added for Note type
+import { Note } from '../../../types/note'; // Added for Note type
 import { NoteActions } from './history/actions/NoteActions'; // Added for NoteActions
-import { historyManager } from './history/HistoryManager'; // Added for historyManager
+import { HistoryManager, historyManager } from './history/HistoryManager'; // Added for historyManager
 import { MUSIC_CONSTANTS } from '../../constants/musicConstants';
 import { DEFAULT_MEASURE_WIDTH, useGridStore } from './gridStore';
+import { CombinedTrack } from 'src/platform/types/project';
+import { BeatGenDB, db } from '../db/dexie-client'; // Import BeatGenDB and db instance
+import SampleManager from '../samples/sampleManager'; // Import SampleManager
 /**
  * Interface for a drum pad in the drum machine grid
  */
-export interface DrumPad {
+interface DrumPad {
   row: number;    // Row position (which drum sound)
   column: number; // Column position (which beat)
   velocity: number; // Velocity/volume (0-127)
@@ -25,21 +27,9 @@ export interface StoreInterface {
   getTransport(): TransportController;
   projectManager: ProjectManager;
   initializeAudio(): Promise<void>;
-  createTrack(
-    name: string, 
-    type: 'audio' | 'midi' | 'drum' | 'sampler', 
-    index: number,
-    existingTrackData?: {
-      id: string;
-      volume?: number;
-      pan?: number;
-      muted?: boolean;
-      soloed?: boolean;
-      instrumentId?: string;
-      instrumentName?: string;
-      instrumentStorageKey?: string;
-    }
-  ): Promise<Track>;
+  // createTrack(
+  //   combinedTrack: CombinedTrack
+  // ): Promise<CombinedTrack>;
   getInstrumentManager(): InstrumentManager;
   getMidiManager(): MidiManager;
   connectTrackToSoundfont(trackId: string, instrumentId: string): Promise<void>;
@@ -52,9 +42,7 @@ export class Store implements StoreInterface {
   private initialized: boolean = false;
   private midiManager: MidiManager;
   private instrumentManager: InstrumentManager;
-  // Removed _tracks array
-  // Removed _listeners array
-
+  private sampleManager: SampleManager; // Add sampleManager property
   // Map to store runtime data associated with track IDs
   private runtimeTrackData: Map<string, { channel: Tone.Channel; player?: Tone.Player; /* Add other runtime-specific state here if needed */ }> = new Map();
 
@@ -62,16 +50,10 @@ export class Store implements StoreInterface {
     this.projectManager = new ProjectManager();
     this.midiManager = new MidiManager();
     this.instrumentManager = new InstrumentManager();
+    // Initialize SampleManager with the db instance
+    this.sampleManager = SampleManager.getInstance(db); 
     
-    // Create TransportController
     this.transportController = new TransportController();
-    
-    // Initialize with project defaults
-    const project = this.projectManager.getCurrentProject();
-    if (project) {
-      this.midiManager.setBpm(project.tempo);
-      this.midiManager.setTimeSignature(project.timeSignature); // Default time signature
-    }
   }
 
   public async initializeAudio(): Promise<void> {
@@ -124,7 +106,7 @@ export class Store implements StoreInterface {
     console.log('Initializing runtime data for existing tracks...');
     project.tracks.forEach(track => {
       if (!this.runtimeTrackData.has(track.id)) {
-        this.createRuntimeTrackData(track.id);
+        //this.createRuntimeTrackData(track.id);
       }
     });
     console.log(`Runtime data initialized for ${this.runtimeTrackData.size} tracks.`);
@@ -134,114 +116,52 @@ export class Store implements StoreInterface {
     return this.transportController;
   }
 
-  public async createTrack(
-    name: string, 
-    type: 'audio' | 'midi' | 'drum' | 'sampler',
-    index: number,
-    existingTrackData?: {
-      id: string;
-      volume?: number;
-      pan?: number;
-      muted?: boolean;
-      soloed?: boolean;
-      instrumentId?: string;
-      instrumentName?: string;
-      instrumentStorageKey?: string;
-      baseMidiNote?: number;
-      grainSize?: number;
-      overlap?: number;
-      sampleFile?: File;
-    }
-  ): Promise<Track> {
-    if (!this.initialized) {
-      throw new Error('Store must be initialized before creating tracks');
-    }
+  // public async createTrack(
+  //   combinedTrack: CombinedTrack
+  // ): Promise<CombinedTrack> {
+  //   if (!this.initialized) {
+  //     throw new Error('Store must be initialized before creating tracks');
+  //   }
     
-    console.log(`Store: Creating ${type} track with name: ${name}`, existingTrackData || 'No existing data');
+  //   console.log(`Store: Creating ${combinedTrack.type} track with name: ${combinedTrack.name}`);
     
-    // Create track in project manager - use existing data if provided
-    const track = existingTrackData 
-      ? this.projectManager.addTrackWithProperties({
-          id: existingTrackData.id,
-          name,
-          type,
-          volume: existingTrackData.volume,
-          pan: existingTrackData.pan,
-          muted: existingTrackData.muted,
-          soloed: existingTrackData.soloed,
-          instrumentId: existingTrackData.instrumentId,
-          instrumentName: existingTrackData.instrumentName,
-          instrumentStorageKey: existingTrackData.instrumentStorageKey
-        })
-      : this.projectManager.addTrack(name, type);
     
-    console.log(`Store: Track created through ProjectManager:`, track);
+  //   console.log(`Store: Track created through ProjectManager:`, track);
     
-    // For MIDI, drum, and sampler tracks, handle persistence
-    if (type === 'midi' || type === 'drum' || type === 'sampler') {
-      try {
-        // Use MIDI persistence
-        const project = this.projectManager.getCurrentProject();
-        if (project) {
-          // Ensure BPM is set
-          this.midiManager.setBpm(project.tempo);
-          
-          // For sampler, we need a default instrumentId since MidiManager requires one
-          const effectiveInstrumentId = track.instrumentId || 'sampler';
-          
-          // Create persisted track directly in MidiManager
-          await this.midiManager.createTrackWithPersistence(
-            track.id, // Always use the track ID (whether new or existing)
-            effectiveInstrumentId,
-            name
-          );
-          
-          if (existingTrackData) {
-            console.log(`Store: Using existing ${type} track ID: ${track.id} for persistence`);
-          } else {
-            console.log(`Store: Created persisted ${type} track: ${track.id}`);
-          }
-        }
-      } catch (error) {
-        console.error(`Store: Error creating persisted ${type} track:`, error);
-        // Continue even if persistence fails
-      }
-    }
+  //   // Create runtime data (channel, etc.) for the new track
+  //   //this.createRuntimeTrackData(track.id);
 
-    // Create runtime data (channel, etc.) for the new track
-    this.createRuntimeTrackData(track.id);
+  //   // Note: No need to notify listeners here, UI should react to ProjectManager changes
 
-    // Note: No need to notify listeners here, UI should react to ProjectManager changes
-
-    return track;
-  }
+  //   return track;
+  // }
 
   //  * Creates the runtime data entry for a track (e.g., Tone.Channel).
   //  * Should be called when a track is added or loaded.
   //  * @param trackId The ID of the track.
   //  */
-  private createRuntimeTrackData(trackId: string): void {
-    if (this.runtimeTrackData.has(trackId)) {
-      console.warn(`Store: Runtime data already exists for track ${trackId}`);
-      return;
-    }
+  // private createRuntimeTrackData(trackId: string): void {
+  //   if (this.runtimeTrackData.has(trackId)) {
+  //     console.warn(`Store: Runtime data already exists for track ${trackId}`);
+  //     return;
+  //   }
 
-    // Create a channel for the track
-    const channel = new Tone.Channel().toDestination();
+  //   // Create a channel for the track
+  //   const channel = new Tone.Channel().toDestination();
 
-    // Set initial volume/pan/mute from ProjectManager's track data
-    const trackData = this.projectManager.getTrackById(trackId);
-    if (trackData) {
-      channel.volume.value = Tone.gainToDb(trackData.volume / 100); // Assuming volume is 0-100
-      channel.pan.value = trackData.pan / 100; // Assuming pan is -100 to 100
-      channel.mute = trackData.muted;
-      // Solo logic needs coordination across tracks, often handled in AudioEngine/Transport
-      // We don't set solo here, as it depends on other tracks' states.
-    }
+  //   // Set initial volume/pan/mute from ProjectManager's track data
+  //   const trackData = this.projectManager.getTrackById(trackId);
+  //   if (trackData) {
+  //     channel.volume.value = Tone.gainToDb(trackData.volume / 100); // Assuming volume is 0-100
+  //     channel.pan.value = trackData.pan / 100; // Assuming pan is -100 to 100
+  //     channel.mute = trackData.mute;
+  //     // Solo logic needs coordination across tracks, often handled in AudioEngine/Transport
+  //     // We don't set solo here, as it depends on other tracks' states.
+  //   }
 
-    this.runtimeTrackData.set(trackId, { channel });
-    console.log(`Store: Created runtime data for track ${trackId}`);
-  }
+  //   this.runtimeTrackData.set(trackId, { channel });
+  //   console.log(`Store: Created runtime data for track ${trackId}`);
+  // }
 
 
   public async loadAudioFile(trackId: string, file: File, position?: { x: number, y: number }): Promise<void> {
@@ -280,41 +200,41 @@ export class Store implements StoreInterface {
     }
   }
 
-  public async removeTrack(trackId: string): Promise<void> {
-    // Get track type from ProjectManager *before* removing it
-    const track = this.projectManager.getTrackById(trackId);
-    const trackType = track?.type;
+  // public async removeTrack(trackId: string): Promise<void> {
+  //   // Get track type from ProjectManager *before* removing it
+  //   const track = this.projectManager.getTrackById(trackId);
+  //   const trackType = track?.type;
 
-    // Clean up MIDI resources if it's a MIDI, drum or sampler track
-    if (trackType === 'midi' || trackType === 'drum' || trackType === 'sampler') {
-      // Ensure MidiManager has the track before attempting deletion
-      if (this.midiManager.hasTrack(trackId)) {
-        await this.midiManager.deleteTrackWithPersistence(trackId);
-      } else {
-        console.warn(`Store.removeTrack: Track ${trackId} not found in MidiManager during cleanup.`);
-      }
-    }
+  //   // Clean up MIDI resources if it's a MIDI, drum or sampler track
+  //   if (trackType === 'midi' || trackType === 'drum' || trackType === 'sampler') {
+  //     // Ensure MidiManager has the track before attempting deletion
+  //     if (this.midiManager.hasTrack(trackId)) {
+  //       await this.midiManager.deleteTrackWithPersistence(trackId);
+  //     } else {
+  //       console.warn(`Store.removeTrack: Track ${trackId} not found in MidiManager during cleanup.`);
+  //     }
+  //   }
 
-    // Remove track from project manager (this should be the source of truth)
-    this.projectManager.removeTrack(trackId);
+  //   // Remove track from project manager (this should be the source of truth)
+  //   this.projectManager.removeTrack(trackId);
 
-    // Clean up runtime data (channel, player etc.)
-    const runtimeData = this.runtimeTrackData.get(trackId);
-    if (runtimeData) {
-      runtimeData.channel.dispose(); // Dispose Tone.js resources
-      runtimeData.player?.dispose();
-      this.runtimeTrackData.delete(trackId);
-      console.log(`Store: Cleaned up runtime data for track ${trackId}`);
-    }
+  //   // Clean up runtime data (channel, player etc.)
+  //   const runtimeData = this.runtimeTrackData.get(trackId);
+  //   if (runtimeData) {
+  //     runtimeData.channel.dispose(); // Dispose Tone.js resources
+  //     runtimeData.player?.dispose();
+  //     this.runtimeTrackData.delete(trackId);
+  //     console.log(`Store: Cleaned up runtime data for track ${trackId}`);
+  //   }
 
-    // Remove from audio engine (AudioEngine might need refactoring to not rely on Store._tracks)
-    // Assuming AudioEngine uses trackId
-    this.getAudioEngine().removeTrack(trackId);
+  //   // Remove from audio engine (AudioEngine might need refactoring to not rely on Store._tracks)
+  //   // Assuming AudioEngine uses trackId
+  //   this.getAudioEngine().removeTrack(trackId);
 
-    // Note: No need to notify listeners here, UI should react to ProjectManager changes
-  }
+  //   // Note: No need to notify listeners here, UI should react to ProjectManager changes
+  // }
 
-  public getAudioEngine(): AudioEngine {
+  public getAudioEngine(): AudioFilePlayer {
     return this.getTransport().getAudioEngine();
   }
 
@@ -408,9 +328,9 @@ export class Store implements StoreInterface {
   /**
    * Gets the persistent track data with the specified ID from ProjectManager.
    */
-  public getTrackDataById(trackId: string): Track | undefined {
-    return this.projectManager.getTrackById(trackId);
-  }
+  // public getTrackDataById(trackId: string): CombinedTrack | undefined {
+  //   return this.projectManager.getTrackById(trackId);
+  // }
 
   /**
    * Gets the runtime data (e.g., Tone.Channel) for the specified track ID.
@@ -422,92 +342,92 @@ export class Store implements StoreInterface {
   /**
    * Gets the current drum pad state for a track by querying MidiManager.
    */
-  public getDrumPads(trackId: string): DrumPad[] {
-    const track = this.projectManager.getTrackById(trackId);
-    if (!track || track.type !== 'drum') {
-      // console.warn(`Cannot get drum pads: Track ${trackId} not found or not a drum track`);
-      return [];
-    }
+  // public getDrumPads(trackId: string): DrumPad[] {
+  //   const track = this.projectManager.getTrackById(trackId);
+  //   if (!track || track.type !== 'drum') {
+  //     // console.warn(`Cannot get drum pads: Track ${trackId} not found or not a drum track`);
+  //     return [];
+  //   }
 
-    const notes = this.midiManager.getTrackNotes(trackId);
-    if (!notes) {
-      // Track might exist in ProjectManager but not yet fully initialized in MidiManager
-      // Or an error occurred fetching notes. MidiManager logs errors internally.
-      return [];
-    }
+  //   const notes = this.midiManager.getTrackNotes(trackId);
+  //   if (!notes) {
+  //     // Track might exist in ProjectManager but not yet fully initialized in MidiManager
+  //     // Or an error occurred fetching notes. MidiManager logs errors internally.
+  //     return [];
+  //   }
 
-    // Map MIDI notes to DrumPad objects
-    // Assuming row = pitch, column = time position
-    return notes.map(note => ({
-      row: note.row,
-      column: note.column,
-      velocity: note.velocity ?? 100 // Use note velocity or default
-    }));
-  }
+  //   // Map MIDI notes to DrumPad objects
+  //   // Assuming row = pitch, column = time position
+  //   return notes.map(note => ({
+  //     row: note.row,
+  //     column: note.column,
+  //     velocity: note.velocity ?? 100 // Use note velocity or default
+  //   }));
+  // }
 
   /**
    * Toggles a drum pad on/off by adding or removing the corresponding MIDI note
    * via the MidiManager and HistoryManager.
    */
-  public async toggleDrumPad(trackId: string, column: number, row: number): Promise<void> {
-    console.log(`Store.toggleDrumPad called for track ${trackId}, column ${column}, row ${row}`);
+  // public async toggleDrumPad(trackId: string, column: number, row: number): Promise<void> {
+  //   console.log(`Store.toggleDrumPad called for track ${trackId}, column ${column}, row ${row}`);
 
-    const track = this.projectManager.getTrackById(trackId);
-    if (!track || track.type !== 'drum') {
-      console.warn(`Cannot toggle drum pad: Track ${trackId} not found or not a drum track`);
-      return;
-    }
+  //   const track = this.projectManager.getTrackById(trackId);
+  //   if (!track || track.type !== 'drum') {
+  //     console.warn(`Cannot toggle drum pad: Track ${trackId} not found or not a drum track`);
+  //     return;
+  //   }
 
-    // Get current notes for the track from the source of truth
-    const notes = this.midiManager.getTrackNotes(trackId);
-    if (notes === null) {
-      console.error(`Cannot toggle drum pad: Failed to get notes for track ${trackId}`);
-      return;
-    }
+  //   // Get current notes for the track from the source of truth
+  //   const notes = this.midiManager.getTrackNotes(trackId);
+  //   if (notes === null) {
+  //     console.error(`Cannot toggle drum pad: Failed to get notes for track ${trackId}`);
+  //     return;
+  //   }
 
-    // Find if a note already exists at this position (row = pitch, column = time)
-    const existingNote = notes.find(note => note.column === column && note.row === row);
+  //   // Find if a note already exists at this position (row = pitch, column = time)
+  //   const existingNote = notes.find(note => note.column === column && note.row === row);
 
-    // Use the proper action names from NoteActions
-    const { AddNote, DeleteNote } = NoteActions;
+  //   // Use the proper action names from NoteActions
+  //   const { AddNote, DeleteNote } = NoteActions;
 
-    if (existingNote) {
-      // Note exists - create and execute a DeleteNote action
-      console.log(`Drum pad exists at [${column}, ${row}], removing note ID: ${existingNote.id}`);
-      const deleteAction = new DeleteNote(
-        this, // Pass the store instance
-        trackId,
-        String(existingNote.id), // Action expects string ID
-        existingNote // Pass the full note object for undo
-      );
-      await historyManager.executeAction(deleteAction);
+  //   if (existingNote) {
+  //     // Note exists - create and execute a DeleteNote action
+  //     console.log(`Drum pad exists at [${column}, ${row}], removing note ID: ${existingNote.id}`);
+  //     const deleteAction = new DeleteNote(
+  //       this, // Pass the store instance
+  //       trackId,
+  //       String(existingNote.id), // Action expects string ID
+  //       existingNote // Pass the full note object for undo
+  //     );
+  //     await historyManager.executeAction(deleteAction);
 
-    } else {
-      // Note does not exist - create and execute an AddNote action
-      console.log(`Drum pad does not exist at [${column}, ${row}], adding note.`);
+  //   } else {
+  //     // Note does not exist - create and execute an AddNote action
+  //     console.log(`Drum pad does not exist at [${column}, ${row}], adding note.`);
 
-      // Create a new note object
-      // WARNING: Using Date.now() for ID is not robust for rapid clicks.
-      // Consider a more reliable ID generation strategy if needed.
-      const newNoteId = Date.now();
-      const newNote: Note = {
-        id: newNoteId,
-        row: row,         // Pitch
-        column: column,   // Time position
-        length: 1,        // Default length (e.g., 1 grid unit for drums)
-        velocity: 100,    // Default velocity
-        trackId: trackId
-      };
+  //     // Create a new note object
+  //     // WARNING: Using Date.now() for ID is not robust for rapid clicks.
+  //     // Consider a more reliable ID generation strategy if needed.
+  //     const newNoteId = Date.now();
+  //     const newNote: Note = {
+  //       id: newNoteId,
+  //       row: row,         // Pitch
+  //       column: column,   // Time position
+  //       length: 1,        // Default length (e.g., 1 grid unit for drums)
+  //       velocity: 100,    // Default velocity
+  //       trackId: trackId
+  //     };
 
-      const addAction = new AddNote(
-        this, // Pass the store instance
-        trackId,
-        String(newNoteId), // Action expects string ID
-        newNote
-      );
-      await historyManager.executeAction(addAction);
-    }
-  }
+  //     const addAction = new AddNote(
+  //       this, // Pass the store instance
+  //       trackId,
+  //       String(newNoteId), // Action expects string ID
+  //       newNote
+  //     );
+  //     await historyManager.executeAction(addAction);
+  //   }
+  // }
 
   public getProjectManager(): ProjectManager {
     return this.projectManager;
@@ -519,8 +439,8 @@ export class Store implements StoreInterface {
    * @returns Number of ticks per pixel at current settings
    */
   public getTicksPerPixel(): number {
-    const bpm = this.getMidiManager().getBpm();
-    const [beatsPerMeasure] = this.getMidiManager().getTimeSignature();
+    const bpm = this.projectManager.getTempo();
+    const [beatsPerMeasure] = this.projectManager.getTimeSignature();
     
     // Standard MIDI ticks per beat (quarter note) is typically 480 or 960
     // We'll use 480 as it's common for DAWs
@@ -550,5 +470,10 @@ export class Store implements StoreInterface {
     const ticksPerPixel = this.getTicksPerPixel();
     // Return the inverse of ticks per pixel
     return 1 / ticksPerPixel;
+  }
+
+  // Add getter for SampleManager
+  public getSampleManager(): SampleManager {
+    return this.sampleManager;
   }
 }

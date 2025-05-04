@@ -1,205 +1,139 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, memo, useMemo } from 'react';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
-import { useStudioStore } from '../../stores/useStudioStore';
+import { useStudioStore } from '../../stores/studioStore';
 import PianoRoll from '../piano-roll2/PianoRoll';
 import { convertToNoteState, NoteState } from '../../utils/noteConversion';
 import { diffNotes } from '../../utils/noteDiffing';
-import {
-  createNoteWithHistory,
-  deleteNoteWithHistory,
-  moveNoteWithHistory,
-  resizeNoteWithHistory
-} from '../../utils/noteActions';
 import { getTrackColor } from '../../constants/gridConstants';
+import { MidiTrack } from 'src/platform/types/track_models/midi_track';
+import { CombinedTrack } from 'src/platform/types/project';
+import { Store } from '../../core/state/store'; 
 
-/**
- * Component that renders all open piano roll windows
- * Uses the new PianoRoll2 component directly
- */
-const PianoRollWindows: React.FC = () => {
-  const { openPianoRolls, closePianoRoll } = usePianoRollStore();
-  const { store, tracks } = useStudioStore();
+const PianoRollWindows: React.FC = memo(() => {
+  const openPianoRolls = usePianoRollStore(state => state.openPianoRolls);
+  const closePianoRoll = usePianoRollStore(state => state.closePianoRoll);
   
-  // Track previous notes per track for diffing when changes occur
+  const store = useStudioStore(state => state.store);
+  const tracks = useStudioStore(state => state.tracks);
+  const addMidiNote = useStudioStore(state => state.addMidiNote);
+  const removeMidiNote = useStudioStore(state => state.removeMidiNote);
+  const updateMidiNote = useStudioStore(state => state.updateMidiNote);
+  const getKeyNotes = useStudioStore(state => state.getKeyNotes);
+  
   const [prevNotesByTrack, setPrevNotesByTrack] = useState<Record<string, NoteState[]>>({});
   
-  // Get track IDs with open piano rolls
-  const openTrackIds = Object.entries(openPianoRolls)
-    .filter(([_, isOpen]) => isOpen)
-    .map(([trackId]) => trackId);
+  const openTrackIds = useMemo(() => 
+      Object.entries(openPianoRolls)
+          .filter(([_, isOpen]) => isOpen)
+          .map(([trackId]) => trackId),
+      [openPianoRolls]
+  );
     
-  // Debug logging
-  console.log('Piano Roll Windows - Open Track IDs:', openTrackIds);
-  console.log('Piano Roll Windows - All Open Piano Rolls:', openPianoRolls);
-  
-  // Handle note changes - apply through history actions
+  console.log('Piano Roll Windows - Render (Individual Selectors) - Open IDs:', openTrackIds);
+
   const handleNotesChange = useCallback(async (trackId: string, newNotes: NoteState[]) => {
-    if (!store) return;
-    
     const prevNotes = prevNotesByTrack[trackId] || [];
     const changes = diffNotes(prevNotes, newNotes);
-    
-    // Process each change and apply the appropriate history action
     for (const change of changes) {
       try {
         switch (change.type) {
-          case 'add':
-            await createNoteWithHistory(store, trackId, change.note);
-            break;
-          case 'delete':
-            await deleteNoteWithHistory(store, trackId, change.id, change.note);
-            break;
+          case 'add': await addMidiNote(trackId, change.note); break;
+          case 'delete': await removeMidiNote(trackId, change.id); break;
           case 'move':
-            if (change.oldNote) {
-              await moveNoteWithHistory(store, trackId, change.id, change.oldNote, change.note);
-            }
-            break;
-          case 'resize':
-            if (change.oldNote) {
-              await resizeNoteWithHistory(store, trackId, change.id, change.oldNote, change.note);
-            }
-            break;
+          case 'resize': if (change.oldNote) { await updateMidiNote(trackId, change.note); } break;
         }
-      } catch (error) {
-        console.error(`Error processing ${change.type} operation:`, error);
-      }
+      } catch (error) { console.error(`Error processing ${change.type} op:`, error); }
     }
-    
-    // Update previous notes for this track for next comparison
-    setPrevNotesByTrack(prev => ({
-      ...prev,
-      [trackId]: [...newNotes] // Create a new array to avoid reference issues
-    }));
-  }, [store, prevNotesByTrack]);
-  
-  // Handle note preview playback
+    setPrevNotesByTrack(prev => ({ ...prev, [trackId]: [...newNotes] }));
+  }, [prevNotesByTrack, addMidiNote, removeMidiNote, updateMidiNote]);
+
   const handleNotePreview = useCallback((trackId: string, midiNote: number, isOn: boolean) => {
-    if (!store) return;
-    
-    const track = tracks.find(t => t.id === trackId);
-    const instrumentManager = store.getInstrumentManager();
+    const instrumentManager = store?.getInstrumentManager(); 
     if (!instrumentManager) return;
-    
-    const instrumentId = track?.instrumentId || 'default';
-    
-    if (isOn) {
-      instrumentManager.playNote(instrumentId, midiNote);
-    } else {
-      instrumentManager.stopNote(instrumentId, midiNote);
-    }
+    const track = tracks.find(t => t.id === trackId);
+    const instrumentId = (track?.track as MidiTrack)?.instrument_id || 'default';
+    if (isOn) { instrumentManager.playNote(instrumentId, midiNote); }
+    else { instrumentManager.stopNote(instrumentId, midiNote); }
   }, [store, tracks]);
-  
-  // Reset track notes when MidiManager updates
+
+  // Effect to initialize prevNotesByTrack for newly opened rolls
   useEffect(() => {
-    if (!store) return;
-    
-    const midiManager = store.getMidiManager();
-    if (!midiManager) return;
-    
-    // Subscribe to updates from MidiManager
-    const unsubscribe = midiManager.subscribeToAllUpdates((updatedTrackId, updatedNotes) => {
-      // Convert notes to PianoRoll2 format
-      const convertedNotes = updatedNotes.map(convertToNoteState);
-      
-      // Update the tracked notes for this track
-      setPrevNotesByTrack(prev => ({
-        ...prev,
-        [updatedTrackId]: convertedNotes
-      }));
+    const midiManager = store?.getMidiManager();
+    if (!midiManager || openTrackIds.length === 0) return; // Exit if no manager or no open rolls
+
+    let stateUpdateNeeded = false;
+    const updates: Record<string, NoteState[]> = {};
+
+    openTrackIds.forEach(trackId => {
+      if (!prevNotesByTrack[trackId]) { // Check if state for this ID needs initialization
+        const currentNotes = midiManager.getTrackNotes(trackId) || [];
+        const pianoRollNotes = currentNotes.map(convertToNoteState);
+        updates[trackId] = pianoRollNotes;
+        stateUpdateNeeded = true;
+        console.log(`Initializing prevNotesByTrack for new trackId: ${trackId}`);
+      }
     });
-    
-    return () => {
-      unsubscribe();
-    };
-  }, [store]);
-  
-  if (openTrackIds.length === 0) {
-    return null;
-  }
-  
-  console.log('===== PianoRollWindows RENDER =====');
-  console.log('openTrackIds:', openTrackIds);
+
+    if (stateUpdateNeeded) {
+      setPrevNotesByTrack(prev => ({ ...prev, ...updates }));
+    }
+  // Depend on the list of open IDs and the store instance
+  }, [openTrackIds, store, prevNotesByTrack]); 
+
+  // Keep MidiManager useEffect commented out
+  /* useEffect(() => { ... }, [store]); */
+
+  if (openTrackIds.length === 0) { return null; }
   
   return (
     <>
       {openTrackIds.map(trackId => {
-        console.log(`Rendering piano roll for track: ${trackId}`);
-        
         const track = tracks.find(t => t.id === trackId);
-        console.log('Found track:', track);
-        
         const midiManager = store?.getMidiManager();
-        const notes = midiManager?.getTrackNotes(trackId) || [];
-        console.log(`Notes for track ${trackId}:`, notes.length);
-        
-        const pianoRollNotes = notes.map(convertToNoteState);
-        console.log('Converted notes:', pianoRollNotes.length);
+        const currentNotes = midiManager?.getTrackNotes(trackId) || [];
+        const pianoRollNotes = currentNotes.map(convertToNoteState);
 
-        console.log('converted notes:', pianoRollNotes);
-        
-        // Initialize notes tracking if not already set
-        if (!prevNotesByTrack[trackId]) {
-          console.log('Initializing prevNotesByTrack for track:', trackId);
-          setPrevNotesByTrack(prev => ({
-            ...prev,
-            [trackId]: pianoRollNotes
-          }));
+        if (!track) {
+           console.warn(`PianoRollWindows: Track data for ID ${trackId} not found render.`);
+           return null; 
         }
-        
-        // Create an event handler for the window close button
-        // Since PianoRoll2 doesn't provide a direct onClose callback,
-        // we need to handle this manually when a window is closed by the user
-        const handleCloseCallback = () => {
-          console.log('Should close piano roll for track:', trackId);
-          closePianoRoll(trackId);
-        };
-        
-        // Note: ESC key handling is now moved to a top-level effect
-        console.log('About to render PianoRoll component for track:', trackId);
-        
-        try {
-          // Now that we know the component container works, let's try with the real PianoRoll
-          // But with a div wrapper that ensures it's positioned correctly
-          return (
-            <div 
-              key={`piano-roll-wrapper-${trackId}`}
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                zIndex: 9999,
-                pointerEvents: 'none' // Add this line to allow clicks to pass through
-              }}
-            >
-              <PianoRoll
-                key={`piano-roll-${trackId}`}
-                title={`Piano Roll - ${track?.name || 'Unknown Track'}`}
-                color={track?.index !== undefined ? getTrackColor(track.index) : getTrackColor(Math.abs(trackId.charCodeAt(0) % 9))}
-                initialNotes={pianoRollNotes}
-                onNotesChange={(newNotes) => handleNotesChange(trackId, newNotes)}
-                // Position in the center of the screen
-                initialX={Math.max(50, window.innerWidth / 2 - 420)}
-                initialY={Math.max(50, window.innerHeight / 2 - 250)}
-                initialWidth={840}
-                initialHeight={500}
-                contentWidth={5000}
-                keyboardWidth={60}
-                // Pass the scale notes if you have them
-                scaleNotes={[0, 2, 4, 5, 7, 9, 11]} // C Major scale
-                // Add the close handler
-                onClose={() => closePianoRoll(trackId)}
-              />
-            </div>
-          );
-        } catch (error) {
-          console.error('Error rendering PianoRoll:', error);
-          return <div key={`piano-roll-error-${trackId}`}>Error rendering piano roll: {String(error)}</div>;
-        }
+
+        const trackWithIndex = track as (CombinedTrack & { index?: number });
+        const trackColor = getTrackColor(trackWithIndex?.index ?? 0); 
+
+        return (
+          <div 
+            key={`piano-roll-wrapper-${trackId}`} 
+            style={{ /* Necessary wrapper styles */ 
+                position: 'fixed', 
+                zIndex: 9999, // Ensure it's on top
+                // Remove pointer-events: none if the wrapper shouldn't block interaction
+                // pointerEvents: 'none' 
+                // Position might be handled by PianoRoll component itself via initialX/Y
+                // top: 0, left: 0, width: '100%', height: '100%' // Example covering screen
+            }} 
+          >
+            <PianoRoll
+              key={`piano-roll-${trackId}`}
+              title={`Piano Roll - ${track?.name || 'Unknown Track'}`}
+              color={trackColor} 
+              initialNotes={pianoRollNotes} 
+              onNotesChange={(newNotes) => handleNotesChange(trackId, newNotes)}
+              // Restore necessary props
+              initialX={Math.max(50, window.innerWidth / 2 - 420)}
+              initialY={Math.max(50, window.innerHeight / 2 - 250)}
+              initialWidth={840}
+              initialHeight={500}
+              contentWidth={5000} 
+              keyboardWidth={60} 
+              scaleNotes={[]} 
+              onClose={() => closePianoRoll(trackId)}
+            />
+          </div>
+        );
       })}
     </>
   );
-};
+});
 
 export default PianoRollWindows;

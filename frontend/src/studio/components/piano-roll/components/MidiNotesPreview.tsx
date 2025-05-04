@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box } from '@mui/material';
-import { Note } from '../../../core/types/note';
-import { useStudioStore } from '../../../stores/useStudioStore';
+import { Note } from '../../../../types/note';
 import { scaleToPreview } from '../../../utils/noteConversion';
 
 interface MidiNotesPreviewProps {
@@ -9,13 +8,15 @@ interface MidiNotesPreviewProps {
   width: number;
   height: number;
   trackColor: string;
+  notes: Note[];
 }
 
 const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({ 
   trackId, 
   width, 
   height,
-  trackColor
+  trackColor,
+  notes
 }) => {
   // Memoize the random heights so they don't change on every render
   const randomHeights = useMemo(() => 
@@ -24,8 +25,6 @@ const MidiNotesPreview: React.FC<MidiNotesPreviewProps> = ({
   );
 
   // Get notes from the MidiManager through store
-  const { store } = useStudioStore();
-  const notes = store?.getMidiManager().getTrackNotes(trackId) || [];
   
   // Find the range of notes for better scaling
   let minNoteRow = 127;

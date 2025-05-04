@@ -1615,7 +1615,7 @@ export const PianoRoll: FC<PianoRollProps> = ({
 
   // Add state to track the most recently used note width in ticks (not pixels)
   // Default to one beat (quarter note)
-  const [lastNoteWidth, setLastNoteWidth] = useState(PULSES_PER_QUARTER_NOTE);
+  const [lastNoteWidth, setLastNoteWidth] = useState<number>(PULSES_PER_QUARTER_NOTE);
 
   // Convert NoteState objects to visual Note objects
   const visualNotes = useMemo(() => {

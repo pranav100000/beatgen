@@ -1,3 +1,5 @@
+from datetime import datetime
+import uuid
 from fastapi import APIRouter, Depends, status, HTTPException
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, EmailStr
@@ -12,13 +14,13 @@ logger = get_api_logger("users")
 
 class UserProfile(BaseModel):
     """User profile data"""
-    id: str
+    id: uuid.UUID
     email: EmailStr
     username: Optional[str] = None
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
 class UpdateProfileRequest(BaseModel):
     """Request model for updating user profile"""

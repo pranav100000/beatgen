@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Drum Sample</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="file"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box; /* Prevents padding from adding to width */
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #output-command {
+            margin-top: 20px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap; /* Wrap long commands */
+            word-wrap: break-word; /* Break long words/paths */
+            font-family: monospace;
+        }
+        .instructions {
+             margin-top: 10px;
+             font-size: 0.9em;
+             color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>Add Drum Sample</h1>
+    <p>Use this form to generate the command needed to run the `add_drumkits.py` script.</p>
+
+    <form id="drum-sample-form">
+        <div class="form-group">
+            <label for="file">Sample File:</label>
+            <input type="file" id="file" name="file" required>
+        </div>
+
+        <div class="form-group">
+            <label for="kit-name">Kit Name:</label>
+            <input type="text" id="kit-name" name="kit-name" placeholder="e.g., 808 Classics" required>
+        </div>
+
+        <div class="form-group">
+            <label for="category">Category:</label>
+            <input type="text" id="category" name="category" placeholder="e.g., Electronic, Acoustic, HipHop" required>
+            <!-- Optional: Use a select dropdown if categories are predefined -->
+            <!-- 
+            <select id="category" name="category" required>
+                <option value="">--Select Category--</option>
+                <option value="Electronic">Electronic</option>
+                <option value="Acoustic">Acoustic</option>
+                <option value="HipHop">HipHop</option>
+                <option value="Experimental">Experimental</option>
+            </select> 
+            -->
+        </div>
+
+        <div class="form-group">
+            <label for="type">Type:</label>
+            <input type="text" id="type" name="type" placeholder="e.g., Kick, Snare, HiHat Open, Rimshot" required>
+            <!-- Optional: Use a select dropdown for common types -->
+            
+            <select id="type" name="type" required>
+                 <option value="">--Select Type--</option>
+                 <option value="Kick">Kick</option>
+                 <option value="Snare">Snare</option>
+                 <option value="HiHat Closed">HiHat Closed</option>
+                 <option value="HiHat Open">HiHat Open</option>
+                 <option value="Clap">Clap</option>
+                 <option value="Rimshot">Rimshot</option>
+                 <option value="Cymbal">Cymbal</option>
+                 <option value="Tom">Tom</option>
+                 <option value="Percussion">Percussion</option>
+            </select> 
+           
+        </div>
+
+        <button type="button" id="generate-btn">Generate Command</button>
+    </form>
+
+    <div id="output-command" style="display: none;">
+        <h2>Generated Command:</h2>
+        <p class="instructions">Copy the command below and run it in your terminal from the project root directory (`/Users/pranavsharan/Developer/beatgen`). Make sure your Python environment is active.</p>
+        <pre><code id="command-output"></code></pre>
+    </div>
+
+    <script>
+        document.getElementById('generate-btn').addEventListener('click', () => {
+            const fileInput = document.getElementById('file');
+            const kitName = document.getElementById('kit-name').value.trim();
+            const category = document.getElementById('category').value.trim();
+            const type = document.getElementById('type').value.trim();
+            const outputDiv = document.getElementById('output-command');
+            const commandOutput = document.getElementById('command-output');
+
+            // Basic validation
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select a sample file.');
+                return;
+            }
+            if (!kitName) {
+                alert('Please enter a Kit Name.');
+                return;
+            }
+            if (!category) {
+                alert('Please enter a Category.');
+                return;
+            }
+            if (!type) {
+                alert('Please enter a Type.');
+                return;
+            }
+
+            // Note: We can only get the file *name*, not the full path due to browser security.
+            // The user will need to replace 'PLACEHOLDER_FILE_PATH' with the actual path.
+            const fileName = fileInput.files[0].name;
+            const placeholderFilePath = `PLACEHOLDER_PATH_TO/${fileName}`; // User needs to replace this
+
+            // Construct the command string, escaping potential spaces in args
+            const command = `python backend/scripts/add_drumkits.py \
+    --file "${placeholderFilePath}" \
+    --kit-name "${kitName}" \
+    --category "${category}" \
+    --type "${type}"`;
+
+            commandOutput.textContent = command;
+            outputDiv.style.display = 'block';
+            
+            // Add more specific instruction about the placeholder path
+            const instructions = outputDiv.querySelector('.instructions');
+            instructions.innerHTML = `Copy the command below and run it in your terminal from the project root directory (<code>/Users/pranavsharan/Developer/beatgen</code>). <strong style="color: red;">You MUST replace <code>"${placeholderFilePath}"</code> with the actual full path to your selected file (<code>${fileName}</code>).</strong> Make sure your Python environment is active.`;
+        });
+    </script>
+
+</body>
+</html> 

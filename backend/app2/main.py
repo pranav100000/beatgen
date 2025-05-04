@@ -1,13 +1,19 @@
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 import logging
 import traceback
+import uuid
 
 from app2.core.config import settings
 from app2.core.logging import get_logger
 from app2.core.exceptions import AppException
 from app2.api.routes import auth, users, projects, sounds, soundfonts
+from app2.infrastructure.database.sqlmodel_client import create_db_and_tables
+from app2.api.routes import assistant_streaming
+from app2.api.routes import drum_samples
 
 # Configure logging
 logger = get_logger("beatgen.main")
@@ -30,6 +36,20 @@ app.add_middleware(
     allow_methods=settings.cors.ALLOW_METHODS,
     allow_headers=settings.cors.ALLOW_HEADERS,
 )
+
+# Initialize SQLModel tables on startup
+@app.on_event("startup")
+def init_db():
+    """Initialize the database and create tables"""
+    logger.info("Initializing database and creating tables...")
+    try:
+        create_db_and_tables()
+        logger.info("Database initialization complete")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {str(e)}")
+        logger.error(traceback.format_exc())
+        # Continue running even if database initialization fails
+        # This allows the app to start and potentially use other features
 
 # Global exception handler for AppExceptions
 @app.exception_handler(AppException)
@@ -69,6 +89,8 @@ app.include_router(users.router, prefix=f"{settings.app.API_PREFIX}/users", tags
 app.include_router(projects.router, prefix=f"{settings.app.API_PREFIX}/projects", tags=["projects"])
 app.include_router(sounds.router, prefix=f"{settings.app.API_PREFIX}/sounds", tags=["sounds"])
 app.include_router(soundfonts.router, prefix=f"{settings.app.API_PREFIX}/soundfonts", tags=["soundfonts"])
+app.include_router(drum_samples.router, prefix=f"{settings.app.API_PREFIX}/drum-samples", tags=["drum_samples"])
+app.include_router(assistant_streaming.router, prefix=f"{settings.app.API_PREFIX}/assistant", tags=["assistant"])
 
 # Root endpoint
 @app.get("/")

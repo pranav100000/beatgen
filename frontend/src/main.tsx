@@ -1,6 +1,5 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
@@ -17,19 +16,8 @@ import Studio from './studio/Studio';
 
 // Import AuthProvider
 import { AuthProvider } from './platform/auth/auth-context';
-
-// Create custom theme to match the original app
-const theme = createTheme({
-  typography: {
-    fontFamily: '"Sen", sans-serif',
-  },
-  palette: {
-    mode: 'dark',
-    background: {
-      default: '#000000'
-    }
-  }
-});
+// Import our custom Theme Provider
+import { AppThemeProvider } from './platform/theme/ThemeContext';
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -45,7 +33,6 @@ const queryClient = new QueryClient({
 const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
-  // Add React Query context for data fetching
   context: {
     queryClient,
   },
@@ -64,9 +51,9 @@ if (document.getElementById('root')) {
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <ThemeProvider theme={theme}>
+          <AppThemeProvider>
             <RouterProvider router={router} />
-          </ThemeProvider>
+          </AppThemeProvider>
         </AuthProvider>
       </QueryClientProvider>
     </React.StrictMode>
@@ -101,9 +88,9 @@ const mountStudio = (elementId: string) => {
         // Using StrictMode in production can cause double-mounting, which might 
         // contribute to cleanup issues
         <AuthProvider>
-          <ThemeProvider theme={theme}>
+          <AppThemeProvider>
             <Studio />
-          </ThemeProvider>
+          </AppThemeProvider>
         </AuthProvider>
       );
       

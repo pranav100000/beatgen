@@ -6,11 +6,13 @@ import {
   Button,
   IconButton,
   CircularProgress,
-  Alert
+  Alert,
+  Divider
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import GoogleIcon from '@mui/icons-material/Google';
 import { useState } from 'react';
-import { useAuth } from '../core/auth/auth-context';
+import { useAuth } from '../auth/auth-context';
 
 const style = {
   position: 'absolute',
@@ -34,9 +36,10 @@ export default function LoginModal({ open, onClose, onSignupClick }: LoginModalP
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +59,20 @@ export default function LoginModal({ open, onClose, onSignupClick }: LoginModalP
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    setError(null);
+    
+    try {
+      await signInWithGoogle();
+      // Will redirect to Google
+    } catch (err) {
+      setError('Failed to connect to Google');
+      console.error(err);
+      setIsGoogleLoading(false);
     }
   };
   
@@ -121,6 +138,28 @@ export default function LoginModal({ open, onClose, onSignupClick }: LoginModalP
             }}
           >
             {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Log In'}
+          </Button>
+          
+          <Divider sx={{ my: 2 }}>or</Divider>
+          
+          <Button 
+            variant="outlined" 
+            startIcon={<GoogleIcon />}
+            onClick={handleGoogleSignIn}
+            disabled={isGoogleLoading || isLoading}
+            fullWidth
+            data-oauth-provider="google"
+            sx={{ 
+              mt: 1,
+              borderColor: '#1a237e',
+              color: '#1a237e',
+              '&:hover': {
+                borderColor: '#000051',
+                bgcolor: 'rgba(26, 35, 126, 0.04)'
+              }
+            }}
+          >
+            {isGoogleLoading ? <CircularProgress size={24} color="inherit" /> : 'Continue with Google'}
           </Button>
 
           <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>

@@ -77,8 +77,8 @@ def transform_bars_to_instrument_format(data: Dict[str, Any], instrument: dict, 
             # Create MIDI note
             midi_note = {
                 "pitch": current_pitch,
-                "start": current_time * 240,
-                "duration": note_duration * 240,
+                "start": current_time * 480,
+                "duration": note_duration * 480,
                 "velocity": velocity
             }
             
@@ -99,7 +99,7 @@ def transform_bars_to_instrument_format(data: Dict[str, Any], instrument: dict, 
         "instrument_id": instrument.id,
         "storage_key": instrument.storage_key,
         "name": instrument.name,
-        "notes": midi_notes
+        "notes": {"notes": midi_notes}
     }
     
     print("RESULT:", result)
@@ -142,8 +142,8 @@ def transform_chord_progression_to_instrument_format(chord_progression: str, ins
             for pitch in chord_notes:
                 midi_note = {
                     "pitch": pitch,
-                    "start": current_time * 240,
-                    "duration": chord_duration * 240,
+                    "start": current_time * 480,
+                    "duration": chord_duration * 480,
                     "velocity": 70  # Default velocity for chords
                 }
                 midi_notes.append(midi_note)
@@ -162,7 +162,7 @@ def transform_chord_progression_to_instrument_format(chord_progression: str, ins
         "instrument_id": instrument.id,
         "storage_key": instrument.storage_key,
         "name": instrument.name,
-        "notes": midi_notes
+        "notes": {"notes": midi_notes}
     }
     
     return result

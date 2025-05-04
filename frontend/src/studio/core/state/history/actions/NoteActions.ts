@@ -1,7 +1,6 @@
-import { Store } from '../../store';
-import { Note } from '../../../types/note';
-import { NoteAction } from './BaseAction';
-
+import { Note } from '../../../../../types/note'; // Corrected path
+import { NoteAction, BaseAction } from './BaseAction';
+import { GetFn } from '../../../../stores/types';
 /**
  * Action for adding a note without callbacks
  */
@@ -10,17 +9,16 @@ export class AddNoteAction extends NoteAction {
     private note: Note;
 
     constructor(
-        store: Store,
+        get: GetFn,
         trackId: string,
         noteId: string,
         note: Note
     ) {
-        super(store, trackId, noteId);
+        super(get, trackId, noteId);
         this.note = note;
     }
 
     async execute(): Promise<void> {
-        // Get the MIDI manager
         const midiManager = this.store.getMidiManager();
         if (!midiManager) {
             console.error(`${this.type}: MidiManager not available`);
@@ -28,15 +26,7 @@ export class AddNoteAction extends NoteAction {
         }
 
         try {
-            // Ensure the note has trackId and correct id
-            const noteWithId = {
-                ...this.note,
-                id: parseInt(this.noteId),
-                trackId: this.trackId
-            };
-            
-            // Add note using MidiManager - central source of truth
-            await midiManager.addNoteToTrack(this.trackId, noteWithId);
+            await midiManager.addNoteToTrack(this.trackId, { ...this.note, id: parseInt(this.noteId) });
             
             this.log('Execute', {
                 trackId: this.trackId,
@@ -51,7 +41,6 @@ export class AddNoteAction extends NoteAction {
     }
 
     async undo(): Promise<void> {
-        // Get the MIDI manager
         const midiManager = this.store.getMidiManager();
         if (!midiManager) {
             console.error(`${this.type}: MidiManager not available`);
@@ -59,7 +48,6 @@ export class AddNoteAction extends NoteAction {
         }
 
         try {
-            // Remove the note by ID
             await midiManager.removeNoteFromTrack(this.trackId, parseInt(this.noteId));
             
             this.log('Undo', {
@@ -80,17 +68,16 @@ export class DeleteNoteAction extends NoteAction {
     private note: Note;
 
     constructor(
-        store: Store,
+        get: GetFn,
         trackId: string,
         noteId: string,
         note: Note
     ) {
-        super(store, trackId, noteId);
-        this.note = { ...note }; // Store a copy for undo
+        super(get, trackId, noteId);
+        this.note = { ...note };
     }
 
     async execute(): Promise<void> {
-        // Get the MIDI manager
         const midiManager = this.store.getMidiManager();
         if (!midiManager) {
             console.error(`${this.type}: MidiManager not available`);
@@ -98,7 +85,6 @@ export class DeleteNoteAction extends NoteAction {
         }
 
         try {
-            // Remove the note by ID
             await midiManager.removeNoteFromTrack(this.trackId, parseInt(this.noteId));
             
             this.log('Execute', {
@@ -111,7 +97,6 @@ export class DeleteNoteAction extends NoteAction {
     }
 
     async undo(): Promise<void> {
-        // Get the MIDI manager
         const midiManager = this.store.getMidiManager();
         if (!midiManager) {
             console.error(`${this.type}: MidiManager not available`);
@@ -119,7 +104,6 @@ export class DeleteNoteAction extends NoteAction {
         }
 
         try {
-            // Restore the note
             await midiManager.addNoteToTrack(this.trackId, this.note);
             
             this.log('Undo', {
@@ -145,21 +129,20 @@ export class MoveNoteAction extends NoteAction {
     private noteData: Note;
 
     constructor(
-        store: Store,
+        get: GetFn,
         trackId: string,
         noteId: string,
         oldPosition: { column: number, row: number },
         newPosition: { column: number, row: number },
         noteData: Note
     ) {
-        super(store, trackId, noteId);
+        super(get, trackId, noteId);
         this.oldPosition = oldPosition;
         this.newPosition = newPosition;
-        this.noteData = { ...noteData }; // Save a copy of the original note
+        this.noteData = { ...noteData };
     }
 
     private async updateNotePosition(position: { column: number, row: number }): Promise<void> {
-        // Get the MIDI manager
         const midiManager = this.store.getMidiManager();
         if (!midiManager) {
             console.error(`${this.type}: MidiManager not available`);
@@ -167,7 +150,6 @@ export class MoveNoteAction extends NoteAction {
         }
 
         try {
-            // Create updated note with new position
             const updatedNote: Note = {
                 ...this.noteData,
                 id: parseInt(this.noteId),
@@ -176,7 +158,6 @@ export class MoveNoteAction extends NoteAction {
                 trackId: this.trackId
             };
             
-            // Update the note through MidiManager
             await midiManager.updateNote(this.trackId, updatedNote);
         } catch (error) {
             console.error(`Error updating position of note ${this.noteId} in track ${this.trackId}:`, error);
@@ -216,7 +197,7 @@ export class ResizeNoteAction extends NoteAction {
     private newColumn?: number;
 
     constructor(
-        store: Store,
+        get: GetFn,
         trackId: string,
         noteId: string,
         oldLength: number,
@@ -225,16 +206,15 @@ export class ResizeNoteAction extends NoteAction {
         oldColumn?: number,
         newColumn?: number
     ) {
-        super(store, trackId, noteId);
+        super(get, trackId, noteId);
         this.oldLength = oldLength;
         this.newLength = newLength;
-        this.noteData = { ...noteData }; // Save a copy of the original note
+        this.noteData = { ...noteData };
         this.oldColumn = oldColumn;
         this.newColumn = newColumn;
     }
 
     private async updateNoteSize(length: number, column?: number): Promise<void> {
-        // Get the MIDI manager
         const midiManager = this.store.getMidiManager();
         if (!midiManager) {
             console.error(`${this.type}: MidiManager not available`);
@@ -242,7 +222,6 @@ export class ResizeNoteAction extends NoteAction {
         }
 
         try {
-            // Create updated note with new length and possibly new column
             const updatedNote: Note = {
                 ...this.noteData,
                 id: parseInt(this.noteId),
@@ -251,7 +230,6 @@ export class ResizeNoteAction extends NoteAction {
                 ...(column !== undefined && { column })
             };
             
-            // Update the note through MidiManager
             await midiManager.updateNote(this.trackId, updatedNote);
         } catch (error) {
             console.error(`Error resizing note ${this.noteId} in track ${this.trackId}:`, error);

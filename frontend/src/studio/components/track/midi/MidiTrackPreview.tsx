@@ -3,10 +3,10 @@ import { Box } from '@mui/material';
 import { useGridStore } from '../../../core/state/gridStore';
 import { GRID_CONSTANTS, getTrackColor } from '../../../constants/gridConstants';
 import { calculateMidiTrackWidth } from '../../../utils/trackWidthCalculators';
-import { useStudioStore } from '../../../stores/useStudioStore';
 import MidiNotesPreview from '../../piano-roll/components/MidiNotesPreview';
 import BaseTrackPreview from '../base/BaseTrackPreview';
 import { TrackPreviewProps } from '../types';
+import { useStudioStore } from '../../../stores/studioStore';
 
 /**
  * MidiTrackPreview is a specialized track component for MIDI tracks.
@@ -89,6 +89,7 @@ export const MidiTrackPreview: React.FC<TrackPreviewProps> = (props) => {
         width={fullContentWidth} // Always use the full content width
         height={GRID_CONSTANTS.trackHeight - 6}
         trackColor={trackColor}
+        notes={trackNotes}
       />
     </>
   );

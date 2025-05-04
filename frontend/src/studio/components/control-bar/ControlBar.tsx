@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, IconButton, Button, Typography, TextField, Menu, MenuItem, Tooltip, Switch, FormControlLabel } from '@mui/material';
+import { Box, IconButton, Button, Typography, TextField, Menu, MenuItem, Tooltip, Switch, FormControlLabel, useTheme } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
@@ -15,7 +15,7 @@ import { TimeDisplay } from './TimeDisplay';
 import KeySelector from './KeySelector';
 import { ArrowBack, ChatBubbleOutlineRounded, ChatBubbleRounded } from '@mui/icons-material';
 import { SaveProjectButton } from './SaveProjectButton';
-import { useStudioStore } from '../../stores/useStudioStore';
+import { useStudioStore } from '../../stores/studioStore';
 
 interface StudioControlBarProps {
     canUndo: boolean;
@@ -71,29 +71,34 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
     onZoomOut,
     onChatToggle,
 }) => {
+    const theme = useTheme();
+
     return (
         <Box sx={{
-            display: 'flex',
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
             alignItems: 'center',
+            width: '100%',
+            gap: 2,
             p: 1,
-            borderBottom: '1px solid #333',
+            borderBottom: `1px solid ${theme.palette.divider}`,
             position: 'relative',
             zIndex: 1300,
+            bgcolor: 'background.paper',
+            color: 'text.primary'
         }}>
             {/* Left section */}
             <Box sx={{ 
-                display: 'flex', 
+                justifySelf: 'start',
+                display: 'flex',
                 alignItems: 'center',
                 gap: 2,
-                flex: '1 1 0',
-                minWidth: 0,
-                maxWidth: '40%', // Prevent left section from taking too much space
             }}>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <Tooltip title="Go back to Projects" arrow>
                         <IconButton
                             size="small"
-                            sx={{ color: 'white' }}
+                            color="inherit"
                             onClick={() => {
                                 window.location.href = '/home';
                             }}
@@ -103,7 +108,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                     </Tooltip>
                     <IconButton
                         size="small"
-                        sx={{ color: canUndo ? 'white' : '#666' }}
+                        color="inherit"
                         onClick={onUndo}
                         disabled={!canUndo}
                         title="Undo"
@@ -112,7 +117,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                     </IconButton>
                     <IconButton
                         size="small"
-                        sx={{ color: canRedo ? 'white' : '#666' }}
+                        color="inherit"
                         onClick={onRedo}
                         disabled={!canRedo}
                         title="Redo"
@@ -124,7 +129,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                 <Box sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    bgcolor: '#1E1E1E',
+                    bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
                     borderRadius: 1,
                     px: 2,
                     py: 0.5,
@@ -148,14 +153,14 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <IconButton
                         size="small"
-                        sx={{ color: 'white' }}
+                        color="inherit"
                         onClick={onPlayPause}
                     >
                         {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
                     </IconButton>
                     <IconButton
                         size="small"
-                        sx={{ color: 'white' }}
+                        color="inherit"
                         onClick={onStop}
                     >
                         <SkipPreviousIcon />
@@ -164,40 +169,17 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
             </Box>
 
             {/* Center section - Project Title */}
-            <Box sx={{
-                flex: '0 0 250px', // Slightly reduced fixed width
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                px: 3, // Increased padding
-                mx: 2, // Added margin
-            }}>
+            <Box>
                 <TextField
                     variant="standard"
                     value={projectTitle}
                     onChange={onTitleChange}
+                    InputProps={{ disableUnderline: true }} 
+                    inputProps={{ style: { textAlign: 'center' } }} 
                     sx={{
                         width: '100%',
-                        '& input': {
-                            color: 'white',
-                            textAlign: 'center',
-                            fontSize: '1rem',
-                            fontWeight: 500,
-                            padding: '4px 8px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            '&:hover': {
-                                backgroundColor: 'rgba(255, 255, 255, 0.05)'
-                            }
-                        },
-                        '& .MuiInput-underline:before': {
-                            borderBottom: 'none'
-                        },
-                        '& .MuiInput-underline:hover:before': {
-                            borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
-                        },
-                        '& .MuiInput-underline:after': {
-                            borderBottom: '2px solid white'
+                        '& .MuiInputBase-input': { 
+                           color: theme.palette.text.primary
                         }
                     }}
                 />
@@ -205,26 +187,30 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
 
             {/* Right section */}
             <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                flex: '1 1 0',
-                justifyContent: 'flex-end',
-                minWidth: 0,
-                maxWidth: '40%', // Prevent right section from taking too much space
+                justifySelf: 'end',
+                paddingRight: 2,
             }}>
                 <Box sx={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1
                 }}>
-                    <IconButton size="small" sx={{ color: 'white' }} onClick={onZoomIn}>
+                    <IconButton size="small" color="inherit" onClick={onZoomIn}>
                         <ZoomInIcon />
                     </IconButton>
-                    <Box sx={{ color: "white", fontWeight: "bold", backgroundColor: "#333", minWidth: 40, textAlign: "center", border: "1px solid rgba(255, 255, 255, 0.2)", padding: "4px 4px", borderRadius: "6px" }}>
+                    <Box sx={{ 
+                        color: "text.primary",
+                        fontWeight: "bold", 
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
+                        minWidth: 40, 
+                        textAlign: "center", 
+                        border: `1px solid ${theme.palette.divider}`,
+                        padding: "4px 4px", 
+                        borderRadius: "6px" 
+                    }}>
                         {zoomLevel.toFixed(1)}x
                     </Box>
-                    <IconButton size="small" sx={{ color: 'white' }} onClick={onZoomOut}>
+                    <IconButton size="small" color="inherit" onClick={onZoomOut}>
                         <ZoomOutIcon />
                     </IconButton>
                     <TimeDisplay
@@ -243,7 +229,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                     />}
                     <IconButton
                         size="small"
-                        sx={{ color: 'white' }}
+                        color="inherit"
                         onClick={onChatToggle}
                     >
                         {isChatOpen ? <ChatBubbleRounded /> : <ChatBubbleOutlineRounded />}

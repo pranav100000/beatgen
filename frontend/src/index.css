@@ -4,10 +4,13 @@
 
 body {
   margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #000000;
-  color: #ffffff;
+  /* background-color: #ffffff; */ /* Removed - Let MUI theme handle */
+  /* color: #000000; */ /* Removed - Let MUI theme handle */
 }
 
 code {
@@ -17,6 +20,7 @@ code {
 html, body, #root {
   height: 100%;
   width: 100%;
+  /* background-color: #ffffff; */ /* Removed - Let MUI theme handle */
 }
 
 /* Fix for MUI components */

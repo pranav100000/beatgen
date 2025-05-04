@@ -9,8 +9,11 @@ from typing import Dict, Any, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
 import asyncio
+
+from app2.core.logging import get_api_logger
+from clients.perplexity_client import PerplexityClient
 # Set up detailed logging with DEBUG level
-logger = logging.getLogger(__name__)
+logger = get_api_logger("music_researcher")
 logger.setLevel(logging.DEBUG)
 
 # If no handlers, add one to ensure logs are visible
@@ -43,12 +46,7 @@ class MusicResearcher:
         Args:
             api_key: Perplexity API key. If not provided, uses PERPLEXITY_API_KEY env variable.
         """
-        self.api_key = api_key or os.environ.get("PERPLEXITY_API_KEY")
-        if not self.api_key:
-            logger.warning("Perplexity API key not provided. Research enhancement will be disabled.")
-        else:
-            self.client = OpenAI(api_key=self.api_key, base_url="https://api.perplexity.ai")
-            logger.debug(f"Initialized OpenAI client with Perplexity base URL")
+        self.perplexity_client = PerplexityClient()
         
     async def enhance_description(self, description: str) -> Dict[str, Any]:
         """
@@ -61,12 +59,6 @@ class MusicResearcher:
             Dictionary with original description and enhanced content
         """
         logger.debug(f"enhance_description called with: {description[:50]}...")
-        
-        # Return unenhanced if no API key
-        if not self.api_key:
-            print(f"[DIRECT PRINT] Skipping research enhancement (no API key)")
-            logger.info("Skipping research enhancement (no API key)")
-            return {"original": description, "enhanced": None}
         
         try:
             # Research the music style
@@ -93,6 +85,11 @@ class MusicResearcher:
         logger.debug(f"Beginning research_chord_progression for: {description[:50]}...")
         print(f"[DIRECT PRINT] Beginning research_chord_progression for: {description[:50]}...")
         return await self._research_chord_progression(description)
+    
+    async def research_drum_sounds(self, description: str) -> str:
+        """Research drum sounds using Perplexity."""
+        logger.debug(f"Beginning research_drum_sounds for: {description[:50]}...")
+        return await self._research_drum_sounds(description)
     
     async def _research_music(self, description: str) -> str:
         """Research musical characteristics using Perplexity."""
@@ -126,25 +123,9 @@ class MusicResearcher:
             print(f"[DIRECT PRINT] Inside _research_music: Setting up async execution for Perplexity API call")
             logger.debug("Setting up async execution for Perplexity API call")
             
-            # Define the function to run in the executor
-            def call_perplexity():
-                print(f"[DIRECT PRINT] Inside executor: Making Perplexity API call")
-                logger.debug("Inside executor: Making Perplexity API call")
-                try:
-                    return self.client.chat.completions.create(
-                        model="sonar-pro",
-                        messages=messages,
-                        temperature=0.1,
-                        max_tokens=1000
-                    )
-                except Exception as e:
-                    print(f"[DIRECT PRINT] Error inside executor: {str(e)}")
-                    logger.error(f"Error inside executor: {str(e)}")
-                    raise
-            
             # Run the synchronous function in the default executor
             logger.debug("Submitting API call to executor")
-            response = await asyncio.get_event_loop().run_in_executor(None, call_perplexity)
+            response = await asyncio.get_event_loop().run_in_executor(None, self.perplexity_client.call_perplexity, messages)
             
             logger.debug("Got response from Perplexity")
             result = response.choices[0].message.content
@@ -187,25 +168,9 @@ class MusicResearcher:
             print(f"[DIRECT PRINT] Inside _research_chord_progression: Setting up async execution for Perplexity API call")
             logger.debug("Setting up async execution for Perplexity API call")
             
-            # Define the function to run in the executor
-            def call_perplexity():
-                print(f"[DIRECT PRINT] Inside executor: Making Perplexity API call")
-                logger.debug("Inside executor: Making Perplexity API call")
-                try:
-                    return self.client.chat.completions.create(
-                        model="sonar-pro",
-                        messages=messages,
-                        temperature=0.1,
-                        max_tokens=1000
-                    )
-                except Exception as e:
-                    print(f"[DIRECT PRINT] Error inside executor: {str(e)}")
-                    logger.error(f"Error inside executor: {str(e)}")
-                    raise
-            
             # Run the synchronous function in the default executor
             logger.debug("Submitting API call to executor")
-            response = await asyncio.get_event_loop().run_in_executor(None, call_perplexity)
+            response = await asyncio.get_event_loop().run_in_executor(None, self.perplexity_client.call_perplexity, messages)
             
             logger.debug("Got response from Perplexity")
             result = response.choices[0].message.content
@@ -217,7 +182,43 @@ class MusicResearcher:
             logger.error("Exception details:", exc_info=True)
             raise
         
+    async def _research_drum_sounds(self, description: str) -> str:
+        """Research drum sounds using Perplexity."""
+        logger.debug(f"Beginning _research_drum_sounds for: {description[:50]}...")
         
-
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a music expert who has specific expertise in drum sounds. You are given a description of a musical style and you need to provide a list of drum sounds that are used in that style."
+            },
+            {
+                "role": "user",
+                "content": f"""As a music expert, provide key information about this musical style:
+                
+                "{description}"
+                
+                Please include:
+                - Most common drum sounds used in this style ranked by popularity
+                - Details about why each drum sound is used in this style
+                - References to specific tracks that use these drum sounds
+                
+                Format your response as a simple set of bullet points under clear headings.
+                Be specific and concise with factual information."""
+            }
+        ]
+        
+        try:
+            # Using asyncio to run the synchronous code in a non-blocking way
+            logger.debug("Setting up async execution for Perplexity API call")
+            response = await asyncio.get_event_loop().run_in_executor(None, self.perplexity_client.call_perplexity, messages)
+            
+            logger.debug("Got response from Perplexity")
+            result = response.choices[0].message.content
+            logger.debug(f"Extracted content, length: {len(result)} chars")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in _research_drum_sounds: {str(e)}")
+            logger.error("Exception details:", exc_info=True)
 # Create a singleton instance
 music_researcher = MusicResearcher()

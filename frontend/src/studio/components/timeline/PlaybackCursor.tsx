@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Box } from '@mui/material';
 import { GRID_CONSTANTS, calculateTimePosition } from '../../constants/gridConstants';
-import { useStudioStore } from '../../stores/useStudioStore';
+import { useStudioStore } from '../../stores/studioStore';
 
 interface PlaybackCursorProps {
   currentTime: number;  // Initial time, but component will manage its own updates

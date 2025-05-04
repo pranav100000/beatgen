@@ -7,7 +7,7 @@ import TrackControlsSidebar from './components/sidebar/TrackControlsSidebar';
 import { Timeline, TimelineRef } from './components/timeline/Timeline';
 import AddTrackMenu from './components/sidebar/AddTrackMenu';
 import { GRID_CONSTANTS } from './constants/gridConstants';
-import { useStudioStore } from './stores/useStudioStore';
+import { useStudioStore } from './stores/studioStore';
 
 // Import piano roll components
 import PianoRollWindows from './components/piano-roll-new/PianoRollWindows';
@@ -22,6 +22,8 @@ import { useHistorySync } from './hooks/useHistorySync';
 import StudioControlBar from './components/control-bar/ControlBar';
 import { DEFAULT_MEASURE_WIDTH, useGridStore } from './core/state/gridStore';
 import ChatWindow from './components/ai-assistant/ChatWindow';
+import DrumMachineWindows from './components/drum-machine/DrumMachineWindows';
+// import DrumMachineWindows from './components/drum-machine/DrumMachineWindows';
 
 // Studio Component Props
 interface StudioProps {
@@ -30,6 +32,9 @@ interface StudioProps {
 
 // Main Studio Component
 function Studio({ projectId }: StudioProps) {
+  // Add console log here
+  console.log('>>> Studio Component Rendering <<<'); 
+
   // Initialize DB session management
   useStudioDBSession();
   
@@ -57,9 +62,7 @@ function Studio({ projectId }: StudioProps) {
     initializeAudio,
     loadProject,
     setZoomLevel,
-    setProjectTitle,
-    setTimeSignature,
-    setKeySignature,
+    handleProjectParamChange,
     playPause,
     stop,
     setCurrentTime,
@@ -76,11 +79,14 @@ function Studio({ projectId }: StudioProps) {
     handleTrackNameChange,
     handleInstrumentChange,
     uploadAudioFile,
-    setBpm,
     setAddMenuAnchor,
     openDrumMachines,
     closeDrumMachine,
     setDrumPattern,
+    addSamplerTrackToDrumTrack,
+    removeSamplerTrack,
+    selectDrumTrackById,
+    selectSamplerTracksForDrumTrack,
     // Fetch MIDI actions
     addMidiNote,
     removeMidiNote,
@@ -101,6 +107,7 @@ function Studio({ projectId }: StudioProps) {
 
   // Initialize audio engine
   useEffect(() => {
+    console.log('>>> Studio useEffect <<<');
     // Always favor prop projectId over existingProjectId state
     const projectToLoad = projectId || existingProjectId;
     
@@ -135,16 +142,25 @@ function Studio({ projectId }: StudioProps) {
   const handleBpmChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newBpm = parseInt(event.target.value, 10);
     if (!isNaN(newBpm) && newBpm > 0 && newBpm <= 999) {
-      setBpm(newBpm);
+      // Use handleProjectParamChange instead of setBpm
+      handleProjectParamChange('bpm', newBpm);
     }
   };
 
   const handleTimeSignatureChange = (numerator?: number, denominator?: number) => {
     const [currentNumerator, currentDenominator] = timeSignature;
-    setTimeSignature(
-      numerator ?? currentNumerator,
-      denominator ?? currentDenominator
-    );
+    // Use handleProjectParamChange for both numerator and denominator
+    // Note: This assumes handleProjectParamChange can handle updating nested state or the store handles this logic.
+    // If it needs separate updates, this needs adjustment.
+    // For now, let's update them individually if provided.
+    if (numerator !== undefined) {
+      handleProjectParamChange('timeSignature', [numerator, currentDenominator]);
+    }
+    if (denominator !== undefined) {
+      // Get the potentially updated numerator before setting denominator
+      const updatedNumerator = numerator !== undefined ? numerator : currentNumerator;
+      handleProjectParamChange('timeSignature', [updatedNumerator, denominator]);
+    }
   };
 
   const handleZoomIn = () => {
@@ -164,7 +180,7 @@ function Studio({ projectId }: StudioProps) {
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setProjectTitle(event.target.value);
+    handleProjectParamChange('projectTitle', event.target.value);
   };
 
   // Handler to trigger file input for replacing track audio
@@ -233,8 +249,8 @@ function Studio({ projectId }: StudioProps) {
   return (
     <Box sx={{ 
       height: '100vh', 
-      bgcolor: '#000000', 
-      color: 'white',
+      bgcolor: 'background.default',
+      color: 'text.primary',
       display: 'flex',
       flexDirection: 'column',
     }}>
@@ -255,7 +271,7 @@ function Studio({ projectId }: StudioProps) {
         onRedo={redo}
         onBpmChange={handleBpmChange}
         onTimeSignatureChange={handleTimeSignatureChange}
-        onKeySignatureChange={setKeySignature}
+        onKeySignatureChange={(newKey) => handleProjectParamChange('keySignature', newKey)}
         onPlayPause={playPause}
         onStop={stop}
         onTitleChange={handleTitleChange}
@@ -275,7 +291,7 @@ function Studio({ projectId }: StudioProps) {
         <Box sx={{ 
           width: GRID_CONSTANTS.sidebarWidth,
           borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`,
-          bgcolor: '#1A1A1A',
+          bgcolor: 'background.paper',
           display: 'flex',
           flexDirection: 'column'
         }}>
@@ -298,9 +314,6 @@ function Studio({ projectId }: StudioProps) {
                 variant="contained"
                 onClick={(e) => setAddMenuAnchor(e.currentTarget)}
                 sx={{
-                  bgcolor: '#1A1A1A',
-                  color: 'white',
-                  '&:hover': { bgcolor: '#444' },
                   height: 24,
                   textTransform: 'none',
                   width: '100%',
@@ -378,23 +391,8 @@ function Studio({ projectId }: StudioProps) {
         />
         
         {/* Render the new piano roll windows directly in Studio */}
-        {<PianoRollWindows />}
-        
-        {/* Render open Drum Machine instances */}
-        {Object.entries(openDrumMachines || {})
-          .filter(([, isOpen]) => isOpen) 
-          .map(([trackId]) => ( 
-            <DrumMachine 
-              key={trackId} 
-              trackId={trackId} 
-              onClose={() => closeDrumMachine(trackId)} 
-              onPatternChange={setDrumPattern} 
-              // Pass MIDI actions
-              onAddNote={addMidiNote}
-              onRemoveNote={removeMidiNote}
-              onUpdateNote={updateMidiNote}
-            />
-        ))}
+        <PianoRollWindows />
+        <DrumMachineWindows />
 
       </Box>
       

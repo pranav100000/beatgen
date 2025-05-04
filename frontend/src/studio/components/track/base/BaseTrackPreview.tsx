@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import { GRID_CONSTANTS } from '../../../constants/gridConstants';
-import { Position, TrackState } from '../../../core/types/track';
 import { pixelsToTicks, ticksToPixels } from '../../../constants/gridConstants';
+import { CombinedTrack } from 'src/platform/types/project';
+import { Position } from '../types';
 
 /**
  * BaseTrackPreview is the foundation for all track visualizations in the timeline.
@@ -15,7 +16,7 @@ import { pixelsToTicks, ticksToPixels } from '../../../constants/gridConstants';
  */
 export interface BaseTrackPreviewProps {
   /** Track data including ID, type, and state */
-  track: TrackState;
+  track: CombinedTrack;
   
   /** Whether the track is currently playing */
   isPlaying: boolean;
@@ -83,7 +84,7 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [startDragMousePosition, setStartDragMousePosition] = useState({ x: 0, y: 0 });
   const [startDragTrackPosition, setStartDragTrackPosition] = useState({ x: 0, y: 0 });
-  const lastMovedPositionRef = useRef<Position>(track.position);
+  const lastMovedPositionRef = useRef<Position>({ x: track.x_position, y: track.y_position });
   
   // Track the content transform during left-side resize
   const [contentTransform, setContentTransform] = useState(0);
@@ -103,15 +104,15 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     startTrackWidth: number,
     startContentTransform?: number 
   } | null>(null);
-  const lastResizeDataRef = useRef<{ newX: number, newWidth: number }>({ newX: track.position.x, newWidth: trackWidth });
+  const lastResizeDataRef = useRef<{ newX: number, newWidth: number }>({ newX: track.x_position, newWidth: trackWidth });
   const MIN_TRACK_WIDTH_SNAP_UNITS = 1; // Minimum width in terms of smallest grid subdivision
 
   // Calculate the normal content offset for trimming from the beginning
   const calculateContentOffset = () => {
-    if (!track.originalDurationTicks || !track.trimStartTicks) return 0;
+    if (!track.duration_ticks || !track.trim_start_ticks) return 0;
     
     // Calculate what percentage of the original content is trimmed from start
-    const trimRatio = track.trimStartTicks / track.originalDurationTicks;
+    const trimRatio = track.trim_start_ticks / track.duration_ticks;
     
     // Apply that ratio to the full content width to get the offset
     return -(trimRatio * actualContentWidth);
@@ -128,8 +129,8 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     boxSizing: 'border-box',
     borderBottom: `1px solid ${GRID_CONSTANTS.borderColor}`,
     borderRadius: '6px',
-    left: `${track.position.x}px`,
-    top: `${track.position.y}px`,
+    left: `${track.x_position}px`,
+    top: `${track.y_position}px`,
     cursor: isDragging ? 'grabbing' : (isResizing ? 'ew-resize' : 'grab'),
     zIndex: isDragging || isResizing ? 1001 : 1000,
     transition: isDragging || isResizing ? 'none' : 'width 0.2s ease, left 0.2s ease, top 0.2s ease',
@@ -167,18 +168,18 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     });
     
     // Convert track position from ticks to pixels before storing
-    const positionXPixels = ticksToPixels(track.position.x, bpm, timeSignature);
+    const positionXPixels = ticksToPixels(track.x_position, bpm, timeSignature);
     setStartDragTrackPosition({
       x: positionXPixels, // Store in pixels for consistent drag calculations
-      y: track.position.y
+      y: track.y_position
     });
     
-    lastMovedPositionRef.current = track.position;
+    lastMovedPositionRef.current = { x: track.x_position, y: track.y_position };
 
     // Setup initial style for dragging
     if (trackRef.current) {
       trackRef.current.style.left = `${positionXPixels}px`; // Use pixels for visual position
-      trackRef.current.style.top = `${track.position.y}px`;
+      trackRef.current.style.top = `${track.y_position}px`;
       trackRef.current.style.transition = 'none';
     }
     
@@ -215,7 +216,7 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
     setContentTransform(initialTransform);
     
     // Convert track position x from ticks to pixels for visual operations
-    const trackXPixels = ticksToPixels(track.position.x, bpm, timeSignature);
+    const trackXPixels = ticksToPixels(track.x_position, bpm, timeSignature);
     
     // Always use the current trackWidth for start information
     setStartResizeInfo({
@@ -459,7 +460,7 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       setStartResizeInfo(null);
     }
     
-  }, [isDragging, isResizing, resizeDirection, track.id, track.position, onPositionChange, onResizeEnd, trackWidth, bpm, timeSignature, startResizeInfo, contentOffsetX]);
+  }, [isDragging, isResizing, resizeDirection, track.id, track.x_position, track.y_position, onPositionChange, onResizeEnd, trackWidth, bpm, timeSignature, startResizeInfo, contentOffsetX]);
 
   // Add/remove mouse event listeners
   useEffect(() => {
@@ -478,17 +479,17 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
   useEffect(() => {
     if (trackRef.current && !isDragging && !isResizing) { // Only sync if not actively dragging/resizing
       // Convert track position from ticks to pixels for display
-      const pixelX = ticksToPixels(track.position.x, bpm, timeSignature);
+      const pixelX = ticksToPixels(track.x_position, bpm, timeSignature);
       
       trackRef.current.style.left = `${pixelX}px`;
-      trackRef.current.style.top = `${track.position.y}px`;
+      trackRef.current.style.top = `${track.y_position}px`;
       
       // Important: Always update the width to match props
       trackRef.current.style.width = `${trackWidth}px`;
       
-      console.log('Syncing track DOM:', { id: track.id, width: trackWidth, ticksX: track.position.x, pixelsX: pixelX });
+      console.log('Syncing track DOM:', { id: track.id, width: trackWidth, ticksX: track.x_position, pixelsX: pixelX });
     }
-  }, [track.position.x, track.position.y, trackWidth, isDragging, isResizing, track.id, bpm, timeSignature]);
+  }, [track.x_position, track.y_position, trackWidth, isDragging, isResizing, track.id, bpm, timeSignature]);
 
   // Reset content transform after trim values change and component re-renders
   // This ensures we switch back to using the calculated offset once state updates
@@ -500,7 +501,7 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [track.trimStartTicks, track.trimEndTicks, isResizing, contentTransform]);
+  }, [track.trim_start_ticks, track.trim_end_ticks, isResizing, contentTransform]);
 
   // Calculate the transform to use for content position
   const getContentTransform = () => {
@@ -564,9 +565,9 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
         borderLeft: 'none',
         borderRight: 'none',
         background: `linear-gradient(180deg, ${trackColor}80 0%, ${trackColor} 100%)`,
-        opacity: track.muted ? 0.4 : 0.85,
+        opacity: track.mute ? 0.4 : 0.85,
         '&:hover': {
-          opacity: track.muted ? 0.5 : 1,
+          opacity: track.mute ? 0.5 : 1,
           boxShadow: 'inset 0 0 10px rgba(255,255,255,0.3)'
         },
         transition: 'opacity 0.2s ease',
@@ -629,7 +630,7 @@ export const BaseTrackPreview: React.FC<BaseTrackPreviewProps> = ({
         </Box>
         
         {/* Muted indicator */}
-        {track.muted && (
+        {track.mute && (
           <Box sx={{
             position: 'absolute',
             width: '100%',

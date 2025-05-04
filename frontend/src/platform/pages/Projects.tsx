@@ -34,12 +34,8 @@ import { useAuth } from '../auth/auth-context';
 import { 
   getProjects, 
   deleteProject, 
-  createProject, 
-  updateProject, 
-  Project, 
-  ProjectCreateDto, 
-  ProjectUpdateDto 
 } from '../api/projects';
+import { Project } from '../types/project';
 
 export default function Projects() {
   const navigate = useNavigate();
@@ -144,7 +140,7 @@ export default function Projects() {
         Back to Home
       </Button>
       <Box className="project-header">
-        <Typography variant="h4" component="h1">
+        <Typography variant="h3" component="h1" sx={{ color: 'text.primary' }}>
           My Projects
         </Typography>
         <Button
@@ -199,7 +195,7 @@ export default function Projects() {
                   </Typography>
                   
                   <Typography variant="body2" color="text.secondary" paragraph>
-                    {`BPM: ${project.bpm}, Time: ${project.time_signature_numerator}/${project.time_signature_denominator}`}
+                    {`BPM: ${project.bpm}, Key: ${project.key_signature}`}
                   </Typography>
                   
                   <Divider className="project-divider" />
@@ -209,13 +205,9 @@ export default function Projects() {
                       BPM: {project.bpm}
                     </Typography>
                     <Typography variant="body2">
-                      Time: {project.time_signature_numerator}/{project.time_signature_denominator}
+                      Key: {project.key_signature}
                     </Typography>
                   </Box>
-                  
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Tracks: {project.tracks.length}
-                  </Typography>
                 </CardContent>
                 
                 <Box className="project-card-actions">
@@ -255,7 +247,7 @@ export default function Projects() {
       {/* My Sounds Section */}
       <Box sx={{ mt: 6, mb: 3 }}>
         <Box className="project-header">
-          <Typography variant="h4" component="h1">
+          <Typography variant="h3" component="h1" sx={{ color: 'text.primary' }}>
             My Sounds
           </Typography>
           <Button

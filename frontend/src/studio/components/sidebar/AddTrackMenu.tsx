@@ -5,12 +5,18 @@ import AudioFileIcon from '@mui/icons-material/AudioFile';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import { VirtualInstrumentsModal } from '../modals/VirtualInstrumentsModal';
+import { DrumMachineModal } from '../modals/drum-machine/DrumMachineModal';
+import { DrumSamplePublicRead } from 'src/platform/types/public_models/drum_samples';
+// Import types from store types file
+import { TrackType, AddTrackPayload, MidiTrackPayload, DrumTrackPayload } from '../../stores/types';
 
 interface AddTrackMenuProps {
   isOpen: boolean;
   anchorEl: HTMLElement | null;
   onClose: () => void;
-  onAddTrack: (type: 'midi' | 'audio' | 'drum' | 'sampler', instrumentId?: string, instrumentName?: string, instrumentStorageKey?: string) => void;
+  // Use imported types
+  onAddTrack: (type: TrackType, payload?: AddTrackPayload) => void;
+  // Keep onFileUpload for direct audio/sampler uploads for now
   onFileUpload?: (file: File, isSampler?: boolean) => void;
 }
 
@@ -22,13 +28,22 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
   onFileUpload 
 }) => {
   const [isVirtualInstrumentModalOpen, setIsVirtualInstrumentModalOpen] = useState(false);
-
+  const [isDrumMachineModalOpen, setIsDrumMachineModalOpen] = useState(false);
+  
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, isSampler: boolean = false) => {
     const files = event.target.files;
     if (files && files.length > 0) {
       const file = files[0];
-      if (onFileUpload) onFileUpload(file, isSampler);
+      // Decide if we want to consolidate file uploads into onAddTrack or keep separate
+      // Keeping separate for now based on original structure
+      if (onFileUpload) {
+          onFileUpload(file, isSampler);
+      } else {
+          // Or potentially call onAddTrack here if we refactor later
+          // onAddTrack(isSampler ? 'sampler' : 'audio', { file });
+      }
       onClose();
+      console.log('File uploaded');
     }
   };
   
@@ -58,7 +73,10 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
           <ListItemText primary="Virtual Instrument" />
         </MenuItem>
         
-        <MenuItem onClick={() => { onAddTrack('drum'); onClose(); }}
+        <MenuItem onClick={() => { 
+          setIsDrumMachineModalOpen(true);
+          onClose(); 
+        }}
           sx={{ 
             fontSize: '13px',
             py: 1,
@@ -87,7 +105,7 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
               type="file" 
               accept="audio/*" 
               style={{ display: 'none' }} 
-              onChange={handleFileUpload} 
+              onChange={(e) => handleFileUpload(e, false)}
             />
           </label>
         </MenuItem>
@@ -107,7 +125,7 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
               type="file" 
               accept="audio/*" 
               style={{ display: 'none' }} 
-              onChange={(e) => handleFileUpload(e, true)} 
+              onChange={(e) => handleFileUpload(e, true)}
             />
           </label>
         </MenuItem>
@@ -116,9 +134,19 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
       <VirtualInstrumentsModal
         open={isVirtualInstrumentModalOpen}
         onClose={() => setIsVirtualInstrumentModalOpen(false)}
-        onSelect={(instrumentId: string, displayName: string, storageKey?: string) => {
-          onAddTrack('midi', instrumentId, displayName, storageKey);
+        onSelect={(instrumentId: string, instrumentName: string, instrumentStorageKey?: string) => {
+          const payload: MidiTrackPayload = { instrumentId, instrumentName, instrumentStorageKey };
+          onAddTrack('midi', payload);
           setIsVirtualInstrumentModalOpen(false);
+        }}
+      />
+      <DrumMachineModal
+        open={isDrumMachineModalOpen}
+        onClose={() => setIsDrumMachineModalOpen(false)}
+        onConfirmSelection={(selectedSamples: DrumSamplePublicRead[]) => {
+          const payload: DrumTrackPayload = { samples: selectedSamples };
+          onAddTrack('drum', payload);
+          setIsDrumMachineModalOpen(false);
         }}
       />
     </>

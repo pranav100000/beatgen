@@ -23,7 +23,7 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
   const isActionOnly = action && onActionClick && !text;
   
   // Debug log for rendering
-  console.log('🎯 RENDERING CHAT BUBBLE:', { text, action, isStreaming });
+  //console.log('🎯 RENDERING CHAT BUBBLE:', { text, action, isStreaming });
   
   // Add keyframes to the DOM when component mounts
   useEffect(() => {

@@ -1,7 +1,5 @@
 import { MidiSoundfontPlayer } from './midiSoundfontPlayer/midiSoundfontPlayer';
 import { MidiManager } from '../midi/MidiManagerNew';
-import { Store } from '../state/store';
-import { Note } from '../types/note';
 import { db } from '../db/dexie-client';
 import { Midi } from '@tonejs/midi';
 
@@ -165,7 +163,6 @@ export class SoundfontEngineController {
         console.log(`SoundfontEngineController: Adding track ${trackId}`);
         
         try {
-            console.log("________adding track with values:", trackId, midiData, soundfontData);
             await this.midiPlayer.addTrack(trackId, midiData, soundfontData);
             console.log(`Track ${trackId} added to player`);
         } catch (error) {
@@ -262,6 +259,8 @@ export class SoundfontEngineController {
             try {
                 // Get notes using the getTrackNotes method for better error handling
                 const notes = midiManager.getTrackNotes(trackId) || [];
+
+                console.log(`nnnnnotes:`, notes);
                 
                 // Create MIDI data from notes
                 const midi = new Midi();
@@ -272,8 +271,8 @@ export class SoundfontEngineController {
                     midi.tracks[0].addNote({
                         midi: note.row,
                         velocity: note.velocity, // Use the note's own velocity
-                        ticks: note.column * this.midiPlayer.getGlobalBPM() * 2,
-                        durationTicks: note.length * this.midiPlayer.getGlobalBPM() * 2
+                        ticks: note.column * this.midiPlayer.getGlobalBPM() * 8,
+                        durationTicks: note.length * this.midiPlayer.getGlobalBPM() * 8
                     });
                 }
 

@@ -1,50 +1,54 @@
-from typing import Dict, Any, List, Optional, Callable, TypeVar, Generic
+"""
+Base repository with common database operations using SQLModel
+"""
+from typing import Generic, TypeVar, Type, List, Optional, Dict, Any
+from sqlmodel import SQLModel, Session, select
 from uuid import UUID
 import traceback
 
 from app2.core.logging import get_repository_logger
 from app2.core.exceptions import DatabaseException, NotFoundException
-from app2.infrastructure.database.supabase_client import supabase
 
-T = TypeVar('T')  # Generic type for entity
+# Generic type for entity
+T = TypeVar('T', bound=SQLModel)
 
-class BaseRepository:
+class BaseRepository(Generic[T]):
     """Base repository with common database operations"""
     
-    def __init__(self, table_name: str):
+    def __init__(self, model_class: Type[T], session: Session):
         """
-        Initialize the repository with a table name
+        Initialize the repository with a model class and database session
         
         Args:
-            table_name: The name of the database table
+            model_class: The SQLModel class this repository works with
+            session: The SQLModel session for database operations
         """
-        self.table_name = table_name
-        self.logger = get_repository_logger(table_name)
+        self.model_class = model_class
+        self.session = session
+        self.logger = get_repository_logger(model_class.__name__)
         
-    async def find_all(self) -> List[Dict[str, Any]]:
+    async def find_all(self) -> List[T]:
         """
-        Find all records in the table
+        Find all records of this model
         
         Returns:
-            A list of records
+            A list of model instances
             
         Raises:
             DatabaseException: If the query fails
         """
-        self.logger.info(f"Finding all records in {self.table_name}")
+        self.logger.info(f"Finding all {self.model_class.__name__} records")
         try:
-            result = supabase.execute_query(
-                self.table_name,
-                lambda table: table.select("*")
-            )
-            self.logger.info(f"Found {len(result)} records in {self.table_name}")
-            return result or []
+            statement = select(self.model_class)
+            results = self.session.exec(statement).all()
+            self.logger.info(f"Found {len(results)} {self.model_class.__name__} records")
+            return results
         except Exception as e:
             self.logger.error(f"Error finding all records: {str(e)}")
             self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to find records in {self.table_name}: {str(e)}")
+            raise DatabaseException(f"Failed to find records: {str(e)}")
             
-    async def find_by_id(self, id: str) -> Dict[str, Any]:
+    async def find_by_id(self, id: str) -> T:
         """
         Find a record by ID
         
@@ -52,33 +56,31 @@ class BaseRepository:
             id: The ID of the record to find
             
         Returns:
-            The record if found
+            The model instance if found
             
         Raises:
             NotFoundException: If the record is not found
             DatabaseException: If the query fails
         """
-        self.logger.info(f"Finding record with ID {id} in {self.table_name}")
+        self.logger.info(f"Finding {self.model_class.__name__} with ID {id}")
         try:
-            result = supabase.execute_query(
-                self.table_name,
-                lambda table: table.select("*").eq("id", str(id)).single()
-            )
+            statement = select(self.model_class).where(self.model_class.id == id)
+            result = self.session.exec(statement).first()
             
-            if not result:
-                self.logger.error(f"Record with ID {id} not found in {self.table_name}")
-                raise NotFoundException(self.table_name, id)
+            if result is None:
+                self.logger.error(f"{self.model_class.__name__} with ID {id} not found")
+                raise NotFoundException(self.model_class.__name__, id)
                 
-            self.logger.info(f"Found record with ID {id} in {self.table_name}")
+            self.logger.info(f"Found {self.model_class.__name__} with ID {id}")
             return result
         except Exception as e:
             if isinstance(e, NotFoundException):
                 raise
             self.logger.error(f"Error finding record by ID: {str(e)}")
             self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to find record in {self.table_name}: {str(e)}")
+            raise DatabaseException(f"Failed to find record: {str(e)}")
             
-    async def find_by_user(self, user_id: str) -> List[Dict[str, Any]]:
+    async def find_by_user(self, user_id: str) -> List[T]:
         """
         Find all records for a user
         
@@ -86,25 +88,23 @@ class BaseRepository:
             user_id: The ID of the user
             
         Returns:
-            A list of records
+            A list of model instances
             
         Raises:
             DatabaseException: If the query fails
         """
-        self.logger.info(f"Finding records for user {user_id} in {self.table_name}")
+        self.logger.info(f"Finding {self.model_class.__name__} records for user {user_id}")
         try:
-            result = supabase.execute_query(
-                self.table_name,
-                lambda table: table.select("*").eq("user_id", str(user_id))
-            )
-            self.logger.info(f"Found {len(result)} records for user {user_id} in {self.table_name}")
-            return result or []
+            statement = select(self.model_class).where(self.model_class.user_id == user_id)
+            results = self.session.exec(statement).all()
+            self.logger.info(f"Found {len(results)} {self.model_class.__name__} records for user {user_id}")
+            return results
         except Exception as e:
             self.logger.error(f"Error finding records by user: {str(e)}")
             self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to find records for user in {self.table_name}: {str(e)}")
+            raise DatabaseException(f"Failed to find records for user: {str(e)}")
             
-    async def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def create(self, data: Dict[str, Any]) -> T:
         """
         Create a new record
         
@@ -112,30 +112,30 @@ class BaseRepository:
             data: The data for the new record
             
         Returns:
-            The created record
+            The created model instance
             
         Raises:
             DatabaseException: If the operation fails
         """
-        self.logger.info(f"Creating new record in {self.table_name}")
+        self.logger.info(f"Creating new {self.model_class.__name__}")
         try:
-            result = supabase.execute_query(
-                self.table_name,
-                lambda table: table.insert(data)
-            )
+            # Create model instance from data
+            model_instance = self.model_class(**data)
             
-            if not result or len(result) == 0:
-                self.logger.error("No data returned from record creation")
-                raise DatabaseException(f"Record created in {self.table_name} but no data was returned")
-                
-            self.logger.info(f"Created record with ID {result[0].get('id', 'unknown')} in {self.table_name}")
-            return result[0]
+            # Add to session
+            self.session.add(model_instance)
+            self.session.commit()
+            self.session.refresh(model_instance)
+            
+            self.logger.info(f"Created {self.model_class.__name__} with ID {model_instance.id}")
+            return model_instance
         except Exception as e:
+            self.session.rollback()
             self.logger.error(f"Error creating record: {str(e)}")
             self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to create record in {self.table_name}: {str(e)}")
+            raise DatabaseException(f"Failed to create record: {str(e)}")
             
-    async def update(self, id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def update(self, id: str, data: Dict[str, Any]) -> T:
         """
         Update a record
         
@@ -144,34 +144,36 @@ class BaseRepository:
             data: The updated data
             
         Returns:
-            The updated record
+            The updated model instance
             
         Raises:
             NotFoundException: If the record is not found
             DatabaseException: If the operation fails
         """
-        self.logger.info(f"Updating record with ID {id} in {self.table_name}")
+        self.logger.info(f"Updating {self.model_class.__name__} with ID {id}")
         try:
-            # First check if record exists
-            await self.find_by_id(id)
+            # First get the existing record
+            model_instance = await self.find_by_id(id)
             
-            result = supabase.execute_query(
-                self.table_name,
-                lambda table: table.update(data).eq("id", str(id))
-            )
+            # Update fields
+            for key, value in data.items():
+                if hasattr(model_instance, key):
+                    setattr(model_instance, key, value)
             
-            if not result or len(result) == 0:
-                self.logger.error("No data returned from record update")
-                raise DatabaseException(f"Record updated in {self.table_name} but no data was returned")
-                
-            self.logger.info(f"Updated record with ID {id} in {self.table_name}")
-            return result[0]
+            # Commit changes
+            self.session.add(model_instance)
+            self.session.commit()
+            self.session.refresh(model_instance)
+            
+            self.logger.info(f"Updated {self.model_class.__name__} with ID {id}")
+            return model_instance
         except Exception as e:
+            self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
             self.logger.error(f"Error updating record: {str(e)}")
             self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to update record in {self.table_name}: {str(e)}")
+            raise DatabaseException(f"Failed to update record: {str(e)}")
             
     async def delete(self, id: str) -> bool:
         """
@@ -187,21 +189,21 @@ class BaseRepository:
             NotFoundException: If the record is not found
             DatabaseException: If the operation fails
         """
-        self.logger.info(f"Deleting record with ID {id} from {self.table_name}")
+        self.logger.info(f"Deleting {self.model_class.__name__} with ID {id}")
         try:
-            # First check if record exists
-            await self.find_by_id(id)
+            # First get the existing record
+            model_instance = await self.find_by_id(id)
             
-            result = supabase.execute_query(
-                self.table_name,
-                lambda table: table.delete().eq("id", str(id))
-            )
+            # Delete the record
+            self.session.delete(model_instance)
+            self.session.commit()
             
-            self.logger.info(f"Deleted record with ID {id} from {self.table_name}")
+            self.logger.info(f"Deleted {self.model_class.__name__} with ID {id}")
             return True
         except Exception as e:
+            self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
             self.logger.error(f"Error deleting record: {str(e)}")
             self.logger.error(traceback.format_exc())
-            raise DatabaseException(f"Failed to delete record from {self.table_name}: {str(e)}")
+            raise DatabaseException(f"Failed to delete record: {str(e)}")

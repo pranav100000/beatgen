@@ -8,20 +8,22 @@ import {
   TextField,
   Select, 
   MenuItem,
-  ButtonBase
+  ButtonBase,
+  useTheme
 } from '@mui/material';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PanToolIcon from '@mui/icons-material/PanTool';
-import { TrackState, AudioTrackState, SamplerTrackState } from '../../core/types/track';
+import { CombinedTrack, AudioTrackRead, SamplerTrackRead } from '../../../platform/types/project';
 import { getTrackColor, GRID_CONSTANTS } from '../../constants/gridConstants';
 import ControlKnob from './track-sidebar-controls/ControlKnob';
+import { alpha } from '@mui/material/styles';
 
 // Interface for the component props
 interface TrackControlsSidebarProps {
-  tracks: TrackState[];
+  tracks: CombinedTrack[];
   onVolumeChange: (trackId: string, volume: number) => void;
   onPanChange: (trackId: string, pan: number) => void;
   onMuteToggle: (trackId: string, muted: boolean) => void;
@@ -43,22 +45,24 @@ const TrackControlsSidebar: React.FC<TrackControlsSidebarProps> = ({
   onInstrumentChange,
   onLoadAudioFile
 }) => {
+  const theme = useTheme();
+
   if (tracks.length === 0) {
     return (
       <Box sx={{ 
         p: 2, 
         textAlign: 'center', 
-        color: 'rgba(255, 255, 255, 0.5)',
+        color: 'text.disabled',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         height: '100%'
       }}>
-        <Typography variant="body2">
+        <Typography variant="body2" color="inherit">
           No tracks yet
         </Typography>
-        <Typography variant="caption" sx={{ mt: 1 }}>
+        <Typography variant="caption" sx={{ mt: 1 }} color="inherit">
           Add tracks using the button above
         </Typography>
       </Box>
@@ -91,7 +95,7 @@ const TrackControlsSidebar: React.FC<TrackControlsSidebarProps> = ({
 };
 
 interface TrackControlsProps {
-  track: TrackState;
+  track: CombinedTrack;
   index: number;
   onVolumeChange: (trackId: string, volume: number) => void;
   onPanChange: (trackId: string, pan: number) => void;
@@ -115,22 +119,23 @@ const TrackControls: React.FC<TrackControlsProps> = ({
   onInstrumentChange,
   onLoadAudioFile
 }) => {
+  const theme = useTheme();
   const trackColor = getTrackColor(index);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(track.name);
   const nameInputRef = useRef<HTMLInputElement>(null);
   
   // Local state for slider values during dragging
-  const [localVolume, setLocalVolume] = useState(track.volume);
-  const [localPan, setLocalPan] = useState(track.pan);
+  const [localVolume, setLocalVolume] = useState(track.volume ?? 80);
+  const [localPan, setLocalPan] = useState(track.pan ?? 0);
   
   // Update local state if track values change from elsewhere
   useEffect(() => {
-    setLocalVolume(track.volume);
+    setLocalVolume(track.volume ?? 80);
   }, [track.volume]);
   
   useEffect(() => {
-    setLocalPan(track.pan);
+    setLocalPan(track.pan ?? 0);
   }, [track.pan]);
   
   // Handler for volume changes during dragging (updates local state only)
@@ -157,12 +162,12 @@ const TrackControls: React.FC<TrackControlsProps> = ({
   
   // Handler for mute toggling
   const handleMuteToggle = () => {
-    onMuteToggle(track.id, !track.muted);
+    onMuteToggle(track.id, !(track.mute ?? false));
   };
   
   // Handler for solo toggling
   const handleSoloToggle = () => {
-    onSoloToggle(track.id, !track.soloed);
+    console.warn('Solo toggle state location unclear on CombinedTrack');
   };
   
   // Handler for track deletion
@@ -207,8 +212,8 @@ const TrackControls: React.FC<TrackControlsProps> = ({
             </Typography>
             <Box sx={{ 
               fontSize: '10px',
-              color: 'rgba(255,255,255,0.8)',
-              bgcolor: 'rgba(0,0,0,0.2)',
+              color: 'text.secondary',
+              bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)',
               p: 0.5,
               borderRadius: 1,
               flexGrow: 1,
@@ -216,7 +221,7 @@ const TrackControls: React.FC<TrackControlsProps> = ({
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
             }}>
-              {track.instrumentName}
+              {track.name}
             </Box>
           </Box>
         );
@@ -241,7 +246,8 @@ const TrackControls: React.FC<TrackControlsProps> = ({
                 fontSize: '10px',
                 height: '22px',
                 '.MuiSelect-select': { py: 0 },
-                bgcolor: 'rgba(0,0,0,0.2)'
+                bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)',
+                color: 'text.primary'
               }}
             >
               <MenuItem value="808" sx={{ fontSize: '10px' }}>808 Kit</MenuItem>
@@ -252,16 +258,9 @@ const TrackControls: React.FC<TrackControlsProps> = ({
         );
         
       case 'audio':
-      case 'sampler':
-        // Explicitly cast track to the correct type to satisfy TypeScript
-        const audioTrack = track as AudioTrackState;
-        const samplerTrack = track as SamplerTrackState;
-        const fileName = track.type === 'audio'
-            ? audioTrack.audioFile?.name
-            : track.type === 'sampler'
-              ? samplerTrack.sampleFile?.name || 'No file loaded'
-              : 'No file loaded';
-
+        // Cast track.track to AudioTrackRead
+        const audioTrackData = track.track as AudioTrackRead;
+        const audioFileName = audioTrackData.name;
         return (
           <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center' }}>
             <Typography variant="caption" sx={{ 
@@ -278,8 +277,8 @@ const TrackControls: React.FC<TrackControlsProps> = ({
                 onClick={handleLoadFileClick}
                 sx={{
                   fontSize: '10px',
-                  color: 'rgba(255,255,255,0.8)',
-                  bgcolor: 'rgba(0,0,0,0.2)',
+                  color: 'text.secondary',
+                  bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)',
                   p: 0.5,
                   borderRadius: 1,
                   flexGrow: 1,
@@ -291,12 +290,56 @@ const TrackControls: React.FC<TrackControlsProps> = ({
                   width: '100%',
                   cursor: 'pointer',
                   '&:hover': {
-                    bgcolor: 'rgba(0,0,0,0.4)',
+                    bgcolor: theme.palette.action.hover,
                   }
                 }}
                 disabled={!onLoadAudioFile}
               >
-                  {fileName}
+                  {audioFileName || track.name}
+              </ButtonBase>
+            </Tooltip>
+          </Box>
+        );
+        
+      case 'sampler':
+        // Cast track.track to SamplerTrackRead
+        const samplerTrackData = track.track as SamplerTrackRead;
+        const samplerFileName = samplerTrackData.audio_file_name;
+        return (
+          <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="caption" sx={{ 
+              color: trackColor,
+              fontSize: '9px',
+              mr: 0.5,
+              whiteSpace: 'nowrap',
+              marginTop: '-20px',
+            }}>
+              File:
+            </Typography>
+            <Tooltip title="Click to load audio file">
+              <ButtonBase
+                onClick={handleLoadFileClick}
+                sx={{
+                  fontSize: '10px',
+                  color: 'text.secondary',
+                  bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)',
+                  p: 0.5,
+                  borderRadius: 1,
+                  flexGrow: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start',
+                  width: '100%',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    bgcolor: theme.palette.action.hover,
+                  }
+                }}
+                disabled={!onLoadAudioFile}
+              >
+                  {samplerFileName || track.name}
               </ButtonBase>
             </Tooltip>
           </Box>
@@ -313,11 +356,11 @@ const TrackControls: React.FC<TrackControlsProps> = ({
       mb: 0.3,
       height: `${GRID_CONSTANTS.trackHeight - 2}px`,
       boxSizing: 'border-box',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+      borderBottom: `1px solid ${theme.palette.divider}`,
       borderLeft: `3px solid ${trackColor}`,
-      bgcolor: 'rgba(30, 30, 30, 0.7)',
+      bgcolor: theme.palette.background.paper,
       '&:hover': {
-        bgcolor: 'rgba(40, 40, 40, 0.9)',
+        bgcolor: theme.palette.action.hover,
       }
     }}>
       {/* Track Name and Delete Button */}
@@ -328,7 +371,7 @@ const TrackControls: React.FC<TrackControlsProps> = ({
         mb: 0.4,
         width: '100%'
       }}>
-        {/* Type-specific controls */}
+        {/* Track name and type-specific controls */}
         <Box sx={{ flexGrow: 1, mr: 1, maxWidth: 146 }}>
           {renderTypeSpecificControls()}
         </Box>
@@ -338,11 +381,11 @@ const TrackControls: React.FC<TrackControlsProps> = ({
             size="small" 
             onClick={handleDelete}
             sx={{ 
-              color: 'rgba(255, 255, 255, 0.7)',
+              color: 'text.secondary',
               padding: '3px',
               '&:hover': { 
-                color: '#ff5252',
-                bgcolor: 'rgba(255, 82, 82, 0.1)'
+                color: theme.palette.error.main,
+                bgcolor: alpha(theme.palette.error.main, 0.1)
               }
             }}
           >
@@ -366,12 +409,12 @@ const TrackControls: React.FC<TrackControlsProps> = ({
             min={0}
             max={100}
             size={32}
-            color={track.muted ? 'rgba(255, 255, 255, 0.3)' : trackColor}
+            color={track.mute ? theme.palette.action.disabled : trackColor}
             label="Vol"
             type="volume"
             onChange={handleVolumeChange}
             onChangeCommitted={handleVolumeChangeCommitted}
-            disabled={track.muted}
+            disabled={track.mute ?? false}
             valueFormatter={(val) => `${val}%`}
           />
         </Box>
@@ -393,12 +436,12 @@ const TrackControls: React.FC<TrackControlsProps> = ({
 
         {/* Mute button */}
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-          <Tooltip title={track.muted ? "Unmute" : "Mute"}>
+          <Tooltip title={track.mute ? "Unmute" : "Mute"}>
               <Box 
                 onClick={handleMuteToggle}
                 sx={{ 
-                  bgcolor: track.muted ? '#ffc107' : 'rgba(255, 255, 255, 0.1)',
-                  color: track.muted ? '#000' : trackColor,
+                  bgcolor: track.mute ? theme.palette.warning.light : theme.palette.action.disabledBackground,
+                  color: track.mute ? theme.palette.warning.contrastText : 'text.primary',
                   borderRadius: '3px',
                   px: 1.2,
                   py: 0.4,
@@ -406,54 +449,17 @@ const TrackControls: React.FC<TrackControlsProps> = ({
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   '&:hover': {
-                    bgcolor: track.soloed ? '#e6ac00' : 'rgba(255, 255, 255, 0.15)'
+                    bgcolor: track.mute ? theme.palette.warning.main : theme.palette.action.hover
                   }
                 }}
               >
                 M
               </Box>
             </Tooltip>
-          {/* <Tooltip title={track.muted ? "Unmute" : "Mute"}>
-            <IconButton 
-              size="small" 
-              onClick={handleMuteToggle}
-              sx={{ 
-                color: track.muted ? 'rgba(255, 82, 82, 0.9)' : 'rgba(255, 255, 255, 0.7)',
-                '&:hover': { color: track.muted ? '#ff5252' : 'white' },
-                padding: '4px'
-              }}
-            >
-              {track.muted ? 
-                <VolumeOffIcon sx={{ fontSize: '20px' }} /> : 
-                <VolumeUpIcon sx={{ fontSize: '20px' }} />
-              }
-            </IconButton>
-          </Tooltip> */}
         </Box>
         
-        {/* Solo Button */}
-        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-          <Tooltip title={track.soloed ? "Unsolo" : "Solo"}>
-            <Box 
-              onClick={handleSoloToggle}
-              sx={{ 
-                bgcolor: track.soloed ? '#ffc107' : 'rgba(255, 255, 255, 0.1)',
-                color: track.soloed ? '#000' : trackColor,
-                borderRadius: '3px',
-                px: 1.2,
-                py: 0.4,
-                fontSize: '12px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                '&:hover': {
-                  bgcolor: track.soloed ? '#e6ac00' : 'rgba(255, 255, 255, 0.15)'
-                }
-              }}
-            >
-              S
-            </Box>
-          </Tooltip>
-        </Box>
+        {/* Solo Button - Needs clarification on where solo state lives */}
+        {/* <Box sx={{ display: 'flex', justifyContent: 'center' }}> ... Solo button ... </Box> */}
       </Box>
     </Box>
   );

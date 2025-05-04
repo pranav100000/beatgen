@@ -5,7 +5,7 @@ import asyncio
 from anthropic import Anthropic, AsyncAnthropic
 import logging
 
-from app.utils.sse_queue_manager import SSEQueueManager
+from app2.sse.sse_queue_manager import SSEQueueManager
 
 
 load_dotenv()
@@ -93,8 +93,6 @@ class AnthropicClient:
         
         # For debugging
         event_types_seen = set()
-        
-        print("response", response)
         
         # Asynchronously iterate through the stream
         async for data in response:

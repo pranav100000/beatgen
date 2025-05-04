@@ -3,10 +3,11 @@ import logging
 from datetime import datetime
 import uuid
 
-from app.core.supabase import supabase
+from app2.infrastructure.database.supabase_client import supabase
+from app2.core.logging import get_api_logger
 
 # Configure logger
-logger = logging.getLogger("beatgen.services.soundfont")
+logger = get_api_logger("soundfont_service")
 
 class SoundfontService:
     """Service for managing soundfonts"""
