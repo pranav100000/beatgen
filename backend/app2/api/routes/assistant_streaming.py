@@ -36,7 +36,6 @@ from app2.infrastructure.database.sqlmodel_client import engine
 from sqlmodel import Session
 
 # Set up logger
-logger = logging.getLogger("beatgen.assistant_streaming")
 logger=get_api_logger("assistant_streaming")
 
 # Create router
@@ -349,23 +348,6 @@ async def process_generate_request(request_id: str, context, sse_queue: SSEQueue
                     continue
                 logger.info(f"Adding instrument: {instrument}")
             
-                # Create action for the generated track
-                action = AssistantAction.add_track(
-                    type=TrackType.MIDI,
-                    instrument_id=instrument['instrument_id'],
-                    notes=instrument['notes']
-                )
-                actions.append(action)
-                # Send the action to the client
-                # await sse_queue.action(action)
-                
-                # Create track data
-                track_data = TrackData(
-                    notes=instrument['notes'],
-                    instrument_name=instrument.get('name', 'Piano'),
-                    instrument_id=instrument['instrument_id']
-                )
-                tracks.append(track_data)
             # Create final response
             final_response = GenerateResponse(
                 response=full_response,

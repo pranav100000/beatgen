@@ -9,7 +9,8 @@ import {
     AccordionSummary, 
     AccordionDetails,
     CircularProgress,
-    Alert
+    Alert,
+    useTheme
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PianoIcon from '@mui/icons-material/Piano';
@@ -20,6 +21,7 @@ import { getPublicSoundfonts, getSoundfontDownloadUrl } from '../../../platform/
 import SoundfontManager from '../../core/soundfont/soundfontManager';
 import { db } from '../../core/db/dexie-client';
 import { InstrumentFileRead } from 'src/platform/types/project';
+import { alpha } from '@mui/material/styles';
 
 interface Instrument {
     id: string;
@@ -101,6 +103,7 @@ export interface VirtualInstrumentsModalProps {
 }
 
 export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInstrumentsModalProps) => {
+    const theme = useTheme();
     const [loading, setLoading] = useState(false);
     const [downloading, setDownloading] = useState<string | null>(null);
     const [soundfonts, setSoundfonts] = useState<InstrumentFileRead[]>([]);
@@ -187,8 +190,8 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
         >
         <Box
             sx={{
-            bgcolor: '#1A1A1A',
-            color: 'white',
+            bgcolor: 'background.paper',
+            color: 'text.primary',
             borderRadius: 2,
             p: 3,
             maxWidth: '900px',
@@ -201,7 +204,7 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
             <Typography variant="h6">Choose Virtual Instrument</Typography>
             <IconButton
                 onClick={onClose}
-                sx={{ color: 'white' }}
+                color="inherit"
             >
                 <CloseIcon />
             </IconButton>
@@ -221,13 +224,13 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
                 <Box
                     onClick={() => handleSelect(instrument.id)}
                     sx={{
-                    bgcolor: 'rgba(255, 255, 255, 0.05)',
+                    bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
                     borderRadius: 2,
                     p: 2,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     '&:hover': {
-                        bgcolor: 'rgba(255, 255, 255, 0.1)',
+                        bgcolor: theme.palette.action.hover,
                         transform: 'translateY(-2px)'
                     },
                     display: 'flex',
@@ -250,7 +253,7 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
                     >
                     <instrument.icon sx={{ fontSize: 32, color: 'white' }} />
                     </Box>
-                    <Typography variant="subtitle1" align="center">
+                    <Typography variant="subtitle1" align="center" color="text.primary">
                     {instrument.name}
                     </Typography>
                 </Box>
@@ -263,8 +266,8 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
             expanded={expanded}
             onChange={() => setExpanded(!expanded)}
             sx={{ 
-                bgcolor: 'rgba(255, 255, 255, 0.03)', 
-                color: 'white',
+                bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+                color: 'inherit',
                 boxShadow: 'none',
                 '&:before': {
                 display: 'none',
@@ -273,11 +276,11 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
             }}
             >
             <AccordionSummary
-                expandIcon={<ExpandMoreIcon sx={{ color: 'white' }} />}
+                expandIcon={<ExpandMoreIcon sx={{ color: 'text.secondary' }} />}
                 sx={{ 
                 borderRadius: 2,
                 '&:hover': {
-                    bgcolor: 'rgba(255, 255, 255, 0.05)'
+                    bgcolor: theme.palette.action.hover
                 }
                 }}
             >
@@ -304,13 +307,13 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
                         <Box
                             onClick={() => !isDownloading && handleSoundfontSelect(soundfont)}
                             sx={{
-                            bgcolor: 'rgba(255, 255, 255, 0.05)',
+                            bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
                             borderRadius: 2,
                             p: 2,
                             cursor: isDownloading ? 'wait' : 'pointer',
                             transition: 'all 0.2s',
                             '&:hover': {
-                                bgcolor: 'rgba(255, 255, 255, 0.1)',
+                                bgcolor: theme.palette.action.hover,
                                 transform: isDownloading ? 'none' : 'translateY(-2px)'
                             },
                             display: 'flex',
@@ -335,7 +338,7 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
                             <Icon sx={{ fontSize: 32, color: 'white' }} />
                             </Box>
                             <Box sx={{ textAlign: 'center' }}>
-                            <Typography variant="subtitle1">
+                            <Typography variant="subtitle1" color="text.primary">
                                 {soundfont.display_name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -346,21 +349,13 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
                             {/* Loading overlay */}
                             {isDownloading && (
                             <Box sx={{ 
-                                position: 'absolute', 
-                                top: 0, 
-                                left: 0, 
-                                right: 0, 
-                                bottom: 0, 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                bgcolor: 'rgba(0,0,0,0.7)',
+                                bgcolor: alpha(theme.palette.background.paper, 0.85),
                                 borderRadius: 2,
                                 zIndex: 2
                             }}>
                                 <Box sx={{ textAlign: 'center' }}>
-                                <CircularProgress size={40} sx={{ mb: 1 }} />
-                                <Typography variant="caption" display="block">
+                                <CircularProgress size={40} sx={{ mb: 1 }} color="inherit"/>
+                                <Typography variant="caption" display="block" color="text.primary">
                                     Downloading...
                                 </Typography>
                                 </Box>

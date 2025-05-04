@@ -1,5 +1,5 @@
 import React, { forwardRef, useRef, useImperativeHandle } from 'react';
-import { Box } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
 import { GRID_CONSTANTS, calculatePositionTime } from '../../constants/gridConstants';
 import Track from '../track/Track';
 import PlaybackCursor, { PlaybackCursorRef } from './PlaybackCursor';
@@ -51,12 +51,21 @@ export const Timeline = forwardRef<TimelineRef, TimelineProps>(({
     borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`
   }
 }, ref) => {
+  const theme = useTheme();
   // Calculate the total width needed for the entire timeline
   const totalTimelineWidth = measureCount * GRID_CONSTANTS.measureWidth;
   
   // Refs for the cursor and container
   const cursorRef = useRef<PlaybackCursorRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Use theme color for border if gridLineStyle is default
+  const defaultGridLineStyle = {
+    borderRight: `${GRID_CONSTANTS.borderWidth} solid ${theme.palette.divider}`
+  };
+  const currentGridLineStyle = gridLineStyle.borderRight === `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`
+    ? defaultGridLineStyle
+    : gridLineStyle;
   
   // Expose imperative methods to parent component
   useImperativeHandle(ref, () => {
@@ -90,6 +99,7 @@ export const Timeline = forwardRef<TimelineRef, TimelineProps>(({
         position: 'relative', 
         overflow: 'auto',
         willChange: 'transform',
+        bgcolor: 'background.default',
         '& > *': {
           backfaceVisibility: 'hidden',
           perspective: 1000,
@@ -109,7 +119,7 @@ export const Timeline = forwardRef<TimelineRef, TimelineProps>(({
       <TimelineRuler 
         measureCount={measureCount} 
         zoomLevel={zoomLevel} 
-        gridLineStyle={gridLineStyle} 
+        gridLineStyle={currentGridLineStyle}
         bpm={bpm}
         timeSignature={timeSignature}
         onTimeChange={onTimeChange}
@@ -126,7 +136,7 @@ export const Timeline = forwardRef<TimelineRef, TimelineProps>(({
           isPlaying={isPlaying}
           bpm={bpm}
           timeSignature={timeSignature}
-          gridLineStyle={gridLineStyle}
+          gridLineStyle={currentGridLineStyle}
           onTrackPositionChange={onTrackPositionChange}
           onTimeChange={onTimeChange}
           totalWidth={totalTimelineWidth}
@@ -151,6 +161,7 @@ interface TimelineRulerProps {
 }
 
 function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4, 4], onTimeChange = () => {}, gridLineStyle, totalWidth }: TimelineRulerProps) {
+  const theme = useTheme();
   // Get beats per measure from time signature
   const beatsPerMeasure = timeSignature[0];
   // Width of a single beat in pixels
@@ -187,25 +198,15 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
         display: 'flex',
         position: 'sticky',
         top: 0,
-        bgcolor: '#111',
+        bgcolor: 'background.paper',
         zIndex: 2,
         height: GRID_CONSTANTS.headerHeight,
         boxSizing: 'border-box',
         willChange: "transform",
         imageRendering: "crisp-edges",
         transformOrigin: "top left",
-        borderBottom: '1px solid #444',
-        boxShadow: `
-          inset 0 12px 12px -10px rgba(255,255,255,0.12),
-          0 1px 6px rgba(0,0,0,0.4)
-        `,
-        background: `
-          linear-gradient(180deg, 
-            rgba(255,255,255,0.08) 0%, 
-            rgba(17,17,17,1) 30%,
-            rgba(0,0,0,1) 100%
-          )
-        `,
+        borderBottom: `1px solid ${theme.palette.divider}`,
+        boxShadow: theme.shadows[2],
         '& > div > div > div': {
           '&:first-of-type': {
             top: '8px',
@@ -221,8 +222,8 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
         sx={{ 
           display: 'flex',
           position: 'relative',
-          width: '100%', // Ensure it fills the full width
-          cursor: 'pointer', // Show pointer cursor to indicate clickable
+          width: '100%',
+          cursor: 'pointer',
         }}
         onClick={handleRulerClick}
       >
@@ -244,7 +245,7 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
               left: '6px',
               fontSize: '14px',
               fontWeight: 'bold',
-              color: '#999',
+              color: 'text.secondary',
               userSelect: 'none',
             }}>
               {measureIndex + 1}
@@ -258,11 +259,9 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
                   position: 'relative',
                   width: beatWidth,
                   height: '100%',
-                  borderLeft: beatIndex === 0 
-                    ? '1px solid #555' // Stronger line for measure start
-                    : '1px solid #333', // Lighter line for beats
+                  borderLeft: `1px solid ${beatIndex === 0 ? theme.palette.text.secondary : theme.palette.divider}`,
                   '&:first-of-type': {
-                    borderLeft: '1px solid #555', // Ensure first beat has stronger line
+                    borderLeft: `1px solid ${theme.palette.text.secondary}`,
                   }
                 }}
               >
@@ -275,7 +274,7 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
                     width: '100%',
                     textAlign: 'left',
                   fontSize: '8px',
-                  color: '#777',
+                  color: 'text.disabled',
                   userSelect: 'none',
                 }}>
                     {beatIndex + 1}
@@ -297,7 +296,7 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
                     
                     // Determine visibility - highlight middle subdivisions for better readability
                     const isMiddle = subBeatIndex === Math.floor(numSubdivisions / 2) - 1;
-                    const subBeatColor = isMiddle ? '#444' : '#333';
+                    const subBeatColor = theme.palette.divider;
                     
                     return (
                       <Box 
@@ -328,7 +327,7 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
             top: 0,
             bottom: 0,
             width: '1px',
-            bgcolor: '#555',
+            bgcolor: theme.palette.text.secondary,
           }}
         />
       </Box>
@@ -360,6 +359,7 @@ function TimelineContent({
   onTimeChange,
   totalWidth
 }: TimelineContentProps) {
+  const theme = useTheme();
   
   // Handler for timeline content clicks to set playback position
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -402,14 +402,20 @@ function TimelineContent({
         willChange: "transform",
         imageRendering: "crisp-edges",
         transformOrigin: "top left",
-        cursor: 'pointer', // Show pointer cursor to indicate clickable
+        cursor: 'pointer',
       }}
       style={{
         width: totalWidth ? `${totalWidth}px` : '100%',
       }}
       onClick={handleTimelineClick}
     >
-      <GridOverlay measureCount={measureCount} timeSignature={timeSignature} />
+      <GridOverlay 
+        measureCount={measureCount} 
+        timeSignature={timeSignature} 
+        measureColor={theme.palette.text.secondary}
+        beatColor={theme.palette.divider}
+        subdivisionColor={theme.palette.divider}
+      />
 
       {tracks.map((track, index) => (
         <Track 
@@ -440,7 +446,21 @@ function TimelineContent({
   );
 }
 
-function GridOverlay({ measureCount, timeSignature = [4, 4] }: { measureCount: number, timeSignature?: [number, number] }) {
+interface GridOverlayProps {
+  measureCount: number;
+  timeSignature?: [number, number];
+  measureColor?: string;
+  beatColor?: string;
+  subdivisionColor?: string;
+}
+
+function GridOverlay({
+  measureCount, 
+  timeSignature = [4, 4], 
+  measureColor = 'rgba(85, 85, 85, 0.9)',
+  beatColor = 'rgba(51, 51, 51, 0.7)',
+  subdivisionColor = 'rgba(34, 34, 34, 0.3)'
+}: GridOverlayProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const beatsPerMeasure = timeSignature[0];
@@ -485,10 +505,10 @@ function GridOverlay({ measureCount, timeSignature = [4, 4] }: { measureCount: n
       
       const denominator = timeSignature[1];
       
-      // For visual clarity, use these constants
-      const MEASURE_COLOR = 'rgba(85, 85, 85, 0.9)';
-      const BEAT_COLOR = 'rgba(51, 51, 51, 0.7)';
-      const SUBDIVISION_COLOR = 'rgba(34, 34, 34, 0.3)';
+      // Use passed theme colors or defaults
+      const MEASURE_COLOR = measureColor;
+      const BEAT_COLOR = beatColor;
+      const SUBDIVISION_COLOR = subdivisionColor;
       
       // Ensure pixel-perfect rendering
       const drawLine = (x: number, opacity: number, color?: string) => {
@@ -497,7 +517,7 @@ function GridOverlay({ measureCount, timeSignature = [4, 4] }: { measureCount: n
         ctx.beginPath();
         ctx.moveTo(xPos, 0);
         ctx.lineTo(xPos, container.clientHeight);
-        ctx.strokeStyle = color || `rgba(34, 34, 34, ${opacity})`;
+        ctx.strokeStyle = color || SUBDIVISION_COLOR;
         ctx.lineWidth = 1;
         ctx.stroke();
       };
@@ -558,7 +578,7 @@ function GridOverlay({ measureCount, timeSignature = [4, 4] }: { measureCount: n
           }
           
           // Draw this subdivision line
-          drawLine(position, opacity);
+          drawLine(position, opacity, opacity === 1 ? undefined : opacity.toString());
         }
       }
       
@@ -567,14 +587,14 @@ function GridOverlay({ measureCount, timeSignature = [4, 4] }: { measureCount: n
         // Skip measure lines (we'll draw them last)
         if (i % beatsPerMeasure !== 0) {
           const x = i * beatWidth;
-          drawLine(x, 0.7, BEAT_COLOR);
+          drawLine(x, 1, BEAT_COLOR);
         }
       }
       
       // 3. Finally draw measure lines (most prominent)
       for (let i = 0; i <= measureCount; i++) {
         const x = i * GRID_CONSTANTS.measureWidth;
-        drawLine(x, 0.9, MEASURE_COLOR);
+        drawLine(x, 1, MEASURE_COLOR);
       }
     }
     
@@ -584,7 +604,7 @@ function GridOverlay({ measureCount, timeSignature = [4, 4] }: { measureCount: n
     return () => {
       resizeObserver.disconnect();
     };
-  }, [measureCount, beatsPerMeasure, beatWidth, timeSignature]);
+  }, [measureCount, beatsPerMeasure, beatWidth, timeSignature, measureColor, beatColor, subdivisionColor]);
   
   return (
     <Box
@@ -621,6 +641,7 @@ interface EmptyTimelineDropZoneProps {
 }
 
 function EmptyTimelineDropZone({ onTimeChange = () => {}, bpm = 120, timeSignature = [4, 4] }: EmptyTimelineDropZoneProps) {
+  const theme = useTheme();
   return (
     <Box sx={{ 
       flex: 1,
@@ -628,9 +649,9 @@ function EmptyTimelineDropZone({ onTimeChange = () => {}, bpm = 120, timeSignatu
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'column',
-      color: '#666',
+      color: 'text.secondary',
       height: '100%',
-      border: '2px dashed #333',
+      border: `2px dashed ${theme.palette.divider}`,
       m: 2,
       borderRadius: 2,
       position: 'relative', // For positioning the cursor inside

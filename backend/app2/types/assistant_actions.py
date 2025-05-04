@@ -1,9 +1,14 @@
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
+import uuid
 from pydantic import BaseModel, Field, validator
 from abc import ABC
 
 from app2.models.public_models.drum_samples import DrumSamplePublicRead
+from app2.models.track_models.drum_track import DrumTrack, DrumTrackRead
+from app2.models.track_models.midi_track import MidiTrack, MidiTrackRead
+from app2.models.track_models.sampler_track import SamplerTrack, SamplerTrackRead
+from app2.models.project_track import ProjectTrack
 
 class TrackType(str, Enum):
     AUDIO = "audio"
@@ -76,17 +81,10 @@ class TimeSignatureData(ActionData):
 
 class TrackData(ActionData):
     type: TrackType
-    instrument_id: str = Field(..., description="The instrument ID")
-    notes: List[dict] = Field(..., description="The notes to add to the track")
-
-class SingleDrumTrackData(ActionData):
-    type: TrackType
-    sample: DrumSamplePublicRead = Field(..., description="The sample to add to the track")
-    notes: List[dict] = Field(..., description="The notes to add to the track")
-
-class DrumTrackData(ActionData):
-    type: TrackType
-    tracks: List[SingleDrumTrackData] = Field(..., description="The tracks to add to the drum track")
+    # instrument_id: str = Field(..., description="The instrument ID")
+    # notes: List[dict] = Field(..., description="The notes to add to the track")
+    track_data: Optional[Union[DrumTrackRead, MidiTrackRead, SamplerTrackRead]] = Field(None, description="The data for the track")
+    project_track_data: Optional[ProjectTrack] = Field(None, description="The data for the project track")
 
 class VolumeData(ActionData):
     track_id: str = Field(..., description="The track ID")
@@ -125,17 +123,17 @@ class AssistantAction(BaseModel):
         )
 
     @classmethod
-    def add_track(cls, type: TrackType, instrument_id: str, notes: List[dict]) -> "AssistantAction":
+    def add_midi_track(cls, track: MidiTrackRead) -> "AssistantAction":
         return cls(
             action_type=ActionType.ADD_TRACK,
-            data=TrackData(type=type, instrument_id=instrument_id, notes=notes)
+            data=TrackData(type=TrackType.MIDI, track_data=track)
         )
         
     @classmethod
-    def add_drum_track(cls, type: TrackType, tracks: List[SingleDrumTrackData]) -> "AssistantAction":
+    def add_drum_track(cls, track: DrumTrackRead) -> "AssistantAction":
         return cls(
             action_type=ActionType.ADD_DRUM_TRACK,
-            data=DrumTrackData(type=type, tracks=tracks)
+            data=TrackData(type=TrackType.DRUM, track_data=track)
         )
 
     @classmethod

@@ -2,10 +2,23 @@
 Utilities for Server-Sent Events (SSE) implementation.
 Provides formatting and helper functions for SSE streams.
 """
+from datetime import datetime
 import json
 import asyncio
 from typing import Any, Dict, AsyncGenerator, Optional, Callable
+import uuid
+from app2.core.logging import get_api_logger
 
+logger = get_api_logger("sse")
+
+def _json_serializer_default(obj):
+    if isinstance(obj, datetime):
+        # Format consistent with your Pydantic config
+        return obj.isoformat() + 'Z'
+    if isinstance(obj, uuid.UUID):
+        return str(obj)
+    # Let the default encoder raise the TypeError for other types
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
 def format_sse_message(event: str, data: Any, id: Optional[str] = None, retry: Optional[int] = None) -> str:
     """
@@ -35,7 +48,7 @@ def format_sse_message(event: str, data: Any, id: Optional[str] = None, retry: O
         message.append(f"retry: {retry}")
     
     # Add data (JSON serialized)
-    json_data = json.dumps(data, ensure_ascii=False)
+    json_data = json.dumps(data, default=_json_serializer_default, ensure_ascii=False)
     
     # Split the data by lines and prefix each with "data: "
     for line in json_data.split("\n"):
@@ -102,9 +115,6 @@ class SSEManager:
         Yields:
             Formatted SSE messages
         """
-        import logging
-        logger = logging.getLogger("beatgen.sse")
-        logger.setLevel(logging.DEBUG)
         
         # Log generator start with queue info
         queue_id = id(queue)
@@ -169,6 +179,7 @@ class SSEManager:
                                 break
                             
                             # Otherwise yield the event and continue
+                            # logger.info(f"Sending event ({event_type}): {data}")
                             msg = self.format_event(event_type, data)
                             #logger.debug(f"Sending event ({event_type}): {msg[:50]}...")
                             yield msg

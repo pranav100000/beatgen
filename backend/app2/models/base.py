@@ -7,7 +7,7 @@ import pydantic
 from sqlmodel import SQLModel, Field
 from sqlalchemy import TIMESTAMP, Column
 from sqlalchemy.dialects.postgresql import JSONB
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ConfigDict
 import uuid
 
 from app2.types.track_types import TrackType
@@ -36,6 +36,15 @@ class TimestampMixin(SQLModel):
     updated_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=TIMESTAMP(timezone=True)
+    )
+
+    # Configure JSON serialization for datetime fields
+    model_config = ConfigDict(
+        json_encoders={
+            datetime: lambda dt: dt.isoformat() + 'Z' # Add 'Z' for UTC timezone indicator in ISO format
+        },
+        populate_by_name=True, # Recommended for SQLModel/Pydantic V2
+        arbitrary_types_allowed=True # Often needed with SQLModel
     )
 
 class DefaultUUIDMixin(SQLModel):

@@ -43,3 +43,6 @@ __pycache__/
 *.aac
 *.flac
 .aider*
+
+# SSL certificates
+.cert/

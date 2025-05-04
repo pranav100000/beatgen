@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import RedirectResponse
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, EmailStr
+import urllib.parse
 
 from app2.api.dependencies import get_auth_service
 from app2.services.auth_service import AuthService
@@ -137,16 +138,18 @@ async def forgot_password(
     
 @router.get("/login/google", response_model=OAuthURLResponse)
 async def login_google(
+    request: Request,
     response: Response,
     auth_service: AuthService = Depends(get_auth_service)
 ) -> Any:
     """
     Get Google OAuth URL for the frontend to redirect to
     """
+    logger.info(f"[API] Received GET /api/auth/login/google from {request.client.host}")
     logger.info("Starting Google OAuth flow")
     try:
         redirect_url = await auth_service.get_google_auth_url(response)
-        logger.info(f"Google auth URL generated: {redirect_url[:30]}...")
+        logger.info(f"[API] Google auth URL generated: {redirect_url}")
         return {"url": redirect_url}
     except Exception as e:
         logger.error(f"Failed to generate Google auth URL: {str(e)}")
@@ -159,57 +162,68 @@ async def login_google(
 async def callback_google(
     request: Request,
     response: Response,
-    code: str = Query(...),
-    redirect_to: Optional[str] = Query(None),
+    code: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+    error_description: Optional[str] = Query(None),
     auth_service: AuthService = Depends(get_auth_service)
 ) -> Any:
     """
     Handle Google OAuth callback
     """
-    logger.info("Processing Google OAuth callback")
+    logger.info(f"[API] Received GET /api/auth/callback/google from {request.client.host}")
     
-    # Get all the query parameters
+    # Log all query parameters received
     params = dict(request.query_params)
-    logger.info(f"Received callback with params: {params}")
+    logger.info(f"[API] Received callback query params: {params}")
+
+    # Check if Google returned an error
+    if error:
+        logger.error(f"Google returned an error during OAuth callback: {error} - {error_description}")
+        # Redirect to frontend with error information
+        error_redirect_url = f"{settings.app.FRONTEND_BASE_URL}?error=google_auth_failed&error_description={error_description or error}"
+        logger.info(f"Redirecting to frontend with error: {error_redirect_url}")
+        return RedirectResponse(error_redirect_url)
     
     # Check for the code parameter
-    code = params.get('code')
     if not code:
-        logger.error("No code parameter found in callback request")
+        logger.error("[API] No code parameter found in successful callback request")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing required 'code' parameter"
+            detail="Missing required 'code' parameter in callback"
         )
     
+    logger.info(f"[API] Code received: {code[:10]}... Attempting to handle callback.")
     try:
+        # Call the service to exchange code and get user info
         result = await auth_service.handle_google_callback(code, request, response)
-        logger.info(f"Google auth successful for user: {result.get('user_id', 'unknown')}")
         
+        user_id = result.get('user_id')
         access_token = result.get("access_token")
+        logger.info(f"[API] Service handle_google_callback successful for user: {user_id}")
+
         if not access_token:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to retrieve access token after Google login"
-            )
+            logger.error("[API] Service handle_google_callback did not return an access token.")
+            raise ServiceException("Failed to retrieve access token after Google login")
             
         # Determine the final redirect URL for the frontend
-        # Default to frontend base URL if no specific redirect_to was provided
-        final_redirect_url = redirect_to or settings.app.FRONTEND_BASE_URL or "/"
+        frontend_redirect_url = settings.app.FRONTEND_BASE_URL or "/"
+        logger.info(f"[API] Preparing redirect to frontend: {frontend_redirect_url}")
         
-        # Add the access token to the redirect URL fragment for the frontend to handle
-        # Note: Storing tokens in URL fragments is common but consider security implications.
-        # An alternative is to set another secure cookie readable by the frontend.
-        redirect_url_with_token = f"{final_redirect_url}#access_token={access_token}"
-        
-        # Use RedirectResponse for the final redirect
-        # Response object passed to handle_google_callback already handled clearing the PKCE cookie
-        logger.info(f"Redirecting user to frontend: {final_redirect_url}")
-        return RedirectResponse(redirect_url_with_token)
+        # Redirect back to the frontend. 
+        # Let the frontend handle the session/token (Supabase client likely sets cookies)
+        logger.info(f"[API] Redirecting user to {frontend_redirect_url}")
+        return RedirectResponse(frontend_redirect_url)
 
-    except UnauthorizedException as e:
-        logger.error(f"Google OAuth callback failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Google authentication failed: {str(e)}",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    except (UnauthorizedException, ServiceException) as e:
+        logger.error(f"[API] Google OAuth callback processing failed: {str(e)}", exc_info=True)
+        # Redirect to frontend with error information
+        error_desc = urllib.parse.quote(str(e))
+        error_redirect_url = f"{settings.app.FRONTEND_BASE_URL}?error=google_auth_failed&error_description={error_desc}"
+        logger.info(f"Redirecting to frontend with error: {error_redirect_url}")
+        return RedirectResponse(error_redirect_url)
+    except Exception as e:
+        logger.error(f"[API] Unexpected error during Google OAuth callback: {str(e)}", exc_info=True)
+        error_desc = urllib.parse.quote("An unexpected error occurred during login.")
+        error_redirect_url = f"{settings.app.FRONTEND_BASE_URL}?error=unexpected&error_description={error_desc}"
+        logger.info(f"Redirecting to frontend with error: {error_redirect_url}")
+        return RedirectResponse(error_redirect_url)

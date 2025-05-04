@@ -540,8 +540,9 @@ export class TransportController implements Transport {
         // Find the track
         const track = this.audioEngine.getAllTracks().find(t => t.id === trackId);
         if (!track || !track.player) {
-            console.log(`Track ${trackId} not found or has no player`);
-            return;
+            // Log a warning instead of just returning silently
+            console.warn(`Track ${trackId} or its player not found during position change while playing. Skipping sync for now.`);
+            return; // Continue to return, but log the warning
         }
         
         console.log(`Handling position change for track ${trackId} to x:${newPositionXTicks} ticks during playback`);

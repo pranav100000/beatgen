@@ -1,6 +1,6 @@
 # Makefile for the beatgen project
 
-.PHONY: install build run clean install-frontend run-frontend install-backend run-backend all help
+.PHONY: install build run clean install-frontend run-frontend install-backend run-backend all help regen-certs
 
 # Default target
 all: install build run
@@ -32,8 +32,10 @@ run-frontend:
 # Run backend server (adjust if necessary)
 # Assuming Flask/FastAPI common run command
 run-backend:
-	@echo "Running backend server..."
-	cd backend && uv run uvicorn app2.main:app --reload
+	@echo "Running backend server on https://0.0.0.0:8000..."
+	# Use 0.0.0.0 to listen on all network interfaces
+	# Adjust SSL certificate paths if they are different
+	cd backend && uv run uvicorn app2.main:app --host 0.0.0.0 --port 8000 --ssl-keyfile ../frontend/.cert/key.pem --ssl-certfile ../frontend/.cert/cert.pem --reload
 
 # Run both frontend and backend (can be run in separate terminals or managed with a tool like concurrently)
 run:
@@ -59,4 +61,12 @@ help:
 	@echo "  run-frontend     - Run the frontend development server"
 	@echo "  run-backend      - Run the backend server"
 	@echo "  clean            - Remove build artifacts and dependencies"
-	@echo "  help             - Show this help message" 
+	@echo "  help             - Show this help message"
+
+# Regenerate SSL certificates for localhost using mkcert
+regen-certs:
+	@echo "Regenerating SSL certificates for localhost..."
+	@echo "Requires mkcert (https://github.com/FiloSottile/mkcert). Run 'mkcert -install' first if needed."
+	@mkdir -p frontend/.cert
+	mkcert -key-file frontend/.cert/key.pem -cert-file frontend/.cert/cert.pem localhost 127.0.0.1 ::1
+	@echo "Certificates regenerated in frontend/.cert/" 

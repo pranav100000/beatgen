@@ -33,7 +33,10 @@ import UserChatBubble from './UserChatBubble';
 import { GRID_CONSTANTS } from '../../constants/gridConstants';
 import { CombinedTrack } from '../../../platform/types/project';
 import ReactMarkdown from 'react-markdown'
-import { MidiTrackPayload } from '../../stores/types';
+import { DrumTrackPayload, MidiTrackPayload } from '../../stores/types';
+import { MidiTrackRead } from 'src/platform/types/track_models/midi_track';
+import { SamplerTrackRead } from 'src/platform/types/track_models/sampler_track';
+import { DrumTrackRead } from 'src/platform/types/track_models/drum_track';
 interface Message {
   text: string;
   isUser: boolean;
@@ -73,12 +76,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
   
   // Access the store for executing actions
   const { 
-    setBpm, 
     handleAddTrack, 
     handleTrackVolumeChange,
     handleTrackMuteToggle,
-    setTimeSignature,
     handleTrackPositionChange,
+    handleProjectParamChange,
+    loadTrack,
     tracks
   } = useStudioStore();
   
@@ -430,16 +433,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
     switch (action) {
       case 'change_bpm':
         if (typeof actionData?.value === 'number') {
-          setBpm(actionData.value);
-        }
-        break;
-      case 'add_track2':
-        if (actionData?.type) {
-          handleAddTrack(
-            actionData.type,
-            actionData.instrumentId,
-            actionData.instrumentName
-          );
+          handleProjectParamChange('bpm', actionData.value);
         }
         break;
       case 'add_track':
@@ -452,6 +446,56 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             const storageKey = actionData.storageKey;
             const hasNotes = actionData.hasNotes || false;
             
+            const trackType = actionData.type;
+            let actionTrackData;
+            let payload: MidiTrackPayload | DrumTrackPayload;
+            switch (trackType) {
+              case 'midi':
+                const midiTrackData = actionData.track_data as MidiTrackRead;
+                // Ensure type is set, although it should come from action
+                console.log('🟢 Midi actionTrackData for CombinedTrack:', midiTrackData);
+
+                // Construct the CombinedTrack object
+                const combinedMidiTrack: CombinedTrack = {
+                  // Populate top-level CombinedTrack fields
+                  // Use data from midiTrackData where available, otherwise provide defaults
+                  // processTrack will apply defaults anyway, but being explicit helps clarity
+                  id: midiTrackData.id,
+                  name: midiTrackData.name || 'New MIDI Track', // Use name from data or default
+                  type: 'midi',
+                  volume: 80, // Default volume
+                  pan: 0,    // Default pan
+                  mute: false, // Default mute state
+                  x_position: 0, // Default position
+                  y_position: 0, // Default position
+                  // Fields related to audio clips, might not be relevant here or default to 0
+                  trim_start_ticks: 0,
+                  trim_end_ticks: 0,
+                  duration_ticks: undefined,
+
+                  // Nest the specific track data
+                  track: midiTrackData
+                };
+
+                console.log('🟢 Constructed CombinedTrack:', combinedMidiTrack);
+                loadTrack(combinedMidiTrack); // Pass the correctly structured object
+                break;
+              case 'sampler':
+                actionTrackData = actionData.track_data as SamplerTrackRead;
+                actionTrackData.type = 'sampler';
+                console.log('🟢 Sampler actionTrackData:', actionTrackData);
+                loadTrack(actionTrackData);
+                break;
+              case 'drum':
+                actionTrackData = actionData.track_data as DrumTrackRead;
+                actionTrackData.type = 'drum';
+                console.log('🟢 Drum actionTrackData:', actionTrackData);
+                loadTrack(actionTrackData);
+                break;
+              default:
+                console.warn(`Unknown track type: ${trackType}`);
+            }
+            return;
             console.log(`Adding generated track with instrumentId: ${instrumentId}`);
             
             // Find the result object that contains the notes
@@ -670,7 +714,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
         break;
       case 'change_time_signature':
         if (typeof actionData?.numerator === 'number' && typeof actionData?.denominator === 'number') {
-          setTimeSignature(actionData.numerator, actionData.denominator);
+          handleProjectParamChange('timeSignature', [actionData.numerator, actionData.denominator]);
         }
         break;
       case 'move_track':

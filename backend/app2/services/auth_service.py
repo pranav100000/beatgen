@@ -5,7 +5,8 @@ import secrets
 import hashlib
 import base64
 
-from fastapi import Request, Response
+from fastapi import Request, Response, HTTPException
+from fastapi.responses import RedirectResponse
 
 from app2.core.logging import get_service_logger
 from app2.core.exceptions import UnauthorizedException, ServiceException
@@ -242,21 +243,15 @@ class AuthService:
             
             # Define the backend callback URL where Google will send the code
             backend_callback_url = f"{settings.app.BASE_URL}/api/auth/callback/google"
+            logger.info(f"[Service] Using callback URL: {backend_callback_url} (from settings.app.BASE_URL: {settings.app.BASE_URL})")
             
             # Use Supabase client to get the OAuth URL.
             # With flow_type='pkce', the library should handle challenge generation.
-            # The library will attempt to store the verifier (likely in memory/session storage,
-            # which might be an issue across requests - requires testing)
             auth_response = supabase.client.auth.sign_in_with_oauth({
                 "provider": "google",
                 "options": {
                     "redirect_to": backend_callback_url,
-                    "scopes": "openid email profile", # Request standard scopes
-                    "queryParams": {
-                         "access_type": "offline", 
-                         "prompt": "consent"
-                    }
-                    # No explicit code_challenge needed here; library handles it
+                    "scopes": "openid email profile" # Request standard scopes
                 }
             })
 
@@ -290,13 +285,16 @@ class AuthService:
         Raises:
             ServiceException: If the authentication fails
         """
+        logger.info(f"[START] Received Google OAuth callback with code: {code[:10]}...")
         try:
             logger.info(f"Handling Google OAuth callback (PKCE handled by library)")
             
             # Exchange the code for a Supabase session using PKCE
+            logger.info(f"Exchanging code for session...")
             auth_response = supabase.client.auth.exchange_code_for_session({
                 "auth_code": code
             })
+            logger.info(f"Code exchanged successfully.")
             
             if not auth_response.user:
                 logger.error("No user returned from Google OAuth after code exchange.")
@@ -306,10 +304,6 @@ class AuthService:
             email = auth_response.user.email or ""
             logger.info(f"Successfully exchanged code. Supabase Auth ID: {session_user_id}, Email: {email}")
             
-            # Attempt to ensure the profile exists using the Supabase Auth ID as the primary key.
-            # The repository method will handle checking/creation.
-            # If an account exists with the same email but DIFFERENT ID, this will likely
-            # fail later with a unique constraint violation during the INSERT attempt.
             logger.info(f"Ensuring profile exists for User ID: {session_user_id}")
             try:
                 user_metadata = auth_response.user.user_metadata
@@ -320,6 +314,7 @@ class AuthService:
                     logger.warning(f"Unexpected type for user_metadata for user {session_user_id}: {type(user_metadata)}. Value: {user_metadata}")
                 username = email.split('@')[0] if email else f"user_{session_user_id.hex[:8]}"
 
+                logger.info(f"Calling create_profile for user_id={session_user_id}...")
                 await self.user_repository.create_profile(
                     user_id=session_user_id, # Pass Supabase ID to be used as primary key
                     email=email,
@@ -328,17 +323,22 @@ class AuthService:
                 )
                 logger.info(f"Profile ensured for User ID: {session_user_id}")
             except Exception as create_err:
-                 # This could be the unique email violation if linking didn't consolidate IDs correctly
                  logger.error(f"Failed to create/ensure profile for User ID {session_user_id}: {create_err}", exc_info=True)
                  raise ServiceException(f"Failed to save user profile: {create_err}")
 
-            # Return token and user info (session is tied to session_user_id)
+            # Return token and user info as dict
+            logger.info(f"handle_google_callback successful for {session_user_id}. Returning token info.")
             return {
                 "access_token": auth_response.session.access_token,
                 "token_type": "bearer",
                 "user_id": session_user_id # Return the Supabase Auth ID
             }
+            
         except Exception as e:
-            logger.error(f"Google authentication failed: {str(e)}")
+            logger.error(f"Google authentication failed in service: {str(e)}")
             logger.error(traceback.format_exc())
-            raise ServiceException(f"Google authentication failed: {str(e)}")
+            # Reraise to be caught by API layer
+            if isinstance(e, UnauthorizedException) or isinstance(e, ServiceException):
+                raise e
+            else:
+                raise ServiceException(f"Google authentication failed: {str(e)}")

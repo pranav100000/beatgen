@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { TanStackRouterVite } from '@tanstack/router-vite-plugin'
 import path from 'path'
 import fs from 'fs'
+import https from 'https'
 
 // Check if the paths exist
 const srcPath = path.resolve(__dirname, '../src')
@@ -34,10 +35,20 @@ export default defineConfig({
     port: 5173, // Default Vite port
     proxy: {
       '/api': {
-        target: 'http://localhost:8000', // Backend API endpoint
-        changeOrigin: true
+        target: 'https://localhost:8000', // Use HTTPS to match backend
+        changeOrigin: true,
+        secure: false, // Allow self-signed certificates
+        // Explicitly configure the agent to potentially help with SSL issues (like TLS version)
+        agent: new https.Agent({
+           minVersion: 'TLSv1.2' // Force TLS 1.2 as a common fix
+        })
       }
-    }
+    },
+    https: {
+      key: fs.readFileSync(path.resolve(__dirname, '.cert/key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, '.cert/cert.pem'))
+    },
+    host: true // This is important to expose the server to the network
   },
   // Log resolved paths for debugging
   optimizeDeps: {

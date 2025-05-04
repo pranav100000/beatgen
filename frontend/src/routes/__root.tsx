@@ -3,6 +3,7 @@ import React, { useEffect } from 'react'
 import Navbar from '../platform/components/Navbar'
 import { useAuth } from '../platform/auth/auth-context'
 import { handleOAuthCallback } from '../platform/api/auth'
+import { useAppTheme } from '../platform/theme/ThemeContext'
 
 // Root Layout Component - this wraps all routes
 export const Route = createRootRoute({
@@ -48,6 +49,7 @@ export const Route = createRootRoute({
 function RootLayout() {
   const { loading } = useAuth();
   const router = useRouter();
+  const { mode } = useAppTheme();
   
   // Simple studio route detection using string matching on location.href
   // This is more reliable than router state during transitions
@@ -90,6 +92,11 @@ function RootLayout() {
     handleOAuth();
   }, []);
   
+  // Define themes inline or import them if preferred
+  const lightTheme = { background: '#ffffff', text: '#000000' }; // Simplified for example
+  const darkTheme = { background: '#000000', text: '#ffffff' };
+  const currentThemePalette = mode === 'light' ? lightTheme : darkTheme;
+  
   if (loading) {
     return (
       <div style={{ 
@@ -97,8 +104,8 @@ function RootLayout() {
         justifyContent: 'center', 
         alignItems: 'center', 
         height: '100vh',
-        background: '#000',
-        color: 'white'
+        background: currentThemePalette.background,
+        color: currentThemePalette.text
       }}>
         <p>Loading...</p>
       </div>
@@ -107,7 +114,7 @@ function RootLayout() {
   
   // No navbar in the root layout - each route will add its own navbar if needed
   return (
-    <div id="root-layout">
+    <div id="root-layout" style={{ background: currentThemePalette.background, color: currentThemePalette.text, minHeight: '100vh' }}>
       <main>
         <Outlet />
       </main>

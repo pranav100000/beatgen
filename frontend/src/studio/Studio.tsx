@@ -62,9 +62,7 @@ function Studio({ projectId }: StudioProps) {
     initializeAudio,
     loadProject,
     setZoomLevel,
-    setProjectTitle,
-    setTimeSignature,
-    setKeySignature,
+    handleProjectParamChange,
     playPause,
     stop,
     setCurrentTime,
@@ -81,7 +79,6 @@ function Studio({ projectId }: StudioProps) {
     handleTrackNameChange,
     handleInstrumentChange,
     uploadAudioFile,
-    setBpm,
     setAddMenuAnchor,
     openDrumMachines,
     closeDrumMachine,
@@ -110,6 +107,7 @@ function Studio({ projectId }: StudioProps) {
 
   // Initialize audio engine
   useEffect(() => {
+    console.log('>>> Studio useEffect <<<');
     // Always favor prop projectId over existingProjectId state
     const projectToLoad = projectId || existingProjectId;
     
@@ -144,16 +142,25 @@ function Studio({ projectId }: StudioProps) {
   const handleBpmChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newBpm = parseInt(event.target.value, 10);
     if (!isNaN(newBpm) && newBpm > 0 && newBpm <= 999) {
-      setBpm(newBpm);
+      // Use handleProjectParamChange instead of setBpm
+      handleProjectParamChange('bpm', newBpm);
     }
   };
 
   const handleTimeSignatureChange = (numerator?: number, denominator?: number) => {
     const [currentNumerator, currentDenominator] = timeSignature;
-    setTimeSignature(
-      numerator ?? currentNumerator,
-      denominator ?? currentDenominator
-    );
+    // Use handleProjectParamChange for both numerator and denominator
+    // Note: This assumes handleProjectParamChange can handle updating nested state or the store handles this logic.
+    // If it needs separate updates, this needs adjustment.
+    // For now, let's update them individually if provided.
+    if (numerator !== undefined) {
+      handleProjectParamChange('timeSignature', [numerator, currentDenominator]);
+    }
+    if (denominator !== undefined) {
+      // Get the potentially updated numerator before setting denominator
+      const updatedNumerator = numerator !== undefined ? numerator : currentNumerator;
+      handleProjectParamChange('timeSignature', [updatedNumerator, denominator]);
+    }
   };
 
   const handleZoomIn = () => {
@@ -173,7 +180,7 @@ function Studio({ projectId }: StudioProps) {
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setProjectTitle(event.target.value);
+    handleProjectParamChange('projectTitle', event.target.value);
   };
 
   // Handler to trigger file input for replacing track audio
@@ -242,8 +249,8 @@ function Studio({ projectId }: StudioProps) {
   return (
     <Box sx={{ 
       height: '100vh', 
-      bgcolor: '#000000', 
-      color: 'white',
+      bgcolor: 'background.default',
+      color: 'text.primary',
       display: 'flex',
       flexDirection: 'column',
     }}>
@@ -264,7 +271,7 @@ function Studio({ projectId }: StudioProps) {
         onRedo={redo}
         onBpmChange={handleBpmChange}
         onTimeSignatureChange={handleTimeSignatureChange}
-        onKeySignatureChange={setKeySignature}
+        onKeySignatureChange={(newKey) => handleProjectParamChange('keySignature', newKey)}
         onPlayPause={playPause}
         onStop={stop}
         onTitleChange={handleTitleChange}
@@ -284,7 +291,7 @@ function Studio({ projectId }: StudioProps) {
         <Box sx={{ 
           width: GRID_CONSTANTS.sidebarWidth,
           borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`,
-          bgcolor: '#1A1A1A',
+          bgcolor: 'background.paper',
           display: 'flex',
           flexDirection: 'column'
         }}>
@@ -307,9 +314,6 @@ function Studio({ projectId }: StudioProps) {
                 variant="contained"
                 onClick={(e) => setAddMenuAnchor(e.currentTarget)}
                 sx={{
-                  bgcolor: '#1A1A1A',
-                  color: 'white',
-                  '&:hover': { bgcolor: '#444' },
                   height: 24,
                   textTransform: 'none',
                   width: '100%',

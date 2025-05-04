@@ -112,14 +112,16 @@ function LoginPage() {
   
   return (
     <Container maxWidth="sm" sx={{ 
-      height: '100%', 
+      minHeight: 'calc(100vh - 64px)',
       display: 'flex', 
       alignItems: 'center', 
       justifyContent: 'center',
-      bgcolor: '#000',
-      color: 'white'
+      py: 4
     }}>
-      <Card sx={{ width: '100%', p: 2, bgcolor: '#111', color: 'white' }}>
+      <Card sx={{ 
+        width: '100%', 
+        p: { xs: 2, sm: 3 },
+      }}>
         <CardContent>
           <Typography variant="h4" component="h1" gutterBottom textAlign="center">
             Log In to BeatGen
@@ -137,14 +139,6 @@ function LoginPage() {
               autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              sx={{
-                '& .MuiInputBase-input': { color: 'white' },
-                '& .MuiInputLabel-root': { color: '#aaa' },
-                '& .MuiOutlinedInput-root': {
-                  '& fieldset': { borderColor: '#333' },
-                  '&:hover fieldset': { borderColor: '#666' },
-                }
-              }}
             />
             <TextField
               margin="normal"
@@ -157,14 +151,6 @@ function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              sx={{
-                '& .MuiInputBase-input': { color: 'white' },
-                '& .MuiInputLabel-root': { color: '#aaa' },
-                '& .MuiOutlinedInput-root': {
-                  '& fieldset': { borderColor: '#333' },
-                  '&:hover fieldset': { borderColor: '#666' },
-                }
-              }}
             />
             
             <Button
@@ -205,13 +191,6 @@ function LoginPage() {
               sx={{ 
                 mb: 2, 
                 position: 'relative',
-                bgcolor: 'rgba(255, 255, 255, 0.08)',
-                borderColor: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                '&:hover': {
-                  bgcolor: 'rgba(255, 255, 255, 0.12)',
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                }
               }}
             >
               {isGoogleLoading ? (

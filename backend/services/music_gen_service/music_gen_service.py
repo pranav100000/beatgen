@@ -4,6 +4,7 @@ import json
 import os
 import traceback
 from typing import Any, Dict, List, Optional
+import uuid
 import anthropic
 from dotenv import load_dotenv
 import logging
@@ -12,6 +13,9 @@ from app2.core.logging import get_api_logger
 from app2.types.assistant_actions import AssistantAction, TrackType
 from app2.api.dependencies import get_drum_sample_service, get_drum_sample_public_repository
 from app2.models.public_models.drum_samples import DrumSamplePublicRead
+from app2.models.track_models.midi_track import MidiTrackRead
+from app2.models.public_models.instrument_file import InstrumentFileRead
+from app2.models.track_models.sampler_track import SamplerTrackRead
 from services.music_gen_service.chord_progression_analysis import analyze_chord_progression
 from services.soundfont_service.soundfont_service import soundfont_service
 from clients.anthropic_client import AnthropicClient
@@ -396,11 +400,19 @@ After your explanation, use the 'create_drum_beat' tool to provide the patterns.
                 if drum_sound_id in drum_sound_map:
                     drum_sample = drum_sound_map[drum_sound_id]
                     logger.info(f"Adding drum track for {drum_sample.display_name} (ID: {drum_sound_id})")
-                    await queue.action(AssistantAction.add_track(
+                    await queue.action(AssistantAction.add_drum_track(
                         type=TrackType.DRUM,
-                        instrument_id=drum_sound_id, # Use the drum sample's ID as string
-                        pattern=pattern,
-                        name=f"{drum_sample.display_name} Beat" # Optional: Give the track a name
+                        track_data=AssistantAction.add_midi_track(
+                            track=SamplerTrackRead(
+                                id=uuid.uuid4(),
+                                name=drum_sample.display_name,
+                                instrument_id=drum_sample.id,
+                                drum_sound_id=drum_sound_id,
+                                drum_sound_name=drum_sample.display_name,
+                                drum_sound_storage_key=drum_sample.storage_key,
+                                drum_sound_kit_name=drum_sample.kit_name
+                            )
+                        )
                     ))
                 else:
                     logger.warning(f"Drum sound ID '{drum_sound_id}' from LLM response not found in selected drums.")
@@ -494,10 +506,31 @@ Then, use the create_melody tool to generate the notes."""
             result["part_type"] = "chords"
             result["description"] = f"Chord progression {processed_chord_progression} in {key} {mode}"
             
-            await queue.action(AssistantAction.add_track(
-                type=TrackType.MIDI,
-                instrument_id=chord_instrument.id,
-                notes=result.get('notes')
+            # await queue.action(AssistantAction.add_midi_track(
+            #     type=TrackType.MIDI,
+            #     instrument_id=chord_instrument.id,
+            #     notes=result.get('notes')
+            # ))
+            
+            logger.info(f"____________notes: {result.get('notes')}")
+            await queue.action(AssistantAction.add_midi_track(
+                track=MidiTrackRead(
+                    id=uuid.uuid4(),
+                    name=chord_instrument.name,
+                    instrument_id=chord_instrument.id,
+                    midi_notes_json=result.get('notes'),
+                    instrument_file=InstrumentFileRead(
+                        id=chord_instrument.id,
+                        file_name=chord_instrument.name,
+                        display_name=chord_instrument.name,
+                        storage_key=chord_instrument.storage_key,
+                        file_format="Fix this later", #TODO: Fix this later
+                        file_size=0, # TODO: Fix this later
+                        category="chords",
+                        is_public=True,
+                        description=f"Chord progression {processed_chord_progression} in {key} {mode}"
+                    )
+                )
             ))
             
             logger.info(f"Generated chord progression with {len(result.get('notes', []))} notes")
@@ -619,10 +652,24 @@ Generate the JSON output now."""
             result["part_type"] = "melody"
             result["description"] = f"Melody for {melody_instrument.name} in {key} {mode}"
             
-            await queue.action(AssistantAction.add_track(
-                type=TrackType.MIDI,
-                instrument_id=melody_instrument.id,
-                notes=result.get('notes')
+            await queue.action(AssistantAction.add_midi_track(
+                track=MidiTrackRead(
+                    id=uuid.uuid4(),
+                    name=melody_instrument.name,
+                    instrument_id=melody_instrument.id,
+                    midi_notes_json=result.get('notes'),
+                    instrument_file=InstrumentFileRead(
+                        id=melody_instrument.id,
+                        file_name=melody_instrument.name,
+                        display_name=melody_instrument.name,
+                        storage_key=melody_instrument.storage_key,
+                        file_format="Fix this later", #TODO: Fix this later
+                        file_size=0, # TODO: Fix this later
+                        category="melody",
+                        is_public=True,
+                        description=f"Melody for {melody_instrument.name} in {key} {mode}"
+                    )
+                )
             ))
             
             logger.info(f"Generated melody with {len(result.get('notes', []))} notes.")

@@ -1,5 +1,6 @@
 import { Store } from '../../core/state/store';
 import { RootState, SetFn, GetFn, StoreSliceCreator, PlaybackCommand } from '../types';
+import * as Tone from 'tone';
 
 // Define the state properties and actions for this slice
 export interface TransportSlice {
@@ -85,6 +86,13 @@ export const createTransportSlice: StoreSliceCreator<TransportSlice> = (set, get
     handlePlaybackCommand,
     playPause: async () => {
       // Read current isPlaying state *inside* the action
+    //   if (Tone.getContext().state !== 'running') {
+    //     await Tone.start();
+    //   }
+    //console.log('>>> Tone.getContext().state <<<', Tone.getContext().state);
+      //await Tone.start();
+      //await Tone.getTransport().start();
+      //console.log('>>> Tone.getContext().state after start <<<', Tone.getContext().state);
       const currentlyPlaying = rootGet().isPlaying;
       await handlePlaybackCommand(currentlyPlaying ? 'pause' : 'play');
     },

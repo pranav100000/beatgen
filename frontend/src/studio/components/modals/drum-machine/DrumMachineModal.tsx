@@ -16,7 +16,8 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    SelectChangeEvent
+    SelectChangeEvent,
+    useTheme
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -34,6 +35,7 @@ export interface DrumMachineModalProps {
 }
 
 export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMachineModalProps) => {
+    const theme = useTheme();
     const [loading, setLoading] = useState(false);
     const [drumSamples, setDrumSamples] = useState<DrumSamplePublicRead[]>([]);
     const [filteredDrumSamples, setFilteredDrumSamples] = useState<DrumSamplePublicRead[]>([]);
@@ -164,16 +166,16 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
         >
             <Box
                 sx={{
-                    bgcolor: '#1A1A1A', // Dark background
-                    color: 'white',
+                    bgcolor: 'background.paper',
+                    color: 'text.primary',
                     borderRadius: 2,
                     p: 3,
-                    maxWidth: '900px', // Increased max width
+                    maxWidth: '900px',
                     width: '90%',
                     maxHeight: '90vh',
                     display: 'flex',
                     flexDirection: 'column',
-                    overflow: 'hidden' // Prevent modal overflow
+                    overflow: 'hidden'
                 }}
             >
                 {/* Header */}
@@ -181,7 +183,7 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
                     <Typography variant="h6">Choose Drum Sample(s)</Typography>
                     <IconButton
                         onClick={onClose}
-                        sx={{ color: 'white' }} // Ensure icon is visible on dark background
+                        color="inherit"
                     >
                         <CloseIcon />
                     </IconButton>
@@ -200,21 +202,19 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
                         expanded={expanded}
                         onChange={() => setExpanded(!expanded)}
                         sx={{ 
-                            bgcolor: 'rgba(255, 255, 255, 0.03)', // Slightly lighter dark background
-                            color: 'white',
+                            bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+                            color: 'inherit',
                             boxShadow: 'none',
-                            '&:before': {
-                                display: 'none', // Remove default top border
-                            },
+                            '&:before': { display: 'none' },
                             borderRadius: 2,
                         }}
                     >
                         <AccordionSummary
-                            expandIcon={<ExpandMoreIcon sx={{ color: 'white' }} />}
+                            expandIcon={<ExpandMoreIcon sx={{ color: 'text.secondary' }} />}
                             sx={{ 
                                 borderRadius: 2,
                                 '&:hover': {
-                                    bgcolor: 'rgba(255, 255, 255, 0.05)' // Subtle hover effect
+                                    bgcolor: theme.palette.action.hover
                                 }
                             }}
                         >
@@ -233,64 +233,64 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
                                         flexGrow: 1, 
                                         minWidth: '200px',
                                         '& .MuiOutlinedInput-root': {
-                                            '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.3)' },
-                                            '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.5)' },
+                                            '& fieldset': { borderColor: theme.palette.divider },
+                                            '&:hover fieldset': { borderColor: theme.palette.text.secondary },
                                             '&.Mui-focused fieldset': { borderColor: 'primary.main' },
                                         },
-                                        '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.7)' },
-                                        '& .MuiInputBase-input': { color: 'white' }
+                                        '& .MuiInputLabel-root': { color: theme.palette.text.secondary },
+                                        '& .MuiInputBase-input': { color: theme.palette.text.primary }
                                     }}
                                 />
                                 <FormControl size="small" sx={{ minWidth: 120 }}>
-                                    <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Kit</InputLabel>
+                                    <InputLabel sx={{ color: theme.palette.text.secondary }}>Kit</InputLabel>
                                     <Select
                                         value={selectedKit}
                                         label="Kit"
                                         onChange={handleFilterChange(setSelectedKit)}
                                         sx={{ 
-                                            color: 'white',
-                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.3)' },
-                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.5)' },
+                                            color: theme.palette.text.primary,
+                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.text.secondary },
                                             '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
-                                            '& .MuiSvgIcon-root': { color: 'white' }
+                                            '& .MuiSvgIcon-root': { color: theme.palette.text.secondary }
                                         }}
-                                        MenuProps={{ PaperProps: { sx: { bgcolor: '#2a2a2a', color: 'white' } } }}
+                                        MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', color: 'text.primary' } } }}
                                     >
                                         {uniqueKits.map(kit => <MenuItem key={kit} value={kit}>{kit}</MenuItem>)}
                                     </Select>
                                 </FormControl>
                                 <FormControl size="small" sx={{ minWidth: 120 }}>
-                                    <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Genre</InputLabel>
+                                    <InputLabel sx={{ color: theme.palette.text.secondary }}>Genre</InputLabel>
                                     <Select
                                         value={selectedGenre}
                                         label="Genre"
                                         onChange={handleFilterChange(setSelectedGenre)}
                                         sx={{ 
-                                            color: 'white',
-                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.3)' },
-                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.5)' },
+                                            color: theme.palette.text.primary,
+                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.text.secondary },
                                             '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
-                                            '& .MuiSvgIcon-root': { color: 'white' }
+                                            '& .MuiSvgIcon-root': { color: theme.palette.text.secondary }
                                         }}
-                                        MenuProps={{ PaperProps: { sx: { bgcolor: '#2a2a2a', color: 'white' } } }}
+                                        MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', color: 'text.primary' } } }}
                                     >
                                         {uniqueGenres.map(genre => <MenuItem key={genre} value={genre}>{genre}</MenuItem>)}
                                     </Select>
                                 </FormControl>
                                 <FormControl size="small" sx={{ minWidth: 120 }}>
-                                    <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Type</InputLabel>
+                                    <InputLabel sx={{ color: theme.palette.text.secondary }}>Type</InputLabel>
                                     <Select
                                         value={selectedType}
                                         label="Type"
                                         onChange={handleFilterChange(setSelectedType)}
                                         sx={{ 
-                                            color: 'white',
-                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.3)' },
-                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.5)' },
+                                            color: theme.palette.text.primary,
+                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.text.secondary },
                                             '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
-                                            '& .MuiSvgIcon-root': { color: 'white' }
+                                            '& .MuiSvgIcon-root': { color: theme.palette.text.secondary }
                                         }}
-                                        MenuProps={{ PaperProps: { sx: { bgcolor: '#2a2a2a', color: 'white' } } }}
+                                        MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', color: 'text.primary' } } }}
                                     >
                                         {uniqueTypes.map(type => <MenuItem key={type} value={type}>{type}</MenuItem>)}
                                     </Select>
@@ -314,8 +314,6 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
                                                 sample={sample}
                                                 onToggleSelect={handleToggleSelect}
                                                 isSelected={selectedSampleIds.has(sample.id)}
-                                                // Pass loading state if needed by the card itself, 
-                                                // otherwise the parent handles overall loading display
                                                 isLoading={loading} 
                                             />
                                         </Grid>
@@ -327,11 +325,17 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
                 </Box>
                 
                 {/* Footer Actions */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)', flexShrink: 0 }}>
+                <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'flex-end', 
+                    pt: 2, 
+                    borderTop: `1px solid ${theme.palette.divider}`,
+                    flexShrink: 0 
+                }}>
                     <Button
                         variant="contained"
                         onClick={handleConfirmSelection}
-                        disabled={selectedSampleIds.size === 0 || loading} // Disable confirm if nothing selected or still loading initial data
+                        disabled={selectedSampleIds.size === 0 || loading}
                     >
                         Confirm Selection ({selectedSampleIds.size})
                     </Button>

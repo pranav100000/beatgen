@@ -129,6 +129,7 @@ export const useStudioStore = create<StudioStoreState>()(immer((set, get) => {
     
     // Add implementations/aliases directly accessible on the root state
     handleTrackOperation,
+    handleProjectParamChange: slices.handleProjectParamChange, // Explicitly expose from project slice
     // Expose _updateState if slices rely on it, otherwise it can be removed
     _updateState, 
     updateState: _updateState, // Alias if needed

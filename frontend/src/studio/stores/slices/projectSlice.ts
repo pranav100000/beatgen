@@ -25,6 +25,7 @@ export interface ProjectSlice {
   timeSignature: [number, number];
   keySignature: string;
   loadProject: (projectId: string) => Promise<ProjectWithTracks | null>;
+  loadTrack: (track: CombinedTrack) => Promise<void>;
   handleProjectParamChange: (param: ProjectParam, value: any) => void;
   handleKeySignatureChange: (keySignature: string) => void;
 }
@@ -52,7 +53,7 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
         break;
       case 'bpm':
         store.projectManager.setTempo(value as number);
-        Tone.Transport.bpm.value = value as number;
+        Tone.getTransport().bpm.value = value as number;
         store.getTransport().setTempo(value as number);
         if (executeHistoryAction) {
             const bpmAction = new Actions.BPMChange(get, oldValue as number, value as number, rootGet().timeSignature);
@@ -62,7 +63,7 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
       case 'timeSignature':
         const [numerator, denominator] = value as [number, number];
         store.projectManager.setTimeSignature(numerator, denominator);
-        Tone.Transport.timeSignature = value as [number, number];
+        Tone.getTransport().timeSignature = value as [number, number];
         if (executeHistoryAction) {
             const timeAction = new Actions.TimeSignature(get, oldValue as [number, number], value as [number, number], rootGet().bpm);
             executeHistoryAction(timeAction);
@@ -77,6 +78,17 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
         break;
     }
   };
+
+  const loadTrack = async (track: CombinedTrack) => {
+    const trackState = await processTrack(track, rootGet().tracks.length);
+    
+    // 5. Update Zustand state with initial track data
+    get().updateTracks([trackState]);
+    
+    // 6. Connect tracks to engines (will load audio from Dexie)
+    await connectTracksToEngines([trackState]);
+  }
+
 
   const handleKeySignatureChange = (keySignature: string) => {
     handleProjectParamChange('keySignature', keySignature);
@@ -192,7 +204,7 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
                       if ((apiTrackData as MidiTrackRead).midi_notes_json) {
                           try {
                               // Cast to unknown then to string
-                              const jsonString = (apiTrackData as MidiTrackRead).midi_notes_json as unknown as string;
+                              const jsonString = (apiTrackData as MidiTrackRead).midi_notes_json as any;
                               nestedTrackData.notes = convertJsonToNotes(jsonString, apiTrack.id); 
                               console.log(`Parsed ${nestedTrackData.notes?.length} MIDI notes for track ${apiTrack.id}`);
                           } catch (e) {
@@ -219,7 +231,7 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
                            console.log(`Processing midiNotesJson for sampler track ${apiTrack.id}`);
                            try {
                               // Cast to unknown then to string
-                              const jsonString = (apiTrackData as SamplerTrackRead).midi_notes_json as unknown as string;
+                              const jsonString = (apiTrackData as SamplerTrackRead).midi_notes_json as any;
                               nestedTrackData.notes = convertJsonToNotes(jsonString, apiTrack.id); 
                               console.log(`Parsed ${nestedTrackData.notes?.length} MIDI notes for sampler track ${apiTrack.id}`);
                           } catch (e) {
@@ -286,14 +298,16 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
           console.log(`Connecting track ${track.id} (type: ${track.type})`);
           try {
               // --- MIDI Connection --- 
-              if (track.type === 'midi' && track.track && 'instrument_file' in track.track) {
-                  const instrumentId = track.track.instrument_file?.id;
+              if (track.type === 'midi' && track.track && 'instrument_id' in track.track) {
+                  const instrumentId = track.track.instrument_id;
                   if (instrumentId) {
                       await store.connectTrackToSoundfont(track.id, instrumentId);
                       console.log(`Connected MIDI track ${track.id} to soundfont ${instrumentId}`);
                   } else { console.warn(`MIDI track ${track.id} missing instrumentId`); }
-                  const convertedNotes = convertJsonToNotes(track.id, track.track.midi_notes_json);
-                  midiManager.updateTrack(track.id, convertedNotes);
+                  // Use already parsed notes from processTrack
+                  const notesToLoad = (track.track as any).notes || []; // Access dynamically added notes
+                  console.log(`Loading ${notesToLoad.length} notes for MIDI track ${track.id}`);
+                  midiManager.updateTrack(track.id, notesToLoad);
               }
               
               // --- Audio Connection --- 
@@ -493,6 +507,7 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
     timeSignature: [4, 4],
     keySignature: "C major",
     loadProject,
+    loadTrack,
     handleProjectParamChange,
     handleKeySignatureChange,
   };

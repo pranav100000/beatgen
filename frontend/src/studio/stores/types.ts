@@ -174,17 +174,16 @@ export interface RootState {
   setIsInitialized: (isInitialized: boolean) => void;
   initializeAudio: () => Promise<void>;
 
-  // Project Settings (align with ProjectWithTracks)
+  // Project Settings (Refactored)
   projectTitle: string; 
   bpm: number;
   timeSignature: [number, number];
   keySignature: string; 
-  setProjectTitle: (title: string) => void;
-  setBpm: (bpm: number) => void;
-  setTimeSignature: (numerator: number, denominator: number) => void;
-  setKeySignature: (keySignature: string) => void;
+  handleProjectParamChange: (param: ProjectParam, value: any) => void;
+
   // Fix: Use ProjectWithTracks directly
   loadProject: (projectId: string) => Promise<ProjectWithTracks | null>; 
+  loadTrack: (track: CombinedTrack) => Promise<void>;
 
   // Track Management (Core)
   tracks: CombinedTrack[];
