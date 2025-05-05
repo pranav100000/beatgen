@@ -136,7 +136,7 @@ class MusicGenService:
         await self._generate_chords(queue)
 
         # Generate melody
-        # await self._generate_melody(prompt, queue)
+        await self._generate_melody(prompt, queue)
 
         # Get drum sounds
         drum_result = await self.researcher.research_drum_sounds(prompt)
@@ -544,7 +544,7 @@ After your explanation, use the 'create_drum_beat' tool to provide the patterns.
             )
             for beat_data in drum_patterns:
                 drum_sound_id = beat_data.get("drum_sound_id")
-                pattern = beat_data.get("pattern")
+                pattern = beat_data.get("pattern") * 2
 
                 logger.info(f"Drum sound ID: {drum_sound_id}")
                 logger.info(f"Pattern: {pattern}")
@@ -555,7 +555,7 @@ After your explanation, use the 'create_drum_beat' tool to provide the patterns.
                 if (
                     not drum_sound_id
                     or not isinstance(pattern, list)
-                    or len(pattern) != 32
+                    or len(pattern) != 64
                 ):
                     logger.warning(
                         f"Invalid drum beat data received: {beat_data}, skipping."
@@ -716,7 +716,6 @@ Then, use the create_melody tool to generate the notes."""
             #     notes=result.get('notes')
             # ))
 
-            logger.info(f"____________notes: {result.get('notes')}")
             await queue.action(
                 AssistantAction.add_midi_track(
                     track=MidiTrackRead(
@@ -865,6 +864,8 @@ Use this note probability data derived from the chord progression to guide note 
 
 Constraints:
 - Adhere strictly to the key of {key} {mode}.
+- Make the rhythm of the melody match the rhythm type '{rhythm_type}'.
+- The rhythm should always be repetitive and something that can be played in a loop. The rhythm MUST be repeated 2, 4, 8, 16, 32, or more times.
 - Follow the chord progression '{chord_progression}' closely.
 - The output MUST be ONLY a valid JSON object representing the melody structure (e.g., bars, notes with pitch, start_beat, duration_beats).
 - Do NOT include any explanatory text, comments, or markdown formatting before or after the JSON object.

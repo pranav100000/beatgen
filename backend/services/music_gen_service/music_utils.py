@@ -91,6 +91,6 @@ def get_root_note_midi(key: str) -> int:
     - Integer representing the MIDI number of the root note
     """
     # Create a scale using C as the reference tonic
-    key_note = note.Note(key + "4") if key >= "C" else note.Note(key + "3")
+    key_note = note.Note(key + "3") if key >= "C" else note.Note(key + "3")
     print("KEY NOTE:", key_note)
     return key_note.pitch.midi

@@ -2,6 +2,7 @@ import { MidiSoundfontPlayer } from './midiSoundfontPlayer/midiSoundfontPlayer';
 import { MidiManager } from '../midi/MidiManagerNew';
 import { db } from '../db/dexie-client';
 import { Midi } from '@tonejs/midi';
+import { Note } from '../../../types/note';
 
 /**
  * Controller for the MidiSoundfontPlayer that integrates with the app's architecture
@@ -159,11 +160,11 @@ export class SoundfontEngineController {
      * @param midiData MIDI file data as ArrayBuffer
      * @param soundfontData Soundfont file data as ArrayBuffer
      */
-    async addTrack(trackId: string, midiData: Midi, soundfontData: ArrayBuffer): Promise<void> {
+    async addTrack(trackId: string, notes: Note[], soundfontData: ArrayBuffer): Promise<void> {
         console.log(`SoundfontEngineController: Adding track ${trackId}`);
         
         try {
-            await this.midiPlayer.addTrack(trackId, midiData, soundfontData);
+            await this.midiPlayer.addTrack(trackId, notes, soundfontData);
             console.log(`Track ${trackId} added to player`);
         } catch (error) {
             console.error(`Failed to add track ${trackId} to player:`, error);
@@ -263,23 +264,23 @@ export class SoundfontEngineController {
                 console.log(`nnnnnotes:`, notes);
                 
                 // Create MIDI data from notes
-                const midi = new Midi();
-                midi.addTrack();
+                // const midi = new Midi();
+                // midi.addTrack();
                 
-                // Add each note to the MIDI track
-                for (const note of notes) {
-                    midi.tracks[0].addNote({
-                        midi: note.row,
-                        velocity: note.velocity, // Use the note's own velocity
-                        ticks: note.column * this.midiPlayer.getGlobalBPM() * 8,
-                        durationTicks: note.length * this.midiPlayer.getGlobalBPM() * 8
-                    });
-                }
+                // // Add each note to the MIDI track
+                // for (const note of notes) {
+                //     midi.tracks[0].addNote({
+                //         midi: note.row,
+                //         velocity: note.velocity, // Use the note's own velocity
+                //         ticks: note.column * this.midiPlayer.getGlobalBPM() * 8,
+                //         durationTicks: note.length * this.midiPlayer.getGlobalBPM() * 8
+                //     });
+                // }
 
                 // Add the track to the player
                 await this.addTrack(
                     trackId, 
-                    midi,
+                    notes,
                     soundfontResult.data
                 );
                 
