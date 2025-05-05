@@ -1,6 +1,6 @@
 # Makefile for the beatgen project
 
-.PHONY: install build run clean install-frontend run-frontend install-backend run-backend all help regen-certs
+.PHONY: install build run clean install-frontend run-frontend install-backend run-backend all help regen-certs lint lint-backend lint-frontend format format-backend format-frontend
 
 # Default target
 all: install build run
@@ -71,11 +71,22 @@ regen-certs:
 	mkcert -key-file frontend/.cert/key.pem -cert-file frontend/.cert/cert.pem localhost 127.0.0.1 ::1
 	@echo "Certificates regenerated in frontend/.cert/" 
 
-lint: ## check code style with ruff and black
-	ruff check . && \
-	black --check --diff .
+lint-backend: ## check code style with ruff and black
+	cd backend && ruff check . && \
+		black --check --diff .
 
-format: ## format code with ruff and black
-	ruff check --select F401 --fix . && \
-	ruff format . && \
-	black .
+format-backend: ## format code with ruff and black
+	cd backend && ruff check --fix .
+	# Temporarily removed: && \
+	#	ruff format . && \
+	#	black .
+
+lint-frontend: ## check code style with eslint
+	cd frontend && npm run lint
+
+format-frontend: ## format code with eslint
+	cd frontend && npm run format
+
+lint: lint-backend lint-frontend
+
+format: format-backend format-frontend

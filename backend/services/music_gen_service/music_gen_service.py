@@ -57,9 +57,7 @@ class Instrument:
     description: str
     soundfont_name: str
     storage_key: str
-    role: str = (
-        ""  # For tracking the instrument's role in the composition (melody, chords, etc.)
-    )
+    role: str = ""  # For tracking the instrument's role in the composition (melody, chords, etc.)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert instrument to a dictionary for serialization"""
