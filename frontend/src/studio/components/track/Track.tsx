@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import { Box } from '@mui/material';
 import { Position } from './types';
 import { useStudioStore } from '../../stores/studioStore';
@@ -37,6 +37,22 @@ function Track(props: TrackProps) {
   const openDrumMachine = useStudioStore(state => state.openDrumMachine);
   
   const { openPianoRoll, closePianoRoll } = usePianoRollStore(); // Corrected closePianoRoll access
+
+  // Effect for cleanup on unmount
+  useEffect(() => {
+    // Return the cleanup function
+    return () => {
+      console.log(`Track component unmounting, cleaning up resources for track ID: ${id}`);
+      // Access the transport controller via the store instance
+      const transport = store?.getTransport(); 
+      if (transport) {
+        // Call the removeTrack method which should handle sampler cleanup
+        transport.removeTrack(id); 
+      } else {
+        console.warn(`Store or transport not available during cleanup for track ${id}`);
+      }
+    };
+  }, [id, store]); // Depend on id and store instance
 
   // Fix: Use useMemo to derive fullTrack from tracks array
   const fullTrack = useMemo(() => tracks.find(t => t.id === id), [tracks, id]);

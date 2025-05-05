@@ -317,21 +317,6 @@ async def delayed_request_cleanup(request_id: str, delay_seconds: int = 10):
 
 async def process_generate_request(request_id: str, context, sse_queue: SSEQueueManager, session: Session):
     """Process a generate mode request"""
-    # Stream fake AI response chunks (for now)
-    full_response = ""
-    chunks = ["Generating music based on your prompt... ", 
-             "This will include notes, harmonies, and rhythm patterns... ",
-             "Creating musical elements that match your description... "]
-    
-    # Process the response in stages
-    await sse_queue.stage("processing", "Creating your music with AI")
-    
-    # Add each chunk with a delay to simulate processing
-    for chunk in chunks:
-        await asyncio.sleep(0.5)  # Simulate processing time
-        await sse_queue.add_chunk(chunk)
-        full_response += chunk
-    
     
     # Generate music with music_gen_service, passing the session
     try:
@@ -350,7 +335,7 @@ async def process_generate_request(request_id: str, context, sse_queue: SSEQueue
             
             # Create final response
             final_response = GenerateResponse(
-                response=full_response,
+                response=json.dumps(response),
                 tracks=tracks,
                 actions=actions
             )

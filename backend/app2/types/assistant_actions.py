@@ -52,6 +52,7 @@ class ActionType(str, Enum):
     CHANGE_TIME_SIGNATURE = "change_time_signature"
     ADD_TRACK = "add_track"
     ADD_DRUM_TRACK = "add_drum_track"
+    ADD_SAMPLER_TRACK = "add_sampler_track"
     ADJUST_VOLUME = "adjust_volume"
     ADJUST_PAN = "adjust_pan"
     TOGGLE_MUTE = "toggle_mute"
@@ -127,6 +128,13 @@ class AssistantAction(BaseModel):
         return cls(
             action_type=ActionType.ADD_TRACK,
             data=TrackData(type=TrackType.MIDI, track_data=track)
+        )
+        
+    @classmethod
+    def add_sampler_track(cls, track: SamplerTrackRead) -> "AssistantAction":
+        return cls(
+            action_type=ActionType.ADD_SAMPLER_TRACK,
+            data=TrackData(type=TrackType.SAMPLER, track_data=track)
         )
         
     @classmethod

@@ -184,7 +184,7 @@ export interface RootState {
   // Fix: Use ProjectWithTracks directly
   loadProject: (projectId: string) => Promise<ProjectWithTracks | null>; 
   loadTrack: (track: CombinedTrack) => Promise<void>;
-
+  loadDrumTrack: (track: CombinedTrack) => Promise<void>;
   // Track Management (Core)
   tracks: CombinedTrack[];
   findTrackById: (trackId: string) => CombinedTrack | undefined;

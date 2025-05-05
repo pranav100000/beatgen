@@ -6,7 +6,8 @@ import {
   TextField, 
   IconButton, 
   CircularProgress,
-  Chip
+  Chip,
+  useTheme
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
@@ -37,6 +38,8 @@ import { DrumTrackPayload, MidiTrackPayload } from '../../stores/types';
 import { MidiTrackRead } from 'src/platform/types/track_models/midi_track';
 import { SamplerTrackRead } from 'src/platform/types/track_models/sampler_track';
 import { DrumTrackRead } from 'src/platform/types/track_models/drum_track';
+import { alpha } from '@mui/material/styles';
+
 interface Message {
   text: string;
   isUser: boolean;
@@ -57,6 +60,7 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
+  const theme = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -82,6 +86,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
     handleTrackPositionChange,
     handleProjectParamChange,
     loadTrack,
+    loadDrumTrack,
     tracks
   } = useStudioStore();
   
@@ -436,6 +441,54 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
           handleProjectParamChange('bpm', actionData.value);
         }
         break;
+      case 'add_drum_track':
+        console.log('🟢 add_track action received:', actionData);
+        // New action type for adding an individual generated track with notes
+        if (store) {
+          try {
+            const trackId = actionData.trackId || crypto.randomUUID();
+            const instrumentId = actionData.instrument_id;  // Fix: map from snake_case to camelCase
+            const storageKey = actionData.storageKey;
+            const hasNotes = actionData.hasNotes || false;
+            
+            const trackType = actionData.type;
+            
+            let actionTrackData;
+            let payload: DrumTrackPayload;
+            const drumTrackData = actionData.track_data as DrumTrackRead;
+            // Ensure type is set, although it should come from action
+            console.log('🟢 Drum actionTrackData for CombinedTrack:', drumTrackData);
+
+            // Construct the CombinedTrack object
+            const combinedDrumTrack: CombinedTrack = {
+              // Populate top-level CombinedTrack fields
+              // Use data from midiTrackData where available, otherwise provide defaults
+              // processTrack will apply defaults anyway, but being explicit helps clarity
+              id: drumTrackData.id,
+              name: drumTrackData.name || 'New MIDI Track', // Use name from data or default
+              type: 'drum',
+              volume: 80, // Default volume
+              pan: 0,    // Default pan
+              mute: false, // Default mute state
+              x_position: 0, // Default position
+              y_position: 0, // Default position
+              // Fields related to audio clips, might not be relevant here or default to 0
+              trim_start_ticks: 0,
+              trim_end_ticks: 0,
+              duration_ticks: 480*16,
+
+              // Nest the specific track data
+              track: drumTrackData
+            };
+
+            console.log('🟢 Constructed CombinedTrack:', combinedDrumTrack);
+            loadDrumTrack(combinedDrumTrack); // Pass the correctly structured object
+            break;
+          } catch (error) {
+            console.error('Failed to add AI generated track:', error);
+          }
+        }
+        break;
       case 'add_track':
         console.log('🟢 add_track action received:', actionData);
         // New action type for adding an individual generated track with notes
@@ -448,7 +501,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             
             const trackType = actionData.type;
             let actionTrackData;
-            let payload: MidiTrackPayload | DrumTrackPayload;
             switch (trackType) {
               case 'midi':
                 const midiTrackData = actionData.track_data as MidiTrackRead;
@@ -471,7 +523,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                   // Fields related to audio clips, might not be relevant here or default to 0
                   trim_start_ticks: 0,
                   trim_end_ticks: 0,
-                  duration_ticks: undefined,
+                  duration_ticks: 480*16,
 
                   // Nest the specific track data
                   track: midiTrackData
@@ -548,6 +600,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                       console.log('Converting notes with format:', notes[0]);
                       await store.getMidiManager().updateTrack(newTrack.id, notes);
                       console.log(`Successfully added ${notes.length} notes to track ${newTrack.id}`);
+
+                      // ---> ADDED: Update track duration based on added notes <--- 
+                      if (notes.length > 0) {
+                        // Calculate the maximum end tick
+                        const maxEndTick = Math.max(...notes.map(n => (n.column || 0) + (n.length || 0)));
+                        console.log(`Calculated maxEndTick for AI track ${newTrack.id}: ${maxEndTick}`);
+                        
+                        // Get the update function from the store
+                        const { updateTrackState } = useStudioStore.getState();
+                        if (updateTrackState) {
+                          // Update duration and ensure trim_end covers the new duration
+                          updateTrackState(newTrack.id, {
+                            duration_ticks: maxEndTick,
+                            // Set trim_end_ticks to match duration if it was null or shorter
+                            trim_end_ticks: Math.max(newTrack.trim_end_ticks || 0, maxEndTick)
+                          });
+                          console.log(`Updated duration_ticks and trim_end_ticks for track ${newTrack.id}`);
+                        } else {
+                           console.error("Could not find updateTrackState to update duration.");
+                        }
+                      }
+                      // ---> END ADDED CODE <--- 
+
                     } catch (error) {
                       console.error("Failed to add notes to track:", error);
                     }
@@ -570,12 +645,30 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                       }));
                       
                       await store.getMidiManager().updateTrack(newTrack.id, notes);
+
+                       // ---> ADDED: Update track duration based on added notes (Fallback Path) <--- 
+                       if (notes.length > 0) {
+                        const maxEndTick = Math.max(...notes.map(n => (n.column || 0) + (n.length || 0)));
+                        console.log(`Calculated maxEndTick (fallback) for AI track ${newTrack.id}: ${maxEndTick}`);
+                        const { updateTrackState } = useStudioStore.getState();
+                        if (updateTrackState) {
+                          updateTrackState(newTrack.id, {
+                            duration_ticks: maxEndTick,
+                            trim_end_ticks: Math.max(newTrack.trim_end_ticks || 0, maxEndTick)
+                          });
+                          console.log(`Updated duration_ticks and trim_end_ticks (fallback) for track ${newTrack.id}`);
+                        } else {
+                           console.error("Could not find updateTrackState (fallback) to update duration.");
+                        }
+                      }
+                      // ---> END ADDED CODE <--- 
+
                     } catch (error) {
                       console.warn("Failed to add notes to track using fallback method", error);
                     }
+                  } else {
+                    console.warn(`No notes available for track ${newTrack.id}`);
                   }
-                } else {
-                  console.warn(`No notes available for track ${newTrack.id}`);
                 }
               },
               undo: async () => {
@@ -849,11 +942,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
         sx={{
           height: '100%',
           width: 350,
-          bgcolor: 'rgba(22, 22, 22, 0.95)',
-          color: 'white',
+          bgcolor: alpha(theme.palette.background.paper, 0.95),
+          color: 'text.primary',
           display: 'flex',
           flexDirection: 'column',
-          borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+          borderLeft: `1px solid ${theme.palette.divider}`,
           transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 225ms cubic-bezier(0, 0, 0.2, 1)',
           visibility: isVisible ? 'visible' : 'hidden'
@@ -866,8 +959,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
           alignItems: 'center',
           justifyContent: 'space-between',
           px: 0,
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          bgcolor: 'rgba(0, 0, 0, 0.2)'
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : alpha(theme.palette.background.paper, 0.9),
+          flexShrink: 0
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1 }}>
             <SmartToyIcon sx={{ fontSize: 20 }} />
@@ -880,9 +974,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             size="small" 
             onClick={onClose} 
             sx={{ 
-              color: 'white',
+              color: 'inherit',
               '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.1)'
+                bgcolor: theme.palette.action.hover
               }
             }}
             aria-label="Close assistant"
@@ -920,11 +1014,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
               />
             )
           ))}
-          {isLoading && (
+          {/* {isLoading && (
             <Box sx={{ alignSelf: 'flex-start', p: 1 }}>
-              <CircularProgress size={24} />
+              <CircularProgress size={24} color="inherit"/>
             </Box>
-          )}
+          )} */}
           <div ref={messagesEndRef} />
         </Box>
 
@@ -932,8 +1026,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
         <Box sx={{ 
           p: 2, 
           display: 'flex', 
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-          bgcolor: 'rgba(0, 0, 0, 0.2)'
+          borderTop: `1px solid ${theme.palette.divider}`,
+          bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : alpha(theme.palette.background.paper, 0.9),
         }}>
           <Box sx={{ position: 'relative', width: '100%' }}>
             {/* Chips Box */}
@@ -997,16 +1091,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
               disabled={isLoading}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: 'white',
-                  bgcolor: 'rgba(30, 30, 30, 0.8)',
+                  color: theme.palette.text.primary,
+                  bgcolor: alpha(theme.palette.background.default, 0.8),
                   '& fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.2)'
+                    borderColor: theme.palette.divider
                   },
                   '&:hover fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.4)'
+                    borderColor: theme.palette.text.secondary
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: 'primary.secondary'
+                    borderColor: 'primary.main'
                   },
                   '& .MuiOutlinedInput-input': {
                     pt: '20px',
@@ -1019,7 +1113,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                 },
                 '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
                   border: '1px solid',
-                  borderColor: 'primary.secondary'
+                  borderColor: 'primary.main'
                 }
               }}
             />

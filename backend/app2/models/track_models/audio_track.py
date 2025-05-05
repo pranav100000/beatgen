@@ -2,6 +2,8 @@
 Audio Track model for SQL database
 """
 from typing import Optional, TYPE_CHECKING, List
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import SQLModel, Field, Relationship
 import uuid
 
@@ -20,8 +22,7 @@ class AudioTrackBase(TrackBase):
     audio_file_size: int
     audio_file_duration: float
     audio_file_sample_rate: int
-    
-
+    waveform_data: Optional[List[float]] = Field(default=None, sa_column=Column(JSONB))
 # Database model
 class AudioTrack(AudioTrackBase, table=True):
     """Audio Track model for the database"""

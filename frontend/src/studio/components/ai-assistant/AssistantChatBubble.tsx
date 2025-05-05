@@ -27,11 +27,8 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
   
   // Add keyframes to the DOM when component mounts
   useEffect(() => {
-    console.log('💥 STREAMING STATUS CHANGE in AssistantChatBubble:', isStreaming);
-    
     if (isStreaming) {
       const styleElement = document.createElement('style');
-      styleElement.type = 'text/css';
       styleElement.appendChild(document.createTextNode(cursorBlinkKeyframes));
       document.head.appendChild(styleElement);
       

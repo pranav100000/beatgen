@@ -441,7 +441,7 @@ const TrackControls: React.FC<TrackControlsProps> = ({
                 onClick={handleMuteToggle}
                 sx={{ 
                   bgcolor: track.mute ? theme.palette.warning.light : theme.palette.action.disabledBackground,
-                  color: track.mute ? theme.palette.warning.contrastText : 'text.primary',
+                  color: track.mute ? theme.palette.warning.contrastText : trackColor,
                   borderRadius: '3px',
                   px: 1.2,
                   py: 0.4,
@@ -458,8 +458,29 @@ const TrackControls: React.FC<TrackControlsProps> = ({
             </Tooltip>
         </Box>
         
-        {/* Solo Button - Needs clarification on where solo state lives */}
-        {/* <Box sx={{ display: 'flex', justifyContent: 'center' }}> ... Solo button ... </Box> */}
+        {/* Solo Button */}
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+          <Tooltip title={track.solo ? "Unsolo" : "Solo"}>
+            <Box 
+              onClick={handleSoloToggle}
+              sx={{ 
+                bgcolor: track.solo ? '#ffc107' : 'rgba(255, 255, 255, 0.1)',
+                color: track.solo ? '#000' : trackColor,
+                borderRadius: '3px',
+                px: 1.2,
+                py: 0.4,
+                fontSize: '12px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                '&:hover': {
+                  bgcolor: track.solo ? '#e6ac00' : 'rgba(255, 255, 255, 0.15)'
+                }
+              }}
+            >
+              S
+            </Box>
+          </Tooltip>
+        </Box>
       </Box>
     </Box>
   );

@@ -58,6 +58,7 @@ class CombinedTrack(SQLModel):
     volume: Optional[float] = 0.0
     pan: Optional[float] = 0.0
     mute: Optional[bool] = False
+    solo: Optional[bool] = False
     x_position: Optional[float] = 0.0
     y_position: Optional[float] = 0.0
     trim_start_ticks: Optional[int] = 0

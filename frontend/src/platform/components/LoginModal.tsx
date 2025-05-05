@@ -13,6 +13,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import GoogleIcon from '@mui/icons-material/Google';
 import { useState } from 'react';
 import { useAuth } from '../auth/auth-context';
+import React from 'react';
 
 const style = {
   position: 'absolute',

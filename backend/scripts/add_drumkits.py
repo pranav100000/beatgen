@@ -15,9 +15,8 @@ import uuid
 import requests
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-
-# Add the parent directory to sys.path to import app modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import librosa  # Added import
+import numpy as np # Added import
 from app2.types.genre_types import GenreType
 from app2.types.drum_sample_types import DrumSampleType
 from app2.infrastructure.database.supabase_client import supabase
@@ -62,6 +61,8 @@ async def create_drum_sample_record(
     internal_kit_name: str, # Added internal kit name for path consistency
     category: DrumSampleType = DrumSampleType.KICK,
     genre: GenreType = GenreType.HIP_HOP,
+    duration: Optional[float] = None,  # Added duration parameter
+    waveform_data: Optional[List[float]] = None, # Added waveform_data parameter
 ) -> Dict[str, Any]:
     """
     Create a record in the drum_samples_public table for a single sample from a kit.
@@ -76,6 +77,8 @@ async def create_drum_sample_record(
         file_format: The file extension (e.g., wav, mp3).
         file_size: The size of the file in bytes.
         internal_kit_name: Lowercase, underscore-separated kit name for path.
+        duration: The duration of the drum sample in seconds.
+        waveform_data: The waveform data of the drum sample.
 
     Returns:
         The created drum sample record including the generated ID and storage_key.
@@ -103,6 +106,14 @@ async def create_drum_sample_record(
         "created_at": now,
         "updated_at": now
     }
+
+    # Add duration and waveform_data if they exist
+    if duration is not None:
+        sample_data["duration"] = duration
+    if waveform_data is not None:
+        # Ensure waveform_data is stored as JSON in the DB if the column type is JSON/JSONB
+        # If the column type is TEXT, it will be stored as a string representation of the list.
+        sample_data["waveform_data"] = waveform_data
 
     logger.info(f"Attempting to create drum sample record with ID: {sample_id}, storage_key: {storage_key}, category: {category.name}")
     try:
@@ -157,6 +168,33 @@ async def upload_and_record_sample(
 
     logger.info(f"Processing sample file: {file_name} for kit: {kit_name} (Category: {category.name})")
 
+    # --- Audio Processing --- Start
+    duration: Optional[float] = None
+    waveform_preview: Optional[List[float]] = None
+    try:
+        logger.debug(f"Loading audio file {file_path} with librosa")
+        # Load audio file; sr=None preserves original sample rate
+        waveform, sampling_rate = librosa.load(file_path, sr=None)
+        duration = librosa.get_duration(y=waveform, sr=sampling_rate)
+
+        # Generate waveform preview (e.g., RMS over ~100 points)
+        # Adjust n_fft and hop_length as needed for desired detail/size
+        n_fft = 2048 # Window size for FFT analysis
+        hop_length = max(1, len(waveform) // 100) # Aim for roughly 100 data points
+        rms = librosa.feature.rms(y=waveform, frame_length=n_fft, hop_length=hop_length)[0]
+        # Normalize RMS values to be between 0 and 1 for consistent visualization
+        rms_normalized = (rms - np.min(rms)) / (np.max(rms) - np.min(rms) + 1e-6) # Add epsilon to avoid division by zero
+        waveform_preview = [float(val) for val in rms_normalized] # Convert to list of standard floats
+
+        logger.debug(f"Extracted duration: {duration:.2f}s and waveform preview ({len(waveform_preview)} points) for {file_name}")
+
+    except Exception as audio_e:
+        logger.error(f"Error processing audio file {file_name} with librosa: {audio_e}")
+        # Decide if you want to proceed without duration/waveform or raise an error
+        # raise audio_e # Option 1: Stop processing this file
+        logger.warning(f"Proceeding without duration and waveform data for {file_name}.") # Option 2: Continue
+    # --- Audio Processing --- End
+
     # Create storage client
     storage = SupabaseStorage(BUCKET_NAME)
 
@@ -171,7 +209,9 @@ async def upload_and_record_sample(
             # type is omitted
             file_format=file_format,
             file_size=file_size,
-            internal_kit_name=internal_kit_name
+            internal_kit_name=internal_kit_name,
+            duration=duration,              # Pass duration
+            waveform_data=waveform_preview  # Pass waveform data
         )
 
         storage_key = db_record['storage_key'] # Get the final storage key

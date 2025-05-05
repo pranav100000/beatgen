@@ -122,5 +122,6 @@ class DrumSamplePublicBase(FileBase):
     genre: GenreType
     category: DrumSampleType
     kit_name: str
+    duration: Optional[float] = None
     description: Optional[str] = None
     waveform_data: Optional[List[float]] = Field(default=None, sa_column=Column(JSONB))

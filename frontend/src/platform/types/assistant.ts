@@ -11,6 +11,7 @@ export type ActionType =
   | "change_time_signature"
   | "add_track"
   | "add_drum_track"
+  | "add_sampler_track"
   | "adjust_volume"
   | "adjust_pan"
   | "toggle_mute"

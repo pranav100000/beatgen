@@ -70,3 +70,11 @@ regen-certs:
 	@mkdir -p frontend/.cert
 	mkcert -key-file frontend/.cert/key.pem -cert-file frontend/.cert/cert.pem localhost 127.0.0.1 ::1
 	@echo "Certificates regenerated in frontend/.cert/" 
+
+lint: ## check code style with ruff and black
+	ruff check . && \
+	black --check --diff .
+
+format: ## format code with ruff and black
+	ruff format . && \
+	black .
