@@ -17,7 +17,7 @@ class MidiSampler {
     
     // Single pool of players for both direct playback and scheduled notes
     private playerPool: Tone.GrainPlayer[] = [];
-    private readonly POOL_SIZE = 300; // Larger pool to handle more simultaneous notes
+    private readonly POOL_SIZE = 100; // Larger pool to handle more simultaneous notes
     
     // Master gain node for volume control
     private gainNode: Tone.Gain;
@@ -215,7 +215,9 @@ class MidiSampler {
         console.log("this.baseNote", this.baseNote);
         console.log("this.currentVolume", this.currentVolume);
         console.log("this.isMuted", this.isMuted);
-        console.log("grainPlayers", this.playerPool);
+        console.log("this.grainSize", this.player?.grainSize);
+        console.log("this.overlap", this.player?.overlap);
+        console.log("this.volume", this.player?.volume.value);
         
         if (!this.player?.buffer) {
             this.log("Cannot play: audio not ready");

@@ -147,7 +147,7 @@ export const createDrumTrackRecord = async (drumData: DrumTrackCreate): Promise<
  * @returns Array of sounds
  */
 export const getSounds = async (): Promise<AudioTrackRead[]> => {
-  const response = await apiClient.get('/sounds');
+  const response = await apiClient.get('/sounds/audio');
   return response.data;
 };
 
@@ -209,10 +209,24 @@ const downloadFile = async (prefix: string, storageKey: string): Promise<Blob> =
 export const downloadAudioTrackFile = async (storageKey: string): Promise<Blob> => {
   // Define the specific prefix for audio tracks
   const prefix = 'storage/v1/object/public/tracks'; 
-  return downloadFile(prefix, storageKey);
+  try {
+    console.log(`Attempting to download audio track file (storageKey ${storageKey}) from tracks prefix.`);
+    return await downloadFile(prefix, storageKey);
+  } catch (error) {
+    console.warn(`Failed to download audio track file from tracks prefix (storageKey ${storageKey}). Falling back to drum samples.`);
+    try {
+      console.log(`Attempting to download drum sample file (storageKey ${storageKey}) as fallback.`);
+      return await downloadDrumSampleFile(storageKey);
+    } catch (fallbackError) {
+      console.error(`Error downloading file after fallback to drum samples (storageKey ${storageKey}): ${fallbackError}`);
+      // Re-throw the original error or the fallback error, depending on desired behavior.
+      // Throwing the fallback error might be more informative here.
+      throw fallbackError; 
+    }
+  }
 };
 
 export const downloadDrumSampleFile = async (storageKey: string): Promise<Blob> => {
   const prefix = 'storage/v1/object/public/assets/drum_samples_public';
-  return downloadFile(prefix, storageKey);
+  return await downloadFile(prefix, storageKey);
 };

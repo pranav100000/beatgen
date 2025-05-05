@@ -7,6 +7,7 @@ import uuid
 
 from app2.models.base import DefaultUUIDStandardBase, TimestampMixin, TrackBase, all_optional
 from app2.types.track_types import TrackType
+from app2.models.track_models.sampler_track import SamplerTrackRead
 
 # Handle circular imports
 if TYPE_CHECKING:
@@ -49,6 +50,7 @@ class DrumTrack(DrumTrackBase, table=True):
 class DrumTrackRead(DrumTrackBase):
     """API response model for drum track data"""
     sampler_track_ids: list[uuid.UUID] = Field(default_factory=list)
+    sampler_tracks: list["SamplerTrackRead"] = Field(default_factory=list)
 
 class DrumTrackCreate(DrumTrackBase):
     """API request model for creating a drum track"""

@@ -34,6 +34,7 @@ export interface DrumSamplePublic {
   genre: GenreType;
   category: DrumSampleType;
   kit_name: string;
+  duration?: number | null;
   description?: string | null;
   waveform_data?: number[] | null;
 }
@@ -52,6 +53,7 @@ export interface DrumSamplePublicBase {
   genre: GenreType;
   category: DrumSampleType;
   kit_name: string;
+  duration?: number | null;
   description?: string | null;
   waveform_data?: number[] | null;
 }
@@ -70,6 +72,7 @@ export interface DrumSamplePublicCreate {
   genre: GenreType;
   category: DrumSampleType;
   kit_name: string;
+  duration?: number | null;
   description?: string | null;
   waveform_data?: number[] | null;
 }
@@ -94,6 +97,7 @@ export interface DrumSamplePublicRead {
   genre: GenreType;
   category: DrumSampleType;
   kit_name: string;
+  duration?: number | null;
   description?: string | null;
   waveform_data?: number[] | null;
 }
@@ -112,6 +116,7 @@ export interface DrumSamplePublicUpdate {
   genre?: GenreType;
   category?: DrumSampleType;
   kit_name?: string;
+  duration?: number | null;
   description?: string | null;
   waveform_data?: number[] | null;
 }

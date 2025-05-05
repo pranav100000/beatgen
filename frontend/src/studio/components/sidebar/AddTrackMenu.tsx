@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, MenuItem, ListItemIcon, ListItemText, Divider } from '@mui/material';
+import { Menu, MenuItem, ListItemIcon, ListItemText, Divider, useTheme } from '@mui/material';
 import PianoIcon from '@mui/icons-material/Piano';
 import AudioFileIcon from '@mui/icons-material/AudioFile';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
@@ -27,6 +27,7 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
   onAddTrack, 
   onFileUpload 
 }) => {
+  const theme = useTheme();
   const [isVirtualInstrumentModalOpen, setIsVirtualInstrumentModalOpen] = useState(false);
   const [isDrumMachineModalOpen, setIsDrumMachineModalOpen] = useState(false);
   
@@ -54,7 +55,12 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
         anchorEl={anchorEl}
         onClose={onClose}
         PaperProps={{
-          sx: { bgcolor: '#222', color: 'white', minWidth: 180 }
+          sx: { 
+            bgcolor: 'background.paper', 
+            color: 'text.primary', 
+            minWidth: 180, 
+            boxShadow: theme.shadows[3]
+          } 
         }}
       >
         <MenuItem onClick={() => {
@@ -65,7 +71,7 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
             fontSize: '13px',
             py: 1,
             '&:hover': { 
-              bgcolor: 'rgba(33, 150, 243, 0.2)' 
+              bgcolor: theme.palette.action.hover 
             }
           }}
         >
@@ -81,7 +87,7 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
             fontSize: '13px',
             py: 1,
             '&:hover': { 
-              bgcolor: 'rgba(255, 152, 0, 0.2)' 
+              bgcolor: theme.palette.action.hover 
             }
           }}
         >
@@ -94,7 +100,7 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
             fontSize: '13px',
             py: 1,
             '&:hover': { 
-              bgcolor: 'rgba(76, 175, 80, 0.2)' 
+              bgcolor: theme.palette.action.hover
             }
           }}
         >
@@ -114,7 +120,7 @@ export const AddTrackMenu: React.FC<AddTrackMenuProps> = ({
             fontSize: '13px',
             py: 1,
             '&:hover': { 
-              bgcolor: 'rgba(156, 39, 176, 0.2)' 
+              bgcolor: theme.palette.action.hover 
             }
           }}
         >

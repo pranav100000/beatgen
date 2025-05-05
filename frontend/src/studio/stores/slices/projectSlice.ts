@@ -26,6 +26,7 @@ export interface ProjectSlice {
   keySignature: string;
   loadProject: (projectId: string) => Promise<ProjectWithTracks | null>;
   loadTrack: (track: CombinedTrack) => Promise<void>;
+  loadDrumTrack: (track: CombinedTrack) => Promise<void>;
   handleProjectParamChange: (param: ProjectParam, value: any) => void;
   handleKeySignatureChange: (keySignature: string) => void;
 }
@@ -60,15 +61,6 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
             executeHistoryAction(bpmAction);
         }
         break;
-      case 'timeSignature':
-        const [numerator, denominator] = value as [number, number];
-        store.projectManager.setTimeSignature(numerator, denominator);
-        Tone.getTransport().timeSignature = value as [number, number];
-        if (executeHistoryAction) {
-            const timeAction = new Actions.TimeSignature(get, oldValue as [number, number], value as [number, number], rootGet().bpm);
-            executeHistoryAction(timeAction);
-        }
-        break;
       case 'keySignature':
         const keySigValue = value as string;
         if (executeHistoryAction) {
@@ -76,14 +68,101 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
             executeHistoryAction(keyAction);
         }
         break;
+      // case 'timeSignature':
+      //   const [numerator, denominator] = value as [number, number];
+      //   store.projectManager.setTimeSignature(numerator, denominator);
+      //   Tone.getTransport().timeSignature = value as [number, number];
+      //   if (executeHistoryAction) {
+      //       const timeAction = new Actions.TimeSignature(get, oldValue as [number, number], value as [number, number], rootGet().bpm);
+      //       executeHistoryAction(timeAction);
+      //   }
+      //   break;
     }
   };
+
+  const loadDrumTrack = async (track: CombinedTrack) => {
+    const { _withErrorHandling, updateTracks, tracks } = rootGet(); // Added tracks for index calculation
+    if (!_withErrorHandling) return;
+
+    const loadLogic = async (): Promise<void> => {
+      const drumTrackData = track.track as DrumTrackRead;
+      if (!drumTrackData || !drumTrackData.sampler_tracks) {
+        console.error(`Drum track ${track.id} is missing nested track data or sampler_tracks.`);
+        return;
+      }
+
+      const currentTrackCount = tracks.length; // Get current count before processing
+
+      // 1. Process the main drum track
+      // Ensure index passed to processTrack reflects potential position if added
+      const drumTrackState = await processTrack(track, currentTrackCount); 
+      if (!drumTrackState) {
+        console.error(`Failed to process main drum track ${track.id}`);
+        return;
+      }
+
+      // 2. Process associated sampler tracks
+      const samplerTrackStates: CombinedTrack[] = [];
+      const samplerProcessingPromises = drumTrackData.sampler_tracks.map(async (samplerTrack, samplerIndex) => {
+        const combinedSamplerTrack: CombinedTrack = {
+          id: samplerTrack.id,
+          name: samplerTrack.name,
+          type: 'sampler',
+          volume: track.volume, // Inherit properties from parent drum track? Or use sampler's own?
+          pan: track.pan,       // Assuming sampler tracks don't have their own top-level vol/pan in API
+          mute: track.mute,
+          x_position: track.x_position, // Samplers might not have independent positions?
+          y_position: track.y_position, 
+          trim_start_ticks: track.trim_start_ticks ?? 0, // Use parent track's trim/duration
+          trim_end_ticks: track.trim_end_ticks ?? 0,
+          duration_ticks: track.duration_ticks ?? 0,
+          track: { // Construct the nested 'track' part for the sampler
+            ...samplerTrack, // Spread the specific SamplerTrackRead data
+            id: samplerTrack.id, // Redundant but ensures consistency
+            name: samplerTrack.name,
+            // Populate other sampler-specific fields needed by processTrack/connect
+            base_midi_note: samplerTrack.base_midi_note,
+            grain_size: samplerTrack.grain_size,
+            overlap: samplerTrack.overlap,
+            midi_notes_json: samplerTrack.midi_notes_json,
+            audio_storage_key: samplerTrack.audio_storage_key, // Make sure storage key is included
+            audio_file_format: samplerTrack.audio_file_format,
+            drum_track_id: track.id // Explicitly link back to the drum track
+          }
+        };
+        // Process each sampler, giving it a unique index based on drum track's position
+        const samplerState = await processTrack(combinedSamplerTrack, currentTrackCount + 1 + samplerIndex); 
+        if (samplerState) {
+          samplerTrackStates.push(samplerState);
+        } else {
+          console.warn(`Failed to process sampler track ${samplerTrack.id} for drum track ${track.id}`);
+        }
+      });
+      await Promise.all(samplerProcessingPromises);
+
+      const allTracksToLoad = [drumTrackState, ...samplerTrackStates];
+
+      // 3. Download and Cache Audio Files for all involved tracks
+      await downloadAndCacheAudioFiles(allTracksToLoad);
+
+      // 4. Update Zustand state with all tracks together
+      // Add the new tracks to the existing ones
+      updateTracks([...get().tracks, ...allTracksToLoad]); 
+
+      // 5. Connect all tracks to engines
+      await connectTracksToEngines(allTracksToLoad);
+
+      console.log(`Successfully loaded drum track ${track.id} and its ${samplerTrackStates.length} sampler tracks.`);
+    };
+
+    await _withErrorHandling(loadLogic, `loadDrumTrack: ${track.id}`)();
+  }
 
   const loadTrack = async (track: CombinedTrack) => {
     const trackState = await processTrack(track, rootGet().tracks.length);
     
     // 5. Update Zustand state with initial track data
-    get().updateTracks([trackState]);
+    get().updateTracks([...get().tracks, trackState]);
     
     // 6. Connect tracks to engines (will load audio from Dexie)
     await connectTracksToEngines([trackState]);
@@ -362,7 +441,7 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
                           track.id, undefined, baseMidiNote, grainSize, overlap
                       );
                   }
-                  const convertedNotes = convertJsonToNotes(track.id, samplerTrackData?.midi_notes_json);
+                  const convertedNotes = convertJsonToNotes(samplerTrackData?.midi_notes_json, track.id);
                   console.log(`Converted ${convertedNotes.length} notes for sampler track ${track.id}: ${JSON.stringify(convertedNotes)}`);
                   midiManager.updateTrack(track.id, convertedNotes);
                   samplerController.registerTrackSubscription(track.id, midiManager);
@@ -508,6 +587,7 @@ export const createProjectSlice: StoreSliceCreator<ProjectSlice> = (set, get) =>
     keySignature: "C major",
     loadProject,
     loadTrack,
+    loadDrumTrack,
     handleProjectParamChange,
     handleKeySignatureChange,
   };

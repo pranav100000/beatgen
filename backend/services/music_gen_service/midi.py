@@ -6,10 +6,72 @@ import logging
 import mido
 from mido import Message, MidiFile, MidiTrack
 from music21 import harmony
+from app2.core.config import settings
 
 from services.music_gen_service.music_utils import get_root_note_midi
 
 logger = logging.getLogger(__name__)
+
+
+
+def transform_drum_beats_to_midi_format(drum_pattern: List[bool]) -> Dict[str, Any]:
+    """
+    Transform drum beat patterns into MIDI format compatible with the MIDIGenerator class.
+    
+    Args:
+        drum_beat_data: Output from the create_drum_beat tool with boolean patterns
+            {
+                "drum_beats": [
+                    {
+                        "drum_sound_id": "string",
+                        "pattern": [true, false, ...] # 32 booleans
+                    },
+                    ...
+                ]
+            }
+            
+    Returns:
+        Dictionary formatted for use with MIDIGenerator class
+    """
+    # Initialize the result structure
+    result = {
+        "name": "Drums",
+        "channel": 9,  # MIDI channel 9 is reserved for percussion
+        "patterns": [
+            {
+                "notes": []
+            }
+        ]
+    }
+    
+    # Handle case where no drum beats are provided
+    if not drum_pattern:
+        return result
+    
+    notes = []
+    sixteenth_duration = 0.25  # Duration of a 16th note in beats
+    
+    # Process each drum sound
+    for i, hit in enumerate(drum_pattern):
+        # Get pitch from mapping or use a default
+        pitch = settings.audio.DEFAULT_SAMPLER_BASE_NOTE
+        
+        # Process the pattern (32 booleans representing 16th notes over 2 bars)
+        if hit:
+            # Calculate start time in beats (each 16th note is 0.25 beats in 4/4 time)
+            start_time = i * sixteenth_duration
+            
+            # Create a note event
+            note = {
+                "pitch": pitch,
+                "start": start_time * 480,  # Convert to ticks (480 ticks per beat)
+                "duration": sixteenth_duration * 480,  # Duration in ticks
+                "velocity": 0.8  # Default velocity for drums
+            }
+            
+            notes.append(note)
+    
+    return {"notes": notes}
 
 def transform_bars_to_instrument_format(data: Dict[str, Any], instrument: dict, key: str) -> Dict[str, Any]:
     """

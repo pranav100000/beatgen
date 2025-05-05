@@ -18,6 +18,7 @@ export interface AudioTrack {
   audio_file_size: number;
   audio_file_duration: number;
   audio_file_sample_rate: number;
+  waveform_data?: number[] | null;
   user_id: string;
 }
 /**
@@ -33,6 +34,7 @@ export interface AudioTrackBase {
   audio_file_size: number;
   audio_file_duration: number;
   audio_file_sample_rate: number;
+  waveform_data?: number[] | null;
 }
 /**
  * API request model for creating an audio track
@@ -47,6 +49,7 @@ export interface AudioTrackCreate {
   audio_file_size: number;
   audio_file_duration: number;
   audio_file_sample_rate: number;
+  waveform_data?: number[] | null;
 }
 /**
  * API request model for deleting an audio track
@@ -65,6 +68,7 @@ export interface AudioTrackRead {
   audio_file_size: number;
   audio_file_duration: number;
   audio_file_sample_rate: number;
+  waveform_data?: number[] | null;
 }
 /**
  * API request model for updating an audio track
@@ -79,6 +83,7 @@ export interface AudioTrackUpdate {
   audio_file_size?: number;
   audio_file_duration?: number;
   audio_file_sample_rate?: number;
+  waveform_data?: number[] | null;
 }
 /**
  * Base model with default UUID primary key and default timestamp fields

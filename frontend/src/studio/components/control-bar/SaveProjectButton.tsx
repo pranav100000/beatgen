@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../../../platform/auth/auth-context';
 import { useStudioStore } from '../../stores/studioStore';
 import { CombinedTrack, Project } from 'src/platform/types/project';
+import { useAppTheme } from '../../../platform/theme/ThemeContext';
 
 interface SaveProjectButtonProps {
   projectTitle: string;
@@ -172,7 +173,7 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
         size="small"
         onClick={handleSave}
         disabled={saving}
-        sx={{ color: 'white' }}
+        sx={{ color: useAppTheme().mode === 'dark' ? 'white' : 'black' }}
       >
         {saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
       </IconButton>

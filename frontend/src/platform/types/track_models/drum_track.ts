@@ -50,6 +50,29 @@ export interface DrumTrackRead {
   id: string;
   name: string;
   sampler_track_ids?: string[];
+  sampler_tracks?: SamplerTrackRead[];
+}
+/**
+ * API response model for sampler track data
+ */
+export interface SamplerTrackRead {
+  created_at?: string;
+  updated_at?: string;
+  id: string;
+  name: string;
+  base_midi_note: number;
+  grain_size: number;
+  overlap: number;
+  audio_storage_key: string;
+  audio_file_format: string;
+  audio_file_size: number;
+  audio_file_name: string;
+  audio_file_duration: number;
+  audio_file_sample_rate: number;
+  midi_notes_json?: {
+    [k: string]: unknown;
+  };
+  drum_track_id?: string | null;
 }
 /**
  * API request model for updating a drum track

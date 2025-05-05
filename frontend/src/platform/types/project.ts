@@ -23,6 +23,7 @@ export interface AudioTrackRead {
   audio_file_size: number;
   audio_file_duration: number;
   audio_file_sample_rate: number;
+  waveform_data?: number[] | null;
 }
 /**
  * Model that combines Track and ProjectTrack data for API responses
@@ -34,6 +35,7 @@ export interface CombinedTrack {
   volume?: number | null;
   pan?: number | null;
   mute?: boolean | null;
+  solo?: boolean | null;
   x_position?: number | null;
   y_position?: number | null;
   trim_start_ticks?: number | null;
@@ -104,6 +106,7 @@ export interface DrumTrackRead {
   id: string;
   name: string;
   sampler_track_ids?: string[];
+  sampler_tracks?: SamplerTrackRead[];
 }
 /**
  * Project model for the database

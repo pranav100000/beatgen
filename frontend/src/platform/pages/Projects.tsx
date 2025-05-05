@@ -141,7 +141,7 @@ export default function Projects() {
       </Button>
       <Box className="project-header">
         <Typography variant="h3" component="h1" sx={{ color: 'text.primary' }}>
-          My Projects
+          Projects
         </Typography>
         <Button
           variant="contained"
@@ -248,19 +248,19 @@ export default function Projects() {
       <Box sx={{ mt: 6, mb: 3 }}>
         <Box className="project-header">
           <Typography variant="h3" component="h1" sx={{ color: 'text.primary' }}>
-            My Sounds
+            Audio Tracks
           </Typography>
-          <Button
+          {/* <Button
             variant="contained"
             color="primary"
             startIcon={<AddIcon />}
             onClick={() => setShowSoundUploader(true)}
           >
             Upload Sound
-          </Button>
+          </Button> */}
         </Box>
 
-        {showSoundUploader && (
+        {/* {showSoundUploader && (
           <Box sx={{ mt: 2, mb: 3 }}>
             <SoundUploader
               onSoundUploaded={(soundId) => {
@@ -271,7 +271,7 @@ export default function Projects() {
               onCancel={() => setShowSoundUploader(false)}
             />
           </Box>
-        )}
+        )} */}
 
         <SoundLibrary onReload={fetchSounds} />
       </Box>

@@ -380,7 +380,7 @@ class ProjectService:
         logger.info(f"Deleting project with ID: {project_id} for user ID: {user_id}")
         try:
             # First get the project to verify ownership
-            project = await self.project_repository.get(project_id)
+            project = await self.project_repository.get_by_id(project_id)
             if not project:
                 logger.error(f"Project with ID {project_id} not found")
                 raise NotFoundException("Project", str(project_id))

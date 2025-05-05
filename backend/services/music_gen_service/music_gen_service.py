@@ -7,19 +7,19 @@ from typing import Any, Dict, List, Optional
 import uuid
 import anthropic
 from dotenv import load_dotenv
-import logging
 from app2.sse.sse_queue_manager import SSEQueueManager
 from app2.core.logging import get_api_logger
 from app2.types.assistant_actions import AssistantAction, TrackType
 from app2.api.dependencies import get_drum_sample_service, get_drum_sample_public_repository
-from app2.models.public_models.drum_samples import DrumSamplePublicRead
 from app2.models.track_models.midi_track import MidiTrackRead
 from app2.models.public_models.instrument_file import InstrumentFileRead
 from app2.models.track_models.sampler_track import SamplerTrackRead
+from app2.models.track_models.drum_track import DrumTrackRead
+from app2.models.public_models.drum_samples import DrumSamplePublicRead
 from services.music_gen_service.chord_progression_analysis import analyze_chord_progression
 from services.soundfont_service.soundfont_service import soundfont_service
 from clients.anthropic_client import AnthropicClient
-from services.music_gen_service.midi import transform_bars_to_instrument_format, transform_chord_progression_to_instrument_format
+from services.music_gen_service.midi import transform_bars_to_instrument_format, transform_chord_progression_to_instrument_format, transform_drum_beats_to_midi_format
 from services.music_gen_service.music_utils import get_mode_intervals
 from services.music_gen_service.music_gen_tools import CREATE_MELODY_TOOL, DETERMINE_MUSICAL_PARAMETERS_TOOL, SELECT_DRUM_SOUNDS_TOOL, SELECT_INSTRUMENTS_TOOL, CREATE_DRUM_BEAT_TOOL
 from services.music_gen_service.prompt_utils import get_ai_composer_agent_initial_system_prompt, get_melody_create_prompt
@@ -27,10 +27,10 @@ from services.music_gen_service.music_researcher import MusicResearcher
 import re
 from sqlmodel import Session
 from uuid import UUID
+from app2.core.config import settings
 
 load_dotenv()
 logger = get_api_logger("music_gen_service")
-
 @dataclass
 class Instrument:
     id: str
@@ -82,7 +82,7 @@ class MusicGenService:
         self.selected_instruments: List[Instrument] = []
         self.drum_sounds: List[DrumSamplePublicRead] = []
 
-    async def compose_music(self, prompt: str, queue: SSEQueueManager, session: Session):
+    async def compose_music(self, prompt: str, queue: SSEQueueManager, session: Session) -> Dict[str, Any]:
         _drum_file_repository = get_drum_sample_public_repository(session)
         drum_sample_service = get_drum_sample_service(_drum_file_repository)
 
@@ -102,7 +102,7 @@ class MusicGenService:
         await self._generate_chords(queue)
 
         # Generate melody
-        await self._generate_melody(prompt, queue)
+        # await self._generate_melody(prompt, queue)
 
         # Get drum sounds
         drum_result = await self.researcher.research_drum_sounds(prompt)
@@ -185,7 +185,7 @@ And here is some research we've done on the chord progression: {chord_research_r
     async def _select_drum_sounds(self, drum_research_result: str, queue: SSEQueueManager):
         """Selects specific drum sounds using an LLM based on available drum sounds."""
         logger.debug("Selecting drum sounds...")
-        # Ensure self.drum_sounds is populated and contains DrumSamplePublicRead objects
+        # Ensure self.drum_sounds is populated and contains SamplerTrackRead objects
         if not self.drum_sounds or not isinstance(self.drum_sounds[0], DrumSamplePublicRead):
              logger.error("Available drum sounds list is empty or contains invalid data.")
              self.musical_params.drum_sounds = []
@@ -215,10 +215,32 @@ After explaining, use the select_drum_sounds tool to finalize your choices."""
              logger.error("LLM did not use the select_drum_sounds tool.")
              self.musical_params.drum_sounds = []
              return
+         
+        logger.info(f"Drum Tool use JSON: {tool_use_json}")
              
-        selected_names = tool_use_json.get("drum_sounds", [])
+        selected_names_raw = tool_use_json.get("drum_sounds", [])
+        
+        # Attempt to parse if it's a string representation of a list
+        selected_names = []
+        if isinstance(selected_names_raw, str):
+            try:
+                # Replace single quotes with double quotes for valid JSON parsing
+                parsed_list = json.loads(selected_names_raw.replace("'", '"')) 
+                if isinstance(parsed_list, list):
+                    selected_names = parsed_list
+                else:
+                     logger.warning(f"Parsed drum_sounds is not a list: {parsed_list}")
+            except json.JSONDecodeError:
+                logger.warning(f"Could not parse drum_sounds string: {selected_names_raw}. Attempting fallback if it's a single string.")
+                # Fallback: Treat the raw string as a single potential drum name if parsing fails
+                selected_names = [selected_names_raw] 
+        elif isinstance(selected_names_raw, list):
+            selected_names = selected_names_raw
+        else:
+             logger.warning(f"Received unexpected type for drum_sounds: {type(selected_names_raw)}")
+
         if not selected_names:
-             logger.warning("LLM tool use did not specify any drum sounds.")
+             logger.warning("LLM tool use did not specify any drum sounds or parsing failed.")
              self.musical_params.drum_sounds = []
              return
 
@@ -384,9 +406,20 @@ After your explanation, use the 'create_drum_beat' tool to provide the patterns.
 
             logger.info(f"Drum patterns: {drum_patterns}")
             logger.info(f"Drum sound map keys: {list(drum_sound_map.keys())}")
+            drum_track_id = uuid.uuid4()
+            drum_track = DrumTrackRead(
+                id=drum_track_id,
+                name="drum_track",
+            )
             for beat_data in drum_patterns:
                 drum_sound_id = beat_data.get('drum_sound_id')
                 pattern = beat_data.get('pattern')
+                
+                logger.info(f"Drum sound ID: {drum_sound_id}")
+                logger.info(f"Pattern: {pattern}")
+                
+                notes = transform_drum_beats_to_midi_format(pattern)
+                logger.info(f"Notes: {notes}")
 
                 if not drum_sound_id or not isinstance(pattern, list) or len(pattern) != 32:
                     logger.warning(f"Invalid drum beat data received: {beat_data}, skipping.")
@@ -396,28 +429,36 @@ After your explanation, use the 'create_drum_beat' tool to provide the patterns.
                     logger.warning(f"Invalid pattern format (non-boolean values) for drum sound ID {drum_sound_id}, skipping.")
                     continue
 
-                # Check if the ID exists in our map (already as string)
                 if drum_sound_id in drum_sound_map:
                     drum_sample = drum_sound_map[drum_sound_id]
                     logger.info(f"Adding drum track for {drum_sample.display_name} (ID: {drum_sound_id})")
-                    await queue.action(AssistantAction.add_drum_track(
-                        type=TrackType.DRUM,
-                        track_data=AssistantAction.add_midi_track(
-                            track=SamplerTrackRead(
-                                id=uuid.uuid4(),
-                                name=drum_sample.display_name,
-                                instrument_id=drum_sample.id,
-                                drum_sound_id=drum_sound_id,
-                                drum_sound_name=drum_sample.display_name,
-                                drum_sound_storage_key=drum_sample.storage_key,
-                                drum_sound_kit_name=drum_sample.kit_name
-                            )
+                    sampler_track_id = uuid.uuid4()
+                    drum_track.sampler_tracks.append(
+                        SamplerTrackRead(
+                            id=sampler_track_id,
+                            name=drum_sample.display_name,
+                            audio_file_name=drum_sample.file_name,
+                            base_midi_note=settings.audio.DEFAULT_SAMPLER_BASE_NOTE,
+                            grain_size=settings.audio.DEFAULT_SAMPLER_GRAIN_SIZE,
+                            overlap=settings.audio.DEFAULT_SAMPLER_OVERLAP,
+                            audio_file_sample_rate=settings.audio.SAMPLE_RATE,
+                            audio_storage_key=drum_sample.storage_key,
+                            audio_file_format=drum_sample.file_format,
+                            audio_file_size=drum_sample.file_size,
+                            audio_file_duration=drum_sample.duration or 0,
+                            drum_track_id=drum_track_id,
+                            midi_notes_json=notes
                         )
-                    ))
+                    )
+                    drum_track.sampler_track_ids.append(sampler_track_id)
                 else:
                     logger.warning(f"Drum sound ID '{drum_sound_id}' from LLM response not found in selected drums.")
 
-            logger.info("Successfully processed and added drum tracks.")
+            logger.info(f"Successfully processed and added drum track: {drum_track}")
+            
+            await queue.action(AssistantAction.add_drum_track(
+                track=drum_track
+            ))
 
         except Exception as e:
             logger.error(f"Error during drum beat generation: {str(e)}")

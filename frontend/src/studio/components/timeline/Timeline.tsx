@@ -3,10 +3,11 @@ import { Box, useTheme } from '@mui/material';
 import { GRID_CONSTANTS, calculatePositionTime } from '../../constants/gridConstants';
 import Track from '../track/Track';
 import PlaybackCursor, { PlaybackCursorRef } from './PlaybackCursor';
-import { TrackState, Position } from '../../../types/track';
+import { CombinedTrack } from 'src/platform/types/project';
+import { Position } from '../track/types';
 
 export interface TimelineProps {
-  tracks: TrackState[];
+  tracks: CombinedTrack[];
   currentTime?: number;
   isPlaying?: boolean;
   measureCount?: number;
@@ -178,16 +179,6 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
     
     // Convert pixel position to time in seconds using our utility function
     const newTime = calculatePositionTime(adjustedX, bpm, timeSignature);
-    
-    console.log('Timeline ruler clicked!', {
-      clickX,
-      adjustedX,
-      newTime,
-      zoomLevel,
-      bpm,
-      timeSignature
-    });
-    
     // Call the callback with the new time
     onTimeChange(newTime);
   };
@@ -336,7 +327,7 @@ function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4,
 }
 
 interface TimelineContentProps extends TimelineRulerProps {
-  tracks: TrackState[];
+  tracks: CombinedTrack[];
   currentTime: number;
   isPlaying: boolean;
   bpm: number;
@@ -359,7 +350,7 @@ function TimelineContent({
   onTimeChange,
   totalWidth
 }: TimelineContentProps) {
-  const theme = useTheme();
+  // const theme = useTheme(); // No longer need theme for grid colors
   
   // Handler for timeline content clicks to set playback position
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -394,6 +385,11 @@ function TimelineContent({
     onTimeChange(newTime);
   };
   
+  // Define fixed gray colors for grid lines
+  const fixedMeasureColor = 'rgba(128, 128, 128, 0.8)'; // Medium Gray, strong alpha
+  const fixedBeatColor = 'rgba(128, 128, 128, 0.5)';    // Medium Gray, medium alpha
+  const fixedSubdivisionColor = 'rgba(128, 128, 128, 0.25)'; // Medium Gray, low alpha
+
   return (
     <Box 
       sx={{ 
@@ -409,37 +405,21 @@ function TimelineContent({
       }}
       onClick={handleTimelineClick}
     >
+      {/* Pass fixed gray colors to GridOverlay */}
       <GridOverlay 
         measureCount={measureCount} 
         timeSignature={timeSignature} 
-        measureColor={theme.palette.text.secondary}
-        beatColor={theme.palette.divider}
-        subdivisionColor={theme.palette.divider}
+        measureColor={fixedMeasureColor} 
+        beatColor={fixedBeatColor}         
+        subdivisionColor={fixedSubdivisionColor}
       />
 
       {tracks.map((track, index) => (
         <Track 
           key={track.id}
           id={track.id}
-          name={track.name}
           index={index}
-          type={track.type}
-          audioFile={track.audioFile}
-          isPlaying={isPlaying}
-          currentTime={currentTime}
-          gridLineStyle={gridLineStyle}
-          measureCount={GRID_CONSTANTS.measureCount}
-          position={track.position}
-          onPositionChange={(newPosition, isDragEnd) => {
-            console.log(`Timeline passing position change: trackId=${track.id}, isDragEnd=${isDragEnd}`, newPosition);
-            if (onTrackPositionChange) {
-              onTrackPositionChange(track.id, newPosition, isDragEnd);
-            }
-          }}
-          bpm={bpm}
-          duration={track.duration}
-          _calculatedWidth={track._calculatedWidth}
-          timeSignature={timeSignature}
+          gridLineStyle={gridLineStyle} 
         />
       ))}
     </Box>
@@ -457,9 +437,10 @@ interface GridOverlayProps {
 function GridOverlay({
   measureCount, 
   timeSignature = [4, 4], 
-  measureColor = 'rgba(85, 85, 85, 0.9)',
-  beatColor = 'rgba(51, 51, 51, 0.7)',
-  subdivisionColor = 'rgba(34, 34, 34, 0.3)'
+  // Update defaults to match the fixed grays
+  measureColor = 'rgba(128, 128, 128, 0.8)', 
+  beatColor = 'rgba(128, 128, 128, 0.5)',
+  subdivisionColor = 'rgba(128, 128, 128, 0.25)'
 }: GridOverlayProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -505,19 +486,19 @@ function GridOverlay({
       
       const denominator = timeSignature[1];
       
-      // Use passed theme colors or defaults
+      // Colors are now passed directly or use the updated defaults
       const MEASURE_COLOR = measureColor;
       const BEAT_COLOR = beatColor;
       const SUBDIVISION_COLOR = subdivisionColor;
       
       // Ensure pixel-perfect rendering
-      const drawLine = (x: number, opacity: number, color?: string) => {
-        // Align to nearest pixel for sharp lines
+      const drawLine = (x: number, _opacity: number, color?: string) => { // Opacity parameter ignored now
         const xPos = Math.round(x) + 0.5;
         ctx.beginPath();
         ctx.moveTo(xPos, 0);
         ctx.lineTo(xPos, container.clientHeight);
-        ctx.strokeStyle = color || SUBDIVISION_COLOR;
+        // Use the provided color string directly (which includes alpha)
+        ctx.strokeStyle = color || SUBDIVISION_COLOR; 
         ctx.lineWidth = 1;
         ctx.stroke();
       };
@@ -556,29 +537,11 @@ function GridOverlay({
           // Calculate the exact position of this subdivision
           const position = beatStartPosition + (subdivision * subdivisionWidth);
           
-          // Determine opacity based on subdivision importance
-          let opacity = 0.15; // Default for minor subdivisions
-          
-          // Special-case important subdivisions for better visual hierarchy
-          // Half-beat is most important (e.g., the "and" in "1 and 2 and")
-          const isHalfBeat = subdivision === Math.floor(subdivisionsPerBeat / 2);
-          
-          // Quarter-beat is next most important (the "e" and "a" in "1 e + a")
-          const isQuarterBeat = subdivision === Math.floor(subdivisionsPerBeat / 4) || 
-                                subdivision === Math.floor(3 * subdivisionsPerBeat / 4);
-                                
-          // Apply opacity based on importance
-          if (isHalfBeat) {
-            opacity = 0.7; // Most visible - half-beat marks
-          } else if (isQuarterBeat) {
-            opacity = 0.5; // Medium visibility - quarter-beat marks
-          } else {
-            // Ensure all other subdivisions are at least somewhat visible
-            opacity = 0.35; 
-          }
-          
-          // Draw this subdivision line
-          drawLine(position, opacity, opacity === 1 ? undefined : opacity.toString());
+          // Simplified: Draw all subdivisions with the base SUBDIVISION_COLOR
+          // Hierarchy is now mainly handled by the color alpha values passed in.
+          // We could still vary color based on isHalfBeat/isQuarterBeat if needed,
+          // but let's start simple.
+          drawLine(position, 1, SUBDIVISION_COLOR); // Pass opacity 1, color has alpha
         }
       }
       
@@ -587,14 +550,14 @@ function GridOverlay({
         // Skip measure lines (we'll draw them last)
         if (i % beatsPerMeasure !== 0) {
           const x = i * beatWidth;
-          drawLine(x, 1, BEAT_COLOR);
+          drawLine(x, 1, BEAT_COLOR); // Pass opacity 1, color has alpha
         }
       }
       
       // 3. Finally draw measure lines (most prominent)
       for (let i = 0; i <= measureCount; i++) {
         const x = i * GRID_CONSTANTS.measureWidth;
-        drawLine(x, 1, MEASURE_COLOR);
+        drawLine(x, 1, MEASURE_COLOR); // Pass opacity 1, color has alpha
       }
     }
     

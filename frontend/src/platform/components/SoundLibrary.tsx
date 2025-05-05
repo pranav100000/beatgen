@@ -17,7 +17,7 @@ import {
   MusicNote as MusicNoteIcon
 } from '@mui/icons-material';
 import { getSounds, deleteSound } from '../api/sounds';
-import { Sound } from '../types/sound'
+import { AudioTrackRead } from '../../platform/types/track_models/audio_track';
 
 // Enhanced waveform component with progress and click handling
 const Waveform = ({ 
@@ -149,7 +149,7 @@ interface SoundLibraryProps {
 }
 
 export default function SoundLibrary({ onReload }: SoundLibraryProps) {
-  const [sounds, setSounds] = useState<Sound[]>([]);
+  const [sounds, setSounds] = useState<AudioTrackRead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -206,7 +206,7 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
     }
   };
   
-  const handlePlaySound = (sound: Sound) => {
+  const handlePlaySound = (sound: AudioTrackRead) => {
     // If we're already playing this sound, pause it
     if (playingId === sound.id && audioElement) {
       audioElement.pause();
@@ -225,7 +225,7 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
     
     // Construct URL from storage key
     const baseUrl = process.env.REACT_APP_SUPABASE_URL || '';
-    const url = `${baseUrl}/storage/v1/object/public/tracks/${sound.storage_key}`;
+    const url = `${baseUrl}/storage/v1/object/public/tracks/${sound.audio_file_storage_key}`;
     console.log('Audio URL:', url);
     
     // Add CORS headers
@@ -351,10 +351,10 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
                 </Box>
                 
                 <Waveform 
-                  data={sound.waveform_data} 
+                  data={sound.waveform_data || []} 
                   playing={playingId === sound.id}
                   progress={playingId === sound.id ? currentTime : 0}
-                  duration={playingId === sound.id ? (duration || sound.duration) : sound.duration}
+                  duration={playingId === sound.id ? (duration || sound.audio_file_duration) : sound.audio_file_duration}
                   onSeek={(position) => handleSeek(sound.id, position)}
                 />
                 
@@ -366,7 +366,7 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
                     fontSize: '0.75rem',
                     mt: 0.5
                   }}>
-                    {formatTime(currentTime)} / {formatTime(duration || sound.duration)}
+                    {formatTime(currentTime)} / {formatTime(duration || sound.audio_file_duration)}
                   </Typography>
                 )}
                 
@@ -379,10 +379,10 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
                   fontSize: '0.8rem'
                 }}>
                   <Typography variant="body2" sx={{ color: '#aaa' }}>
-                    {formatTime(sound.duration)}
+                    {formatTime(sound.audio_file_duration)}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#aaa' }}>
-                    {sound.file_format} · {formatFileSize(sound.file_size)}
+                    {sound.audio_file_format} · {formatFileSize(sound.audio_file_size)}
                   </Typography>
                 </Box>
               </CardContent>

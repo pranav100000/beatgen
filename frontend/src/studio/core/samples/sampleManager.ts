@@ -106,6 +106,7 @@ class SampleManager {
     name?: string
   ): Promise<AudioFile | null> {
     try {
+      console.log(`Downloading sample (storageKey ${storageKey}): ${type}`);
       // Fetch using storageKey
       const blob = await (type === 'audio_track' ? downloadAudioTrackFile(storageKey) : downloadDrumSampleFile(storageKey)); 
       if (!blob) {

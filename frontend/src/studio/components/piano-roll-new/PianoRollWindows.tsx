@@ -18,17 +18,31 @@ const PianoRollWindows: React.FC = memo(() => {
   const addMidiNote = useStudioStore(state => state.addMidiNote);
   const removeMidiNote = useStudioStore(state => state.removeMidiNote);
   const updateMidiNote = useStudioStore(state => state.updateMidiNote);
-  const getKeyNotes = useStudioStore(state => state.getKeyNotes);
+  const getKeyNotes = useCallback(() => {
+    return store?.getProjectManager()?.getKeyNotes() || [];
+  }, [store]);
   
   const [prevNotesByTrack, setPrevNotesByTrack] = useState<Record<string, NoteState[]>>({});
   
-  const openTrackIds = useMemo(() => 
+  const openTrackIds = useMemo(() =>
       Object.entries(openPianoRolls)
           .filter(([_, isOpen]) => isOpen)
           .map(([trackId]) => trackId),
       [openPianoRolls]
   );
-    
+
+  // Add a useEffect to clean up stale openPianoRolls entries
+  useEffect(() => {
+    openTrackIds.forEach(trackId => {
+      const trackExists = tracks.some(t => t.id === trackId);
+      if (!trackExists) {
+        console.warn(`PianoRollWindows: Stale open piano roll detected for non-existent track ${trackId}. Closing it.`);
+        closePianoRoll(trackId);
+      }
+    });
+  // Depend on the raw openTrackIds array and the tracks array
+  }, [openTrackIds, tracks, closePianoRoll]);
+
   console.log('Piano Roll Windows - Render (Individual Selectors) - Open IDs:', openTrackIds);
 
   const handleNotesChange = useCallback(async (trackId: string, newNotes: NoteState[]) => {
@@ -85,17 +99,20 @@ const PianoRollWindows: React.FC = memo(() => {
 
   if (openTrackIds.length === 0) { return null; }
   
+  // Filter openTrackIds again *just before rendering* based on current tracks state
+  const currentlyAvailableTrackIds = openTrackIds.filter(trackId => tracks.some(t => t.id === trackId));
+
   return (
     <>
-      {openTrackIds.map(trackId => {
-        const track = tracks.find(t => t.id === trackId);
+      {currentlyAvailableTrackIds.map(trackId => { // Map over the filtered list
+        const track = tracks.find(t => t.id === trackId); // This find should now always succeed
         const midiManager = store?.getMidiManager();
         const currentNotes = midiManager?.getTrackNotes(trackId) || [];
         const pianoRollNotes = currentNotes.map(convertToNoteState);
 
         if (!track) {
-           console.warn(`PianoRollWindows: Track data for ID ${trackId} not found render.`);
-           return null; 
+           console.error(`PianoRollWindows: Track data for ID ${trackId} unexpectedly not found despite check.`);
+           return null;
         }
 
         const trackWithIndex = track as (CombinedTrack & { index?: number });

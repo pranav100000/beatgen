@@ -240,7 +240,7 @@ export const createSamplerSlice: StoreSliceCreator<SamplerSlice> = (set, get) =>
             console.log(`Processing MIDI notes for sampler track ${trackId}`);
             try {
                 // Revert: Cast midiJson to string first, pass trackId second
-                const notes = convertJsonToNotes(trackId, midiJson);
+                const notes = convertJsonToNotes(midiJson, trackId);
                 if (notes && notes.length > 0) {
                     midiBlob = await convertNotesToMidiBlob(notes, trackName) || undefined;
                     if (midiBlob) {

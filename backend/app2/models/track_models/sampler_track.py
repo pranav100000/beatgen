@@ -43,7 +43,7 @@ class SamplerTrack(SamplerTrackBase, table=True):
     
     drum_track_id: Optional[uuid.UUID] = Field(foreign_key="drum_tracks.id", default=None)
     drum_track: Optional["DrumTrack"] = Relationship(back_populates="sampler_tracks")
-    
+        
     # Relationships to project tracks
     project_tracks: list["ProjectTrack"] = Relationship(
         back_populates="sampler_track",

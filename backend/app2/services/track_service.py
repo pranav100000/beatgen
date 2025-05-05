@@ -75,10 +75,10 @@ class TrackService:
         logger.info(f"Getting tracks for user ID: {user_id}")
         try:
             # Get tracks by type
-            audio_tracks = self.audio_repository.get_by_user_id(user_id)
-            midi_tracks = self.midi_repository.get_by_user_id(user_id)
-            sampler_tracks = self.sampler_repository.get_by_user_id(user_id)
-            drum_tracks = self.drum_repository.get_by_user_id(user_id)
+            audio_tracks = await self.audio_repository.get_by_user_id(user_id)
+            midi_tracks = await self.midi_repository.get_by_user_id(user_id)
+            sampler_tracks = await self.sampler_repository.get_by_user_id(user_id)
+            drum_tracks = await self.drum_repository.get_by_user_id(user_id)
             
             # Convert to read models
             audio_read = [AudioTrackRead.model_validate(track) for track in audio_tracks]

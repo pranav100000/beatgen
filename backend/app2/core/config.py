@@ -42,6 +42,18 @@ class DatabaseConfig(BaseModel):
     """Database configuration"""
     URL: str = os.getenv("DATABASE_URL", "")
 
+class AudioConfig(BaseModel):
+    """Audio processing and DAW configuration"""
+    DEFAULT_SAMPLER_BASE_NOTE: int = 60  # Middle C (C4) in MIDI notation
+    DEFAULT_SAMPLER_GRAIN_SIZE: float = 0.1
+    DEFAULT_SAMPLER_OVERLAP: float = 0.1
+    DEFAULT_BPM: int = 120
+    DEFAULT_TIME_SIGNATURE: str = "4/4"
+    SAMPLE_RATE: int = 44100  # Standard CD-quality sample rate
+    BIT_DEPTH: int = 16       # Standard CD-quality bit depth
+    DEFAULT_VELOCITY: int = 100  # MIDI velocity (0-127)
+    BUFFER_SIZE: int = 1024
+    
 class Settings(BaseModel):
     """Main settings container"""
     app: AppConfig = AppConfig()
@@ -49,6 +61,7 @@ class Settings(BaseModel):
     jwt: JWTConfig = JWTConfig()
     cors: CORSConfig = CORSConfig()
     db: DatabaseConfig = DatabaseConfig()
+    audio: AudioConfig = AudioConfig()
     
     class Config:
         env_file = ".env"

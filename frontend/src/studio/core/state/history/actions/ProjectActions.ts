@@ -27,10 +27,10 @@ export class BPMChangeAction extends BaseAction {
     }
     
     private updateBPM(bpm: number): void {
-        Tone.Transport.bpm.value = bpm;
+        Tone.getTransport().bpm.value = bpm;
         this.store.getTransport().setTempo(bpm);
-        this.store.projectManager.setTempo(bpm);
-        this.get().setBpm(bpm);
+        this.store.getProjectManager().setTempo(bpm);
+        this.get().handleProjectParamChange('bpm', bpm);
     }
     
     async execute(): Promise<void> {
@@ -47,40 +47,40 @@ export class BPMChangeAction extends BaseAction {
 /**
  * Action for time signature changes without callbacks
  */
-export class TimeSignatureAction extends BaseAction {
-    readonly type = 'TIME_SIGNATURE_CHANGE';
-    private oldTimeSignature: [number, number];
-    private newTimeSignature: [number, number];
-    private bpm: number;
+// export class TimeSignatureAction extends BaseAction {
+//     readonly type = 'TIME_SIGNATURE_CHANGE';
+//     private oldTimeSignature: [number, number];
+//     private newTimeSignature: [number, number];
+//     private bpm: number;
     
-    constructor(
-        get: GetFn,
-        oldTimeSignature: [number, number],
-        newTimeSignature: [number, number],
-        bpm: number
-    ) {
-        super(get);
-        this.oldTimeSignature = oldTimeSignature;
-        this.newTimeSignature = newTimeSignature;
-        this.bpm = bpm;
-    }
+//     constructor(
+//         get: GetFn,
+//         oldTimeSignature: [number, number],
+//         newTimeSignature: [number, number],
+//         bpm: number
+//     ) {
+//         super(get);
+//         this.oldTimeSignature = oldTimeSignature;
+//         this.newTimeSignature = newTimeSignature;
+//         this.bpm = bpm;
+//     }
     
-    private updateTimeSignature(timeSignature: [number, number]): void {
-        Tone.Transport.timeSignature = timeSignature;
-        this.store.projectManager.setTimeSignature(timeSignature[0], timeSignature[1]);
-        this.get().setTimeSignature(timeSignature[0], timeSignature[1]);
-    }
+//     private updateTimeSignature(timeSignature: [number, number]): void {
+//         Tone.Transport.timeSignature = timeSignature;
+//         this.store.projectManager.setTimeSignature(timeSignature[0], timeSignature[1]);
+//         this.get().setTimeSignature(timeSignature[0], timeSignature[1]);
+//     }
     
-    async execute(): Promise<void> {
-        this.updateTimeSignature(this.newTimeSignature);
-        this.log('Execute', { from: this.oldTimeSignature, to: this.newTimeSignature });
-    }
+//     async execute(): Promise<void> {
+//         this.updateTimeSignature(this.newTimeSignature);
+//         this.log('Execute', { from: this.oldTimeSignature, to: this.newTimeSignature });
+//     }
     
-    async undo(): Promise<void> {
-        this.updateTimeSignature(this.oldTimeSignature);
-        this.log('Undo', { from: this.newTimeSignature, to: this.oldTimeSignature });
-    }
-}
+//     async undo(): Promise<void> {
+//         this.updateTimeSignature(this.oldTimeSignature);
+//         this.log('Undo', { from: this.newTimeSignature, to: this.oldTimeSignature });
+//     }
+// }
 
 /**
  * Action for key signature changes without callbacks
@@ -105,7 +105,7 @@ export class KeySignatureAction extends BaseAction {
             this.store.projectManager.setKey(keySignature);
         }
         
-        this.get().setKeySignature(keySignature);
+        this.get().handleProjectParamChange('keySignature', keySignature);
     }
     
     async execute(): Promise<void> {
@@ -124,6 +124,6 @@ export class KeySignatureAction extends BaseAction {
  */
 export const ProjectActions = {
     BPMChange: BPMChangeAction,
-    TimeSignature: TimeSignatureAction,
+    //TimeSignature: TimeSignatureAction,
     KeySignature: KeySignatureAction
 };

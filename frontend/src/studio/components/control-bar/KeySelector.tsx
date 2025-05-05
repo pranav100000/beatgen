@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Button, Popover, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { Box, Button, Popover, ToggleButton, ToggleButtonGroup, useTheme } from '@mui/material';
 
 interface KeySelectorProps {
   selectedKey: string;
@@ -10,6 +10,7 @@ const DIATONIC_KEY_LIST = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const ACCIDENTAL_KEY_LIST = ['C♯/D♭', 'D♯/E♭', 'F♯/G♭', 'G♯/A♭', 'A♯/B♭'];
 
 const KeySelector: React.FC<KeySelectorProps> = ({ selectedKey = 'C major', onKeyChange }) => {
+  const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [mode, setMode] = useState<'major' | 'minor'>(
     selectedKey.toLowerCase().includes('minor') ? 'minor' : 'major'
@@ -46,16 +47,19 @@ const KeySelector: React.FC<KeySelectorProps> = ({ selectedKey = 'C major', onKe
     <Box sx={{ width: '124px' }}>
       <Button
         onClick={handleClick}
+        variant="contained"
+        color="inherit"
+        disableElevation
         sx={{
-          bgcolor: '#1E1E1E',
-          color: 'white',
+          bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
+          color: 'text.primary',
           width: '100%',
           px: 2,
           py: 0.5,
           borderRadius: 1,
           textTransform: 'none',
           '&:hover': {
-            bgcolor: '#2E2E2E'
+            bgcolor: theme.palette.action.hover
           }
         }}
       >
@@ -75,11 +79,12 @@ const KeySelector: React.FC<KeySelectorProps> = ({ selectedKey = 'C major', onKe
         }}
         PaperProps={{
           sx: {
-            bgcolor: '#1A1A1A',
-            color: 'white',
+            bgcolor: 'background.paper',
+            color: 'text.primary',
             mt: 1,
             width: 'auto',
-            p: 1
+            p: 1,
+            boxShadow: theme.shadows[3]
           }
         }}
       >
@@ -88,20 +93,24 @@ const KeySelector: React.FC<KeySelectorProps> = ({ selectedKey = 'C major', onKe
             value={mode}
             exclusive
             onChange={handleModeChange}
+            size="small"
             sx={{
-              bgcolor: '#111',
+              bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)',
+              borderRadius: 1,
               '.MuiToggleButton-root': {
-                color: '#666',
+                color: 'text.secondary',
                 textTransform: 'none',
+                border: 0,
+                borderRadius: 'inherit',
                 '&.Mui-selected': {
-                  color: 'white',
-                  bgcolor: '#333',
+                  color: 'text.primary',
+                  bgcolor: theme.palette.action.selected,
                   '&:hover': {
-                    bgcolor: '#444'
+                    bgcolor: theme.palette.action.selected
                   }
                 },
                 '&:hover': {
-                  bgcolor: '#222'
+                  bgcolor: theme.palette.action.hover
                 }
               }
             }}
@@ -118,45 +127,53 @@ const KeySelector: React.FC<KeySelectorProps> = ({ selectedKey = 'C major', onKe
           }}
         >
           {/* Diatonic Keys */}
-          {DIATONIC_KEY_LIST.map((key) => (
-            <Button
-              key={key}
-              onClick={() => handleKeySelect(key)}
-              variant={selectedKey === `${key} ${mode}` ? 'contained' : 'text'}
-              sx={{
-                minWidth: 0,
-                p: 1,
-                textTransform: 'none',
-                bgcolor: selectedKey === `${key} ${mode}` ? '#333' : 'transparent',
-                color: selectedKey === `${key} ${mode}` ? 'white' : '#666',
-                '&:hover': {
-                  bgcolor: selectedKey === `${key} ${mode}` ? '#444' : '#222'
-                }
-              }}
-            >
-              {key}
-            </Button>
-          ))}
+          {DIATONIC_KEY_LIST.map((key) => {
+            const isSelected = selectedKey === `${key} ${mode}`;
+            return (
+              <Button
+                key={key}
+                onClick={() => handleKeySelect(key)}
+                size="small"
+                sx={{
+                  minWidth: 0,
+                  p: 1,
+                  textTransform: 'none',
+                  borderRadius: 1,
+                  bgcolor: isSelected ? theme.palette.action.selected : 'transparent',
+                  color: isSelected ? theme.palette.text.primary : theme.palette.text.secondary,
+                  '&:hover': {
+                    bgcolor: isSelected ? theme.palette.action.selected : theme.palette.action.hover
+                  }
+                }}
+              >
+                {key}
+              </Button>
+            );
+          })}
           {/* Accidental Keys */}
-          {ACCIDENTAL_KEY_LIST.map((key) => (
-            <Button
-              key={key}
-              onClick={() => handleKeySelect(key)}
-              variant={selectedKey === `${key} ${mode}` ? 'contained' : 'text'}
-              sx={{
-                minWidth: 0,
-                p: 1,
-                textTransform: 'none',
-                bgcolor: selectedKey === `${key} ${mode}` ? '#333' : 'transparent',
-                color: selectedKey === `${key} ${mode}` ? 'white' : '#666',
-                '&:hover': {
-                  bgcolor: selectedKey === `${key} ${mode}` ? '#444' : '#222'
-                }
-              }}
-            >
-              {key}
-            </Button>
-          ))}
+          {ACCIDENTAL_KEY_LIST.map((key) => {
+             const isSelected = selectedKey === `${key} ${mode}`;
+             return (
+              <Button
+                key={key}
+                onClick={() => handleKeySelect(key)}
+                size="small"
+                sx={{
+                  minWidth: 0,
+                  p: 1,
+                  textTransform: 'none',
+                  borderRadius: 1,
+                  bgcolor: isSelected ? theme.palette.action.selected : 'transparent',
+                  color: isSelected ? theme.palette.text.primary : theme.palette.text.secondary,
+                  '&:hover': {
+                    bgcolor: isSelected ? theme.palette.action.selected : theme.palette.action.hover
+                  }
+                }}
+              >
+                {key}
+              </Button>
+             );
+          })}
         </Box>
       </Popover>
     </Box>
