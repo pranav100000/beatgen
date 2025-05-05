@@ -19,6 +19,8 @@ from app2.models.track_models.sampler_track import SamplerTrack
 from app2.models.track_models.drum_track import DrumTrack
 
 
+Track = Union[AudioTrack, MidiTrack, SamplerTrack, DrumTrack]
+
 class TrackRepository:
     """Repository for track operations"""
 
