@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class DrumSampleType(str, Enum):
     KICK = "kick"
     SNARE = "snare"

@@ -4,12 +4,12 @@ from music21 import pitch, key, harmony, roman
 def analyze_chord_progression(chord_progression, key_str):
     """Analyze a chord progression and return information for melody generation"""
     # Parse the key
-    if key_str.endswith('m'):
+    if key_str.endswith("m"):
         # Handle 'Em' format
-        k = key.Key(key_str[:-1], 'minor')
-    elif 'm' in key_str:
+        k = key.Key(key_str[:-1], "minor")
+    elif "m" in key_str:
         # Handle other minor formats like 'E minor'
-        k = key.Key(key_str.split('m')[0], 'minor')
+        k = key.Key(key_str.split("m")[0], "minor")
     else:
         # Assume major
         k = key.Key(key_str)
@@ -19,11 +19,24 @@ def analyze_chord_progression(chord_progression, key_str):
     key_notes = [p.name for p in key_scale.getPitches()]
 
     # Standard chromatic scale
-    chromatic_scale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+    chromatic_scale = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
     # For minor keys, adjust some notes to use flats
-    if k.mode == 'minor':
-        chromatic_scale = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+    if k.mode == "minor":
+        chromatic_scale = [
+            "C",
+            "Db",
+            "D",
+            "Eb",
+            "E",
+            "F",
+            "F#",
+            "G",
+            "Ab",
+            "A",
+            "Bb",
+            "B",
+        ]
 
     melody_data = []
 
@@ -45,7 +58,10 @@ def analyze_chord_progression(chord_progression, key_str):
         for note in chord_notes:
             # Find equivalent note in our chromatic scale (handling enharmonics)
             for chromatic_note in list(available_notes):
-                if pitch.Pitch(note).pitchClass == pitch.Pitch(chromatic_note).pitchClass:
+                if (
+                    pitch.Pitch(note).pitchClass
+                    == pitch.Pitch(chromatic_note).pitchClass
+                ):
                     available_notes.discard(chromatic_note)
 
         # Get one extended chord note - the next logical extension based on chord type
@@ -54,14 +70,20 @@ def analyze_chord_progression(chord_progression, key_str):
         # Remove extended note from available notes
         for note in extended_chord_notes:
             for chromatic_note in list(available_notes):
-                if pitch.Pitch(note).pitchClass == pitch.Pitch(chromatic_note).pitchClass:
+                if (
+                    pitch.Pitch(note).pitchClass
+                    == pitch.Pitch(chromatic_note).pitchClass
+                ):
                     available_notes.discard(chromatic_note)
 
         # Get remaining key notes
         key_only_notes = []
         for note in key_notes:
             for chromatic_note in list(available_notes):
-                if pitch.Pitch(note).pitchClass == pitch.Pitch(chromatic_note).pitchClass:
+                if (
+                    pitch.Pitch(note).pitchClass
+                    == pitch.Pitch(chromatic_note).pitchClass
+                ):
                     key_only_notes.append(chromatic_note)
                     available_notes.discard(chromatic_note)
 
@@ -76,7 +98,7 @@ def analyze_chord_progression(chord_progression, key_str):
             "extended_chord_notes": extended_chord_notes,
             "key_notes": key_only_notes,
             "tension_notes": tension_notes,
-            "note_weights": {}
+            "note_weights": {},
         }
 
         # Calculate weights for all notes in the chromatic scale
@@ -93,9 +115,15 @@ def analyze_chord_progression(chord_progression, key_str):
             scale_degree = get_scale_degree(note_p, k)
 
             # Categorize note
-            is_chord_note = any(pitch.Pitch(n).pitchClass == note_pc for n in chord_notes)
-            is_extended = any(pitch.Pitch(n).pitchClass == note_pc for n in extended_chord_notes)
-            is_key_note = any(pitch.Pitch(n).pitchClass == note_pc for n in key_only_notes)
+            is_chord_note = any(
+                pitch.Pitch(n).pitchClass == note_pc for n in chord_notes
+            )
+            is_extended = any(
+                pitch.Pitch(n).pitchClass == note_pc for n in extended_chord_notes
+            )
+            is_key_note = any(
+                pitch.Pitch(n).pitchClass == note_pc for n in key_only_notes
+            )
 
             # Calculate tension level
             if is_chord_note:
@@ -114,7 +142,7 @@ def analyze_chord_progression(chord_progression, key_str):
                 "is_key_note": is_key_note,
                 "interval_name": interval_name,
                 "scale_degree": scale_degree,
-                "tension_level": tension_level
+                "tension_level": tension_level,
             }
 
             # Calculate weight
@@ -125,6 +153,7 @@ def analyze_chord_progression(chord_progression, key_str):
 
     return melody_data
 
+
 def get_one_extension(chord_obj, k, available_notes):
     """Get one logical extension note for the chord"""
     root = chord_obj.root()
@@ -134,16 +163,16 @@ def get_one_extension(chord_obj, k, available_notes):
     available_pcs = [pitch.Pitch(n).pitchClass for n in available_notes]
 
     # Define possible extensions in order of preference
-    if 'minor' in chord_type.lower():
+    if "minor" in chord_type.lower():
         # For minor chords: 9, 11, 13/b13
         extensions = [2, 5, 8]  # 9th, 11th, b13th
-    elif 'major' in chord_type.lower():
+    elif "major" in chord_type.lower():
         # For major chords: 9, 13, #11
         extensions = [2, 9, 6]  # 9th, 13th, #11th
-    elif 'dominant' in chord_type.lower() or '7' in chord_type:
+    elif "dominant" in chord_type.lower() or "7" in chord_type:
         # For dominant 7th chords: 9, 13, b9, #9, #11
         extensions = [2, 9, 1, 3, 6]  # 9th, 13th, b9th, #9th, #11th
-    elif 'diminished' in chord_type.lower():
+    elif "diminished" in chord_type.lower():
         # For diminished chords: 9, 11
         extensions = [2, 5]  # 9th, 11th
     else:
@@ -177,6 +206,7 @@ def get_one_extension(chord_obj, k, available_notes):
     # Return empty list if no extension found
     return []
 
+
 def determine_function_from_roman(rn):
     """Determine harmonic function from Roman numeral analysis"""
     # Get the scale degree (handle potential AttributeError)
@@ -186,11 +216,12 @@ def determine_function_from_roman(rn):
         # Fallback if scaleDegree is not available
         # Extract scale degree from the figure (e.g., "V" -> 5)
         import re
-        match = re.match(r'([ivIV]+)', rn.figure)
+
+        match = re.match(r"([ivIV]+)", rn.figure)
         if match:
             roman_numeral = match.group(1).upper()
             # Convert Roman numeral to integer
-            roman_map = {'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 'VI': 6, 'VII': 7}
+            roman_map = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6, "VII": 7}
             degree = roman_map.get(roman_numeral, 0)
         else:
             degree = 0
@@ -207,11 +238,12 @@ def determine_function_from_roman(rn):
     else:
         return "other"
 
+
 def find_extended_notes(chord_obj, k):
     """Find extended chord notes (9, 11, 13) that are in the key"""
     # Get the chord's root note and basic chord tones
     root = chord_obj.root()
-    chord_notes = [p.name for p in chord_obj.pitches]
+    [p.name for p in chord_obj.pitches]
 
     # Get the key scale
     key_scale = k.getScale()
@@ -251,15 +283,21 @@ def find_extended_notes(chord_obj, k):
 
     return extensions
 
+
 def is_valid_extension_for_chord(chord_obj, extension_pitch):
     """Determine if an extension is valid for a given chord type"""
     # Get basic chord properties
     root = chord_obj.root()
     chord_type = chord_obj.commonName
-    has_seventh = any(p for p in chord_obj.pitches if (p.pitchClass - root.pitchClass) % 12 in [10, 11])
+    any(
+        p
+        for p in chord_obj.pitches
+        if (p.pitchClass - root.pitchClass) % 12 in [10, 11]
+    )
 
     # Calculate the interval from root to extension
     from music21 import interval
+
     int_obj = interval.Interval(noteStart=root, noteEnd=extension_pitch)
     semitones = int_obj.semitones % 12
 
@@ -270,21 +308,25 @@ def is_valid_extension_for_chord(chord_obj, extension_pitch):
     # 11th (4th): Often clashes with major 3rd
     elif semitones == 5:
         # Check if chord has a major 3rd
-        has_major_third = any(p for p in chord_obj.pitches 
-                             if (p.pitchClass - root.pitchClass) % 12 == 4)
+        has_major_third = any(
+            p for p in chord_obj.pitches if (p.pitchClass - root.pitchClass) % 12 == 4
+        )
 
         # Major chords + perfect 4th = clash
         # However, sus4 chords or minor chords can handle it
-        if has_major_third and ('major' in chord_type.lower() or 'dominant' in chord_type.lower()):
+        if has_major_third and (
+            "major" in chord_type.lower() or "dominant" in chord_type.lower()
+        ):
             return False
         return True
 
     # 13th (6th): Generally okay except in some diminished contexts
     elif semitones == 9:
-        return 'diminished' not in chord_type.lower()
+        return "diminished" not in chord_type.lower()
 
     # Other extensions are not standard
     return False
+
 
 def find_available_tensions(chord_obj, k):
     """Find available tension notes - chromatic notes that create harmonic tension"""
@@ -293,12 +335,25 @@ def find_available_tensions(chord_obj, k):
     key_notes = [p.name for p in k.getScale().getPitches()]
 
     # Standard chromatic scale with correct enharmonics
-    chromatic_scale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+    chromatic_scale = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
     # For minor keys, adjust the chromatic notes to use flats where appropriate
     # Based on standard music theory practice
-    if k.mode == 'minor':
-        chromatic_scale = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+    if k.mode == "minor":
+        chromatic_scale = [
+            "C",
+            "Db",
+            "D",
+            "Eb",
+            "E",
+            "F",
+            "F#",
+            "G",
+            "Ab",
+            "A",
+            "Bb",
+            "B",
+        ]
 
     # Filter out notes that are already in the chord or key
     tension_notes = []
@@ -316,6 +371,7 @@ def find_available_tensions(chord_obj, k):
 
     return tension_notes
 
+
 def get_interval_name(semitones):
     """Get interval name based on semitones"""
     # Use a more direct mapping without relying on music21 methods
@@ -331,9 +387,10 @@ def get_interval_name(semitones):
         8: "#5",
         9: "13",
         10: "7",
-        11: "maj7"
+        11: "maj7",
     }
     return interval_map.get(semitones, "unknown")
+
 
 def get_scale_degree(pitch_obj, k):
     """Get scale degree of a pitch in a key"""
@@ -347,6 +404,7 @@ def get_scale_degree(pitch_obj, k):
     if pitch_pc in key_pcs:
         return key_pcs.index(pitch_pc) + 1
     return None
+
 
 def calculate_tension_level(pitch_obj, chord_obj, k):
     """Calculate tension level using music21 interval methods"""
@@ -403,6 +461,7 @@ def calculate_tension_level(pitch_obj, chord_obj, k):
 
     return 8  # Default high tension
 
+
 def calculate_note_weight(note_properties, chord_function, roman_numeral):
     """Calculate the probability weight for a note using sophisticated rules"""
     # Base weights - increase extended chord weight
@@ -413,22 +472,22 @@ def calculate_note_weight(note_properties, chord_function, roman_numeral):
     elif note_properties["is_key_note"]:
         base_weight = 25  # Slightly increased
     else:
-        base_weight = 8   # Slightly increased for more tension options
+        base_weight = 8  # Slightly increased for more tension options
 
     # Apply position modifiers - make third/fifth more equal
     interval_name = note_properties["interval_name"]
     position_modifiers = {
         "root": 1.0,
-        "3": 0.95,    # Slightly reduced from 0.9
-        "b3": 0.95,   # Slightly reduced from 0.9
-        "5": 0.85,    # Slightly increased from 0.8
-        "7": 0.75,    # Slightly increased from 0.7
-        "maj7": 0.75, # Slightly increased from 0.7
-        "9": 0.65,    # Increased from 0.6
-        "11": 0.55,   # Increased from 0.5
-        "13": 0.55,   # Increased from 0.5
-        "b9": 0.5,    # New - specifically for dominant chords
-        "#11": 0.5    # New - specifically for jazz contexts
+        "3": 0.95,  # Slightly reduced from 0.9
+        "b3": 0.95,  # Slightly reduced from 0.9
+        "5": 0.85,  # Slightly increased from 0.8
+        "7": 0.75,  # Slightly increased from 0.7
+        "maj7": 0.75,  # Slightly increased from 0.7
+        "9": 0.65,  # Increased from 0.6
+        "11": 0.55,  # Increased from 0.5
+        "13": 0.55,  # Increased from 0.5
+        "b9": 0.5,  # New - specifically for dominant chords
+        "#11": 0.5,  # New - specifically for jazz contexts
     }
 
     modifier = position_modifiers.get(interval_name, 0.4)
@@ -451,7 +510,9 @@ def calculate_note_weight(note_properties, chord_function, roman_numeral):
             weight *= 1.2
         # De-emphasize tendency tones
         if scale_degree == 7:
-            weight *= 0.6  # Reduced from 0.7 - even less emphasis on leading tone in tonic
+            weight *= (
+                0.6  # Reduced from 0.7 - even less emphasis on leading tone in tonic
+            )
     elif chord_function == "subdominant":
         # Emphasize 4th scale degree
         if scale_degree == 4:
@@ -459,11 +520,11 @@ def calculate_note_weight(note_properties, chord_function, roman_numeral):
 
     # Apply chord-specific modifiers based on Roman numeral
     try:
-        if hasattr(roman_numeral, 'quality') and roman_numeral.quality == "major":
+        if hasattr(roman_numeral, "quality") and roman_numeral.quality == "major":
             # Major chords favor major scale runs
             if scale_degree in [1, 3, 5]:
                 weight *= 1.1
-        elif hasattr(roman_numeral, 'quality') and roman_numeral.quality == "minor":
+        elif hasattr(roman_numeral, "quality") and roman_numeral.quality == "minor":
             # Minor chords favor minor scale runs
             if scale_degree in [1, 3, 5]:
                 weight *= 1.1
@@ -483,6 +544,7 @@ def calculate_note_weight(note_properties, chord_function, roman_numeral):
 
     return weight
 
+
 # Example usage
 if __name__ == "__main__":
     chord_progression = ["Em", "C", "Am", "B7"]
@@ -499,7 +561,9 @@ if __name__ == "__main__":
         print(f"Tension Notes: {chord_data['tension_notes']}")
 
         # Print top notes by weight
-        sorted_notes = sorted(chord_data["note_weights"].items(), key=lambda x: x[1], reverse=True)
+        sorted_notes = sorted(
+            chord_data["note_weights"].items(), key=lambda x: x[1], reverse=True
+        )
         print("\nTop melody notes for this chord (with weights):")
         for note_name, weight in sorted_notes[:5]:
             print(f"{note_name}: {weight:.2f}")

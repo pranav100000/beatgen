@@ -1,14 +1,10 @@
 """
 Tests for the TrackRepository class
 """
+
 import pytest
-import uuid
-from sqlmodel import Session
 
 from app2.models.track import Track
-from app2.models.file_models.audio_file import AudioFile
-from app2.models.file_models.midi_file import MidiFile
-from backend.app2.models.public_models.instrument_file import InstrumentFile
 from app2.repositories.track_repository import TrackRepository
 from app2.core.exceptions import DatabaseException, NotFoundException
 from app2.types.track_types import TrackType
@@ -30,30 +26,32 @@ class TestTrackRepository:
         db_session.add(sample_user)
         db_session.add(sample_audio_file)
         db_session.commit()
-        
+
         # Create track
         track = Track(
             id="audio-track-test-id",
             name="Test Audio Track",
             type=TrackType.AUDIO,
             user_id=sample_user.id,
-            audio_file_id=sample_audio_file.id
+            audio_file_id=sample_audio_file.id,
         )
         db_session.add(track)
         db_session.commit()
         db_session.refresh(track)
-        
+
         return track
 
     @pytest.fixture
-    def midi_track(self, sample_user, sample_midi_file, sample_instrument_file, db_session):
+    def midi_track(
+        self, sample_user, sample_midi_file, sample_instrument_file, db_session
+    ):
         """Create a sample MIDI track in the database"""
         # Add user, MIDI file, and instrument file
         db_session.add(sample_user)
         db_session.add(sample_midi_file)
         db_session.add(sample_instrument_file)
         db_session.commit()
-        
+
         # Create track
         track = Track(
             id="midi-track-test-id",
@@ -61,12 +59,12 @@ class TestTrackRepository:
             type=TrackType.MIDI,
             user_id=sample_user.id,
             midi_file_id=sample_midi_file.id,
-            instrument_id=sample_instrument_file.id
+            instrument_id=sample_instrument_file.id,
         )
         db_session.add(track)
         db_session.commit()
         db_session.refresh(track)
-        
+
         return track
 
     @pytest.mark.asyncio
@@ -74,7 +72,7 @@ class TestTrackRepository:
         """Test get_by_id when the track exists"""
         # Act
         result = await track_repository.get_by_id(audio_track.id)
-        
+
         # Assert
         assert result.id == audio_track.id
         assert result.name == audio_track.name
@@ -94,7 +92,7 @@ class TestTrackRepository:
         """Test get_with_files"""
         # Act
         result = await track_repository.get_with_files(audio_track.id)
-        
+
         # Assert
         assert result.id == audio_track.id
         assert result.audio_file_id == audio_track.audio_file_id
@@ -105,7 +103,7 @@ class TestTrackRepository:
         """Test get_all"""
         # Act
         results = await track_repository.get_all()
-        
+
         # Assert
         assert len(results) == 2
         # Check that both tracks are in the results
@@ -119,12 +117,12 @@ class TestTrackRepository:
         # Act
         # Filter by track type
         results = await track_repository.get_all(type=TrackType.AUDIO)
-        
+
         # Assert
         assert len(results) == 1
         assert results[0].id == audio_track.id
         assert results[0].type == TrackType.AUDIO
-        
+
         # Test with non-matching filter
         results = await track_repository.get_all(type="non-existent-type")
         assert len(results) == 0
@@ -134,10 +132,10 @@ class TestTrackRepository:
         """Test get_by_user_id"""
         # Act
         results = await track_repository.get_by_user_id(audio_track.user_id)
-        
+
         # Assert
         assert len(results) == 2  # Both tracks have the same user_id
-        
+
         # Test with non-matching user_id
         results = await track_repository.get_by_user_id("non-existent-id")
         assert len(results) == 0
@@ -147,37 +145,45 @@ class TestTrackRepository:
         """Test get_by_file_id"""
         # Act
         # Get tracks for audio file
-        results = await track_repository.get_by_file_id(audio_track.audio_file_id, FileType.AUDIO)
-        
+        results = await track_repository.get_by_file_id(
+            audio_track.audio_file_id, FileType.AUDIO
+        )
+
         # Assert
         assert len(results) == 1
         assert results[0].id == audio_track.id
-        
+
         # Test with non-matching file ID
-        results = await track_repository.get_by_file_id("non-existent-id", FileType.AUDIO)
+        results = await track_repository.get_by_file_id(
+            "non-existent-id", FileType.AUDIO
+        )
         assert len(results) == 0
-        
+
         # Test with invalid file type
         with pytest.raises(ValueError):
-            await track_repository.get_by_file_id(audio_track.audio_file_id, "invalid-type")
+            await track_repository.get_by_file_id(
+                audio_track.audio_file_id, "invalid-type"
+            )
 
     @pytest.mark.asyncio
-    async def test_create(self, track_repository, sample_user, sample_audio_file, db_session):
+    async def test_create(
+        self, track_repository, sample_user, sample_audio_file, db_session
+    ):
         """Test create method"""
         # Arrange
         db_session.add(sample_user)
         db_session.add(sample_audio_file)
         db_session.commit()
-        
+
         track_data = {
             "name": "New Audio Track",
             "user_id": sample_user.id,
-            "audio_file_id": sample_audio_file.id
+            "audio_file_id": sample_audio_file.id,
         }
-        
+
         # Act
         result = await track_repository.create(track_data, FileType.AUDIO)
-        
+
         # Assert
         assert result.name == "New Audio Track"
         assert result.user_id == sample_user.id
@@ -188,10 +194,8 @@ class TestTrackRepository:
     async def test_create_db_error(self, track_repository):
         """Test create method with database error"""
         # Arrange
-        track_data = {
-            "invalid_field": "value"  # This will cause a validation error
-        }
-        
+        track_data = {"invalid_field": "value"}  # This will cause a validation error
+
         # Act & Assert
         with pytest.raises(DatabaseException):
             await track_repository.create(track_data, FileType.AUDIO)
@@ -200,13 +204,11 @@ class TestTrackRepository:
     async def test_update(self, track_repository, audio_track):
         """Test update method"""
         # Arrange
-        update_data = {
-            "name": "Updated Audio Track"
-        }
-        
+        update_data = {"name": "Updated Audio Track"}
+
         # Act
         result = await track_repository.update(audio_track.id, update_data)
-        
+
         # Assert
         assert result.id == audio_track.id
         assert result.name == "Updated Audio Track"
@@ -225,10 +227,10 @@ class TestTrackRepository:
         """Test delete method"""
         # Act
         result = await track_repository.delete(audio_track.id)
-        
+
         # Assert
         assert result is True
-        
+
         # Verify the track is deleted
         with pytest.raises(NotFoundException):
             await track_repository.get_by_id(audio_track.id)

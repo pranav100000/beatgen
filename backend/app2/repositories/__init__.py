@@ -1,6 +1,7 @@
 """
 Repository layer for database access
 """
+
 from app2.repositories.base_repository import BaseRepository
 from app2.repositories.user_repository import UserRepository
 from app2.repositories.project_repository import ProjectRepository

@@ -39,7 +39,7 @@
 #     midi_file_id: Optional[uuid.UUID] = Field(default=None, foreign_key="midi_files.id")
 #     instrument_id: Optional[uuid.UUID] = Field(default=None, foreign_key="instrument_files.id")
 #     drum_track_id: Optional[uuid.UUID] = Field(default=None, foreign_key="tracks.id")
-    
+
 #     # Relationships
 #     audio_file: Optional["AudioFile"] = Relationship(
 #         back_populates="track",  # Link to AudioFile.track
@@ -50,12 +50,12 @@
 #         back_populates="track", # Added back_populates
 #         sa_relationship_kwargs=dict(foreign_keys="[Track.instrument_id]")
 #     )
-    
+
 #     projects: List["Project"] = Relationship(back_populates="tracks", link_model=ProjectTrack)
-    
+
 #     # Relationship to the association object
 #     project_tracks: List["ProjectTrack"] = Relationship(back_populates="track")
-    
+
 #     @root_validator(pre=False, skip_on_failure=True)
 #     def check_track_type_constraints(cls, values):
 #         track_type = values.get('type')
@@ -75,7 +75,7 @@
 #             if audio_file_id or drum_track_id:
 #                 raise ValueError("MIDI tracks must only have instrument_id and midi_file_id")
 #         elif track_type == TrackType.SAMPLER:
-#             if not audio_file_id or not midi_file_id: 
+#             if not audio_file_id or not midi_file_id:
 #                 raise ValueError("SAMPLER tracks must have both audio_file_id and midi_file_id")
 #             if instrument_id:
 #                 raise ValueError("SAMPLER tracks must not have instrument_id")
@@ -94,7 +94,7 @@
 #     midi_file_id: Optional[uuid.UUID] = None
 #     instrument_id: Optional[uuid.UUID] = None
 #     drum_track_id: Optional[uuid.UUID] = None
-    
+
 #     audio_file: Optional["AudioFile"] = None
 #     midi_file: Optional["MidiFile"] = None
 #     instrument_file: Optional["InstrumentFile"] = None

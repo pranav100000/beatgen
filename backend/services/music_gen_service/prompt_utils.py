@@ -10,14 +10,36 @@ IMPORTANT: Always explain your reasoning before using a tool.
 IMPORTANT: Do not ask questions. You will be repeatedly prompted.
 """
 
-def get_chords_create_prompt(key: str, mode: str, tempo: int, chord_progression: str, duration_bars: int, duration_beats: int) -> str:
+
+def get_chords_create_prompt(
+    key: str,
+    mode: str,
+    tempo: int,
+    chord_progression: str,
+    duration_bars: int,
+    duration_beats: int,
+) -> str:
     return f"""You are a music composer creating a chord progression based on a text description.
 The chord progression you create needs to be {duration_bars} bars long and needs to be in the key of {key} {mode} at {tempo} BPM.
 
 
 """
 
-def get_melody_create_prompt(key: str, mode: str, tempo: int, allowed_intervals_string: str, chord_progression: str, mood: str, tempo_character: str, rhythm_type: str, musical_style: str, melodic_character: str, duration_bars: int, duration_beats: int) -> str:
+
+def get_melody_create_prompt(
+    key: str,
+    mode: str,
+    tempo: int,
+    allowed_intervals_string: str,
+    chord_progression: str,
+    mood: str,
+    tempo_character: str,
+    rhythm_type: str,
+    musical_style: str,
+    melodic_character: str,
+    duration_bars: int,
+    duration_beats: int,
+) -> str:
     return f"""You are a music composer creating a melodic pattern based on a text description.
 The melody you create needs to be {duration_bars} bars long and needs to be in the key of {key} {mode} at {tempo} BPM.
 

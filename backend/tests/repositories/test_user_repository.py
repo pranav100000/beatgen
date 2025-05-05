@@ -1,13 +1,12 @@
 """
 Tests for the UserRepository class
 """
+
 import pytest
 import uuid
-from sqlmodel import Session
 
-from app2.models.user import User
 from app2.repositories.user_repository import UserRepository
-from app2.core.exceptions import DatabaseException, NotFoundException
+from app2.core.exceptions import NotFoundException
 
 
 class TestUserRepository:
@@ -24,10 +23,10 @@ class TestUserRepository:
         # Arrange
         db_session.add(sample_user)
         db_session.commit()
-        
+
         # Act
         result = await user_repository.get_profile(sample_user.id)
-        
+
         # Assert
         assert result.id == sample_user.id
         assert result.email == sample_user.email
@@ -46,15 +45,15 @@ class TestUserRepository:
         # Arrange
         db_session.add(sample_user)
         db_session.commit()
-        
+
         profile_data = {
             "name": "Updated User",
-            "profile_picture_url": "https://example.com/updated.jpg"
+            "profile_picture_url": "https://example.com/updated.jpg",
         }
-        
+
         # Act
         result = await user_repository.update_profile(sample_user.id, profile_data)
-        
+
         # Assert
         assert result.id == sample_user.id
         assert result.name == "Updated User"
@@ -76,10 +75,12 @@ class TestUserRepository:
         email = "new@example.com"
         username = "newuser"
         display_name = "New User"
-        
+
         # Act
-        result = await user_repository.create_profile(user_id, email, username, display_name)
-        
+        result = await user_repository.create_profile(
+            user_id, email, username, display_name
+        )
+
         # Assert
         assert result.id == user_id
         assert result.email == email
@@ -87,20 +88,22 @@ class TestUserRepository:
         assert result.display_name == display_name
 
     @pytest.mark.asyncio
-    async def test_create_profile_existing(self, user_repository, sample_user, db_session):
+    async def test_create_profile_existing(
+        self, user_repository, sample_user, db_session
+    ):
         """Test create_profile when the profile already exists"""
         # Arrange
         db_session.add(sample_user)
         db_session.commit()
-        
+
         # Act
         result = await user_repository.create_profile(
-            sample_user.id, 
+            sample_user.id,
             "new@example.com",  # Different from sample_user.email
-            "newusername", 
-            "New Name"
+            "newusername",
+            "New Name",
         )
-        
+
         # Assert - should return existing profile without changes
         assert result.id == sample_user.id
         assert result.email == sample_user.email  # Not updated
@@ -112,10 +115,10 @@ class TestUserRepository:
         # Arrange
         db_session.add(sample_user)
         db_session.commit()
-        
+
         # Act
         result = await user_repository.find_by_email(sample_user.email)
-        
+
         # Assert
         assert result is not None
         assert result.id == sample_user.id
@@ -126,6 +129,6 @@ class TestUserRepository:
         """Test find_by_email when the user does not exist"""
         # Act
         result = await user_repository.find_by_email("nonexistent@example.com")
-        
+
         # Assert
         assert result is None

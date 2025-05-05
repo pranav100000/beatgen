@@ -1,19 +1,18 @@
 from enum import Enum
-from typing import List, Optional, Dict, Any, Union
-import uuid
+from typing import Optional, Dict, Any, Union
 from pydantic import BaseModel, Field, validator
-from abc import ABC
 
-from app2.models.public_models.drum_samples import DrumSamplePublicRead
-from app2.models.track_models.drum_track import DrumTrack, DrumTrackRead
-from app2.models.track_models.midi_track import MidiTrack, MidiTrackRead
-from app2.models.track_models.sampler_track import SamplerTrack, SamplerTrackRead
+from app2.models.track_models.drum_track import DrumTrackRead
+from app2.models.track_models.midi_track import MidiTrackRead
+from app2.models.track_models.sampler_track import SamplerTrackRead
 from app2.models.project_track import ProjectTrack
+
 
 class TrackType(str, Enum):
     AUDIO = "audio"
     MIDI = "midi"
     DRUM = "drum"
+
 
 class KeySignature(str, Enum):
     C_MAJOR = "C Major"
@@ -45,7 +44,8 @@ class KeySignature(str, Enum):
     F_MINOR = "F Minor"
     B_FLAT_MINOR = "Bb Minor"
     E_FLAT_MINOR = "Eb Minor"
-    
+
+
 class ActionType(str, Enum):
     CHANGE_BPM = "change_bpm"
     CHANGE_KEY = "change_key"
@@ -58,53 +58,83 @@ class ActionType(str, Enum):
     TOGGLE_MUTE = "toggle_mute"
     TOGGLE_SOLO = "toggle_solo"
 
+
 # Base models for action data
 class ActionData(BaseModel):
     """Base class for all action data"""
+
     pass
 
+
 class BPMData(ActionData):
-    value: float = Field(..., ge=20.0, le=400.0, description="The new BPM value between 20 and 400")
+    value: float = Field(
+        ..., ge=20.0, le=400.0, description="The new BPM value between 20 and 400"
+    )
+
 
 class KeyData(ActionData):
     value: KeySignature = Field(..., description="The new key value")
 
+
 class TimeSignatureData(ActionData):
-    numerator: int = Field(..., gt=0, le=32, description="Time signature numerator (1-32)")
+    numerator: int = Field(
+        ..., gt=0, le=32, description="Time signature numerator (1-32)"
+    )
     denominator: int = Field(..., description="Time signature denominator (power of 2)")
 
-    @validator('denominator')
+    @validator("denominator")
     def validate_denominator(cls, v):
         valid_denominators = [1, 2, 4, 8, 16, 32]
         if v not in valid_denominators:
-            raise ValueError(f'Denominator must be a power of 2 up to 32. Got {v}')
+            raise ValueError(f"Denominator must be a power of 2 up to 32. Got {v}")
         return v
+
 
 class TrackData(ActionData):
     type: TrackType
     # instrument_id: str = Field(..., description="The instrument ID")
     # notes: List[dict] = Field(..., description="The notes to add to the track")
-    track_data: Optional[Union[DrumTrackRead, MidiTrackRead, SamplerTrackRead]] = Field(None, description="The data for the track")
-    project_track_data: Optional[ProjectTrack] = Field(None, description="The data for the project track")
+    track_data: Optional[Union[DrumTrackRead, MidiTrackRead, SamplerTrackRead]] = Field(
+        None, description="The data for the track"
+    )
+    project_track_data: Optional[ProjectTrack] = Field(
+        None, description="The data for the project track"
+    )
+
 
 class VolumeData(ActionData):
     track_id: str = Field(..., description="The track ID")
-    value: float = Field(..., ge=0.0, le=1.0, description="The new volume value between 0 (silent) and 1 (full volume)")
+    value: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="The new volume value between 0 (silent) and 1 (full volume)",
+    )
+
 
 class PanData(ActionData):
     track_id: str = Field(..., description="The track ID")
-    value: float = Field(..., ge=-1, le=1, description="The new pan value between -1 (full left) and 1 (full right)")
+    value: float = Field(
+        ...,
+        ge=-1,
+        le=1,
+        description="The new pan value between -1 (full left) and 1 (full right)",
+    )
+
 
 class MuteData(ActionData):
     track_id: str = Field(..., description="The track ID")
     muted: bool = Field(..., description="The new mute state")
 
+
 class SoloData(ActionData):
     track_id: str = Field(..., description="The track ID")
     soloed: bool = Field(..., description="The new solo state")
 
+
 class AssistantAction(BaseModel):
     """Base class for all assistant actions"""
+
     action_type: ActionType = Field(..., description="The type of action to perform")
     data: ActionData = Field(..., description="The data for this action")
 
@@ -117,65 +147,67 @@ class AssistantAction(BaseModel):
         return cls(action_type=ActionType.CHANGE_KEY, data=KeyData(value=value))
 
     @classmethod
-    def change_time_signature(cls, numerator: int, denominator: int) -> "AssistantAction":
+    def change_time_signature(
+        cls, numerator: int, denominator: int
+    ) -> "AssistantAction":
         return cls(
             action_type=ActionType.CHANGE_TIME_SIGNATURE,
-            data=TimeSignatureData(numerator=numerator, denominator=denominator)
+            data=TimeSignatureData(numerator=numerator, denominator=denominator),
         )
 
     @classmethod
     def add_midi_track(cls, track: MidiTrackRead) -> "AssistantAction":
         return cls(
             action_type=ActionType.ADD_TRACK,
-            data=TrackData(type=TrackType.MIDI, track_data=track)
+            data=TrackData(type=TrackType.MIDI, track_data=track),
         )
-        
+
     @classmethod
     def add_sampler_track(cls, track: SamplerTrackRead) -> "AssistantAction":
         return cls(
             action_type=ActionType.ADD_SAMPLER_TRACK,
-            data=TrackData(type=TrackType.SAMPLER, track_data=track)
+            data=TrackData(type=TrackType.SAMPLER, track_data=track),
         )
-        
+
     @classmethod
     def add_drum_track(cls, track: DrumTrackRead) -> "AssistantAction":
         return cls(
             action_type=ActionType.ADD_DRUM_TRACK,
-            data=TrackData(type=TrackType.DRUM, track_data=track)
+            data=TrackData(type=TrackType.DRUM, track_data=track),
         )
 
     @classmethod
     def adjust_volume(cls, track_id: str, value: float) -> "AssistantAction":
         return cls(
             action_type=ActionType.ADJUST_VOLUME,
-            data=VolumeData(track_id=track_id, value=value)
+            data=VolumeData(track_id=track_id, value=value),
         )
 
     @classmethod
     def adjust_pan(cls, track_id: str, value: float) -> "AssistantAction":
         return cls(
             action_type=ActionType.ADJUST_PAN,
-            data=PanData(track_id=track_id, value=value)
+            data=PanData(track_id=track_id, value=value),
         )
 
     @classmethod
     def toggle_mute(cls, track_id: str, muted: bool) -> "AssistantAction":
         return cls(
             action_type=ActionType.TOGGLE_MUTE,
-            data=MuteData(track_id=track_id, muted=muted)
+            data=MuteData(track_id=track_id, muted=muted),
         )
 
     @classmethod
     def toggle_solo(cls, track_id: str, soloed: bool) -> "AssistantAction":
         return cls(
             action_type=ActionType.TOGGLE_SOLO,
-            data=SoloData(track_id=track_id, soloed=soloed)
+            data=SoloData(track_id=track_id, soloed=soloed),
         )
 
     def model_dump(self, **kwargs) -> Dict[str, Any]:
         """Override model_dump to provide a clean serialization"""
         result = super().model_dump(**kwargs)
-        if 'data' in result:
-            result.update(result['data'])
-            del result['data']
+        if "data" in result:
+            result.update(result["data"])
+            del result["data"]
         return result
