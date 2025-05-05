@@ -1,7 +1,4 @@
 from typing import List, Dict, Any, Optional
-import logging
-from datetime import datetime
-import uuid
 
 from app2.infrastructure.database.supabase_client import supabase
 from app2.core.logging import get_api_logger
@@ -9,11 +6,14 @@ from app2.core.logging import get_api_logger
 # Configure logger
 logger = get_api_logger("soundfont_service")
 
+
 class SoundfontService:
     """Service for managing soundfonts"""
-    
+
     @staticmethod
-    async def get_public_soundfonts(category: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_public_soundfonts(
+        category: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Get all public soundfonts, optionally filtered by category
         """
@@ -30,7 +30,7 @@ class SoundfontService:
             # Execute query
             response = query.execute()
 
-            if hasattr(response, 'error') and response.error:
+            if hasattr(response, "error") and response.error:
                 logger.error(f"Error retrieving soundfonts: {response.error}")
                 return []
 
@@ -41,11 +41,17 @@ class SoundfontService:
             for soundfont in soundfonts:
                 try:
                     # Get public URL for the soundfont file
-                    file_url = supabase.storage.from_("soundfonts").get_public_url(soundfont["storage_key"])
+                    file_url = supabase.storage.from_("soundfonts").get_public_url(
+                        soundfont["storage_key"]
+                    )
                     soundfont["download_url"] = file_url
-                    logger.debug(f"Generated download URL for soundfont: {soundfont['name']}")
+                    logger.debug(
+                        f"Generated download URL for soundfont: {soundfont['name']}"
+                    )
                 except Exception as url_err:
-                    logger.error(f"Error generating URL for soundfont {soundfont['id']}: {str(url_err)}")
+                    logger.error(
+                        f"Error generating URL for soundfont {soundfont['id']}: {str(url_err)}"
+                    )
                     soundfont["download_url"] = None
 
             return soundfonts
@@ -62,9 +68,14 @@ class SoundfontService:
         logger.info(f"Getting public soundfont with ID: {soundfont_id}")
 
         try:
-            response = supabase.table("soundfont_public").select("*").eq("id", soundfont_id).execute()
+            response = (
+                supabase.table("soundfont_public")
+                .select("*")
+                .eq("id", soundfont_id)
+                .execute()
+            )
 
-            if hasattr(response, 'error') and response.error:
+            if hasattr(response, "error") and response.error:
                 logger.error(f"Error retrieving soundfont: {response.error}")
                 return None
 
@@ -76,11 +87,17 @@ class SoundfontService:
 
             # Generate download URL
             try:
-                file_url = supabase.storage.from_("soundfonts").get_public_url(soundfont["storage_key"])
+                file_url = supabase.storage.from_("soundfonts").get_public_url(
+                    soundfont["storage_key"]
+                )
                 soundfont["download_url"] = file_url
-                logger.debug(f"Generated download URL for soundfont: {soundfont['name']}")
+                logger.debug(
+                    f"Generated download URL for soundfont: {soundfont['name']}"
+                )
             except Exception as url_err:
-                logger.error(f"Error generating URL for soundfont {soundfont['id']}: {str(url_err)}")
+                logger.error(
+                    f"Error generating URL for soundfont {soundfont['id']}: {str(url_err)}"
+                )
                 soundfont["download_url"] = None
 
             return soundfont
@@ -89,5 +106,6 @@ class SoundfontService:
             logger.error(f"Unexpected error in get_public_soundfont: {str(e)}")
             return None
 
+
 # Create a singleton instance
-soundfont_service = SoundfontService() 
+soundfont_service = SoundfontService()

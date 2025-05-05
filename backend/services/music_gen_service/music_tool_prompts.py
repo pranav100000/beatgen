@@ -12,21 +12,20 @@ def get_select_instruments_prompt(available_instruments: list[str]) -> dict:
                 "soundfont_names": {
                     "type": "array",
                     "description": f"List of soundfont names to use in the composition. You must select instruments out of the available instruments. These are the available instruments: {instrument_list_string}",
-                    "items": {
-                        "type": "string"
-                    }
+                    "items": {"type": "string"},
                 }
             },
-            "required": ["soundfont_names"]
-        }
+            "required": ["soundfont_names"],
+        },
     }
-    
+
+
 def get_create_melody_prompt(available_instruments: list[str]) -> dict:
     instrument_list_string = ", ".join(available_instruments)
     if available_instruments:
-        random_available_instruments_string = ", ".join(random.sample(available_instruments, len(available_instruments) // 2))
+        ", ".join(random.sample(available_instruments, len(available_instruments) // 2))
     else:
-        random_available_notes_string = ""
+        pass
     return {
         "name": "create_melody",
         "description": f"Uses an AI agent to create a melodic pattern for a specified instrument. The instrument name you select must be one of the available instruments: {instrument_list_string}",
@@ -35,14 +34,14 @@ def get_create_melody_prompt(available_instruments: list[str]) -> dict:
             "properties": {
                 "instrument_name": {
                     "type": "string",
-                    "description": "Name of the instrument (e.g., 'Piano', 'Violin')"
+                    "description": "Name of the instrument (e.g., 'Piano', 'Violin')",
                 },
                 "description": {
                     "type": "string",
-                    "description": "Description of the melody character (e.g., 'cheerful', 'melancholic')"
+                    "description": "Description of the melody character (e.g., 'cheerful', 'melancholic')",
                 },
                 # "duration_beats": {
-                #     "type": "integer", 
+                #     "type": "integer",
                 #     "description": "Length of the melody in beats"
                 # },
                 # "note_names": {
@@ -67,6 +66,6 @@ def get_create_melody_prompt(available_instruments: list[str]) -> dict:
                 #     }
                 # }
             },
-            "required": ["instrument_name", "description"]
-        }
+            "required": ["instrument_name", "description"],
+        },
     }

@@ -17,7 +17,7 @@
 #     5: "Electric Piano 2",
 #     6: "Harpsichord",
 #     7: "Clavinet",
-    
+
 #     # Chromatic Percussion Family (8-15)
 #     8: "Celesta",
 #     9: "Glockenspiel",
@@ -27,7 +27,7 @@
 #     13: "Xylophone",
 #     14: "Tubular Bells",
 #     15: "Dulcimer",
-    
+
 #     # Organ Family (16-23)
 #     16: "Drawbar Organ",
 #     17: "Percussive Organ",
@@ -37,7 +37,7 @@
 #     21: "Accordion",
 #     22: "Harmonica",
 #     23: "Tango Accordion",
-    
+
 #     # Guitar Family (24-31)
 #     24: "Acoustic Guitar (nylon)",
 #     25: "Acoustic Guitar (steel)",
@@ -47,7 +47,7 @@
 #     29: "Overdriven Guitar",
 #     30: "Distortion Guitar",
 #     31: "Guitar Harmonics",
-    
+
 #     # Bass Family (32-39)
 #     32: "Acoustic Bass",
 #     33: "Electric Bass (finger)",
@@ -57,7 +57,7 @@
 #     37: "Slap Bass 2",
 #     38: "Synth Bass 1",
 #     39: "Synth Bass 2",
-    
+
 #     # Strings Family (40-47)
 #     40: "Violin",
 #     41: "Viola",
@@ -67,7 +67,7 @@
 #     45: "Pizzicato Strings",
 #     46: "Orchestral Harp",
 #     47: "Timpani",
-    
+
 #     # Ensemble Family (48-55)
 #     48: "String Ensemble 1",
 #     49: "String Ensemble 2",
@@ -77,7 +77,7 @@
 #     53: "Voice Oohs",
 #     54: "Synth Voice",
 #     55: "Orchestra Hit",
-    
+
 #     # Brass Family (56-63)
 #     56: "Trumpet",
 #     57: "Trombone",
@@ -87,7 +87,7 @@
 #     61: "Brass Section",
 #     62: "Synth Brass 1",
 #     63: "Synth Brass 2",
-    
+
 #     # Reed Family (64-71)
 #     64: "Soprano Sax",
 #     65: "Alto Sax",
@@ -97,7 +97,7 @@
 #     69: "English Horn",
 #     70: "Bassoon",
 #     71: "Clarinet",
-    
+
 #     # Pipe Family (72-79)
 #     72: "Piccolo",
 #     73: "Flute",
@@ -107,7 +107,7 @@
 #     77: "Shakuhachi",
 #     78: "Whistle",
 #     79: "Ocarina",
-    
+
 #     # Synth Lead Family (80-87)
 #     80: "Lead 1 (square)",
 #     81: "Lead 2 (sawtooth)",
@@ -117,7 +117,7 @@
 #     85: "Lead 6 (voice)",
 #     86: "Lead 7 (fifths)",
 #     87: "Lead 8 (bass + lead)",
-    
+
 #     # Synth Pad Family (88-95)
 #     88: "Pad 1 (new age)",
 #     89: "Pad 2 (warm)",
@@ -127,7 +127,7 @@
 #     93: "Pad 6 (metallic)",
 #     94: "Pad 7 (halo)",
 #     95: "Pad 8 (sweep)",
-    
+
 #     # Synth Effects Family (96-103)
 #     96: "FX 1 (rain)",
 #     97: "FX 2 (soundtrack)",
@@ -137,7 +137,7 @@
 #     101: "FX 6 (goblins)",
 #     102: "FX 7 (echoes)",
 #     103: "FX 8 (sci-fi)",
-    
+
 #     # Ethnic Family (104-111)
 #     104: "Sitar",
 #     105: "Banjo",
@@ -147,7 +147,7 @@
 #     109: "Bag pipe",
 #     110: "Fiddle",
 #     111: "Shanai",
-    
+
 #     # Percussive Family (112-119)
 #     112: "Tinkle Bell",
 #     113: "Agogo",
@@ -157,7 +157,7 @@
 #     117: "Melodic Tom",
 #     118: "Synth Drum",
 #     119: "Reverse Cymbal",
-    
+
 #     # Sound Effects Family (120-127)
 #     120: "Guitar Fret Noise",
 #     121: "Breath Noise",
@@ -193,21 +193,21 @@
 #     """
 #     Manages soundfont files and instrument selection.
 #     """
-    
+
 #     def __init__(self, soundfont_dir: str = "soundfonts"):
 #         """
 #         Initialize the soundfont manager.
-        
+
 #         Args:
 #             soundfont_dir: Directory containing soundfont files
 #         """
 #         self.soundfont_dir = soundfont_dir
 #         self.soundfont_files = []
 #         self.instrument_catalog = {}
-        
+
 #         # Scan available soundfonts
 #         self._scan_soundfonts()
-    
+
 #     def _scan_soundfonts(self):
 #         """
 #         Scan the soundfont directory for .sf2 files.
@@ -215,14 +215,14 @@
 #         if not os.path.exists(self.soundfont_dir):
 #             logger.warning(f"Soundfont directory {self.soundfont_dir} does not exist")
 #             return
-        
+
 #         # Walk through directory recursively
 #         for root, _, files in os.walk(self.soundfont_dir):
 #             for file in files:
 #                 if file.lower().endswith('.sf2'):
 #                     file_path = os.path.join(root, file)
 #                     relative_path = os.path.relpath(file_path, self.soundfont_dir)
-                    
+
 #                     # Basic metadata
 #                     sf_info = {
 #                         "file_path": file_path,
@@ -231,51 +231,51 @@
 #                         "size_bytes": os.path.getsize(file_path),
 #                         "inferred_type": self._infer_instrument_type(file)
 #                     }
-                    
+
 #                     self.soundfont_files.append(sf_info)
-                    
+
 #                     # Add to catalog by inferred type
 #                     instrument_type = sf_info["inferred_type"]["type"]
 #                     if instrument_type not in self.instrument_catalog:
 #                         self.instrument_catalog[instrument_type] = []
-                    
+
 #                     self.instrument_catalog[instrument_type].append(sf_info)
-        
+
 #         logger.info(f"Found {len(self.soundfont_files)} soundfont files")
-    
+
 #     def _infer_instrument_type(self, filename: str) -> Dict[str, Any]:
 #         """
 #         Infer the instrument type from the filename.
-        
+
 #         Args:
 #             filename: Soundfont filename
-            
+
 #         Returns:
 #             Dictionary with inferred type information
 #         """
 #         name_lower = filename.lower()
-        
+
 #         # Initialize with defaults
 #         result = {
 #             "type": "unknown",
 #             "family": "unknown",
 #             "gm_program": None
 #         }
-        
+
 #         # Try to match with GM instrument names
 #         for program, instrument_name in GM_INSTRUMENTS.items():
 #             if instrument_name.lower() in name_lower:
 #                 result["type"] = instrument_name.lower().split()[0]
 #                 result["gm_program"] = program
-                
+
 #                 # Find the family
 #                 for family, range_ids in GM_FAMILIES.items():
 #                     if program in range_ids:
 #                         result["family"] = family
 #                         break
-                
+
 #                 return result
-        
+
 #         # If no direct match, try keyword matching
 #         keywords = {
 #             "piano": ["piano", "grand", "upright"],
@@ -287,12 +287,12 @@
 #             "percussion": ["drum", "kit", "percussion"],
 #             "synth": ["synth", "pad", "lead"]
 #         }
-        
+
 #         for instrument_type, type_keywords in keywords.items():
 #             for keyword in type_keywords:
 #                 if keyword in name_lower:
 #                     result["type"] = instrument_type
-                    
+
 #                     # Guess a GM program based on type
 #                     if instrument_type == "piano":
 #                         result["gm_program"] = 0
@@ -310,65 +310,65 @@
 #                         result["gm_program"] = 118
 #                     elif instrument_type == "synth":
 #                         result["gm_program"] = 80
-                    
+
 #                     return result
-        
+
 #         return result
-    
+
 #     def get_all_soundfonts(self) -> List[Dict[str, Any]]:
 #         """
 #         Get all available soundfont files.
-        
+
 #         Returns:
 #             List of soundfont dictionaries
 #         """
 #         return self.soundfont_files
-    
+
 #     def get_available_instrument_types(self) -> List[str]:
 #         """
 #         Get a list of available instrument types.
-        
+
 #         Returns:
 #             List of instrument type strings
 #         """
 #         return list(self.instrument_catalog.keys())
-    
+
 #     def get_soundfonts_by_type(self, instrument_type: str) -> List[Dict[str, Any]]:
 #         """
 #         Get soundfonts of a specific instrument type.
-        
+
 #         Args:
 #             instrument_type: Type of instrument to get
-            
+
 #         Returns:
 #             List of matching soundfont dictionaries
 #         """
 #         return self.instrument_catalog.get(instrument_type, [])
-    
+
 #     def find_soundfonts(self, query: str) -> List[Dict[str, Any]]:
 #         """
 #         Find soundfonts matching a search query.
-        
+
 #         Args:
 #             query: Search query
-            
+
 #         Returns:
 #             List of matching soundfont dictionaries
 #         """
 #         query_lower = query.lower()
 #         results = []
-        
+
 #         for sf in self.soundfont_files:
-#             if (query_lower in sf["name"].lower() or 
+#             if (query_lower in sf["name"].lower() or
 #                 query_lower in sf["inferred_type"]["type"]):
 #                 results.append(sf)
-        
+
 #         return results
-    
+
 #     def get_instrument_metadata(self) -> Dict[str, Any]:
 #         """
 #         Get metadata about available instruments.
-        
+
 #         Returns:
 #             Dictionary with instrument metadata
 #         """

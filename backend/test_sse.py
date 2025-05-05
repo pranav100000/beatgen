@@ -9,12 +9,12 @@ from app.utils.sse import format_sse_message
 
 # Test the SSE message formatter
 print("Testing SSE message formatter...")
-test_message = format_sse_message('test', {'hello': 'world'})
+test_message = format_sse_message("test", {"hello": "world"})
 print(f"Message:\n{test_message}")
 
 # Test JSON serialization
 print("\nTesting JSON serialization...")
-data = {'name': 'Test', 'values': [1, 2, 3]}
+data = {"name": "Test", "values": [1, 2, 3]}
 json_str = json.dumps(data)
 print(f"JSON string: {json_str}")
 

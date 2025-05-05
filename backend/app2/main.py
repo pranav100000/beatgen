@@ -1,11 +1,7 @@
-from fastapi import FastAPI, Request, status, HTTPException
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
-import logging
 import traceback
-import uuid
 
 from app2.core.config import settings
 from app2.core.logging import get_logger
@@ -22,7 +18,7 @@ logger = get_logger("beatgen.main")
 app = FastAPI(
     title=settings.app.PROJECT_NAME,
     description="Backend API for BeatGen DAW",
-    version="0.2.0"
+    version="0.2.0",
 )
 
 # Disable automatic redirection of trailing slashes
@@ -36,6 +32,7 @@ app.add_middleware(
     allow_methods=settings.cors.ALLOW_METHODS,
     allow_headers=settings.cors.ALLOW_HEADERS,
 )
+
 
 # Initialize SQLModel tables on startup
 @app.on_event("startup")
@@ -51,6 +48,7 @@ def init_db():
         # Continue running even if database initialization fails
         # This allows the app to start and potentially use other features
 
+
 # Global exception handler for AppExceptions
 @app.exception_handler(AppException)
 async def app_exception_handler(request: Request, exc: AppException):
@@ -63,17 +61,18 @@ async def app_exception_handler(request: Request, exc: AppException):
         },
     )
 
+
 # Global exception handler for unhandled exceptions
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     error_detail = str(exc)
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    
+
     # Log the full exception with traceback
     logger.error(f"Unhandled exception: {error_detail}")
     logger.error(f"Request path: {request.url.path}")
     logger.error(traceback.format_exc())
-    
+
     return JSONResponse(
         status_code=status_code,
         content={
@@ -83,19 +82,40 @@ async def global_exception_handler(request: Request, exc: Exception):
         },
     )
 
+
 # Include routers
 app.include_router(auth.router, prefix=f"{settings.app.API_PREFIX}/auth", tags=["auth"])
-app.include_router(users.router, prefix=f"{settings.app.API_PREFIX}/users", tags=["users"])
-app.include_router(projects.router, prefix=f"{settings.app.API_PREFIX}/projects", tags=["projects"])
-app.include_router(sounds.router, prefix=f"{settings.app.API_PREFIX}/sounds", tags=["sounds"])
-app.include_router(soundfonts.router, prefix=f"{settings.app.API_PREFIX}/soundfonts", tags=["soundfonts"])
-app.include_router(drum_samples.router, prefix=f"{settings.app.API_PREFIX}/drum-samples", tags=["drum_samples"])
-app.include_router(assistant_streaming.router, prefix=f"{settings.app.API_PREFIX}/assistant", tags=["assistant"])
+app.include_router(
+    users.router, prefix=f"{settings.app.API_PREFIX}/users", tags=["users"]
+)
+app.include_router(
+    projects.router, prefix=f"{settings.app.API_PREFIX}/projects", tags=["projects"]
+)
+app.include_router(
+    sounds.router, prefix=f"{settings.app.API_PREFIX}/sounds", tags=["sounds"]
+)
+app.include_router(
+    soundfonts.router,
+    prefix=f"{settings.app.API_PREFIX}/soundfonts",
+    tags=["soundfonts"],
+)
+app.include_router(
+    drum_samples.router,
+    prefix=f"{settings.app.API_PREFIX}/drum-samples",
+    tags=["drum_samples"],
+)
+app.include_router(
+    assistant_streaming.router,
+    prefix=f"{settings.app.API_PREFIX}/assistant",
+    tags=["assistant"],
+)
+
 
 # Root endpoint
 @app.get("/")
 async def root():
     return {"message": "Welcome to BeatGen API v2"}
+
 
 # Health check endpoint
 @app.get(f"{settings.app.API_PREFIX}/health")

@@ -76,5 +76,6 @@ lint: ## check code style with ruff and black
 	black --check --diff .
 
 format: ## format code with ruff and black
+	ruff check --select F401 --fix . && \
 	ruff format . && \
 	black .

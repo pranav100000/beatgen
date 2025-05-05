@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class GenreType(str, Enum):
     POP = "pop"
     ROCK = "rock"
