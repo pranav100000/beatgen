@@ -71,6 +71,7 @@ class AudioConfig(BaseModel):
     BIT_DEPTH: int = 16  # Standard CD-quality bit depth
     DEFAULT_VELOCITY: int = 100  # MIDI velocity (0-127)
     BUFFER_SIZE: int = 1024
+    PPQ: int = 480
 
 
 class Settings(BaseModel):

@@ -19,7 +19,7 @@ DETERMINE_MUSICAL_PARAMETERS_TOOL = {
             },
             "mode": {
                 "type": "string",
-                "description": "The mode of the chord progression (e.g. major, minor, harmonic minor, etc.)",
+                "description": "The mode of the chord progression, MUST be either major or minor. DO NOT use any other mode.",
             },
             "tempo": {
                 "type": "integer",
@@ -97,7 +97,7 @@ CREATE_MELODY_TOOL = {
 
 SELECT_INSTRUMENTS_TOOL = {
     "name": "select_instruments",
-    "description": "Selects the instruments that fit the beat we are trying to make. These instruments will be used to create melody, chords, and countermelody. Select the instruments that most accurately fit the description. You should select 2-3 instruments. IMPORTANT: The instruments you select must be out of the list of available instruments.",
+    "description": "Selects the instruments that fit the beat we are trying to make. These instruments will be used to create melody, chords, and countermelody. Select the instruments that most accurately fit the description. IMPORTANT: The instruments you select must be out of the list of available instruments.",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -123,8 +123,6 @@ SELECT_INSTRUMENTS_TOOL = {
                     },
                     "required": ["instrument_name", "role", "explanation"],
                 },
-                "minItems": 2,
-                "maxItems": 3,
             }
         },
         "required": ["instrument_selections"],

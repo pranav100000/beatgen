@@ -63,7 +63,7 @@ export class SequencerWrapper {
     this.originalVolume = volume;
   }
   
-  async initialize(midiData: Midi): Promise<SequencerWrapper> {
+  async initialize(notes: Note[]): Promise<SequencerWrapper> {
     console.log(`Initializing with sfontId ${this.sfontId} on channel ${this.channel}`);
 
     // Step 1: First set the bank offset before anything else
@@ -81,19 +81,6 @@ export class SequencerWrapper {
     // Step 3: Create and set up sequencer (after bank offset is confirmed)
     this.sequencer = await this.synth.createSequencer();
     await this.sequencer.registerSynthesizer(this.synth);
-    
-    
-    // Extract PPQ from MIDI file if available
-    if (midiData.header && midiData.header.ppq) {
-      this.ppq = midiData.header.ppq;
-      console.log(`MIDI file has PPQ: ${this.ppq}`);
-    }
-    
-    // Extract tempo from MIDI file if available
-    if (midiData.header && midiData.header.tempos && midiData.header.tempos.length > 0) {
-      this.currentBpm = midiData.header.tempos[0].bpm;
-      console.log(`MIDI file has tempo: ${this.currentBpm} BPM`);
-    }
     
     // Apply the tempo through time scale
     this.applyTempoToTimeScale();
@@ -149,7 +136,7 @@ export class SequencerWrapper {
     }
     
     // Convert MIDI to note events
-    this.noteEvents = this.convertMidiToNoteEvents(midiData, this.channel);
+    this.noteEvents = this.convertMidiToNoteEvents(notes, this.channel);
     
     // Set initial volume
     this.setVolume(this.originalVolume);
@@ -695,16 +682,9 @@ export class SequencerWrapper {
    * Convert a Midi object to a series of sequencer events
    * Original method - kept for initial setup and backward compatibility
    */
-  convertMidiToNoteEvents(midi: Midi, channel: number, trackIndex: number = 0): EventInstance[] {
-    console.log('convertMidiToNoteEvents', midi, channel, trackIndex);
+  convertMidiToNoteEvents(notes: Note[], channel: number): EventInstance[] {
+    console.log('convertMidiToNoteEvents', notes, channel);
     const events: EventInstance[] = [];
-    
-    // Use the first track, or specified track
-    const track = midi.tracks[trackIndex] || midi.tracks[0];
-    if (!track) {
-      console.warn('No tracks found in MIDI file');
-      return events;
-    }
     
     // Extract PPQ and BPM to calculate ticks per second
     const ppq = this.ppq; // Default PPQ if not available
@@ -714,11 +694,11 @@ export class SequencerWrapper {
     console.log(`MIDI conversion using: BPM=${bpm}, PPQ=${ppq}, ticksPerSecond=${ticksPerSecond}`);
     
     // Process all notes in the track
-    for (const note of track.notes) {
+    for (const note of notes) {
       // Convert note timing from seconds to ACTUAL ticks, not milliseconds
       // Uses the correct ticks-per-second calculation based on tempo and PPQ
-      const startTick = Math.round(note.time);
-      const duration = Math.round(note.duration); // Duration still in ms for event handling
+      const startTick = Math.round(note.column);
+      const duration = Math.round(note.length); // Duration still in ms for event handling
       
       console.log(`MIDI conversion: startTick=${startTick}, duration=${duration}`);
       // Create note event (single event with duration)
@@ -727,7 +707,7 @@ export class SequencerWrapper {
         event: {
           type: 'note',
           channel: channel,
-          key: note.midi,
+          key: note.row,
           vel: (note.velocity <= 1) ? Math.round(note.velocity * 127) : note.velocity, // Convert 0-1 to 0-127
           duration: duration
         }

@@ -1,7 +1,7 @@
 // Import directly
 import { AudioWorkletNodeSynthesizer } from 'js-synthesizer';
 import { SequencerWrapper } from './sequencerWrapper';
-import { Midi } from '@tonejs/midi';
+import { Note } from '../../../../types/note';
 
 /**
  * Options for adding a track to the player
@@ -32,6 +32,7 @@ export class MidiSoundfontPlayer {
   private bpm: number; 
   private soundfontBankOffsets: Map<number, number> = new Map(); // Maps sfontId -> bankOffset
   private initPromise: Promise<void> | null = null; // Promise for tracking initialization
+  private audioNode: AudioWorkletNode | null = null; // Store the audio node
   
   /**
    * Create a new MidiSoundfontPlayer
@@ -63,11 +64,11 @@ export class MidiSoundfontPlayer {
           await audioContext.audioWorklet.addModule('/js-synthesizer/js-synthesizer.worklet.js');
           
           // Create node and connect
-          const node = this.synth.createAudioNode(audioContext, {
+          this.audioNode = this.synth.createAudioNode(audioContext, {
             polyphony: 256 // High polyphony for multiple tracks
           });
           
-          node.connect(audioContext.destination);
+          this.audioNode.connect(audioContext.destination);
           
           console.log('MidiSoundfontPlayer initialized successfully');
           resolve();
@@ -103,7 +104,7 @@ export class MidiSoundfontPlayer {
    * @param options Additional options
    * @returns Promise resolving to the created track
    */
-  async addTrack(id: string, midiData: Midi, soundfontData: ArrayBuffer, options: TrackOptions = {}) {
+  async addTrack(id: string, notes: Note[], soundfontData: ArrayBuffer, options: TrackOptions = {}) {
     try {
       // Ensure synthesizer is initialized before proceeding
       if (!this.initPromise) {
@@ -139,7 +140,7 @@ export class MidiSoundfontPlayer {
       
       // Initialize with MIDI data
       console.log(`Initializing track "${id}" with MIDI data...`);
-      await track.initialize(midiData);
+      await track.initialize(notes);
       
       // Debug log before adding to tracks map
       console.log(`[DEBUG] Before adding to tracks map. Current size: ${this.tracks.size}`);
@@ -549,6 +550,19 @@ export class MidiSoundfontPlayer {
     
     this.pause();
     
+    // Disconnect the main audio node first
+    if (this.audioNode) {
+        console.log('Disconnecting and cleaning up audio node...');
+        try {
+           this.audioNode.disconnect();
+        } catch (e) {
+            console.error("Error disconnecting audio node:", e);
+        }
+        this.audioNode = null; // Allow garbage collection
+    } else {
+        console.warn("Dispose called but audioNode was null.");
+    }
+    
     // Clean up all tracks
     const trackEntries = Array.from(this.tracks.entries());
     for (const [id, track] of trackEntries) {
@@ -556,7 +570,13 @@ export class MidiSoundfontPlayer {
       track.dispose();
     }
     
+    this.synth.closePlayer();
     this.tracks.clear();
+    this.soundfontBankOffsets.clear(); // Clear this map too
+
+    // Potentially add cleanup for this.synth itself if js-synthesizer provides a dispose/terminate method for the main node?
+    // Example: this.synth.terminateWorklet?.(); // Check js-synthesizer docs
+    console.log('MidiSoundfontPlayer disposed');
   }
   
   /**
