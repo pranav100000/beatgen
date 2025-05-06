@@ -1,8 +1,11 @@
 import React, { useEffect } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, useTheme } from '@mui/material'; // Keep using useTheme from MUI
 import AssistantActionChip from './AssistantActionChip';
 import ReactMarkdown from 'react-markdown';
+// Remove the incorrect import
+// import { useAppTheme } from '../../../platform/theme/ThemeContext';
 
+// ... (keep keyframes)
 // Add keyframes for cursor blink animation
 const cursorBlinkKeyframes = `
 @keyframes cursor-blink {
@@ -19,11 +22,30 @@ interface AssistantChatBubbleProps {
 }
 
 const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action, onActionClick, isStreaming }) => {
+  const theme = useTheme(); // Get the MUI theme object
+
+  // Determine colors based on theme.palette.mode
+  const bubbleBgColor = theme.palette.mode === 'light'
+    ? '#e5e5ea' // iMessage light grey for light mode
+    : theme.palette.grey[800]; // Darker grey for dark mode
+
+  const bubbleTextColor = theme.palette.getContrastText(bubbleBgColor);
+
+  const codeBgColor = theme.palette.mode === 'light'
+    ? 'rgba(0, 0, 0, 0.08)'
+    : 'rgba(255, 255, 255, 0.1)';
+
+  const blockquoteBorderColor = theme.palette.mode === 'light'
+    ? 'rgba(0, 0, 0, 0.2)'
+    : 'rgba(255, 255, 255, 0.2)';
+
+  const blockquoteTextColor = theme.palette.mode === 'light'
+    ? 'rgba(0, 0, 0, 0.6)'
+    : 'rgba(255, 255, 255, 0.7)';
+
+  // ... (rest of the component remains the same, using the theme object correctly)
   // For action-only messages, we need a different style
   const isActionOnly = action && onActionClick && !text;
-  
-  // Debug log for rendering
-  //console.log('🎯 RENDERING CHAT BUBBLE:', { text, action, isStreaming });
   
   // Add keyframes to the DOM when component mounts
   useEffect(() => {
@@ -33,7 +55,10 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
       document.head.appendChild(styleElement);
       
       return () => {
-        document.head.removeChild(styleElement);
+        // Check if the element is still in the head before removing
+        if (styleElement.parentNode === document.head) {
+           document.head.removeChild(styleElement);
+        }
       };
     }
   }, [isStreaming]);
@@ -61,21 +86,23 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
       sx={{
         alignSelf: 'flex-start',
         maxWidth: '85%',
-        p: 1,
-        borderRadius: 2,
-        bgcolor: 'rgba(60, 60, 60, 0.8)',
-        boxShadow: 1,
+        p: 1.5, // Slightly more padding like iMessage
+        borderRadius: '18px', // More rounded corners like iMessage
+        bgcolor: bubbleBgColor, // Use theme-aware background color
+        color: bubbleTextColor, // Use theme-aware text color
+        boxShadow: theme.shadows[1],
         wordBreak: 'break-word',
         position: 'relative', // For positioning the cursor
         '& code': {
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          backgroundColor: codeBgColor, // Theme-aware code background
           padding: '2px 4px',
           borderRadius: '4px',
           fontFamily: 'monospace',
           fontSize: '0.9em',
+          color: bubbleTextColor, // Ensure code text matches bubble text color
         },
         '& pre': {
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          backgroundColor: codeBgColor, // Theme-aware pre background
           padding: '8px',
           borderRadius: '4px',
           overflow: 'auto',
@@ -99,10 +126,10 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
           paddingLeft: '20px',
         },
         '& blockquote': {
-          borderLeft: '3px solid rgba(255, 255, 255, 0.2)',
+          borderLeft: `3px solid ${blockquoteBorderColor}`, // Theme-aware border
           margin: '8px 0',
           paddingLeft: '12px',
-          color: 'rgba(255, 255, 255, 0.7)',
+          color: blockquoteTextColor, // Theme-aware text color
         }
       }}
     >
@@ -123,8 +150,9 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
               marginLeft: '2px',
               animation: 'cursor-blink 1s step-end infinite',
               fontWeight: 'bold',
-              fontSize: '20px',
-              color: '#FFFFFF',
+              fontSize: '1em', // Match text size
+              lineHeight: 'inherit', // Match line height
+              color: bubbleTextColor, // Match text color
             }}
           >
             |
@@ -143,4 +171,4 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
   );
 };
 
-export default AssistantChatBubble; 
+export default AssistantChatBubble;

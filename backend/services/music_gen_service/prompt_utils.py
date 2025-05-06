@@ -55,6 +55,7 @@ Musical Considerations:
 - Chord progression: {chord_progression if chord_progression else "Not specified"}
 IMPORTANT:
 - DO NOT try to add contrast to the mood, tempo, rhythm, or melodic character. Just follow the description. Create a melody that follows the description as closely as possible.
+- DO NOT use more than 12 notes total in the melody.
 
 Here are some tips to help create a catchy melody:
 - Simplicity - Catchy melodies are usually simple enough to remember but not so simple that they're boring. They often use step-wise motion (moving to adjacent notes) with occasional leaps for interest.

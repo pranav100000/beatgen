@@ -19,7 +19,7 @@ DETERMINE_MUSICAL_PARAMETERS_TOOL = {
             },
             "mode": {
                 "type": "string",
-                "description": "The mode of the chord progression, MUST be either major or minor",
+                "description": "The mode of the chord progression, MUST be either major or minor. DO NOT use any other mode.",
             },
             "tempo": {
                 "type": "integer",

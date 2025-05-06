@@ -865,7 +865,7 @@ Use this note probability data derived from the chord progression to guide note 
 Constraints:
 - Adhere strictly to the key of {key} {mode}.
 - Make the rhythm of the melody match the rhythm type '{rhythm_type}'.
-- The rhythm should always be repetitive and something that can be played in a loop. The rhythm MUST be repeated 2, 4, 8, 16, 32, or more times.
+- The rhythm should always be repetitive and something that can be played in a loop. The rhythm MUST be repeated 2, 4, 8, 16, 32, or more times. The rhythm should be as repetitive as possible. DO NOT create a melody with a rhythm that is not repeated. DO NOT create a melody that has a sporadic rhythm.
 - Follow the chord progression '{chord_progression}' closely.
 - The output MUST be ONLY a valid JSON object representing the melody structure (e.g., bars, notes with pitch, start_beat, duration_beats).
 - Do NOT include any explanatory text, comments, or markdown formatting before or after the JSON object.
