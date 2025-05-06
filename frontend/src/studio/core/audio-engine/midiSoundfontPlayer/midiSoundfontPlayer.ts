@@ -570,6 +570,7 @@ export class MidiSoundfontPlayer {
       track.dispose();
     }
     
+    this.synth.closePlayer();
     this.tracks.clear();
     this.soundfontBankOffsets.clear(); // Clear this map too
 
