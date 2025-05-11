@@ -26,6 +26,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.49.3
         version: 2.49.4
+      '@tabler/icons-react':
+        specifier: ^3.31.0
+        version: 3.31.0(react@19.1.0)
       '@tanstack/react-query':
         specifier: ^5.69.0
         version: 5.74.4(react@19.1.0)
@@ -768,6 +771,14 @@ packages:
 
   '@supabase/supabase-js@2.49.4':
     resolution: {integrity: sha512-jUF0uRUmS8BKt37t01qaZ88H9yV1mbGYnqLeuFWLcdV+x1P4fl0yP9DGtaEhFPZcwSom7u16GkLEH9QJZOqOkw==}
+
+  '@tabler/icons-react@3.31.0':
+    resolution: {integrity: sha512-2rrCM5y/VnaVKnORpDdAua9SEGuJKVqPtWxeQ/vUVsgaUx30LDgBZph7/lterXxDY1IKR6NO//HDhWiifXTi3w==}
+    peerDependencies:
+      react: '>= 16'
+
+  '@tabler/icons@3.31.0':
+    resolution: {integrity: sha512-dblAdeKY3+GA1U+Q9eziZ0ooVlZMHsE8dqP0RkwvRtEsAULoKOYaCUOcJ4oW1DjWegdxk++UAt2SlQVnmeHv+g==}
 
   '@tanstack/history@1.115.0':
     resolution: {integrity: sha512-K7JJNrRVvyjAVnbXOH2XLRhFXDkeP54Kt2P4FR1Kl2KDGlIbkua5VqZQD2rot3qaDrpufyUa63nuLai1kOLTsQ==}
@@ -2019,8 +2030,8 @@ packages:
   space-separated-tokens@2.0.2:
     resolution: {integrity: sha512-PEGlAwrG8yXGXRjW32fGbg66JAlOAwbObuqVoJpv/mRgoWDQfgH1wDPvtzWyUSNAXBGSk8h755YDbbcEy3SH2Q==}
 
-  spessasynth_core@3.26.6:
-    resolution: {integrity: sha512-st19XB823GqM4toy+KGL0WFEOTgua5A1iNc4LylKESMtQOB0V1A6yEqkfWZmFMJVLXVYDp6H5A2+iKs55WpWSw==}
+  spessasynth_core@3.26.7:
+    resolution: {integrity: sha512-TrJ40nNPDrOK775wDey6cBqCzCn035bFx8XeefPMOV7FWIt4DwEpkUy5rW2Doehf2J33WJEoZSHzX2+PJpZjJw==}
 
   spessasynth_lib@3.26.10:
     resolution: {integrity: sha512-zQQN019au6zccTLh6EHsbcq/OH1tJyDYUv7WnTIZz/D1bh6JoCo8n5GKfwcWWV+P7p2vTIkpPeXjez2hQCJnrg==}
@@ -2851,6 +2862,13 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@tabler/icons-react@3.31.0(react@19.1.0)':
+    dependencies:
+      '@tabler/icons': 3.31.0
+      react: 19.1.0
+
+  '@tabler/icons@3.31.0': {}
 
   '@tanstack/history@1.115.0': {}
 
@@ -4324,11 +4342,11 @@ snapshots:
 
   space-separated-tokens@2.0.2: {}
 
-  spessasynth_core@3.26.6: {}
+  spessasynth_core@3.26.7: {}
 
   spessasynth_lib@3.26.10:
     dependencies:
-      spessasynth_core: 3.26.6
+      spessasynth_core: 3.26.7
 
   standardized-audio-context@25.3.77:
     dependencies:
