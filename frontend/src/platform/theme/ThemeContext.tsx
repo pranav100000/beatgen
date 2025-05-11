@@ -36,7 +36,7 @@ const darkTheme = createTheme({
 // Create the provider component
 export const AppThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Default to dark mode, or read from localStorage/preference
-  const [mode, setMode] = useState<'light' | 'dark'>('dark'); 
+  const [mode, setMode] = useState<'light' | 'dark'>('light'); 
 
   const toggleTheme = () => {
     setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));

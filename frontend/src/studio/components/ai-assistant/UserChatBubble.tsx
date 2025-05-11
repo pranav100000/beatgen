@@ -19,7 +19,7 @@ const UserChatBubble: React.FC<UserChatBubbleProps> = ({ text, mode, selectedTra
         alignSelf: 'flex-end',
         maxWidth: '85%',
         p: 1,
-        borderRadius: 2,
+        borderRadius: '16px',
         bgcolor: 'rgba(44, 151, 251, 0.8)',
         boxShadow: 1,
         wordBreak: 'break-word'
