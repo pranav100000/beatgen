@@ -15,3 +15,4 @@ openai
 pydantic-ai
 uv
 sqlmodel
+psycopg2-binary
