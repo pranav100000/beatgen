@@ -36,6 +36,7 @@ from app2.sse.request_manager import request_manager, RequestStatus
 from app2.sse.sse import SSEManager
 from app2.sse.sse_queue_manager import SSEQueueManager
 from app2.core.logging import get_api_logger
+from services.music_gen_service.music_gen_service3 import music_gen_service3
 from services.music_gen_service.music_gen_service import music_gen_service
 from pydantic import BaseModel
 from app2.infrastructure.database.sqlmodel_client import engine
@@ -341,7 +342,7 @@ async def process_generate_request(
 
     # Generate music with music_gen_service, passing the session
     try:
-        response = await music_gen_service.compose_music(
+        response = await music_gen_service3.compose_music(
             context.prompt, sse_queue, session
         )
         logger.info(
