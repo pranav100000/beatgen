@@ -156,7 +156,7 @@ async def login_google(
     """
     Get Google OAuth URL for the frontend to redirect to
     """
-    logger.info(f"[API] Received GET /api/auth/login/google from {request.client.host}")
+    logger.info(f"[API] Received GET /auth/login/google from {request.client.host}")
     logger.info("Starting Google OAuth flow")
     try:
         redirect_url = await auth_service.get_google_auth_url(response)
@@ -183,7 +183,7 @@ async def callback_google(
     Handle Google OAuth callback
     """
     logger.info(
-        f"[API] Received GET /api/auth/callback/google from {request.client.host}"
+        f"[API] Received GET /auth/callback/google from {request.client.host}"
     )
 
     # Log all query parameters received

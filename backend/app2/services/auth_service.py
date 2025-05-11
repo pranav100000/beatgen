@@ -250,7 +250,7 @@ class AuthService:
             logger.info("Generating Google OAuth URL (PKCE handled by library)")
 
             # Define the backend callback URL where Google will send the code
-            backend_callback_url = f"{settings.app.BASE_URL}/api/auth/callback/google"
+            backend_callback_url = f"{settings.app.BASE_URL}/auth/callback/google"
             logger.info(
                 f"[Service] Using callback URL: {backend_callback_url} (from settings.app.BASE_URL: {settings.app.BASE_URL})"
             )
