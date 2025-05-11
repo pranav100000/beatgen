@@ -16,3 +16,4 @@ pydantic-ai
 uv
 sqlmodel
 psycopg2-binary
+email-validator
