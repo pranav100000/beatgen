@@ -6,6 +6,8 @@ Handles basic CRUD operations for project entities
 from typing import Dict, Any, List
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
+from sqlalchemy import func
+import asyncio
 import traceback
 from datetime import datetime
 import uuid
@@ -183,6 +185,66 @@ class ProjectRepository:
             self.logger.error(f"Error getting projects for user: {str(e)}")
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to get projects for user: {str(e)}")
+
+    async def get_by_user_id_paginated(
+        self, user_id: uuid.UUID, page: int, size: int
+    ) -> tuple[List[Project], int]:
+        """
+        Get projects for a user with pagination.
+
+        Args:
+            user_id: The ID of the user.
+            page: The page number (1-indexed).
+            size: The number of items per page.
+
+        Returns:
+            A tuple containing the list of projects and the total number of projects.
+
+        Raises:
+            DatabaseException: If there's a database error.
+        """
+        self.logger.info(
+            f"Getting projects for user: {user_id}, page: {page}, size: {size}"
+        )
+        try:
+            offset = (page - 1) * size
+
+            # Query for items on the current page
+            def _get_items():
+                return (
+                    self.session.exec(
+                        select(Project)
+                        .where(Project.user_id == user_id)
+                        .offset(offset)
+                        .limit(size)
+                        .order_by(Project.created_at.desc())
+                    )
+                    .all()
+                )
+            items_result = await asyncio.to_thread(_get_items)
+
+            # Query for total count
+            def _get_count():
+                return (
+                    self.session.exec(
+                        select(func.count())
+                        .select_from(Project)
+                        .where(Project.user_id == user_id)
+                    )
+                    .one()
+                )
+            total_items_result = await asyncio.to_thread(_get_count)
+
+            self.logger.info(
+                f"Found {len(items_result)} projects (total: {total_items_result}) for user: {user_id}"
+            )
+            return items_result, total_items_result
+        except Exception as e:
+            self.logger.error(f"Error getting paginated projects for user: {str(e)}")
+            self.logger.error(traceback.format_exc())
+            raise DatabaseException(
+                f"Failed to get paginated projects for user: {str(e)}"
+            )
 
     async def get_by_user_id_with_tracks(self, user_id: uuid.UUID) -> List[Project]:
         """

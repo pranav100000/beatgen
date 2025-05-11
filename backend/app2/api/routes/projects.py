@@ -14,23 +14,28 @@ from app2.models.project import (
     ProjectWithTracks,
 )
 from app2.types.track_types import TrackType
+from app2.dto.projects_dto import Page, PageParams
 
 router = APIRouter()
 logger = get_api_logger("projects")
 
 
-@router.get("", response_model=List[ProjectRead])
-@router.get("/", response_model=List[ProjectRead])
+@router.get("", response_model=Page[ProjectRead])
+@router.get("/", response_model=Page[ProjectRead])
 async def get_projects(
     current_user: Dict[str, Any] = Depends(get_current_user),
     project_service: ProjectService = Depends(get_project_service),
-) -> List[ProjectRead]:
+    page_params: PageParams = Depends(),
+) -> Page[ProjectRead]:
     """
     Get all projects for the current user
     """
     logger.info(f"Getting projects for user ID: {current_user['id']}")
     try:
-        return await project_service.get_user_projects(UUID(current_user["id"]))
+        return await project_service.get_user_projects(
+            UUID(current_user["id"]),
+            page_params
+        )
     except Exception as e:
         logger.error(f"Error getting projects: {str(e)}")
         raise HTTPException(

@@ -16,9 +16,12 @@ import { SamplerTrack } from '../types/track_models/sampler_track';
 import { MidiTrack } from '../types/track_models/midi_track';
 import { db } from '../../studio/core/db/dexie-client';
 import { DrumTrack } from '../types/track_models/drum_track';
+import { Page } from '../types/pagination';
 
-export const getProjects = async (): Promise<Project[]> => {
-  const response = await apiClient.get('/projects');
+export const getProjects = async (page: number = 1, size: number = 10): Promise<Page<Project>> => {
+  const response = await apiClient.get<Page<Project>>('/projects', {
+    params: { page, size }
+  });
   return response.data;
 };
 

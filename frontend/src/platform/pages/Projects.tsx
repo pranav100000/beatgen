@@ -37,11 +37,22 @@ import {
 } from '../api/projects';
 import { Project } from '../types/project';
 
+// Constants for pagination and display
+const INITIAL_DISPLAY_COUNT = 6;
+const DISPLAY_INCREMENT = 6; // How many more to show on each click (relevant later)
+const FETCH_THRESHOLD = 10; // When to fetch more from API (relevant later)
+const PROJECTS_PER_PAGE_API = 20; // How many to fetch from API at a time
+
 export default function Projects() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [allFetchedProjects, setAllFetchedProjects] = useState<Project[]>([]);
+  const [displayedProjectsCount, setDisplayedProjectsCount] = useState<number>(INITIAL_DISPLAY_COUNT);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalProjectsOnServer, setTotalProjectsOnServer] = useState<number>(0);
+
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSoundUploader, setShowSoundUploader] = useState(false);
   const [snackbar, setSnackbar] = useState<{
@@ -55,7 +66,7 @@ export default function Projects() {
   });
 
   useEffect(() => {
-    fetchProjects();
+    fetchAndSetInitialProjects();
   }, []);
   
   // Function to fetch sounds (will be passed to SoundLibrary for reloading)
@@ -65,17 +76,66 @@ export default function Projects() {
     console.log('Refreshing sounds library');
   };
 
-  const fetchProjects = async () => {
+  const fetchAndSetInitialProjects = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getProjects();
-      setProjects(data);
+      const response = await getProjects(1, PROJECTS_PER_PAGE_API); // Fetch page 1, 20 items
+      setAllFetchedProjects(response.items);
+      setTotalProjectsOnServer(response.total_items);
+      const initialDisplay = Math.min(INITIAL_DISPLAY_COUNT, response.items.length);
+      setDisplayedProjectsCount(initialDisplay);
+      setCurrentPage(1);
+
+      // Add these logs for debugging:
+      console.log("Initial fetch complete. States after initial set:");
+      console.log("displayedProjectsCount:", initialDisplay);
+      console.log("totalProjectsOnServer:", response.total_items);
+      console.log("allFetchedProjects.length:", response.items.length);
+
     } catch (err) {
       console.error('Error fetching projects:', err);
       setError('Failed to load projects. Please try again later.');
     } finally {
       setLoading(false);
+      // Add log here too to see when loading is actually set to false
+      console.log("Initial loading state (in finally block):", false);
+    }
+  };
+
+  const fetchMoreProjects = async () => {
+    if (loadingMore || allFetchedProjects.length >= totalProjectsOnServer) return;
+
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const nextPage = currentPage + 1;
+      const response = await getProjects(nextPage, PROJECTS_PER_PAGE_API);
+      
+      setAllFetchedProjects(prevProjects => [...prevProjects, ...response.items]);
+      setTotalProjectsOnServer(response.total_items); // Update total, though it might not change often
+      setCurrentPage(nextPage);
+    } catch (err) {
+      console.error('Error fetching more projects:', err);
+      setError('Failed to load more projects.'); // You might want a less intrusive error display here
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleShowMore = () => {
+    const newDisplayedCount = Math.min(
+      displayedProjectsCount + DISPLAY_INCREMENT,
+      allFetchedProjects.length
+    );
+    setDisplayedProjectsCount(newDisplayedCount);
+
+    // Check if we need to fetch more from the API
+    const remainingInBatch = allFetchedProjects.length - newDisplayedCount;
+    const hasMoreOnServer = allFetchedProjects.length < totalProjectsOnServer;
+
+    if (remainingInBatch < FETCH_THRESHOLD && hasMoreOnServer && !loadingMore) {
+      fetchMoreProjects();
     }
   };
 
@@ -94,7 +154,7 @@ export default function Projects() {
     if (window.confirm('Are you sure you want to delete this project?')) {
       try {
         await deleteProject(projectId);
-        setProjects(projects.filter(p => p.id !== projectId));
+        await fetchAndSetInitialProjects(); // Re-fetch initial set after delete
         showSnackbar('Project deleted successfully', 'success');
       } catch (err) {
         console.error('Error deleting project:', err);
@@ -166,7 +226,7 @@ export default function Projects() {
             Loading your projects...
           </Typography>
         </Paper>
-      ) : projects.length === 0 ? (
+      ) : allFetchedProjects.length === 0 ? (
         <Paper className="project-empty-state">
           <MusicNoteIcon className="project-empty-icon" />
           <Typography variant="h6" gutterBottom>
@@ -186,7 +246,7 @@ export default function Projects() {
         </Paper>
       ) : (
         <Grid container spacing={3}>
-          {projects.map((project) => (
+          {allFetchedProjects.slice(0, displayedProjectsCount).map((project) => (
             <Grid item xs={12} sm={6} md={4} key={project.id}>
               <Card className="project-card">
                 <CardContent className="project-card-content">
@@ -240,6 +300,19 @@ export default function Projects() {
             </Grid>
           ))}
         </Grid>
+      )}
+
+      {/* Show More Button */} 
+      {!loading && displayedProjectsCount < totalProjectsOnServer && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4, mb: 2 }}>
+          <Button 
+            variant="outlined"
+            onClick={handleShowMore} 
+            disabled={loadingMore}
+          >
+            Show More
+          </Button>
+        </Box>
       )}
 
       {/* Project Dialog removed - users go directly to studio page */}

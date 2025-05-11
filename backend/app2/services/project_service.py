@@ -14,6 +14,7 @@ from app2.repositories.project_track_repository import ProjectTrackRepository
 from app2.models.project import ProjectWithTracks, ProjectRead, CombinedTrack
 from app2.types.track_types import TrackType
 from app2.services.track_service import TrackService
+from app2.dto.projects_dto import Page, PageParams
 
 logger = get_service_logger("project")
 
@@ -39,26 +40,44 @@ class ProjectService:
         self.project_track_repository = project_track_repository
         self.track_service = track_service
 
-    async def get_user_projects(self, user_id: uuid.UUID) -> List[ProjectRead]:
+    async def get_user_projects(
+        self, user_id: uuid.UUID, page_params: PageParams
+    ) -> Page[ProjectRead]:
         """
-        Get all projects for a user
+        Get all projects for a user with pagination
 
         Args:
             user_id: The ID of the user
+            page_params: Pagination parameters (page, size)
 
         Returns:
-            A list of projects
+            A paginated list of projects
 
         Raises:
             ServiceException: If the operation fails
         """
-        logger.info(f"Getting projects for user ID: {user_id}")
+        logger.info(
+            f"Getting projects for user ID: {user_id} with params: {page_params}"
+        )
         try:
-            projects = await self.project_repository.get_by_user_id(user_id)
-            logger.info(f"Found {len(projects)} projects for user ID: {user_id}")
+            # Assume project_repository.get_by_user_id_paginated exists
+            # and returns (items, total_count)
+            projects, total_items = (
+                await self.project_repository.get_by_user_id_paginated(
+                    user_id, page_params.page, page_params.size
+                )
+            )
+            logger.info(
+                f"Found {len(projects)} projects (total: {total_items}) for user ID: {user_id}"
+            )
 
-            # Convert SQLModel objects to API models
-            return [ProjectRead.model_validate(project) for project in projects]
+            project_reads = [
+                ProjectRead.model_validate(project) for project in projects
+            ]
+
+            return Page.create(
+                items=project_reads, total_items=total_items, params=page_params
+            )
         except Exception as e:
             logger.error(f"Error getting user projects: {str(e)}")
             logger.error(traceback.format_exc())
