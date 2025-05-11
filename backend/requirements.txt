@@ -13,3 +13,4 @@ httpx==0.28.0
 instructor>=1.7.9
 openai
 pydantic-ai
+uv
