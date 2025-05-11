@@ -184,6 +184,13 @@ export const DrumMachineModal = ({ open, onClose, onConfirmSelection }: DrumMach
                     <IconButton
                         onClick={onClose}
                         color="inherit"
+                        sx={{
+                            borderRadius: '8px',
+                            '&:hover': {
+                                backgroundColor: theme.palette.action.hover,
+                            },
+                        }}
+                        disableRipple
                     >
                         <CloseIcon />
                     </IconButton>

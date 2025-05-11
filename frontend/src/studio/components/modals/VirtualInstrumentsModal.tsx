@@ -205,6 +205,13 @@ export const VirtualInstrumentsModal = ({ open, onClose, onSelect }: VirtualInst
             <IconButton
                 onClick={onClose}
                 color="inherit"
+                sx={{
+                    borderRadius: '8px',
+                    '&:hover': {
+                        backgroundColor: theme.palette.action.hover,
+                    },
+                }}
+                disableRipple
             >
                 <CloseIcon />
             </IconButton>

@@ -12,6 +12,7 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as StudioImport } from './routes/studio'
+import { Route as SettingsImport } from './routes/settings'
 import { Route as RegisterImport } from './routes/register'
 import { Route as OauthCallbackImport } from './routes/oauth-callback'
 import { Route as LoginImport } from './routes/login'
@@ -23,6 +24,12 @@ import { Route as IndexImport } from './routes/index'
 const StudioRoute = StudioImport.update({
   id: '/studio',
   path: '/studio',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const SettingsRoute = SettingsImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -95,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterImport
       parentRoute: typeof rootRoute
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsImport
+      parentRoute: typeof rootRoute
+    }
     '/studio': {
       id: '/studio'
       path: '/studio'
@@ -113,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/oauth-callback': typeof OauthCallbackRoute
   '/register': typeof RegisterRoute
+  '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
 }
 
@@ -122,6 +137,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/oauth-callback': typeof OauthCallbackRoute
   '/register': typeof RegisterRoute
+  '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
 }
 
@@ -132,6 +148,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/oauth-callback': typeof OauthCallbackRoute
   '/register': typeof RegisterRoute
+  '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
 }
 
@@ -143,9 +160,17 @@ export interface FileRouteTypes {
     | '/login'
     | '/oauth-callback'
     | '/register'
+    | '/settings'
     | '/studio'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/home' | '/login' | '/oauth-callback' | '/register' | '/studio'
+  to:
+    | '/'
+    | '/home'
+    | '/login'
+    | '/oauth-callback'
+    | '/register'
+    | '/settings'
+    | '/studio'
   id:
     | '__root__'
     | '/'
@@ -153,6 +178,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/oauth-callback'
     | '/register'
+    | '/settings'
     | '/studio'
   fileRoutesById: FileRoutesById
 }
@@ -163,6 +189,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OauthCallbackRoute: typeof OauthCallbackRoute
   RegisterRoute: typeof RegisterRoute
+  SettingsRoute: typeof SettingsRoute
   StudioRoute: typeof StudioRoute
 }
 
@@ -172,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OauthCallbackRoute: OauthCallbackRoute,
   RegisterRoute: RegisterRoute,
+  SettingsRoute: SettingsRoute,
   StudioRoute: StudioRoute,
 }
 
@@ -190,6 +218,7 @@ export const routeTree = rootRoute
         "/login",
         "/oauth-callback",
         "/register",
+        "/settings",
         "/studio"
       ]
     },
@@ -207,6 +236,9 @@ export const routeTree = rootRoute
     },
     "/register": {
       "filePath": "register.tsx"
+    },
+    "/settings": {
+      "filePath": "settings.tsx"
     },
     "/studio": {
       "filePath": "studio.tsx"

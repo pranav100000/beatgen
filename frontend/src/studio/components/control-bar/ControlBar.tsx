@@ -8,6 +8,7 @@ import KeySelector from './KeySelector';
 import { SaveProjectButton } from './SaveProjectButton';
 import { useStudioStore } from '../../stores/studioStore';
 import { IconPlayerPlayFilled, IconPlayerSkipBackFilled, IconPlayerPauseFilled, IconArrowForwardUp, IconArrowBackUp, IconZoomIn, IconZoomOut, IconInputAi, IconChevronsRight, IconArrowLeft } from '@tabler/icons-react';
+import { IconSettings } from '@tabler/icons-react';
 
 interface StudioControlBarProps {
     canUndo: boolean;
@@ -35,6 +36,7 @@ interface StudioControlBarProps {
     onZoomIn: () => void;
     onZoomOut: () => void;
     onChatToggle: () => void;
+    onSettingsToggle: () => void;
 }
 
 
@@ -62,6 +64,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
     onZoomIn,
     onZoomOut,
     onChatToggle,
+    onSettingsToggle,
 }) => {
     const theme = useTheme();
 
@@ -94,6 +97,13 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                             onClick={() => {
                                 window.location.href = '/home';
                             }}
+                            sx={{
+                                borderRadius: '8px',
+                                '&:hover': {
+                                    backgroundColor: theme.palette.action.hover,
+                                },
+                            }}
+                            disableRipple
                         >
                             <IconArrowLeft />
                         </IconButton>
@@ -104,6 +114,13 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         onClick={onUndo}
                         disabled={!canUndo}
                         title="Undo"
+                        sx={{
+                            borderRadius: '8px',
+                            '&:hover': {
+                                backgroundColor: theme.palette.action.hover,
+                            },
+                        }}
+                        disableRipple
                     >
                         <IconArrowBackUp />
                     </IconButton>
@@ -113,6 +130,13 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         onClick={onRedo}
                         disabled={!canRedo}
                         title="Redo"
+                        sx={{
+                            borderRadius: '8px',
+                            '&:hover': {
+                                backgroundColor: theme.palette.action.hover,
+                            },
+                        }}
+                        disableRipple
                     >
                         <IconArrowForwardUp />
                     </IconButton>
@@ -147,6 +171,13 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         size="small"
                         color="inherit"
                         onClick={onPlayPause}
+                        sx={{
+                            borderRadius: '8px',
+                            '&:hover': {
+                                backgroundColor: theme.palette.action.hover,
+                            },
+                        }}
+                        disableRipple
                     >
                         {isPlaying ? <IconPlayerPauseFilled /> : <IconPlayerPlayFilled />}
                     </IconButton>
@@ -154,6 +185,13 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         size="small"
                         color="inherit"
                         onClick={onStop}
+                        sx={{
+                            borderRadius: '8px',
+                            '&:hover': {
+                                backgroundColor: theme.palette.action.hover,
+                            },
+                        }}
+                        disableRipple
                     >
                         <IconPlayerSkipBackFilled />
                     </IconButton>
@@ -187,7 +225,18 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                     alignItems: 'center',
                     gap: 1
                 }}>
-                    <IconButton size="small" color="inherit" onClick={onZoomIn}>
+                    <IconButton
+                        size="small"
+                        color="inherit"
+                        onClick={onZoomIn}
+                        sx={{
+                            borderRadius: '8px',
+                            '&:hover': {
+                                backgroundColor: theme.palette.action.hover,
+                            },
+                        }}
+                        disableRipple
+                    >
                         <IconZoomIn />
                     </IconButton>
                     <Box sx={{ 
@@ -202,7 +251,18 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                     }}>
                         {zoomLevel.toFixed(1)}x
                     </Box>
-                    <IconButton size="small" color="inherit" onClick={onZoomOut}>
+                    <IconButton
+                        size="small"
+                        color="inherit"
+                        onClick={onZoomOut}
+                        sx={{
+                            borderRadius: '8px',
+                            '&:hover': {
+                                backgroundColor: theme.palette.action.hover,
+                            },
+                        }}
+                        disableRipple
+                    >
                         <IconZoomOut />
                     </IconButton>
                     <TimeDisplay
@@ -223,8 +283,29 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         size="small"
                         color="inherit"
                         onClick={onChatToggle}
+                        sx={{
+                            borderRadius: '8px',
+                            '&:hover': {
+                                backgroundColor: theme.palette.action.hover,
+                            },
+                        }}
+                        disableRipple
                     >
                         {isChatOpen ? <IconChevronsRight /> : <IconInputAi />}
+                    </IconButton>
+                    <IconButton
+                        size="small"
+                        color="inherit"
+                        onClick={onSettingsToggle}
+                        sx={{
+                            borderRadius: '8px',
+                            '&:hover': {
+                                backgroundColor: theme.palette.action.hover,
+                            },
+                        }}
+                        disableRipple
+                    >
+                        <IconSettings />
                     </IconButton>
                 </Box>
             </Box>

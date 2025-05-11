@@ -1,11 +1,12 @@
 import MidiSampler from './midiSamplePlayer/sampler';
 import { MidiManager } from '../midi/MidiManagerNew';
+import { TrackPlayer } from './trackPlayer';
 
 /**
  * Manages all sampler instances and handles communication between the MidiManager,
  * Transport, and individual sampler instances.
  */
-export class SamplerController {
+export class SamplerController implements TrackPlayer {
     private samplers: Map<string, MidiSampler> = new Map();
     private trackSubscriptions: Map<string, () => void> = new Map();
     // Removed scheduledEvents map
@@ -16,7 +17,23 @@ export class SamplerController {
     constructor() {
         console.log('SamplerController initialized');
     }
-    
+    setTrackPan(id: string, pan: number): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
+    setTrackMute(id: string, mute: boolean): Promise<void> {
+        console.log(`SamplerController: Setting mute for track ${id} to ${mute}`);
+        this.samplers.get(id)?.setMute(mute);
+        return Promise.resolve();
+    }
+    setTrackPositionTicks(id: string, position: number): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
+    setTrackTrimStartTicks(id: string, start: number): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
+    setTrackTrimEndTicks(id: string, end: number): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
     /**
      * Initialize a sampler for a specific track
      * @param trackId The unique track identifier
@@ -309,7 +326,7 @@ export class SamplerController {
      * @param trackId The track ID
      * @param volume Volume level (0-100)
      */
-    setTrackVolume(trackId: string, volume: number): void {
+    setTrackVolume(trackId: string, volume: number): Promise<void> {
         console.log(`SamplerController: Setting track ${trackId} volume to ${volume}`);
         
         const sampler = this.samplers.get(trackId);
@@ -318,6 +335,7 @@ export class SamplerController {
         } else {
             console.warn(`Cannot set volume: no sampler found for track ${trackId}`);
         }
+        return Promise.resolve();
     }
     
     /**
@@ -371,7 +389,7 @@ export class SamplerController {
      * Individual samplers might need explicit pause handling if they don't use Tone.Transport events directly.
      * For now, we assume pausing the transport is sufficient, but also stop individual samplers for safety.
      */
-    pause(): void {
+    pause(): Promise<void> {
         console.log('SamplerController: Pausing playback for all samplers');
         // Pausing the main transport should pause scheduled events.
         // Additionally, explicitly stop samplers to release any active voices/nodes immediately.
@@ -380,6 +398,7 @@ export class SamplerController {
             const sampler = this.samplers.get(trackId);
             sampler?.stopPlayback(); // Use stopPlayback for immediate halt and cleanup
         }
+        return Promise.resolve();
     }
 
     /**

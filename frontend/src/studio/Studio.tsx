@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Box, Button, FormControlLabel, Switch } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 
 // Import components
 import TrackControlsSidebar from './components/sidebar/TrackControlsSidebar';
@@ -23,7 +24,9 @@ import StudioControlBar from './components/control-bar/ControlBar';
 import { DEFAULT_MEASURE_WIDTH, useGridStore } from './core/state/gridStore';
 import ChatWindow from './components/ai-assistant/ChatWindow';
 import DrumMachineWindows from './components/drum-machine/DrumMachineWindows';
-// import DrumMachineWindows from './components/drum-machine/DrumMachineWindows';
+import { StudioSettingsModal } from './components/modals/StudioSettingsModal';
+import { useAppTheme } from '../platform/theme/ThemeContext';
+import { studioLightTheme, studioDarkTheme } from '../platform/theme/ThemeContext';
 
 // Studio Component Props
 interface StudioProps {
@@ -40,6 +43,9 @@ function Studio({ projectId }: StudioProps) {
   
   // Setup history state sync
   useHistorySync();
+  
+  // Get studioMode from theme context
+  const { studioMode } = useAppTheme();
   
   // Get state and actions from Zustand store
   const {
@@ -100,9 +106,14 @@ function Studio({ projectId }: StudioProps) {
   const [existingProjectId, setExistingProjectId] = useState<string | null>(projectId || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [trackIdForFileUpload, setTrackIdForFileUpload] = useState<string | null>(null);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const handleChatToggle = () => {
     setIsChatOpen(prev => !prev);
+  };
+
+  const handleSettingsToggle = () => {
+    setIsSettingsModalOpen(prev => !prev);
   };
 
   // Initialize audio engine
@@ -246,165 +257,179 @@ function Studio({ projectId }: StudioProps) {
     return () => scrollContainer.removeEventListener("scroll", debounceScroll);
   }, [handleScroll]);
 
-  return (
-    <Box sx={{ 
-      height: '100vh', 
-      bgcolor: 'background.default',
-      color: 'text.primary',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
-      <StudioControlBar
-        canUndo={canUndo}
-        canRedo={canRedo}
-        bpm={bpm}
-        timeSignature={timeSignature}
-        keySignature={keySignature}
-        isPlaying={isPlaying}
-        projectTitle={projectTitle}
-        zoomLevel={zoomLevel}
-        currentTime={currentTime}
-        isChatOpen={isChatOpen}
-        existingProjectId={existingProjectId}
-        tracks={tracks}
-        onUndo={undo}
-        onRedo={redo}
-        onBpmChange={handleBpmChange}
-        onTimeSignatureChange={handleTimeSignatureChange}
-        onKeySignatureChange={(newKey) => handleProjectParamChange('keySignature', newKey)}
-        onPlayPause={playPause}
-        onStop={stop}
-        onTitleChange={handleTitleChange}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onChatToggle={handleChatToggle}
-      />
+  // Determine the theme for the studio based on studioMode
+  const currentStudioTheme = useMemo(() => {
+    return studioMode === 'light' ? studioLightTheme : studioDarkTheme;
+  }, [studioMode]);
 
-      {/* Main Content Area */}
+  return (
+    <MuiThemeProvider theme={currentStudioTheme}>
       <Box sx={{ 
-        display: 'flex', 
-        flex: 1, 
-        overflow: 'hidden',
-        position: 'relative'
+        height: '100vh', 
+        bgcolor: 'background.default',
+        color: 'text.primary',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
-        {/* Left Sidebar */}
+        <StudioControlBar
+          canUndo={canUndo}
+          canRedo={canRedo}
+          bpm={bpm}
+          timeSignature={timeSignature}
+          keySignature={keySignature}
+          isPlaying={isPlaying}
+          projectTitle={projectTitle}
+          zoomLevel={zoomLevel}
+          currentTime={currentTime}
+          isChatOpen={isChatOpen}
+          existingProjectId={existingProjectId}
+          tracks={tracks}
+          onUndo={undo}
+          onRedo={redo}
+          onBpmChange={handleBpmChange}
+          onTimeSignatureChange={handleTimeSignatureChange}
+          onKeySignatureChange={(newKey) => handleProjectParamChange('keySignature', newKey)}
+          onPlayPause={playPause}
+          onStop={stop}
+          onTitleChange={handleTitleChange}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onChatToggle={handleChatToggle}
+          onSettingsToggle={handleSettingsToggle}
+        />
+
+        {/* Main Content Area */}
         <Box sx={{ 
-          width: GRID_CONSTANTS.sidebarWidth,
-          borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`,
-          bgcolor: 'background.paper',
-          display: 'flex',
-          flexDirection: 'column'
+          display: 'flex', 
+          flex: 1, 
+          overflow: 'hidden',
+          position: 'relative'
         }}>
-          {/* Header section with Add Track button */}
-          <Box sx={{
-            height: GRID_CONSTANTS.headerHeight,
-            borderBottom: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`,
+          {/* Left Sidebar */}
+          <Box sx={{ 
+            width: GRID_CONSTANTS.sidebarWidth,
+            borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`,
+            bgcolor: 'background.paper',
             display: 'flex',
-            alignItems: 'center',
-            p: 0.3,
-            boxSizing: 'border-box'
+            flexDirection: 'column'
           }}>
-            <Box sx={{ 
-              position: 'relative', 
+            {/* Header section with Add Track button */}
+            <Box sx={{
+              height: GRID_CONSTANTS.headerHeight,
+              borderBottom: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`,
               display: 'flex',
-              width: '100%'
+              alignItems: 'center',
+              p: 0.3,
+              boxSizing: 'border-box'
             }}>
-              <Button
-                startIcon={<AddIcon />}
-                variant="contained"
-                onClick={(e) => setAddMenuAnchor(e.currentTarget)}
-                sx={{
-                  height: 24,
-                  textTransform: 'none',
-                  width: '100%',
-                  mx: 'auto',
-                  display: 'flex',
-                  fontSize: '12px',
-                  fontWeight: 'bold'
-                }}
-              >
-                Add Track
-              </Button>
-              <AddTrackMenu
-                isOpen={Boolean(addMenuAnchor)}
-                anchorEl={addMenuAnchor}
-                onClose={() => setAddMenuAnchor(null)}
-                onAddTrack={handleAddTrack}
-                onFileUpload={uploadAudioFile}
+              <Box sx={{ 
+                position: 'relative', 
+                display: 'flex',
+                width: '100%'
+              }}>
+                <Button
+                  startIcon={<AddIcon />}
+                  variant="contained"
+                  onClick={(e) => setAddMenuAnchor(e.currentTarget)}
+                  sx={{
+                    height: 24,
+                    textTransform: 'none',
+                    width: '100%',
+                    mx: 'auto',
+                    display: 'flex',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Add Track
+                </Button>
+                <AddTrackMenu
+                  isOpen={Boolean(addMenuAnchor)}
+                  anchorEl={addMenuAnchor}
+                  onClose={() => setAddMenuAnchor(null)}
+                  onAddTrack={handleAddTrack}
+                  onFileUpload={uploadAudioFile}
+                />
+              </Box>
+            </Box>
+
+            {/* Track controls section */}
+            <Box sx={{ 
+              flex: 1, 
+              overflow: 'auto'
+            }}>
+              <TrackControlsSidebar 
+                tracks={tracks}
+                onVolumeChange={handleTrackVolumeChange}
+                onPanChange={handleTrackPanChange}
+                onMuteToggle={handleTrackMuteToggle}
+                onSoloToggle={handleTrackSoloToggle}
+                onTrackDelete={handleTrackDelete}
+                onTrackNameChange={handleTrackNameChange}
+                onInstrumentChange={handleInstrumentChange}
+                onLoadAudioFile={handleLoadAudioFile}
               />
             </Box>
           </Box>
 
-          {/* Track controls section */}
-          <Box sx={{ 
-            flex: 1, 
-            overflow: 'auto'
-          }}>
-            <TrackControlsSidebar 
-              tracks={tracks}
-              onVolumeChange={handleTrackVolumeChange}
-              onPanChange={handleTrackPanChange}
-              onMuteToggle={handleTrackMuteToggle}
-              onSoloToggle={handleTrackSoloToggle}
-              onTrackDelete={handleTrackDelete}
-              onTrackNameChange={handleTrackNameChange}
-              onInstrumentChange={handleInstrumentChange}
-              onLoadAudioFile={handleLoadAudioFile}
-            />
-          </Box>
+          {/* Timeline Area */}
+          <Timeline
+            tracks={tracks}
+            currentTime={currentTime}
+            isPlaying={isPlaying}
+            measureCount={measureCount}
+            zoomLevel={zoomLevel}
+            bpm={bpm}
+            timeSignature={timeSignature}
+            onTrackPositionChange={handleTrackPositionChange}
+            onTimeChange={(newTime) => {
+              // Update global state only when user explicitly changes time
+              setCurrentTime(newTime);
+              
+              // Update transport position
+              if (store && store.getTransport()) {
+                store.getTransport().setPosition(newTime);
+              }
+              
+              // Use imperative API to update cursor position
+              if (scrollRef.current?.playbackCursor) {
+                scrollRef.current.playbackCursor.seek(newTime);
+              }
+            }}
+            gridLineStyle={{
+              borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`
+            }}
+            ref={scrollRef}
+          />
+          
+          {/* AI Assistant Chat Window - slides in from right */}
+          <ChatWindow 
+            isOpen={isChatOpen}
+            onClose={handleChatToggle}
+          />
+          
+          {/* Render the new piano roll windows directly in Studio */}
+          <PianoRollWindows />
+          <DrumMachineWindows />
+
         </Box>
-
-        {/* Timeline Area */}
-        <Timeline
-          tracks={tracks}
-          currentTime={currentTime}
-          isPlaying={isPlaying}
-          measureCount={measureCount}
-          zoomLevel={zoomLevel}
-          bpm={bpm}
-          timeSignature={timeSignature}
-          onTrackPositionChange={handleTrackPositionChange}
-          onTimeChange={(newTime) => {
-            // Update global state only when user explicitly changes time
-            setCurrentTime(newTime);
-            
-            // Update transport position
-            if (store && store.getTransport()) {
-              store.getTransport().setPosition(newTime);
-            }
-            
-            // Use imperative API to update cursor position
-            if (scrollRef.current?.playbackCursor) {
-              scrollRef.current.playbackCursor.seek(newTime);
-            }
-          }}
-          gridLineStyle={{
-            borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`
-          }}
-          ref={scrollRef}
-        />
         
-        {/* AI Assistant Chat Window - slides in from right */}
-        <ChatWindow 
-          isOpen={isChatOpen}
-          onClose={handleChatToggle}
+        {/* Studio Settings Modal */}
+        <StudioSettingsModal
+          open={isSettingsModalOpen}
+          onClose={handleSettingsToggle}
         />
-        
-        {/* Render the new piano roll windows directly in Studio */}
-        <PianoRollWindows />
-        <DrumMachineWindows />
 
+        {/* Hidden file input for replacing track audio */}
+        <input 
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileSelected}
+          accept="audio/*" 
+          style={{ display: 'none' }}
+        />
       </Box>
-      
-      {/* Hidden file input for replacing track audio */}
-      <input 
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileSelected}
-        accept="audio/*" 
-        style={{ display: 'none' }}
-      />
-    </Box>
+    </MuiThemeProvider>
   );
 }
 

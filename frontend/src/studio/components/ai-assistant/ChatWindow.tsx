@@ -1001,13 +1001,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             onClick={onClose} 
             sx={{ 
               color: 'inherit',
+              borderRadius: '8px',
               '&:hover': {
-                bgcolor: theme.palette.action.hover
+                backgroundColor: theme.palette.action.hover
               }
             }}
+            disableRipple
             aria-label="Close assistant"
           >
-            <IconX />
+            <IconX size={16} />
           </IconButton>
         </Box>
         

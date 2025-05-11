@@ -29,6 +29,15 @@ class AudioFilePlayer implements TrackPlayer {
     this.mainOutput = new Tone.Channel().toDestination();
     this.tracks = new Map();
   }
+  setTrackPositionTicks(id: string, position: number): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+  setTrackTrimStartTicks(id: string, start: number): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+  setTrackTrimEndTicks(id: string, end: number): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
   play(position: number): Promise<void> {
     throw new Error('Method not implemented.');
   }
@@ -36,24 +45,6 @@ class AudioFilePlayer implements TrackPlayer {
     throw new Error('Method not implemented.');
   }
   stop(): Promise<void> {
-    throw new Error('Method not implemented.');
-  }
-  setVolume(volume: number): Promise<void> {
-    throw new Error('Method not implemented.');
-  }
-  setPan(pan: number): Promise<void> {
-    throw new Error('Method not implemented.');
-  }
-  setMute(mute: boolean): Promise<void> {
-    throw new Error('Method not implemented.');
-  }
-  setPositionTicks(position: number): Promise<void> {
-    throw new Error('Method not implemented.');
-  }
-  setTrimStartTicks(start: number): Promise<void> {
-    throw new Error('Method not implemented.');
-  }
-  setTrimEndTicks(end: number): Promise<void> {
     throw new Error('Method not implemented.');
   }
 
@@ -134,7 +125,7 @@ class AudioFilePlayer implements TrackPlayer {
     }
   }
 
-  public setTrackVolume(id: string, volume: number): void {
+  public setTrackVolume(id: string, volume: number): Promise<void> {
     const track = this.tracks.get(id);
     if (track) {
       track.volume = volume;
@@ -150,9 +141,10 @@ class AudioFilePlayer implements TrackPlayer {
         track.player.volume.value = volumeInDB;
       }
     }
+    return Promise.resolve();
   }
 
-  public setTrackPan(id: string, pan: number): void {
+  public setTrackPan(id: string, pan: number): Promise<void> {
     const track = this.tracks.get(id);
     if (track) {
       track.pan = pan;
@@ -160,9 +152,10 @@ class AudioFilePlayer implements TrackPlayer {
       const normalizedPan = pan / 100;
       track.channel.pan.value = normalizedPan;
     }
+    return Promise.resolve();
   }
 
-  public setTrackMute(id: string, muted: boolean): void {
+  public setTrackMute(id: string, muted: boolean): Promise<void> {
     const track = this.tracks.get(id);
     if (track) {
       track.muted = muted;
@@ -174,6 +167,7 @@ class AudioFilePlayer implements TrackPlayer {
         track.player.volume.value = convertVolumeToDecibels(track.volume, muted);
       }
     }
+    return Promise.resolve();
   }
 
   public getAllTracks(): AudioTrack[] {

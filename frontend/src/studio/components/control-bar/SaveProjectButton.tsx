@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IconButton, CircularProgress, Snackbar, Alert } from '@mui/material';
+import { IconButton, CircularProgress, Snackbar, Alert, useTheme } from '@mui/material';
 import { IconCloudUpload } from '@tabler/icons-react';
 import { 
   createProject, 
@@ -44,6 +44,8 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
   // Get auth user and store
   const { user } = useAuth();
   const studioStore = useStudioStore();
+  const appTheme = useAppTheme(); // Renamed to avoid conflict
+  const muiTheme = useTheme(); // Get the MUI theme for palette
 
   // Prepare MIDI notes for each track before saving
   const prepareTracksWithMidiNotes = (tracks: CombinedTrack[]): CombinedTrack[] => {
@@ -173,7 +175,14 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
         size="small"
         onClick={handleSave}
         disabled={saving}
-        sx={{ color: useAppTheme().mode === 'dark' ? 'white' : 'black' }}
+        sx={{
+          color: appTheme.studioMode === 'dark' ? 'white' : 'black',
+          borderRadius: '8px',
+          '&:hover': {
+            backgroundColor: muiTheme.palette.action.hover,
+          },
+        }}
+        disableRipple
       >
         {saving ? <CircularProgress size={20} color="inherit" /> : <IconCloudUpload />}
       </IconButton>

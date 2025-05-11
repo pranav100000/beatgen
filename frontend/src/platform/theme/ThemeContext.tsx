@@ -5,7 +5,9 @@ import CssBaseline from '@mui/material/CssBaseline';
 // Define the shape of the context
 interface ThemeContextType {
   mode: 'light' | 'dark';
-  toggleTheme: () => void;
+  studioMode: 'light' | 'dark';
+  toggleUITheme: () => void;
+  toggleStudioTheme: () => void;
 }
 
 // Create the context with a default value (or null and check)
@@ -33,20 +35,47 @@ const darkTheme = createTheme({
   },
 });
 
+// Studio-specific themes (can be customized independently later)
+// For now, they mirror the global themes
+export const studioLightTheme = createTheme({
+  palette: {
+    mode: 'light',
+  },
+  typography: {
+    fontFamily: '"Sen", sans-serif',
+  },
+});
+
+export const studioDarkTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    background: {
+      default: '#000000'
+    },
+  },
+  typography: {
+    fontFamily: '"Sen", sans-serif',
+  },
+});
+
 // Create the provider component
 export const AppThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Default to dark mode, or read from localStorage/preference
-  const [mode, setMode] = useState<'light' | 'dark'>('light'); 
+  const [uiMode, setUIMode] = useState<'light' | 'dark'>('light'); 
+  const [studioMode, setStudioMode] = useState<'light' | 'dark'>('dark'); 
 
-  const toggleTheme = () => {
-    setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
+  const toggleUITheme = () => {
+    setUIMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
+  };
+  const toggleStudioTheme = () => {
+    setStudioMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
   };
 
   // Select the theme object based on the current mode
-  const theme = useMemo(() => (mode === 'light' ? lightTheme : darkTheme), [mode]);
+  const theme = useMemo(() => (uiMode === 'light' ? lightTheme : darkTheme), [uiMode]);
 
   // Provide the context value
-  const contextValue = useMemo(() => ({ mode, toggleTheme }), [mode]);
+  const contextValue = useMemo(() => ({ mode: uiMode, studioMode: studioMode, toggleUITheme, toggleStudioTheme }), [uiMode, studioMode]);
 
   return (
     <ThemeContext.Provider value={contextValue}>

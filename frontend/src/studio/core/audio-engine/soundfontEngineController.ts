@@ -3,17 +3,39 @@ import { MidiManager } from '../midi/MidiManagerNew';
 import { db } from '../db/dexie-client';
 import { Midi } from '@tonejs/midi';
 import { Note } from '../../../types/note';
+import { TrackPlayer } from './trackPlayer';
 
 /**
  * Controller for the MidiSoundfontPlayer that integrates with the app's architecture
  * This controller coordinates between MidiManager, Transport, and the SoundfontPlayer
  */
-export class SoundfontEngineController {
+export class SoundfontEngineController implements TrackPlayer{
     private midiPlayer: MidiSoundfontPlayer;
     private trackSubscriptions: Map<string, () => void> = new Map();
     
     constructor() {
         this.midiPlayer = new MidiSoundfontPlayer();
+    }
+    setTrackPan(id: string, pan: number): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
+    setTrackMute(id: string, mute: boolean): Promise<void> {
+        console.log(`SoundfontEngineController: Setting mute for track ${id} to ${mute}`);
+        this.midiPlayer.muteTrack(id, mute);
+        return Promise.resolve();
+    }
+    setTrackPositionTicks(id: string, position: number): Promise<void> {
+        console.log(`SoundfontEngineController: Setting position for track ${id} to ${position}`);
+        //this.midiPlayer.setTrackPositionTicks(id, position);
+        return Promise.resolve();
+    }
+    setTrackTrimStartTicks(id: string, start: number): Promise<void> {
+        console.log(`SoundfontEngineController: Setting trim start for track ${id} to ${start}`);
+        //this.midiPlayer.setTrackTrimStartTicks(id, start);
+        return Promise.resolve();
+    }
+    setTrackTrimEndTicks(id: string, end: number): Promise<void> {
+        throw new Error('Method not implemented.');
     }
     
     /**
@@ -120,7 +142,7 @@ export class SoundfontEngineController {
     /**
      * Pause playback
      */
-    pause(): void {
+    pause(): Promise<void> {
         console.log('SoundfontEngineController: Pausing playback');
         const trackIds = this.midiPlayer.getTrackIds();
         
@@ -133,6 +155,7 @@ export class SoundfontEngineController {
         });
         
         this.midiPlayer.pause();
+        return Promise.resolve();
     }
     
     /**
@@ -196,11 +219,12 @@ export class SoundfontEngineController {
      * @param trackId Track ID
      * @param volume Volume level (0-100)
      */
-    setTrackVolume(trackId: string, volume: number): void {
+    setTrackVolume(trackId: string, volume: number): Promise<void> {
         // Convert from app's volume scale (0-100) to MIDI volume scale (0-127) if needed
         const midiVolume = volume > 100 ? volume : Math.round((volume / 100) * 127);
         console.log(`SoundfontEngineController: Setting track ${trackId} volume to ${volume} (${midiVolume} in MIDI)`);
         this.midiPlayer.setTrackVolume(trackId, midiVolume);
+        return Promise.resolve();
     }
     
     /**
@@ -260,22 +284,6 @@ export class SoundfontEngineController {
             try {
                 // Get notes using the getTrackNotes method for better error handling
                 const notes = midiManager.getTrackNotes(trackId) || [];
-
-                console.log(`nnnnnotes:`, notes);
-                
-                // Create MIDI data from notes
-                // const midi = new Midi();
-                // midi.addTrack();
-                
-                // // Add each note to the MIDI track
-                // for (const note of notes) {
-                //     midi.tracks[0].addNote({
-                //         midi: note.row,
-                //         velocity: note.velocity, // Use the note's own velocity
-                //         ticks: note.column * this.midiPlayer.getGlobalBPM() * 8,
-                //         durationTicks: note.length * this.midiPlayer.getGlobalBPM() * 8
-                //     });
-                // }
 
                 // Add the track to the player
                 await this.addTrack(
