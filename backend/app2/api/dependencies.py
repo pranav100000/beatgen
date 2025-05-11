@@ -29,7 +29,7 @@ from app2.services.drum_sample_service import DrumSampleService
 logger = get_logger("beatgen.api.dependencies")
 
 # OAuth2 scheme for token extraction
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.app.API_PREFIX}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # Database session dependency
 SessionDep = Annotated[Session, Depends(get_session)]

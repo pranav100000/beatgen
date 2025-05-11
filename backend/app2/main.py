@@ -84,29 +84,29 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # Include routers
-app.include_router(auth.router, prefix=f"{settings.app.API_PREFIX}/auth", tags=["auth"])
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(
-    users.router, prefix=f"{settings.app.API_PREFIX}/users", tags=["users"]
+    users.router, prefix="/users", tags=["users"]
 )
 app.include_router(
-    projects.router, prefix=f"{settings.app.API_PREFIX}/projects", tags=["projects"]
+    projects.router, prefix="/projects", tags=["projects"]
 )
 app.include_router(
-    sounds.router, prefix=f"{settings.app.API_PREFIX}/sounds", tags=["sounds"]
+    sounds.router, prefix="/sounds", tags=["sounds"]
 )
 app.include_router(
     soundfonts.router,
-    prefix=f"{settings.app.API_PREFIX}/soundfonts",
+    prefix="/soundfonts",
     tags=["soundfonts"],
 )
 app.include_router(
     drum_samples.router,
-    prefix=f"{settings.app.API_PREFIX}/drum-samples",
+    prefix="/drum-samples",
     tags=["drum_samples"],
 )
 app.include_router(
     assistant_streaming.router,
-    prefix=f"{settings.app.API_PREFIX}/assistant",
+    prefix="/assistant",
     tags=["assistant"],
 )
 
@@ -118,7 +118,7 @@ async def root():
 
 
 # Health check endpoint
-@app.get(f"{settings.app.API_PREFIX}/health")
+@app.get("/health")
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "version": "2.0.0"}

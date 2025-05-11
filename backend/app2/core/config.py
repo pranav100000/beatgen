@@ -16,7 +16,6 @@ class AppConfig(BaseModel):
     """Base application configuration"""
 
     PROJECT_NAME: str = "BeatGen API"
-    API_PREFIX: str = "/api"
     BASE_URL: str = os.getenv("BASE_URL")
     FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL")
     DEBUG: bool = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
@@ -93,7 +92,6 @@ settings = Settings()
 
 # Log the loaded settings for verification
 logger.info(f"Loaded Settings - App Name: {settings.app.PROJECT_NAME}")
-logger.info(f"Loaded Settings - API Prefix: {settings.app.API_PREFIX}")
 logger.info(f"Loaded Settings - Base URL: {settings.app.BASE_URL}")
 logger.info(f"Loaded Settings - Frontend Base URL: {settings.app.FRONTEND_BASE_URL}")
 logger.info(f"Loaded Settings - Debug: {settings.app.DEBUG}")
