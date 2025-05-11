@@ -57,15 +57,13 @@ class CORSConfig(BaseModel):
     """CORS configuration"""
 
     ORIGINS: List[str] = [
-        "http://localhost:5173",
-        "http://192.168.1.235:5173",
-        "https://localhost:5173",
-        "https://169.254.70.78:5173",
-        "*",
+        "http://localhost:5173", # For local development (Vite dev server)
+        "https://localhost:5173", # If using HTTPS locally
+        "https://beatgen.vercel.app", # Production frontend
     ]
     ALLOW_CREDENTIALS: bool = True
-    ALLOW_METHODS: List[str] = ["*"]
-    ALLOW_HEADERS: List[str] = ["*"]
+    ALLOW_METHODS: List[str] = ["*"] # Consider restricting this in the future
+    ALLOW_HEADERS: List[str] = ["*"] # Consider restricting this in the future
 
 
 class DatabaseConfig(BaseModel):
