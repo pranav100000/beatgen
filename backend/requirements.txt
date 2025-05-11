@@ -8,6 +8,7 @@ numpy==1.26.4
 openai==1.78.0
 pydantic==2.11.4
 pydantic_ai==0.1.11
+psycopg2-binary
 pytest==8.3.5
 pytest_asyncio==0.26.0
 python-dotenv==1.1.0
