@@ -223,16 +223,22 @@ async def callback_google(
             logger.error(
                 "[API] Service handle_google_callback did not return an access token."
             )
-            raise ServiceException("Failed to retrieve access token after Google login")
+            # Redirect to frontend with an error
+            error_desc = urllib.parse.quote("Failed to retrieve access token after Google login")
+            error_redirect_url = f"{settings.app.FRONTEND_BASE_URL}?error=token_missing&error_description={error_desc}"
+            logger.info(f"Redirecting to frontend with error: {error_redirect_url}")
+            return RedirectResponse(error_redirect_url)
 
         # Determine the final redirect URL for the frontend
         frontend_redirect_url = settings.app.FRONTEND_BASE_URL or "/"
-        logger.info(f"[API] Preparing redirect to frontend: {frontend_redirect_url}")
+        
+        # Append access_token to the fragment
+        redirect_url_with_token = f"{frontend_redirect_url}#access_token={access_token}"
+        # Optionally, you might want to include token_type or expires_in if your frontend expects them in the hash
+        # redirect_url_with_token += f"&token_type=bearer" 
 
-        # Redirect back to the frontend.
-        # Let the frontend handle the session/token (Supabase client likely sets cookies)
-        logger.info(f"[API] Redirecting user to {frontend_redirect_url}")
-        return RedirectResponse(frontend_redirect_url)
+        logger.info(f"[API] Preparing redirect to frontend with token in hash: {redirect_url_with_token}")
+        return RedirectResponse(redirect_url_with_token)
 
     except (UnauthorizedException, ServiceException) as e:
         logger.error(
