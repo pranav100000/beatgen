@@ -1,7 +1,7 @@
 import os
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from dotenv import load_dotenv
-from typing import List
+from typing import List, Any
 import logging  # Add logging import
 
 # Load environment variables from .env file
@@ -16,9 +16,25 @@ class AppConfig(BaseModel):
     """Base application configuration"""
 
     PROJECT_NAME: str = "BeatGen API"
-    BASE_URL: str = os.getenv("BASE_URL")
-    FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL")
+    APP_ENV: str = os.getenv("APP_ENV", "dev")
+    BASE_URL: str
+    FRONTEND_BASE_URL: str
     DEBUG: bool = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
+
+    @model_validator(mode='before')
+    @classmethod
+    def _set_dynamic_urls(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Determine APP_ENV: use value from input data if present, else from os.getenv via class default logic
+            app_env = data.get('APP_ENV', os.getenv("APP_ENV", "dev"))
+
+            if app_env == "prod":
+                data.setdefault('BASE_URL', os.getenv("PROD_BASE_URL", "https://beatgen-api.onrender.com"))
+                data.setdefault('FRONTEND_BASE_URL', os.getenv("PROD_FRONTEND_BASE_URL", "https://beatgen.vercel.app"))
+            else:  # Default to dev/local
+                data.setdefault('BASE_URL', os.getenv("LOCAL_BASE_URL", "http://localhost:8000"))
+                data.setdefault('FRONTEND_BASE_URL', os.getenv("LOCAL_FRONTEND_BASE_URL", "http://localhost:5173"))
+        return data
 
 
 class SupabaseConfig(BaseModel):
@@ -92,6 +108,7 @@ settings = Settings()
 
 # Log the loaded settings for verification
 logger.info(f"Loaded Settings - App Name: {settings.app.PROJECT_NAME}")
+logger.info(f"Loaded Settings - Environment: {settings.app.APP_ENV}")
 logger.info(f"Loaded Settings - Base URL: {settings.app.BASE_URL}")
 logger.info(f"Loaded Settings - Frontend Base URL: {settings.app.FRONTEND_BASE_URL}")
 logger.info(f"Loaded Settings - Debug: {settings.app.DEBUG}")
