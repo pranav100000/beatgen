@@ -2,7 +2,7 @@
 Service for track operations with specialized track models
 """
 
-from typing import Dict, Any, List, Union
+from typing import Dict, Any, List, Union, Type
 import traceback
 import uuid
 
@@ -73,13 +73,15 @@ class TrackService:
         self.file_repository = file_repository
 
     async def get_user_tracks(
-        self, user_id: uuid.UUID
+        self, user_id: uuid.UUID, requested_track_type: TrackType = None
     ) -> Dict[str, List[AnyTrackRead]]:
         """
-        Get all tracks for a user, organized by track type
+        Get all tracks for a user, organized by track type.
+        If a specific track type is provided, only tracks of that type are returned.
 
         Args:
             user_id: The ID of the user
+            requested_track_type: Optional. The specific type of tracks to retrieve.
 
         Returns:
             A dictionary with track types as keys and lists of tracks as values
@@ -87,37 +89,45 @@ class TrackService:
         Raises:
             ServiceException: If the operation fails
         """
-        logger.info(f"Getting tracks for user ID: {user_id}")
+        logger.info(f"Getting tracks for user ID: {user_id}{f' of type {requested_track_type.value}' if requested_track_type else ''}")
         try:
-            # Get tracks by type
-            audio_tracks = await self.audio_repository.get_by_user_id(user_id)
-            midi_tracks = await self.midi_repository.get_by_user_id(user_id)
-            sampler_tracks = await self.sampler_repository.get_by_user_id(user_id)
-            drum_tracks = await self.drum_repository.get_by_user_id(user_id)
+            result: Dict[str, List[AnyTrackRead]] = {}
 
-            # Convert to read models
-            audio_read = [
-                AudioTrackRead.model_validate(track) for track in audio_tracks
-            ]
-            midi_read = [MidiTrackRead.model_validate(track) for track in midi_tracks]
-            sampler_read = [
-                SamplerTrackRead.model_validate(track) for track in sampler_tracks
-            ]
-            drum_read = [DrumTrackRead.model_validate(track) for track in drum_tracks]
-
-            result = {
-                TrackType.AUDIO.value: audio_read,
-                TrackType.MIDI.value: midi_read,
-                TrackType.SAMPLER.value: sampler_read,
-                TrackType.DRUM.value: drum_read,
+            # Map TrackType to its repository and Pydantic read model
+            track_config = {
+                TrackType.AUDIO: (self.audio_repository, AudioTrackRead),
+                TrackType.MIDI: (self.midi_repository, MidiTrackRead),
+                TrackType.SAMPLER: (self.sampler_repository, SamplerTrackRead),
+                TrackType.DRUM: (self.drum_repository, DrumTrackRead),
             }
 
-            total_tracks = (
-                len(audio_read) + len(midi_read) + len(sampler_read) + len(drum_read)
-            )
-            logger.info(f"Found {total_tracks} tracks for user ID: {user_id}")
+            async def fetch_and_store_tracks(
+                track_type_enum: TrackType,
+                repository: Union[AudioTrackRepository, MidiTrackRepository, SamplerTrackRepository, DrumTrackRepository],
+                read_model: Union[Type[AudioTrackRead], Type[MidiTrackRead], Type[SamplerTrackRead], Type[DrumTrackRead]]
+            ):
+                tracks = await repository.get_by_user_id(user_id)
+                validated_tracks = [read_model.model_validate(track) for track in tracks]
+                result[track_type_enum.value] = validated_tracks
+                return len(validated_tracks)
 
-            return result
+            if requested_track_type is not None:  # Specific track type requested
+                if requested_track_type not in track_config:
+                    logger.error(f"Unsupported track type requested: {requested_track_type}")
+                    raise ServiceException(f"Unsupported track type: {requested_track_type.value}")
+                
+                repo, model = track_config[requested_track_type]
+                count = await fetch_and_store_tracks(requested_track_type, repo, model)
+                logger.info(f"Found {count} {requested_track_type.value} tracks for user ID: {user_id}")
+                return result
+            else:  # No specific type, fetch all track types
+                total_tracks = 0
+                for t_type, (repo, model) in track_config.items():
+                    total_tracks += await fetch_and_store_tracks(t_type, repo, model)
+                
+                logger.info(f"Found {total_tracks} tracks for user ID: {user_id}")
+                return result
+
         except Exception as e:
             logger.error(f"Error getting user tracks: {str(e)}")
             logger.error(traceback.format_exc())

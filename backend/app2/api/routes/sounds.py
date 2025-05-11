@@ -200,7 +200,7 @@ async def get_audio_tracks(
     logger.info(f"Getting audio tracks for user: {user_id}")
     try:
         # Get all tracks for the user
-        all_tracks = await track_service.get_user_tracks(user_id)
+        all_tracks = await track_service.get_user_tracks(user_id, TrackType.AUDIO)
 
         # Return just the audio tracks
         return all_tracks[TrackType.AUDIO.value]
@@ -224,7 +224,7 @@ async def get_midi_tracks(
     logger.info(f"Getting MIDI tracks for user: {user_id}")
     try:
         # Get all tracks for the user
-        all_tracks = await track_service.get_user_tracks(user_id)
+        all_tracks = await track_service.get_user_tracks(user_id, TrackType.MIDI)
 
         # Return just the MIDI tracks
         return all_tracks[TrackType.MIDI.value]
@@ -248,7 +248,7 @@ async def get_sampler_tracks(
     logger.info(f"Getting sampler tracks for user: {user_id}")
     try:
         # Get all tracks for the user
-        all_tracks = await track_service.get_user_tracks(user_id)
+        all_tracks = await track_service.get_user_tracks(user_id, TrackType.SAMPLER)
 
         # Return just the sampler tracks
         return all_tracks[TrackType.SAMPLER.value]
