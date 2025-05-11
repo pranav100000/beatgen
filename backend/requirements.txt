@@ -14,3 +14,4 @@ instructor>=1.7.9
 openai
 pydantic-ai
 uv
+sqlmodel

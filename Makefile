@@ -17,7 +17,7 @@ install-frontend:
 # Adjust if using a different backend setup
 install-backend:
 	@echo "Installing backend dependencies..."
-	cd backend && pip install -r requirements.txt
+	cd backend && uv pip install -r requirements.txt
 
 # Build frontend (adjust if necessary)
 build:

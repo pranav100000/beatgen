@@ -36,30 +36,30 @@ export const AudioTrackPreview: React.FC<TrackPreviewProps> = (props) => {
     
     // Only calculate if we don't have an explicit width
     return calculateAudioTrackWidth(
-      track.duration || 8, // Default to 8 seconds if no duration specified
+      track.duration_ticks || 8, // Default to 8 seconds if no duration specified
       bpm,
       audioMeasureWidth
     );
-  }, [track.duration, bpm, audioMeasureWidth, providedTrackWidth]);
+  }, [track.duration_ticks, bpm, audioMeasureWidth, providedTrackWidth]);
   
   // Calculate full content width - this should NEVER change due to trimming
   // This is the full width of the audio waveform
   const fullContentWidth = useMemo(() => {
     return calculateAudioTrackWidth(
-      track.duration || 8, // Default to 8 seconds if no duration specified
+      track.duration_ticks || 8, // Default to 8 seconds if no duration specified
       bpm,
       audioMeasureWidth
     );
-  }, [track.duration, bpm, audioMeasureWidth]);
+  }, [track.duration_ticks, bpm, audioMeasureWidth]);
   
   // Audio-specific track content rendering
   const renderTrackContent = () => {
-    if (track.audioFile) {
+    if (track) {
       return (
         <WaveformDisplay 
-          audioFile={track.audioFile}
+          audioFile={undefined} // TODO: Fix this
           trackColor={trackColor}
-          duration={track.duration || 0}
+          duration={track.duration_ticks || 0}
           width={fullContentWidth} // Always use the full content width
         />
       );

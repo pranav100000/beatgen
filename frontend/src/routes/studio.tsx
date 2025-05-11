@@ -15,16 +15,11 @@ interface StudioSearchParams {
 // Studio route - this will render at the path '/studio'
 export const Route = createFileRoute('/studio')({
   // Type-safe search parameters
-  /* // Temporarily commented out to test type inference
-  validateSearch: (search): StudioSearchParams => {
-    // Handle the case where search might be undefined
-    if (!search) return { projectId: undefined };
-    
+  validateSearch: (search: { projectId?: string }): StudioSearchParams => {
     return {
-      projectId: search.projectId as string | undefined,
-    }
+      projectId: search.projectId,
+    };
   },
-  */
   
   // Use requireAuth utility to protect this route
   ...requireAuth('/login'),

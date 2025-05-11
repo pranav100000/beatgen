@@ -1,4 +1,5 @@
-import { Note } from '../core/types/note';
+import { Note } from "src/types/note";
+
 
 /**
  * Calculate width for audio tracks based on duration and BPM

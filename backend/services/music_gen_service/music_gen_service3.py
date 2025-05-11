@@ -408,7 +408,7 @@ Then, provide your final selections using the `SelectInstruments` structure, inc
         # The first role assigned by the LLM (or fallback) for a given soundfont name wins.
         is_duplicate = any(inst.name == soundfont_data.get("name") for inst in self.selected_instruments)
         if is_duplicate:
-            logger.debug(f"Soundfont '{soundfont_data.get("name")}' already selected. Skipping add for new role '{role}'.")
+            logger.debug(f"Soundfont '{soundfont_data.get('name')}' already selected. Skipping add for new role '{role}'.")
             return
         
         # Validate essential soundfont data is present

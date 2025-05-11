@@ -86,7 +86,7 @@ export default function Projects() {
   const handleEditProject = (project: Project) => {
     navigate({ 
       to: '/studio',
-      search: { projectId: project.id }
+      search: { projectId: project.id } as any
     });
   };
 
@@ -123,7 +123,7 @@ export default function Projects() {
   const openProject = (projectId: string) => {
     navigate({ 
       to: '/studio',
-      search: { projectId }
+      search: { projectId } as any
     });
   };
 
@@ -222,7 +222,7 @@ export default function Projects() {
                     size="small" 
                     onClick={() => navigate({ 
                       to: '/studio',
-                      search: { projectId: project.id }
+                      search: { projectId: project.id } as any
                     })} 
                     aria-label="edit"
                   >
