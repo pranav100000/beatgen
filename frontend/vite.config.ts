@@ -37,13 +37,61 @@ export default defineConfig(({ command }) => {
     server: {
       port: 5173, // Default Vite port
       proxy: {
-        '/api': {
-          target: 'https://localhost:8000', // Use HTTPS to match backend
+        // '/api': {
+        //   target: 'https://localhost:8000', // Use HTTPS to match backend
+        //   changeOrigin: true,
+        //   secure: false, // Allow self-signed certificates
+        //   agent: new https.Agent({
+        //      minVersion: 'TLSv1.2'
+        //   })
+        // }
+        '/auth': {
+          target: 'https://localhost:8000',
           changeOrigin: true,
-          secure: false, // Allow self-signed certificates
-          agent: new https.Agent({
-             minVersion: 'TLSv1.2'
-          })
+          secure: false,
+          agent: new https.Agent({ minVersion: 'TLSv1.2' })
+        },
+        '/users': {
+          target: 'https://localhost:8000',
+          changeOrigin: true,
+          secure: false,
+          agent: new https.Agent({ minVersion: 'TLSv1.2' })
+        },
+        '/projects': {
+          target: 'https://localhost:8000',
+          changeOrigin: true,
+          secure: false,
+          agent: new https.Agent({ minVersion: 'TLSv1.2' })
+        },
+        '/sounds': {
+          target: 'https://localhost:8000',
+          changeOrigin: true,
+          secure: false,
+          agent: new https.Agent({ minVersion: 'TLSv1.2' })
+        },
+        '/soundfonts': {
+          target: 'https://localhost:8000',
+          changeOrigin: true,
+          secure: false,
+          agent: new https.Agent({ minVersion: 'TLSv1.2' })
+        },
+        '/drum-samples': {
+          target: 'https://localhost:8000',
+          changeOrigin: true,
+          secure: false,
+          agent: new https.Agent({ minVersion: 'TLSv1.2' })
+        },
+        '/assistant': {
+          target: 'https://localhost:8000',
+          changeOrigin: true,
+          secure: false,
+          agent: new https.Agent({ minVersion: 'TLSv1.2' })
+        },
+        '/health': { 
+          target: 'https://localhost:8000',
+          changeOrigin: true,
+          secure: false,
+          agent: new https.Agent({ minVersion: 'TLSv1.2' })
         }
       },
       https: isDev ? {

@@ -4,7 +4,7 @@ import { logApiRequest, logApiResponse, logApiError } from './debug';
 // In development, use a relative URL to leverage Vite's proxy
 // In production, this would be the actual API URL
 // The backend has redirect_slashes=False, but we need to be consistent with URL formats
-const API_URL = import.meta.env.DEV ? '/api' : 'https://beatgen-api.onrender.com';
+const API_URL = import.meta.env.DEV ? '' : 'https://beatgen-api.onrender.com';
 
 export const apiClient = axios.create({
   baseURL: API_URL,

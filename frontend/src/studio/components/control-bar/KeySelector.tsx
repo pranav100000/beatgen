@@ -44,7 +44,7 @@ const KeySelector: React.FC<KeySelectorProps> = ({ selectedKey = 'C major', onKe
   const open = Boolean(anchorEl);
 
   return (
-    <Box sx={{ width: '124px' }}>
+    <Box sx={{ width: '132px' }}>
       <Button
         onClick={handleClick}
         variant="contained"
