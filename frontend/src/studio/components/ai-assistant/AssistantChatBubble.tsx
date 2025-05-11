@@ -87,7 +87,7 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
         alignSelf: 'flex-start',
         maxWidth: '85%',
         p: 1.5, // Slightly more padding like iMessage
-        borderRadius: '18px', // More rounded corners like iMessage
+        borderRadius: '16px', // More rounded corners like iMessage
         bgcolor: bubbleBgColor, // Use theme-aware background color
         color: bubbleTextColor, // Use theme-aware text color
         boxShadow: theme.shadows[1],

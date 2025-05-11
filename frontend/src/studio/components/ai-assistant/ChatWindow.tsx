@@ -9,7 +9,7 @@ import {
   Chip,
   useTheme
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
+import {IconX} from '@tabler/icons-react';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { 
@@ -40,6 +40,7 @@ import { MidiTrackRead } from 'src/platform/types/track_models/midi_track';
 import { SamplerTrackRead } from 'src/platform/types/track_models/sampler_track';
 import { DrumTrackRead } from 'src/platform/types/track_models/drum_track';
 import { alpha } from '@mui/material/styles';
+import ChatModelMenu from './ChatModelMenu';
 
 interface Message {
   text: string;
@@ -60,6 +61,9 @@ interface ChatWindowProps {
   onClose: () => void;
 }
 
+// Define available AI models (placeholder)
+const AVAILABLE_MODELS = ["Claude Sonnet", "GPT-4o", "Gemini Pro"];
+
 const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
   const theme = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -71,6 +75,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
   const [contextAnchorEl, setContextAnchorEl] = useState<null | HTMLElement>(null);
   const [cursorPosition, setCursorPosition] = useState<number>(0);
   const [selectedTrack, setSelectedTrack] = useState<CombinedTrack | null>(null);
+  
+  // State for AI model selection
+  const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0]); // Default to the first model
+  const [modelAnchorEl, setModelAnchorEl] = useState<null | HTMLElement>(null);
   
   // Streaming state
   const [isStreaming, setIsStreaming] = useState(false);
@@ -415,7 +423,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
         {
           prompt,
           mode: apiMode,
-          track_id: trackId
+          track_id: trackId,
+          context: { // Pass selected model in context
+            model: selectedModel 
+          }
         },
         setupStreamCallbacks()
       );
@@ -927,6 +938,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
     setCursorPosition(e.currentTarget.selectionStart);
   };
 
+  // Handlers for AI Model Chip
+  const handleModelChipClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    setModelAnchorEl(event.currentTarget);
+  };
+
+  const handleModelMenuClose = () => {
+    setModelAnchorEl(null);
+  };
+
+  const handleModelSelect = (newModel: string) => {
+    setSelectedModel(newModel);
+    setModelAnchorEl(null); // Close menu on selection
+  };
+
   return (
     <Box
       sx={{
@@ -982,7 +1007,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             }}
             aria-label="Close assistant"
           >
-            <CloseIcon sx={{ fontSize: 20 }} />
+            <IconX />
           </IconButton>
         </Box>
         
@@ -1134,10 +1159,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                 height: '36px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'flex-end',
-                px: 1
+                justifyContent: 'space-between',
+                px: 1,
+                gap: 1
               }}
             >
+              {/* Model Selector Chip - Bottom Left */}
+              <MenuChip
+                label={selectedModel}
+                onClick={handleModelChipClick}
+              />
+              <ChatModelMenu
+                anchorEl={modelAnchorEl}
+                open={Boolean(modelAnchorEl)}
+                onClose={handleModelMenuClose}
+                onSelect={handleModelSelect}
+                models={AVAILABLE_MODELS}
+              />
+
+              {/* Send/Cancel Chip - Bottom Right */}
               <MenuChip 
                 label={isLoading ? "Cancel" : "Send"}
                 onClick={handleSend}

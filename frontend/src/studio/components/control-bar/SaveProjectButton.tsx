@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { IconButton, CircularProgress, Snackbar, Alert } from '@mui/material';
-import { Save as SaveIcon } from '@mui/icons-material';
+import { IconCloudUpload } from '@tabler/icons-react';
 import { 
   createProject, 
   updateProject, 
@@ -175,7 +175,7 @@ export const SaveProjectButton: React.FC<SaveProjectButtonProps> = ({
         disabled={saving}
         sx={{ color: useAppTheme().mode === 'dark' ? 'white' : 'black' }}
       >
-        {saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+        {saving ? <CircularProgress size={20} color="inherit" /> : <IconCloudUpload />}
       </IconButton>
       
       <Snackbar 

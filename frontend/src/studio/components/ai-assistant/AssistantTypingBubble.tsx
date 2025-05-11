@@ -15,10 +15,10 @@ const bounce = keyframes`
 const BubbleContainer = styled.div`
   display: inline-flex;
   align-items: flex-end; // Align dots to bottom for bounce effect
-  padding: 10px 12px 8px; // Adjusted padding
+  padding: 6px 8px; // Adjusted padding
   background-color: #e5e5ea; // iMessage-like grey bubble color
-  border-radius: 18px;
-  height: 36px; // Fixed height to contain bounce
+  border-radius: 16px;
+  height: 24px; // Fixed height to contain bounce
   box-sizing: border-box;
 `;
 

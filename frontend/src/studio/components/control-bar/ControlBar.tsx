@@ -1,21 +1,13 @@
 import React from 'react';
-import { Box, IconButton, Button, Typography, TextField, Menu, MenuItem, Tooltip, Switch, FormControlLabel, useTheme } from '@mui/material';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
-import ZoomInIcon from '@mui/icons-material/ZoomIn';
-import ZoomOutIcon from '@mui/icons-material/ZoomOut';
-import UndoIcon from '@mui/icons-material/Undo';
-import RedoIcon from '@mui/icons-material/Redo';
-
+import { Box, IconButton, Typography, TextField, Tooltip, useTheme } from '@mui/material';
 // Import components
 import BPMControl from './BPMControl';
 import TimeSignatureDisplay from './TimeSignatureDisplay';
 import { TimeDisplay } from './TimeDisplay';
 import KeySelector from './KeySelector';
-import { ArrowBack, ChatBubbleOutlineRounded, ChatBubbleRounded } from '@mui/icons-material';
 import { SaveProjectButton } from './SaveProjectButton';
 import { useStudioStore } from '../../stores/studioStore';
+import { IconPlayerPlayFilled, IconPlayerSkipBackFilled, IconPlayerPauseFilled, IconArrowForwardUp, IconArrowBackUp, IconZoomIn, IconZoomOut, IconInputAi, IconChevronsRight, IconArrowLeft } from '@tabler/icons-react';
 
 interface StudioControlBarProps {
     canUndo: boolean;
@@ -103,7 +95,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                                 window.location.href = '/home';
                             }}
                         >
-                            <ArrowBack />
+                            <IconArrowLeft />
                         </IconButton>
                     </Tooltip>
                     <IconButton
@@ -113,7 +105,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         disabled={!canUndo}
                         title="Undo"
                     >
-                        <UndoIcon />
+                        <IconArrowBackUp />
                     </IconButton>
                     <IconButton
                         size="small"
@@ -122,7 +114,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         disabled={!canRedo}
                         title="Redo"
                     >
-                        <RedoIcon />
+                        <IconArrowForwardUp />
                     </IconButton>
                 </Box>
 
@@ -156,14 +148,14 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         color="inherit"
                         onClick={onPlayPause}
                     >
-                        {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+                        {isPlaying ? <IconPlayerPauseFilled /> : <IconPlayerPlayFilled />}
                     </IconButton>
                     <IconButton
                         size="small"
                         color="inherit"
                         onClick={onStop}
                     >
-                        <SkipPreviousIcon />
+                        <IconPlayerSkipBackFilled />
                     </IconButton>
                 </Box>
             </Box>
@@ -196,7 +188,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                     gap: 1
                 }}>
                     <IconButton size="small" color="inherit" onClick={onZoomIn}>
-                        <ZoomInIcon />
+                        <IconZoomIn />
                     </IconButton>
                     <Box sx={{ 
                         color: "text.primary",
@@ -211,7 +203,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         {zoomLevel.toFixed(1)}x
                     </Box>
                     <IconButton size="small" color="inherit" onClick={onZoomOut}>
-                        <ZoomOutIcon />
+                        <IconZoomOut />
                     </IconButton>
                     <TimeDisplay
                         currentTime={currentTime}
@@ -232,7 +224,7 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
                         color="inherit"
                         onClick={onChatToggle}
                     >
-                        {isChatOpen ? <ChatBubbleRounded /> : <ChatBubbleOutlineRounded />}
+                        {isChatOpen ? <IconChevronsRight /> : <IconInputAi />}
                     </IconButton>
                 </Box>
             </Box>

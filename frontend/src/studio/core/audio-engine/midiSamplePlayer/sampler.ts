@@ -15,14 +15,11 @@ class MidiSampler {
     private cutSelfOff: boolean = false;
     private offsetSeconds: number = 0; // Track's position offset in seconds
     
-    // Single pool of players for both direct playback and scheduled notes
-    private playerPool: Tone.GrainPlayer[] = [];
-    private readonly POOL_SIZE = 100; // Larger pool to handle more simultaneous notes
-    
     // Master gain node for volume control
     private gainNode: Tone.Gain;
     private currentVolume: number = 100; // Store current volume (0-100)
     private isMuted: boolean = false;
+    private activePlayNoteTimeouts: Set<NodeJS.Timeout> = new Set(); // Store setTimeout IDs from playNote
 
     constructor(
         onLog: LogCallback,
@@ -68,7 +65,6 @@ class MidiSampler {
                     overlap,
                     onload: async () => {
                         this.log("Audio sample loaded successfully");
-                        await this.initializePlayerPool();
                         resolve();
                     },
                     onerror: (error) => {
@@ -84,85 +80,24 @@ class MidiSampler {
         }
     }
 
-    // Initialize a pool of players that will be reused
-    private async initializePlayerPool(): Promise<void> {
-        if (!this.player?.buffer) {
-            this.log("Cannot initialize player pool: no buffer loaded");
-            return;
+    // Renamed from getPlayerFromPool and refactored for on-demand creation
+    private createAndConfigurePlayer(): Tone.GrainPlayer | null {
+        if (!this.player?.buffer) { // this.player is the main GrainPlayer holding the loaded buffer
+            this.log("Cannot create player: no buffer loaded on main player");
+            return null;
         }
-
-        // Clean up existing pool first
-        this.cleanupPlayerPool();
-        
-        const startTime = performance.now();
-        this.log(`Initializing player pool with ${this.POOL_SIZE} players...`);
-
-        // Create players in batches for UI responsiveness
-        const batchSize = 50;
-        for (let i = 0; i < this.POOL_SIZE; i += batchSize) {
-            const endIdx = Math.min(i + batchSize, this.POOL_SIZE);
-            
-            // Create players in this batch
-            for (let j = i; j < endIdx; j++) {
-                try {
-                    const player = new Tone.GrainPlayer();
-                    
-                    // Configure and connect each player immediately
-                    player.buffer = this.player.buffer;
-                    player.grainSize = this.player.grainSize;
-                    player.overlap = this.player.overlap;
-                    
-                    // Connect to gain node instead of destination
-                    player.connect(this.gainNode);
-                    player.volume.value = -Infinity;
-                    
-                    this.playerPool.push(player);
-                } catch (error) {
-                    this.log(`Error creating player: ${error}`);
-                }
-            }
-            
-            // Yield to UI thread between batches
-            if (i + batchSize < this.POOL_SIZE) {
-                await new Promise(resolve => setTimeout(resolve, 0));
-            }
+        try {
+            const newPlayer = new Tone.GrainPlayer();
+            newPlayer.buffer = this.player.buffer; // Share the main buffer
+            newPlayer.grainSize = this.player.grainSize; // Use main player's current settings
+            newPlayer.overlap = this.player.overlap;   // Use main player's current settings
+            newPlayer.connect(this.gainNode); // Connect to this sampler's gain node
+            newPlayer.volume.value = -Infinity; // Start silent, will be set before play
+            return newPlayer;
+        } catch (error) {
+            this.log(`Error creating on-demand player: ${error}`);
+            return null;
         }
-        
-        const elapsed = performance.now() - startTime;
-        this.log(`Player pool initialized in ${elapsed.toFixed(1)}ms, ${this.playerPool.length} players ready`);
-    }
-
-    // Get an available player from the pool
-    private getPlayerFromPool(): Tone.GrainPlayer | null {
-        // Look for a player that's not currently in use
-        const availablePlayer = this.playerPool.find(p => !p.state.includes('started'));
-        
-        if (availablePlayer) {
-            return availablePlayer;
-        }
-        
-        // If no player is available, create a new one on demand
-        if (this.player?.buffer) {
-            try {
-                const newPlayer = new Tone.GrainPlayer();
-                newPlayer.buffer = this.player.buffer;
-                newPlayer.grainSize = this.player.grainSize;
-                newPlayer.overlap = this.player.overlap;
-                newPlayer.toDestination();
-                newPlayer.volume.value = -Infinity;
-                
-                // Add to pool for future reuse
-                this.playerPool.push(newPlayer);
-                
-                this.log(`Created additional player (pool size now ${this.playerPool.length})`);
-                return newPlayer;
-            } catch (error) {
-                this.log(`Error creating additional player: ${error}`);
-            }
-        }
-        
-        this.log("No available players in pool and couldn't create a new one");
-        return null;
     }
 
     // Play a single note
@@ -171,31 +106,43 @@ class MidiSampler {
         duration: number = 0.5,
         velocity: number = 0.8
     ): void {
-        if (!this.player?.buffer) return;
+        if (!this.player?.buffer) {
+            this.log("Cannot play note: main player or buffer not ready.");
+            return;
+        }
         
-        // Get a player for this note
-        const player = this.getPlayerFromPool();
-        if (!player) {
-            this.log("No available players");
+        const tempPlayer = this.createAndConfigurePlayer();
+        if (!tempPlayer) {
+            this.log("Failed to create player for playNote");
             return;
         }
 
         try {
-            // Set up the player for this note
             const pitchShiftAmount = midiNote - this.baseNote;
-            player.detune = pitchShiftAmount * 100;
-            player.volume.value = Tone.gainToDb(velocity);
+            tempPlayer.detune = pitchShiftAmount * 100;
+            tempPlayer.volume.value = Tone.gainToDb(velocity);
             
-            // Get precise time and play
             const now = Tone.now();
-            player.start(now).stop(now + duration);
+            tempPlayer.start(now).stop(now + duration);
             
-            // Use a simple timeout for cleanup since this is direct playback
-            setTimeout(() => {
-                player.volume.value = -Infinity;
-            }, (duration * 1000) + 50);
+            // Dispose the temporary player after its duration
+            const timeoutId = setTimeout(() => {
+                try {
+                    if (!tempPlayer.disposed) tempPlayer.dispose();
+                } catch (e) {
+                    this.log(`Error disposing player in playNote: ${e}`)
+                }
+                this.activePlayNoteTimeouts.delete(timeoutId); // Remove from set once executed
+            }, (duration * 1000) + 100); // 100ms grace period before disposing
+            this.activePlayNoteTimeouts.add(timeoutId); // Add to set
         } catch (error) {
             this.log(`Error playing note: ${error}`);
+            // Ensure player is disposed even if there was an error during setup/play
+            try {
+                 if (!tempPlayer.disposed) tempPlayer.dispose();
+            } catch (e) {
+                 this.log(`Error disposing player after playNote error: ${e}`)
+            }
         }
     }
 
@@ -258,36 +205,49 @@ class MidiSampler {
                 
                 // Schedule at the adjusted absolute time
                 Tone.Transport.schedule((time) => {
-                    // Get a player from the pool at playback time
-                    const player = this.getPlayerFromPool();
-                    if (!player || !this.player?.buffer) return;
+                    // Get a player from the pool at playback time - NOW CREATE ON DEMAND
+                    const tempPlayer = this.createAndConfigurePlayer();
+                    if (!tempPlayer) {
+                        this.log("Failed to create player for scheduled note in playMidi");
+                        return;
+                    }
                     
                     try {
-                        // Set pitch shift based on note
                         const pitchShiftAmount = note.row - this.baseNote;
-                        player.detune = pitchShiftAmount * 100;
+                        tempPlayer.detune = pitchShiftAmount * 100;
                         
-                        // Set volume
-                        player.volume.value = note.velocity 
+                        tempPlayer.volume.value = note.velocity 
                             ? Tone.gainToDb(note.velocity) 
                             : Tone.gainToDb(0.8);
                         
-                        // Play the note directly at the scheduled time
                         if (!this.cutSelfOff) {
-                            player.start(time);
+                            tempPlayer.start(time);
                         } else {
-                            player.start(time).stop(time + noteDuration);
+                            tempPlayer.start(time).stop(time + noteDuration);
                         }
                         
-                        // Clean up when done
+                        // Schedule disposal of the temporary player
                         Tone.Transport.schedule(() => {
-                            player.stop();
-                            player.volume.value = -Infinity;
-                        }, time + noteDuration + 0.01);
+                            try {
+                                // Ensure it hasn't been already disposed if a global stop was called
+                                if (!tempPlayer.disposed) {
+                                    tempPlayer.stop(time + noteDuration + 0.01); // Ensure stop before dispose
+                                    tempPlayer.dispose();
+                                }
+                            } catch (e) {
+                                this.log(`Error disposing player in playMidi: ${e}`)
+                            }
+                        }, time + noteDuration + 0.05); // 50ms grace period
                         
                         this.log(`Playing note: ${Tone.Frequency(note.row, "midi").toNote()} at t=${time}, noteTime=${noteTimeInSeconds}s, offset=${this.offsetSeconds}s, absoluteTime=${absoluteTransportTime + lookAheadTime}s, transportTime=${Tone.Transport.seconds}s`);
                     } catch (error) {
                         this.log(`Error playing scheduled note: ${error}`);
+                        // Ensure player is disposed even if there was an error
+                        try {
+                            if (!tempPlayer.disposed) tempPlayer.dispose();
+                        } catch (e) {
+                            this.log(`Error disposing player after playMidi error: ${e}`)
+                        }
                     }
                 }, absoluteTransportTime);
             }
@@ -296,21 +256,17 @@ class MidiSampler {
 
     // Stop playback
     public stopPlayback(): void {
-
+        // Clear any pending timeouts for playNote disposals
+        this.activePlayNoteTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+        this.activePlayNoteTimeouts.clear();
         
-        // Cancel scheduled events
+        // Cancel scheduled events via Tone.Transport (for playMidi)
         Tone.Transport.cancel(); 
         
         // Mark as stopped
         this.isPlaying = false;
         this.onPlaybackStatusChange(false);
         this.log(`Playback stopped - all audio silenced and events cancelled`);
-    }
-    
-    // Clean up players in the pool
-    private cleanupPlayerPool(): void {
-        this.playerPool.forEach(player => player.dispose());
-        this.playerPool = [];
     }
     
     // Clean up all resources
@@ -324,8 +280,8 @@ class MidiSampler {
             this.player = null;
         }
         
-        // Clean up the player pool
-        this.cleanupPlayerPool();
+        // Clean up the player pool - REMOVED
+        // this.cleanupPlayerPool();
     }
     
     /**
@@ -335,8 +291,14 @@ class MidiSampler {
         this.cleanupResources(true);
         
         // Also dispose the gain node
-        this.gainNode.dispose();
+        if (this.gainNode && !this.gainNode.disposed) {
+            this.gainNode.dispose();
+        }
         
+        // Ensure any remaining playNote timeouts are cleared
+        this.activePlayNoteTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+        this.activePlayNoteTimeouts.clear();
+
         this.log('All resources disposed');
     }
 
@@ -344,12 +306,6 @@ class MidiSampler {
     public setGrainSize(value: number): void {
         if (this.player) {
             this.player.grainSize = value;
-            
-            // Also update all pool players
-            this.playerPool.forEach(player => {
-                player.grainSize = value;
-            });
-            
             this.log(`Grain size set to ${value} seconds`);
         }
     }
@@ -358,12 +314,6 @@ class MidiSampler {
     public setOverlap(value: number): void {
         if (this.player) {
             this.player.overlap = value;
-            
-            // Also update all pool players
-            this.playerPool.forEach(player => {
-                player.overlap = value;
-            });
-            
             this.log(`Overlap set to ${value}`);
         }
     }
