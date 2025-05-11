@@ -342,7 +342,7 @@ async def process_generate_request(
 
     # Generate music with music_gen_service, passing the session
     try:
-        response = await music_gen_service3.compose_music(
+        response = await music_gen_service.compose_music(
             context.prompt, sse_queue, session
         )
         logger.info(

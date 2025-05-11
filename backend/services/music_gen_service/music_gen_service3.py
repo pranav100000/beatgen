@@ -375,7 +375,6 @@ Then, provide your final selections using the `SelectInstruments` structure, inc
             selected_roles = {inst.role: inst.name for inst in self.selected_instruments}
             log_msg = f"Finalized Instruments: {selected_roles}"
             logger.info(log_msg)
-            await queue.add_chunk(log_msg)
             
             return True
 
