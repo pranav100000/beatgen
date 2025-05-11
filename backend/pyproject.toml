@@ -13,7 +13,8 @@ dependencies = [
     "openai>=1.75.0",
     "numpy>=1.26.4",
     "librosa>=0.11.0",
-    "instructor>=1.7.9",
+    "instructor[anthropic]>=1.7.9",
+    "pydantic-ai>=0.0.31",
 ]
 
 [tool.pytest.ini_options]
