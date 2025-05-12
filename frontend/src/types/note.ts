@@ -15,9 +15,9 @@ export function convertJsonToNotes(json_data: { [k: string]: unknown }, trackId?
         const notesArray = json_data.notes as any[];
         const ret = notesArray.map((note: any, index: number) => ({
             id: Date.now() + index,
-            row: note.row || note.pitch,
-            column: note.column || note.start,
-            length: note.length || note.duration,
+            row: note.row ?? note.pitch,
+            column: note.column ?? note.start,
+            length: note.length ?? note.duration,
             velocity: note.velocity,
             trackId: trackId
         }));
