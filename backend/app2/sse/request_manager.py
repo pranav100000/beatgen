@@ -279,10 +279,12 @@ class RequestManager:
         # Check if request exists
         request = self._requests.get(request_id)
         if not request:
+            logger.error(f"Request {request_id} not found")
             return False
 
         # Check user if provided
         if user_id and request.user_id != user_id:
+            logger.error(f"Request {request_id} not found for user {user_id}")
             return False
 
         return True
