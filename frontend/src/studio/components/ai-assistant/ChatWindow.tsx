@@ -483,7 +483,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
               pan: 0,    // Default pan
               mute: false, // Default mute state
               x_position: 0, // Default position
-              y_position: 0, // Default position
               // Fields related to audio clips, might not be relevant here or default to 0
               trim_start_ticks: 0,
               trim_end_ticks: 0,
@@ -531,7 +530,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                   pan: 0,    // Default pan
                   mute: false, // Default mute state
                   x_position: 0, // Default position
-                  y_position: 0, // Default position
                   // Fields related to audio clips, might not be relevant here or default to 0
                   trim_start_ticks: 0,
                   trim_end_ticks: 0,
@@ -1009,7 +1007,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             disableRipple
             aria-label="Close assistant"
           >
-            <IconX size={16} />
+            <IconX size={12} />
           </IconButton>
         </Box>
         
