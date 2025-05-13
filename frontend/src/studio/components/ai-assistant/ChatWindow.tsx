@@ -56,7 +56,7 @@ interface ChatWindowProps {
 }
 
 // Define available AI models (placeholder)
-const AVAILABLE_MODELS = ["deepseek-r1", "deepseek-v3", "claude-3.7-sonnet", "gpt-4o", "o3", "gemini-2.5-pro"];
+const AVAILABLE_MODELS = ["deepseek-r1", "deepseek-v3", "claude-3.7-sonnet", "gpt-4o", "o3", "gemini-2.5-pro", "llama-4-maverick", "llama-4-scout"];
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
   const theme = useTheme();
@@ -1012,7 +1012,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
           bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : alpha(theme.palette.background.paper, 0.9),
           flexShrink: 0
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 0.5}}>
+          <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5}}>
             <IconAi size={28} />
             <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
               Assistant

@@ -56,17 +56,33 @@ GOOGLE_GEMINI_FLASH = ModelInfo(
 )
 
 OPENROUTER_DEEPSEEK_R1 = ModelInfo(
-    provider_name="openrouter", # Use specific name or "openai" if ChatSession handles it
+    provider_name="openrouter", 
     display_name="Deepseek R1",
-    model_name="deepseek/deepseek-r1", # Check OpenRouter for exact model string
+    model_name="deepseek/deepseek-r1", 
     api_key_env_var="OPENROUTER_API_KEY",
     base_url="https://openrouter.ai/api/v1"
 )
 
 OPENROUTER_DEEPSEEK_V3 = ModelInfo(
-    provider_name="openrouter", # Use specific name or "openai" if ChatSession handles it
+    provider_name="openrouter", 
     display_name="Deepseek V3",
-    model_name="deepseek/deepseek-chat-v3-0324", # Check OpenRouter for exact model string
+    model_name="deepseek/deepseek-chat-v3-0324",
+    api_key_env_var="OPENROUTER_API_KEY",
+    base_url="https://openrouter.ai/api/v1"
+)
+
+OPENROUTER_LLAMA_4_MAVERICK = ModelInfo(
+    provider_name="openrouter", 
+    display_name="Llama 4 Maverick",
+    model_name="meta-llama/llama-4-maverick", 
+    api_key_env_var="OPENROUTER_API_KEY",
+    base_url="https://openrouter.ai/api/v1"
+)
+
+OPENROUTER_LLAMA_4_SCOUT = ModelInfo(
+    provider_name="openrouter", 
+    display_name="Llama 4 Scout",
+    model_name="meta-llama/llama-4-scout", 
     api_key_env_var="OPENROUTER_API_KEY",
     base_url="https://openrouter.ai/api/v1"
 )
@@ -79,6 +95,8 @@ ALL_MODELS = [
     GOOGLE_GEMINI_FLASH,
     OPENROUTER_DEEPSEEK_R1,
     OPENROUTER_DEEPSEEK_V3,
+    OPENROUTER_LLAMA_4_MAVERICK,
+    OPENROUTER_LLAMA_4_SCOUT
 ]
 
 def get_model_by_name(model_name: str) -> ModelInfo:
@@ -97,6 +115,10 @@ def get_model_by_name(model_name: str) -> ModelInfo:
             return OPENROUTER_DEEPSEEK_R1
         case "deepseek-v3":
             return OPENROUTER_DEEPSEEK_V3
+        case "llama-4-maverick":
+            return OPENROUTER_LLAMA_4_MAVERICK
+        case "llama-4-scout":
+            return OPENROUTER_LLAMA_4_SCOUT
         case _:
             raise ValueError(f"Model not found: {model_name}")
 
