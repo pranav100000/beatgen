@@ -113,6 +113,7 @@ async def create_assistant_request(
                 "id"
             ),  # This should match what we use in the stream endpoint
             mode=request.mode,
+            model=request.model,
             prompt=request.prompt,
             track_id=request.track_id,
             context=request.context,
@@ -350,16 +351,13 @@ async def process_generate_request(
         # response = await music_gen_service.compose_music(
         #     context.prompt, sse_queue, session
         # )
+        selected_model_info = available_models.get_model_by_name(context.model)
+        selected_model_info.api_key = selected_model_info.get_api_key()
+        logger.info(f"Selected model: {selected_model_info}")
         response = await music_agent.run(
             SongRequest(user_prompt=context.prompt,
                         duration_bars=4),
-            model_info=ModelInfo(
-                provider_name=available_models.OPENAI_GPT_4O.provider_name,
-                display_name=available_models.OPENAI_GPT_4O.display_name,
-                model_name=available_models.OPENAI_GPT_4O.model_name,
-                api_key_env_var=available_models.OPENAI_GPT_4O.api_key_env_var,
-                api_key=available_models.OPENAI_GPT_4O.get_api_key()
-            ),
+            model_info=selected_model_info,
             queue=sse_queue,
             session=session
         )

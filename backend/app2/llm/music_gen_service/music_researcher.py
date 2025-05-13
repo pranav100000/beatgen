@@ -220,6 +220,7 @@ class MusicResearcher:
                 - Most common drum sounds used in this style ranked by popularity
                 - Details about why each drum sound is used in this style
                 - References to specific tracks that use these drum sounds
+                - How the drum sounds are used rhythmically in this style (what beats the drum sounds typically play on)
                 
                 Format your response as a simple set of bullet points under clear headings.
                 Be specific and concise with factual information.""",

@@ -36,6 +36,8 @@ from app2.llm.music_gen_service.llm_schemas import (
 # Utilities from music_gen_service
 from app2.llm.music_gen_service.music_researcher import MusicResearcher
 from app2.core.logging import get_service_logger
+from app2.models.track_models.drum_track import DrumTrackRead
+from app2.models.track_models.sampler_track import SamplerTrackRead
 from services.soundfont_service.soundfont_service import soundfont_service
 from app2.api.dependencies import (
     get_drum_sample_service,
@@ -87,6 +89,8 @@ from app2.llm.chat_wrapper import ChatSession # Keep this import
 from app2.llm.available_models import ModelInfo # Import the new dataclass
 from app2.llm.streaming import TextDeltaEvent # Import TextDeltaEvent
 
+from app2.core.config import settings
+
 # --- Input and Output Schemas for the Main Agent Tool ---
 
 
@@ -129,6 +133,7 @@ class MusicGenerationAgent:
         self._available_drum_samples = await drum_sample_service.get_all_samples()
         self._soundfont_map = {sf["name"]: sf for sf in self._available_soundfonts}
         self._drum_sample_map = {ds.display_name: ds for ds in self._available_drum_samples}
+        self._drum_sample_id_map = {str(ds.id): ds for ds in self._available_drum_samples}
 
     # --- Helper for Focused LLM Calls (No longer uses RunContext) ---
     async def _focused_llm_call(self, prompt: str, output_type: Type[BaseModel]) -> BaseModel:
@@ -580,6 +585,18 @@ Keep it concise and conversational. Do NOT generate the actual musical notes or 
         except Exception as e:
             logger.error(f"Error during melody note generation or SSE: {str(e)}", exc_info=True)
             await queue.error(f"Failed to generate melody notes: {str(e)}")
+            
+    async def _generate_drum_beat_patterns_and_send_sse(self, params: FullMusicalParameters, selected_drums_data: SelectDrumSounds, queue: SSEQueueManager, drum_research_result: Optional[str] = None):
+        """Streams explanation, then generates drum beat patterns via LLM call."""
+        logger.info(f"Step 'generate_drum_beat_patterns' called for song: {params.song_title if params.song_title else 'Untitled'}")
+        drum_track = await self.generate_drum_beat_patterns(
+            determined_params=params,
+            selected_drums_data=selected_drums_data,
+            drum_research_result=drum_research_result
+        )
+        
+        await queue.action(AssistantAction.add_drum_track(track=drum_track))
+
 
     async def generate_melody_notes(self, current_params: FullMusicalParameters, selected_instruments: SelectInstruments) -> MelodyData:
         """Generates melody notes. This tool now uses a detailed interval-based prompt and converts the result to absolute notes."""
@@ -855,37 +872,38 @@ Output only the JSON object."""
         
         # Fallback if no drums selected
         if not validated_drums and self._available_drum_samples:
-            logger.warning("No drum sounds selected by LLM or validated, attempting fallback.")
-            # Simple fallback: try to pick common types if names are suggestive, else pick first few
-            common_types = {'kick': False, 'snare': False, 'hat': False, 'clap': False}
-            for sample in self._available_drum_samples:
-                sample_name_lower = sample.display_name.lower()
-                added = False
-                if 'kick' in sample_name_lower and not common_types['kick']:
-                    validated_drums.append(sample.display_name)
-                    common_types['kick'] = True
-                    added = True
-                elif 'snare' in sample_name_lower and not common_types['snare']:
-                    validated_drums.append(sample.display_name)
-                    common_types['snare'] = True
-                    added = True
-                elif ('hat' in sample_name_lower or 'hi-hat' in sample_name_lower) and not common_types['hat']:
-                    validated_drums.append(sample.display_name)
-                    common_types['hat'] = True
-                    added = True
-                elif 'clap' in sample_name_lower and not common_types['clap']:
-                    validated_drums.append(sample.display_name)
-                    common_types['clap'] = True
-                    added = True
-                if len(validated_drums) >= 4: break # Limit fallback to around 4 sounds
+            raise Exception("No drum sounds selected by LLM or validated, attempting fallback.")
+            # logger.warning("No drum sounds selected by LLM or validated, attempting fallback.")
+            # # Simple fallback: try to pick common types if names are suggestive, else pick first few
+            # common_types = {'kick': False, 'snare': False, 'hat': False, 'clap': False}
+            # for sample in self._available_drum_samples:
+            #     sample_name_lower = sample.display_name.lower()
+            #     added = False
+            #     if 'kick' in sample_name_lower and not common_types['kick']:
+            #         validated_drums.append(sample.display_name)
+            #         common_types['kick'] = True
+            #         added = True
+            #     elif 'snare' in sample_name_lower and not common_types['snare']:
+            #         validated_drums.append(sample.display_name)
+            #         common_types['snare'] = True
+            #         added = True
+            #     elif ('hat' in sample_name_lower or 'hi-hat' in sample_name_lower) and not common_types['hat']:
+            #         validated_drums.append(sample.display_name)
+            #         common_types['hat'] = True
+            #         added = True
+            #     elif 'clap' in sample_name_lower and not common_types['clap']:
+            #         validated_drums.append(sample.display_name)
+            #         common_types['clap'] = True
+            #         added = True
+            #     if len(validated_drums) >= 4: break # Limit fallback to around 4 sounds
             
-            if not validated_drums: # If name matching failed, just pick first few
-                validated_drums = [ds.display_name for ds in self._available_drum_samples[:min(4, len(self._available_drum_samples))]]
-            logger.info(f"Fallback selected drums: {validated_drums}")
+            # if not validated_drums: # If name matching failed, just pick first few
+            #     validated_drums = [ds.display_name for ds in self._available_drum_samples[:min(4, len(self._available_drum_samples))]]
+            # logger.info(f"Fallback selected drums: {validated_drums}")
 
         return SelectDrumSounds(drum_sounds=validated_drums)
 
-    async def generate_drum_beat_patterns(self, determined_params: FullMusicalParameters, selected_drums_data: SelectDrumSounds) -> CreateDrumBeat:
+    async def generate_drum_beat_patterns(self, determined_params: FullMusicalParameters, selected_drums_data: SelectDrumSounds, drum_research_result: Optional[str] = None) -> CreateDrumBeat:
         """Streams explanation, then generates drum beat patterns via LLM call."""
         logger.info(f"Step 'generate_drum_beat_patterns' called for song: {determined_params.song_title if determined_params.song_title else 'Untitled'}")
         
@@ -900,30 +918,6 @@ Output only the JSON object."""
             logger.info("No valid selected drum sounds to generate patterns for. Returning empty patterns.")
             return CreateDrumBeat(drum_beats=[])
         
-        drum_names_for_explanation = [d["name"] for d in drum_info_for_llm]
-
-        # 1. Stream Explanation for Drum Beat Generation
-        explanation_prompt_drum_beats = f"""Now I'm going to create the drum beat patterns.
-Musical Context: Key: {determined_params.key} {determined_params.mode}, Tempo: {determined_params.tempo} BPM, User Prompt: '{determined_params.original_user_prompt}'.
-Selected Drum Sounds: {json.dumps(drum_names_for_explanation)}.
-
-Describe the overall feel of the drum beat you are about to create. For each of the selected drum sounds, briefly explain the rhythmic role its pattern will play (e.g., kick provides the main pulse, snare on 2 and 4, hi-hats provide 16th note rhythm, etc.).
-Do NOT generate the actual 32-step boolean patterns in this step, just your conversational reasoning and description."""
-
-        logger.info("Streaming explanation for drum beat patterns...")
-        try:
-            async for text_chunk in await self.chat_session.send_message_async(
-                user_prompt_content=explanation_prompt_drum_beats,
-                stream=True
-            ):
-                if isinstance(text_chunk, str):
-                    logger.debug(f"DRUM BEAT EXPLANATION STREAMING TEXT CHUNK: '{text_chunk}'") 
-                    await self.chat_session.queue.add_chunk(text_chunk)
-            logger.info("Finished streaming drum beat pattern explanation.")
-        except Exception as e:
-            logger.error(f"Error streaming drum beat pattern explanation: {e}")
-            await self.chat_session.queue.error("Failed to stream drum beat explanation.")
-
         # 2. Get JSON Data (Focused Call)
         logger.info("Requesting JSON for drum beat patterns...")
         # drum_info_for_prompt used in the focused_prompt should contain the IDs as expected by the CreateDrumBeat schema
@@ -932,7 +926,11 @@ Create drum beat patterns for a {determined_params.duration_bars}-bar song in {d
 User prompt for style: '{determined_params.original_user_prompt}'.
 Use these selected drum sounds (provide patterns for these IDs and names): {json.dumps(drum_info_for_llm)}.
 
-Based on our prior discussion, for EACH of the drum sounds listed above, create a rhythmic pattern.
+Here is some research on drum beats of this style:
+{drum_research_result}
+
+<CRITICAL_INSTRUCTION>Ensure the drum patterns are in the style of the research and prompt provided.</CRITICAL_INSTRUCTION>
+For EACH of the drum sounds listed above, create a rhythmic pattern.
 Each pattern MUST be a JSON array of exactly 32 boolean values (true/false), representing 16th notes over 2 bars (in 4/4 time).
 'true' means the drum hits on that 16th note step, 'false' means silence.
 Do NOT exceed 32 items in any pattern list.
@@ -940,7 +938,97 @@ Output *only* in the 'CreateDrumBeat' JSON structure (an object with a 'drum_bea
 Example of desired JSON structure: {json.dumps(CreateDrumBeat.model_json_schema(), indent=2)}
 Output only the JSON object."""
         
-        drum_beat_data = await self._focused_llm_call(focused_prompt, CreateDrumBeat)
+        # Create a fresh ChatSession for this specific LLM call
+        drum_chat_session = ChatSession(
+            provider_name=self.chat_session.current_provider_name,
+            model_name=self.chat_session.current_model_name,
+            queue=self.chat_session.queue, # Use the main agent's queue
+            api_key=self.chat_session.current_api_key,
+            base_url=self.chat_session.current_base_url,
+            **self.chat_session.current_provider_kwargs
+        )
+
+        max_retries = 1 
+        drum_beat_data_raw: Optional[CreateDrumBeat] = None
+        current_llm_prompt_for_drums = focused_prompt
+        last_error: Optional[Exception] = None
+
+        for attempt in range(max_retries + 1):
+            logger.info(f"Drum beat pattern generation attempt {attempt + 1} for CreateDrumBeat...")
+            raw_llm_output_str: Optional[str] = None
+            # Reset last_error for this attempt, critical if previous attempt had error but didn't enter except block
+            last_error = None 
+            
+            try:
+                response_data = await drum_chat_session.send_message_async(
+                    user_prompt_content=current_llm_prompt_for_drums,
+                    stream=False,
+                    model_settings={}, 
+                    expect_json=True
+                )
+
+                if isinstance(response_data, str):
+                    raw_llm_output_str = response_data
+                    parsed_json_data = json.loads(raw_llm_output_str)
+                    
+                    # Specific correction logic for CreateDrumBeat patterns (ensure 32 booleans)
+                    if isinstance(parsed_json_data, dict) and 'drum_beats' in parsed_json_data and isinstance(parsed_json_data['drum_beats'], list):
+                        for item_dict in parsed_json_data['drum_beats']:
+                            if isinstance(item_dict, dict) and 'pattern' in item_dict and isinstance(item_dict['pattern'], list):
+                                pat = item_dict['pattern']
+                                expected_len = 32 
+                                if len(pat) > expected_len:
+                                    logger.info(f"Drum pattern parse: Truncating drum pattern for {item_dict.get('drum_sound_id', 'N/A')} from {len(pat)} to {expected_len}.")
+                                    item_dict['pattern'] = pat[:expected_len]
+                                elif len(pat) < expected_len:
+                                    logger.info(f"Drum pattern parse: Padding drum pattern for {item_dict.get('drum_sound_id', 'N/A')} from {len(pat)} to {expected_len}.")
+                                    item_dict['pattern'].extend([False] * (expected_len - len(pat)))
+                    
+                    drum_beat_data_raw = CreateDrumBeat(**parsed_json_data)
+                    logger.info(f"Successfully parsed and validated CreateDrumBeat on attempt {attempt + 1}.")
+                    break 
+                elif isinstance(response_data, CreateDrumBeat):
+                    drum_beat_data_raw = response_data
+                    logger.info(f"ChatSession directly returned CreateDrumBeat object on attempt {attempt + 1}.")
+                    break
+                else:
+                    last_error = TypeError(f"ChatSession returned unexpected data type for drum patterns: {type(response_data)}. Content: {str(response_data)[:200]}...")
+                    logger.info(f"Error on attempt {attempt + 1}: {last_error}")
+
+            except json.JSONDecodeError as jde:
+                last_error = jde
+                logger.info(f"ERROR on attempt {attempt + 1} (JSONDecodeError) for CreateDrumBeat: {jde}. Raw: '{raw_llm_output_str if raw_llm_output_str else 'N/A'}...'")
+            except Exception as e_pydantic: 
+                last_error = e_pydantic
+                parsed_json_for_error_msg = raw_llm_output_str if raw_llm_output_str else 'N/A (no raw string)'
+                if 'parsed_json_data' in locals() and isinstance(parsed_json_data, dict):
+                     parsed_json_for_error_msg = str(parsed_json_data) # locals() check needed
+                logger.info(f"ERROR on attempt {attempt + 1} (Pydantic/Validation Error) for CreateDrumBeat: {e_pydantic}. Data: {parsed_json_for_error_msg}...")
+            
+            if drum_beat_data_raw: 
+                break
+
+            if attempt < max_retries and last_error:
+                logger.info(f"Preparing for retry attempt {attempt + 2} for CreateDrumBeat...")
+                prev_output_for_retry = (raw_llm_output_str[:500] + '...' if raw_llm_output_str and len(raw_llm_output_str) > 500 else raw_llm_output_str) or 'N/A'
+                retry_instruction = (
+                    f"The previous attempt to generate JSON for CreateDrumBeat failed. "
+                    f"Please carefully review the original request and the following error, then provide a corrected JSON response. "
+                    f"Ensure your entire response is a single, valid JSON object matching the schema, with all keys and string values in double quotes.\\n"
+                    f"Previous Error: {str(last_error)}\\n"
+                    f"Previous Raw Output (possibly truncated):\\n{prev_output_for_retry}\\n\\n"
+                    f"Original request was (please regenerate response based on this original request, incorporating corrections):\\n{focused_prompt}"
+                )
+                current_llm_prompt_for_drums = retry_instruction
+            elif attempt >= max_retries and last_error and not drum_beat_data_raw: # Check last_error here
+                 logger.info(f"All {max_retries + 1} attempts failed for CreateDrumBeat. Last error: {last_error}")
+        
+        if not drum_beat_data_raw:
+            logger.info("All drum beat pattern generation attempts failed. Using empty CreateDrumBeat fallback.")
+            drum_beat_data_raw = CreateDrumBeat(drum_beats=[])
+            
+        drum_beat_data = drum_beat_data_raw
+        # END of new LLM call logic
         
         # 3. Process JSON Data (existing logic)
         if not isinstance(drum_beat_data, CreateDrumBeat):
@@ -956,7 +1044,68 @@ Output only the JSON object."""
 
         logger.info(f"LLM generated drum patterns JSON: {drum_beat_data.model_dump_json() if drum_beat_data else 'None'}")
         # Further validation of patterns can be added here if needed (e.g., ensuring all patterns are 32 booleans)
-        return drum_beat_data
+        
+        logger.info(f"Drum sound keys: {[beat_data.drum_sound_id for beat_data in drum_beat_data.drum_beats]}")
+        logger.info(f"Drum sound map keys: {[key for key in self._drum_sample_id_map.keys()]}")
+        
+        drum_track_id = uuid.uuid4()
+        drum_track = DrumTrackRead(
+            id=drum_track_id,
+            name="Drums",
+        )
+        for beat_data in drum_beat_data.drum_beats:
+            drum_sound_id = beat_data.drum_sound_id
+            pattern = beat_data.pattern * 2
+
+            logger.info(f"Drum sound ID: {drum_sound_id}")
+            logger.info(f"Pattern: {pattern}")
+
+            notes = transform_drum_beats_to_midi_format(pattern)
+            logger.info(f"Notes: {notes}")
+
+            if (
+                not drum_sound_id
+                or not isinstance(pattern, list)
+                or len(pattern) != 64
+            ):
+                logger.warning(
+                    f"Invalid drum beat data received: {beat_data}, skipping."
+                )
+                continue
+
+
+            if drum_sound_id in self._drum_sample_id_map:
+                drum_sample = self._drum_sample_id_map[drum_sound_id]
+                logger.info(
+                    f"Adding drum track for {drum_sample.display_name} (ID: {drum_sound_id})"
+                )
+                sampler_track_id = uuid.uuid4()
+                drum_track.sampler_tracks.append(
+                    SamplerTrackRead(
+                        id=sampler_track_id,
+                        name=drum_sample.display_name,
+                        audio_file_name=drum_sample.file_name,
+                        base_midi_note=settings.audio.DEFAULT_SAMPLER_BASE_NOTE,
+                        grain_size=settings.audio.DEFAULT_SAMPLER_GRAIN_SIZE,
+                        overlap=settings.audio.DEFAULT_SAMPLER_OVERLAP,
+                        audio_file_sample_rate=settings.audio.SAMPLE_RATE,
+                        audio_storage_key=drum_sample.storage_key,
+                        audio_file_format=drum_sample.file_format,
+                        audio_file_size=drum_sample.file_size,
+                        audio_file_duration=drum_sample.duration or 0,
+                        drum_track_id=drum_track_id,
+                        midi_notes_json=notes,
+                    )
+                )
+                drum_track.sampler_track_ids.append(sampler_track_id)
+            else:
+                logger.warning(
+                    f"Drum sound ID '{drum_sound_id}' from LLM response not found in selected drums."
+                )
+
+        logger.info(f"Successfully processed and added drum track: {drum_track}")
+
+        return drum_track
 
     def _sanitize_key_and_mode(self, key: str, mode: str) -> tuple[str, str]:
         """If key is like 'A minor' or 'C major', split it. Always return (tonic, mode)."""
@@ -967,7 +1116,7 @@ Output only the JSON object."""
         return key, mode.lower() if mode else "major"
 
     # --- Main Orchestration Method ---
-    async def run(self, request: SongRequest, model_info: ModelInfo, queue: SSEQueueManager, session: Session) -> SongComposition:
+    async def run(self, request: SongRequest, model_info: ModelInfo, queue: SSEQueueManager, session: Session):
         """Orchestrates the music generation process and returns the final composition. Requires model_info for ChatSession."""
         self.chat_session = ChatSession(
             provider_name=model_info.provider_name,
@@ -1041,27 +1190,11 @@ Output only the JSON object."""
             determined_params=params, 
             drum_research_result=drum_research_result
         )
-
-        # 6. Generate Drum Beat
-        drum_beat_patterns = await self.generate_drum_beat_patterns(
-            determined_params=params,
-            selected_drums_data=selected_drum_sounds
-        )
-
-
-        song_composition = SongComposition(
-            title=params.song_title,
-            key=params.key,
-            mode=params.mode,
-            tempo=params.tempo,
-            chord_progression_str=params.chord_progression,
-            instrument_tracks=[],
-            drum_track_data=None,
-            composition_summary=None
-        )
         
-        logger.info(f"MusicGenerationAgent run finished. Title: {song_composition.title}")
-        return song_composition
+        # 6. Generate Drum Beat
+        await self._generate_drum_beat_patterns_and_send_sse(params, selected_drum_sounds, queue, drum_research_result)
+        
+        logger.info(f"MusicGenerationAgent run finished. Title: {params.song_title}")
 
 # Example of how this agent might be instantiated and used (conceptual)
 # async def main():

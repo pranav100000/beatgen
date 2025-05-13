@@ -36,6 +36,7 @@ class RequestContext(BaseModel):
     status: RequestStatus
     mode: str
     prompt: str
+    model: str
     track_id: Optional[str] = None
     context: Optional[Dict[str, Any]] = None
     task_ref: Optional[Any] = None
@@ -131,6 +132,7 @@ class RequestManager:
         user_id: str,
         mode: str,
         prompt: str,
+        model: str,
         track_id: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> str:
@@ -172,6 +174,7 @@ class RequestManager:
             timestamp=time.time(),
             status=RequestStatus.PENDING,
             mode=mode,
+            model=model,
             prompt=prompt,
             track_id=track_id,
             context=context,
