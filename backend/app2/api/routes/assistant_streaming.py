@@ -39,8 +39,6 @@ from app2.sse.sse_queue_manager import SSEQueueManager
 from app2.core.logging import get_api_logger
 from app2.llm.available_models import ModelInfo
 from app2.llm import available_models
-from services.music_gen_service.music_gen_service3 import music_gen_service3
-from services.music_gen_service.music_gen_service import music_gen_service
 from app2.llm.agents.music_agent import SongRequest, music_agent
 from pydantic import BaseModel
 from app2.infrastructure.database.sqlmodel_client import engine

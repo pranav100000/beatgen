@@ -13,7 +13,7 @@ from app2.models.public_models.instrument_file import InstrumentFileRead
 from app2.llm.agents.music_agent import IntervalMelodyOutput
 from app2.llm.music_gen_service.llm_schemas import MelodyData, Note, Bar
 from app2.llm.music_gen_service.music_utils import get_complete_scale_pitch_classes, get_key_root_midi, get_note_name
-from services.music_gen_service.music_utils import get_root_note_midi
+from app2.llm.music_gen_service.music_utils import get_root_note_midi
 
 logger = logging.getLogger(__name__)
 

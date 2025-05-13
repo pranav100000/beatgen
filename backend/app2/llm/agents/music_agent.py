@@ -1132,7 +1132,7 @@ Output only the JSON object."""
         logger.info(f"Available soundfonts length: {len(self._available_soundfonts)}")
         logger.info(f"Available drum samples length: {len(self._available_drum_samples)}")
         
-        await queue.add_chunk(f"MusicGenerationAgent run started for prompt: '{request.user_prompt}', duration: {request.duration_bars} bars")
+        await queue.add_chunk(f"Doing research for prompt: '{request.user_prompt}'")
         # Pass chat_session to all internal methods that need it
         # ... update all internal calls to use chat_session ...
         # For brevity, only show the start of the method here. The rest of the method and all internal calls must be updated to use chat_session as needed.
