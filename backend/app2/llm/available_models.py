@@ -27,6 +27,13 @@ OPENAI_GPT_3_5_TURBO = ModelInfo(
     api_key_env_var="OPENAI_API_KEY"
 )
 
+OPENAI_GPT_4_1 = ModelInfo(
+    provider_name="openai",
+    display_name="GPT-4.1",
+    model_name="gpt-4.1",
+    api_key_env_var="OPENAI_API_KEY"
+)
+
 OPENAI_GPT_4O = ModelInfo(
     provider_name="openai",
     display_name="GPT-4o",
@@ -41,6 +48,13 @@ OPENAI_GPT_O3 = ModelInfo(
     api_key_env_var="OPENAI_API_KEY"
 )
 
+OPENAI_GPT_O3_MINI = ModelInfo(
+    provider_name="openai",
+    display_name="o3-mini",
+    model_name="o3-mini",
+    api_key_env_var="OPENAI_API_KEY"
+)
+
 ANTHROPIC_CLAUDE_3_7_SONNET = ModelInfo(
     provider_name="anthropic",
     display_name="Claude 3.7 Sonnet",
@@ -48,12 +62,20 @@ ANTHROPIC_CLAUDE_3_7_SONNET = ModelInfo(
     api_key_env_var="ANTHROPIC_API_KEY"
 )
 
-GOOGLE_GEMINI_FLASH = ModelInfo(
+GOOGLE_GEMINI_PRO = ModelInfo(
     provider_name="google-gla",
     display_name="Gemini Pro 2.5",
     model_name="gemini-2.5-pro-exp-03-25",
     api_key_env_var="GEMINI_API_KEY"
 )
+
+GOOGLE_GEMINI_FLASH = ModelInfo(
+    provider_name="google-gla",
+    display_name="Gemini Flash 2.5",
+    model_name="gemini-2.5-flash-preview-04-17",
+    api_key_env_var="GEMINI_API_KEY"
+)
+
 
 OPENROUTER_DEEPSEEK_R1 = ModelInfo(
     provider_name="openrouter", 
@@ -101,23 +123,29 @@ ALL_MODELS = [
 
 def get_model_by_name(model_name: str) -> ModelInfo:
     match model_name:
-        case "gpt-3.5-turbo":
+        case "GPT-3.5 Turbo":
             return OPENAI_GPT_3_5_TURBO
-        case "gpt-4o":
+        case "GPT-4o":
             return OPENAI_GPT_4O
         case "o3":
             return OPENAI_GPT_O3
-        case "claude-3.7-sonnet":
+        case "o3-mini":
+            return OPENAI_GPT_O3_MINI
+        case "GPT-4.1":
+            return OPENAI_GPT_4_1
+        case "Claude 3.7 Sonnet":
             return ANTHROPIC_CLAUDE_3_7_SONNET
-        case "gemini-2.5-pro":
+        case "Gemini Pro 2.5":
+            return GOOGLE_GEMINI_PRO
+        case "Gemini Flash 2.5":
             return GOOGLE_GEMINI_FLASH
-        case "deepseek-r1":
+        case "Deepseek R1":
             return OPENROUTER_DEEPSEEK_R1
-        case "deepseek-v3":
+        case "Deepseek V3":
             return OPENROUTER_DEEPSEEK_V3
-        case "llama-4-maverick":
+        case "Llama 4 Maverick":
             return OPENROUTER_LLAMA_4_MAVERICK
-        case "llama-4-scout":
+        case "Llama 4 Scout":
             return OPENROUTER_LLAMA_4_SCOUT
         case _:
             raise ValueError(f"Model not found: {model_name}")

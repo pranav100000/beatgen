@@ -320,6 +320,16 @@ class AuthService:
             ServiceException: If the authentication fails
         """
         logger.info(f"[START] Received Google OAuth callback with code: {code[:10]}...")
+        logger.info(f"[PROD DEBUG] Handling Google Callback. Code: {code[:10]}...")
+        logger.info(f"[PROD DEBUG] Request cookies: {request.cookies}") # Log all received cookies
+
+        retrieved_pkce_verifier = request.cookies.get("google_pkce_verifier")
+        logger.info(f"[PROD DEBUG] Retrieved PKCE verifier from cookie: {retrieved_pkce_verifier}")
+        
+        if not retrieved_pkce_verifier:
+            logger.error("[Service] PKCE verifier cookie 'google_pkce_verifier' not found in callback.")
+            raise ServiceException("PKCE_REDIRECT::PKCE verifier cookie 'google_pkce_verifier' not found in callback.")
+
         try:
             logger.info("Handling Google OAuth callback (PKCE handled by library)")
 

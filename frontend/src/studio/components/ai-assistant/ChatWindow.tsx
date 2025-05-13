@@ -56,7 +56,7 @@ interface ChatWindowProps {
 }
 
 // Define available AI models (placeholder)
-const AVAILABLE_MODELS = ["deepseek-r1", "deepseek-v3", "claude-3.7-sonnet", "gpt-4o", "o3", "gemini-2.5-pro", "llama-4-maverick", "llama-4-scout"];
+const AVAILABLE_MODELS = ["Deepseek R1", "Deepseek V3", "Claude 3.7 Sonnet", "GPT-4.1", "GPT-4o", "o3", "o3-mini", "Gemini Pro 2.5", "Gemini Flash 2.5", "Llama 4 Maverick", "Llama 4 Scout"];
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
   const theme = useTheme();
