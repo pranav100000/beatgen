@@ -305,12 +305,13 @@ class AuthService:
                 key="google_pkce_verifier",
                 value=pkce_verifier,
                 httponly=True,
-                samesite=current_samesite_setting,  # DIAGNOSTIC: Changed from "lax"
+                samesite=current_samesite_setting,
                 max_age=300,
-                secure=effective_secure_flag,     # IMPORTANT: Must be True with SameSite=None in prod
+                secure=effective_secure_flag,
                 path="/auth",
+                domain="beatgen-api.onrender.com"  # EXPLICITLY SET DOMAIN
             )
-            logger.info(f"PKCE verifier stored in cookie. Verifier: {pkce_verifier[:10]}..., SameSite: {current_samesite_setting}, Secure: {effective_secure_flag}")
+            logger.info(f"PKCE verifier stored in cookie. Verifier: {pkce_verifier[:10]}..., SameSite: {current_samesite_setting}, Secure: {effective_secure_flag}, Domain: beatgen-api.onrender.com")
 
             generated_url = auth_response.url
             logger.info(f"Generated OAuth URL: {generated_url[:30]}...")
@@ -395,10 +396,11 @@ class AuthService:
                 response.delete_cookie(
                     key="google_pkce_verifier",
                     path="/auth",
-                    secure=delete_secure_flag,      # Match setting
-                    samesite=current_samesite_for_delete   # Match setting
+                    secure=delete_secure_flag,
+                    samesite=current_samesite_for_delete,
+                    domain="beatgen-api.onrender.com"  # MATCH EXPLICIT DOMAIN
                 )
-                logger.info(f"PKCE verifier cookie (SameSite={current_samesite_for_delete} attempt) deleted. Secure: {delete_secure_flag}")
+                logger.info(f"PKCE verifier cookie (SameSite={current_samesite_for_delete}, Domain=beatgen-api.onrender.com attempt) deleted. Secure: {delete_secure_flag}")
             else:
                 logger.warning("Response object not available to delete PKCE verifier cookie.")
 
