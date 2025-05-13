@@ -193,7 +193,7 @@ class RequestManager:
         self._user_requests[user_id].add(request_id)
 
         logger.info(
-            f"🔵 REQUEST_MANAGER - Created request {request_id} for user {user_id}, mode: {mode}"
+            f"🔵 REQUEST_MANAGER (Instance: {id(self)}) - Created request {request_id} for user {user_id}, mode: {mode}"
         )
         logger.info(
             f"🔵 REQUEST_MANAGER - Active requests for user {user_id}: {self._user_requests[user_id]}"
@@ -282,12 +282,12 @@ class RequestManager:
         # Check if request exists
         request = self._requests.get(request_id)
         if not request:
-            logger.error(f"Request {request_id} not found")
+            logger.error(f"Request {request_id} not found in RequestManager (Instance: {id(self)})")
             return False
 
         # Check user if provided
         if user_id and request.user_id != user_id:
-            logger.error(f"Request {request_id} not found for user {user_id}")
+            logger.error(f"Request {request_id} not found for user {user_id} in RequestManager (Instance: {id(self)})")
             return False
 
         return True
