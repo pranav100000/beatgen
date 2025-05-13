@@ -63,6 +63,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [animatedDots, setAnimatedDots] = useState(''); // New state for animated dots
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState('Generate');
   const [modeAnchorEl, setModeAnchorEl] = useState<null | HTMLElement>(null);
@@ -156,6 +157,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+  
+  // Effect for animating dots in placeholder when loading
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    if (isLoading) {
+      const dotStates = ['', '.', '..', '...'];
+      let currentStateIndex = 0;
+      setAnimatedDots(dotStates[currentStateIndex]); // Initial state
+
+      intervalId = setInterval(() => {
+        currentStateIndex = (currentStateIndex + 1) % dotStates.length;
+        setAnimatedDots(dotStates[currentStateIndex]);
+      }, 500); // Update every half a second
+    } else {
+      setAnimatedDots(''); // Reset dots when not loading
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isLoading]);
   
   // Set up callbacks for streaming
   const setupStreamCallbacks = (): StreamCallbacks => {
@@ -1107,7 +1131,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             <TextField
               fullWidth
               multiline
-              placeholder="Ask me anything about your project..."
+              placeholder={isLoading ? `Generating${animatedDots}` : "Ask me anything about your project..."}
               value={prompt}
               onChange={handleTextChange}
               onKeyDown={(e) => {
