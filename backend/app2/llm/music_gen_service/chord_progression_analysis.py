@@ -1,3 +1,4 @@
+from decimal import Decimal
 from music21 import pitch, key, harmony, roman
 
 
@@ -147,7 +148,7 @@ def analyze_chord_progression(chord_progression, key_str):
 
             # Calculate weight
             weight = calculate_note_weight(note_properties, chord_function, rn)
-            chord_data["note_weights"][note_name] = weight
+            chord_data["note_weights"][note_name] = float(round(Decimal(weight), 4))
 
         melody_data.append(chord_data)
 

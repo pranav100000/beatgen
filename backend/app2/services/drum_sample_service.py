@@ -228,7 +228,7 @@ class DrumSampleService:
             )
             logger.info(f"Successfully created upload URL for drum sample {file_id}")
             return upload_info
-        except StorageException:
+        except StorageException as e:
             logger.error(
                 f"Storage error creating upload URL for drum sample {file_id}: {str(e)}"
             )

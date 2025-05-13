@@ -19,29 +19,29 @@ from app2.models.public_models.instrument_file import InstrumentFileRead
 from app2.models.track_models.sampler_track import SamplerTrackRead
 from app2.models.track_models.drum_track import DrumTrackRead
 from app2.models.public_models.drum_samples import DrumSamplePublicRead
-from services.music_gen_service.chord_progression_analysis import (
+from app2.llm.music_gen_service.chord_progression_analysis import (
     analyze_chord_progression,
 )
 from services.soundfont_service.soundfont_service import soundfont_service
 from clients.anthropic_client import AnthropicClient
-from services.music_gen_service.midi import (
+from app2.llm.music_gen_service.midi import (
     transform_bars_to_instrument_format,
     transform_chord_progression_to_instrument_format,
     transform_drum_beats_to_midi_format,
 )
-from services.music_gen_service.music_utils import get_mode_intervals
-from services.music_gen_service.music_gen_tools import (
+from app2.llm.music_gen_service.music_utils import get_mode_intervals
+from app2.llm.music_gen_service.music_gen_tools import (
     CREATE_MELODY_TOOL,
     DETERMINE_MUSICAL_PARAMETERS_TOOL,
     SELECT_DRUM_SOUNDS_TOOL,
     SELECT_INSTRUMENTS_TOOL,
     CREATE_DRUM_BEAT_TOOL,
 )
-from services.music_gen_service.prompt_utils import (
+from app2.llm.music_gen_service.prompt_utils import (
     get_ai_composer_agent_initial_system_prompt,
     get_melody_create_prompt,
 )
-from services.music_gen_service.music_researcher import MusicResearcher
+from app2.llm.music_gen_service.music_researcher import MusicResearcher
 import re
 from sqlmodel import Session
 from app2.core.config import settings
@@ -540,7 +540,7 @@ After your explanation, use the 'create_drum_beat' tool to provide the patterns.
             drum_track_id = uuid.uuid4()
             drum_track = DrumTrackRead(
                 id=drum_track_id,
-                name="drum_track",
+                name="Drums",
             )
             for beat_data in drum_patterns:
                 drum_sound_id = beat_data.get("drum_sound_id")

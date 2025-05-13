@@ -6,7 +6,7 @@ from app2.types.assistant_actions import AssistantAction
 
 class AssistantRequestBase(BaseModel):
     """Base request data for the AI assistant"""
-
+    model: str
     prompt: str
     project_id: Optional[str] = None
     context: Optional[Dict[str, Any]] = None
@@ -106,7 +106,6 @@ class EditResponse(AssistantResponseBase):
 # Legacy models for backward compatibility
 class AssistantRequest(AssistantRequestBase):
     """Request data for the AI assistant (legacy)"""
-
     track_id: Optional[str] = None
 
 

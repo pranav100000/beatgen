@@ -36,7 +36,15 @@ const ChatModelMenu: React.FC<ChatModelMenuProps> = ({ anchorEl, open, onClose, 
       }}
     >
       {models.map((model) => (
-        <MenuItem key={model} onClick={() => handleSelect(model)}>
+        <MenuItem 
+          key={model} 
+          onClick={() => handleSelect(model)}
+          sx={{ 
+            paddingTop: '2px', // Further reduced padding
+            paddingBottom: '2px', // Further reduced padding
+            fontSize: '0.75rem' // Smaller font size
+          }}
+        >
           {model}
         </MenuItem>
       ))}

@@ -34,8 +34,26 @@ const ChatModeMenu: React.FC<ChatModeMenuProps> = ({ anchorEl, open, onClose, on
         }
       }}
     >
-      <MenuItem onClick={() => handleSelect('generate')}>Generate</MenuItem>
-      <MenuItem onClick={() => handleSelect('edit')}>Edit</MenuItem>
+      <MenuItem 
+        onClick={() => handleSelect('generate')}
+        sx={{ 
+          paddingTop: '4px',      // Adjusted padding
+          paddingBottom: '4px',   // Adjusted padding
+          fontSize: '0.7rem'      // Matched font size from MenuChip
+        }}
+      >
+        Generate
+      </MenuItem>
+      <MenuItem 
+        onClick={() => handleSelect('edit')}
+        sx={{ 
+          paddingTop: '4px',      // Adjusted padding
+          paddingBottom: '4px',   // Adjusted padding
+          fontSize: '0.7rem'      // Matched font size from MenuChip
+        }}
+      >
+        Edit
+      </MenuItem>
     </Menu>
   );
 };

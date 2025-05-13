@@ -7,6 +7,7 @@ This implementation uses a request manager to track active requests and
 provides streaming responses with proper resource management.
 """
 
+from dotenv import load_dotenv
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -36,8 +37,9 @@ from app2.sse.request_manager import request_manager, RequestStatus
 from app2.sse.sse import SSEManager
 from app2.sse.sse_queue_manager import SSEQueueManager
 from app2.core.logging import get_api_logger
-from services.music_gen_service.music_gen_service3 import music_gen_service3
-from services.music_gen_service.music_gen_service import music_gen_service
+from app2.llm.available_models import ModelInfo
+from app2.llm import available_models
+from app2.llm.agents.music_agent import SongRequest, music_agent
 from pydantic import BaseModel
 from app2.infrastructure.database.sqlmodel_client import engine
 from sqlmodel import Session
@@ -51,6 +53,7 @@ router = APIRouter()
 # Initialize SSE manager
 sse_manager = SSEManager(heartbeat_interval=20)
 
+load_dotenv()
 
 # Request schema for unified assistant endpoint
 class AssistantRequestModel(AssistantRequest):
@@ -108,6 +111,7 @@ async def create_assistant_request(
                 "id"
             ),  # This should match what we use in the stream endpoint
             mode=request.mode,
+            model=request.model,
             prompt=request.prompt,
             track_id=request.track_id,
             context=request.context,
@@ -342,33 +346,49 @@ async def process_generate_request(
 
     # Generate music with music_gen_service, passing the session
     try:
-        response = await music_gen_service.compose_music(
-            context.prompt, sse_queue, session
+        # response = await music_gen_service.compose_music(
+        #     context.prompt, sse_queue, session
+        # )
+        selected_model_info = available_models.get_model_by_name(context.model)
+        selected_model_info.api_key = selected_model_info.get_api_key()
+        logger.info(f"Selected model: {selected_model_info}")
+        response = await music_agent.run(
+            SongRequest(user_prompt=context.prompt,
+                        duration_bars=4),
+            model_info=selected_model_info,
+            queue=sse_queue,
+            session=session
         )
-        logger.info(
-            f"Music generation complete: {len(response.get('instruments', []))} instruments"
-        )
-        logger.info(f"Response: {response}")
-        # Extract first instrument
-        if response.get("instruments") and len(response["instruments"]) > 0:
-            tracks = []
-            actions = []
-            logger.info(f"Response instruments: {response['instruments']}")
-            for instrument in response["instruments"]:
-                if not instrument.get("notes"):
-                    continue
-                logger.info(f"Adding instrument: {instrument}")
+        
+        # logger.info(
+        #     f"Music generation complete: {len(response.get('instruments', []))} instruments"
+        # )
+        # logger.info(f"Response: {response}")
+        # # Extract first instrument
+        # if response.get("instruments") and len(response["instruments"]) > 0:
+        #     tracks = []
+        #     actions = []
+        #     logger.info(f"Response instruments: {response['instruments']}")
+        #     for instrument in response["instruments"]:
+        #         if not instrument.get("notes"):
+        #             continue
+        #         logger.info(f"Adding instrument: {instrument}")
 
-            # Create final response
-            final_response = GenerateResponse(
-                response=json.dumps(response), tracks=tracks, actions=actions
-            )
+        #     # Create final response
+        #     final_response = GenerateResponse(
+        #         response=json.dumps(response), tracks=tracks, actions=actions
+        #     )
 
             # Send complete event
-            await sse_queue.complete(final_response.model_dump())
-            logger.info(f"Generate request completed successfully: {request_id}")
-        else:
-            raise ValueError("No instruments returned from music generation service")
+        # Send the final composition data before completing the stream
+        # Assuming 'response' is the SongComposition object returned by the agent
+        # and sse_queue has a method to send the final structured data.
+        # We'll use model_dump() to serialize the Pydantic model.
+        # The event name "final_composition" is arbitrary, adjust as needed for frontend.
+        
+        # Now signal that the entire process is complete
+        await sse_queue.complete({})
+        logger.info(f"Generate request completed successfully: {request_id}")
 
     except Exception as gen_error:
         logger.error(f"Error in music generation: {gen_error}")

@@ -8,11 +8,13 @@ from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 import asyncio
 
-from app2.core.logging import get_api_logger
-from clients.perplexity_client import PerplexityClient
+from app2.llm.music_gen_service.perplexity_client import PerplexityClient
+
+# from app2.core.logging import get_api_logger
+# from clients.perplexity_client import PerplexityClient
 
 # Set up detailed logging with DEBUG level
-logger = get_api_logger("music_researcher")
+logger = logging.getLogger("music_researcher")
 logger.setLevel(logging.DEBUG)
 
 # If no handlers, add one to ensure logs are visible
@@ -218,6 +220,7 @@ class MusicResearcher:
                 - Most common drum sounds used in this style ranked by popularity
                 - Details about why each drum sound is used in this style
                 - References to specific tracks that use these drum sounds
+                - How the drum sounds are used rhythmically in this style (what beats the drum sounds typically play on)
                 
                 Format your response as a simple set of bullet points under clear headings.
                 Be specific and concise with factual information.""",

@@ -28,6 +28,7 @@ export interface TrackData {
 export interface AssistantRequestOptions {
   prompt: string;
   mode: 'generate' | 'edit' | 'chat';
+  model: string;
   track_id?: string;
   project_id?: string;
   style?: string;
@@ -308,156 +309,159 @@ export const interactWithAssistant = async (
 /**
  * Interface for streaming edit event callbacks (legacy)
  */
-export interface EditStreamCallbacks extends StreamCallbacks {
-  // Maintained for backward compatibility
-}
+// export interface EditStreamCallbacks extends StreamCallbacks {
+//   // Maintained for backward compatibility
+// }
 
-/**
- * Interact with the AI assistant using streaming updates (legacy)
- * 
- * @deprecated Use interactWithAssistant() instead
- */
-export const streamAssistant = (
-  prompt: string,
-  mode: 'generate' | 'edit' | 'chat',
-  callbacks: StreamCallbacks,
-  trackId?: string,
-  context?: Record<string, any>
-): { close: () => void } => {
-  // Create options object for the new API
-  const options: AssistantRequestOptions = {
-    prompt,
-    mode,
-    track_id: trackId,
-    context
-  };
+// /**
+//  * Interact with the AI assistant using streaming updates (legacy)
+//  * 
+//  * @deprecated Use interactWithAssistant() instead
+//  */
+// export const streamAssistant = (
+//   prompt: string,
+//   mode: 'generate' | 'edit' | 'chat',
+//   callbacks: StreamCallbacks,
+//   model?: string,
+//   trackId?: string,
+//   context?: Record<string, any>
+// ): { close: () => void } => {
+//   // Create options object for the new API
+//   const options: AssistantRequestOptions = {
+//     prompt,
+//     mode,
+//     track_id: trackId,
+//     context
+//   };
   
-  // Use the new combined function
-  interactWithAssistant(options, callbacks)
-    .catch(error => {
-      console.error('Legacy streamAssistant error:', error);
-      callbacks.onError?.(error);
-    });
+//   // Use the new combined function
+//   interactWithAssistant(options, callbacks)
+//     .catch(error => {
+//       console.error('Legacy streamAssistant error:', error);
+//       callbacks.onError?.(error);
+//     });
   
-  // Return a placeholder close function that will be replaced
-  // once interactWithAssistant resolves
-  let realClose: () => void = () => {};
+//   // Return a placeholder close function that will be replaced
+//   // once interactWithAssistant resolves
+//   let realClose: () => void = () => {};
   
-  return {
-    close: () => realClose()
-  };
-};
+//   return {
+//     close: () => realClose()
+//   };
+// };
 
-/**
- * Edit a track with streaming updates (legacy)
- * 
- * @deprecated Use interactWithAssistant() instead
- */
-export const editTrackStream = (
-  prompt: string,
-  trackId: string,
-  callbacks: EditStreamCallbacks,
-  editType?: string,
-  context?: Record<string, any>
-): { close: () => void } => {
-  return streamAssistant(
-    prompt,
-    editType === 'generate' ? 'generate' : 'edit',
-    callbacks,
-    trackId,
-    context
-  );
-};
+// /**
+//  * Edit a track with streaming updates (legacy)
+//  * 
+//  * @deprecated Use interactWithAssistant() instead
+//  */
+// export const editTrackStream = (
+//   prompt: string,
+//   trackId: string,
+//   callbacks: EditStreamCallbacks,
+//   model?: string,
+//   editType?: string,
+//   context?: Record<string, any>
+// ): { close: () => void } => {
+//   return streamAssistant(
+//     prompt,
+//     editType === 'generate' ? 'generate' : 'edit',
+//     callbacks,
+//     model,
+//     trackId,
+//     context
+//   );
+// };
 
-/**
- * Generate tracks using the AI assistant (legacy)
- * 
- * @deprecated Use interactWithAssistant() instead
- */
-export const generateTracks = async (
-  prompt: string,
-  style?: string,
-  numTracks: number = 1,
-  context?: Record<string, any>
-): Promise<GenerateResponse> => {
-  try {
-    // Use the new API instead
-    const options: AssistantRequestOptions = {
-      prompt,
-      mode: 'generate',
-      style,
-      context: {
-        ...context,
-        num_tracks: numTracks
-      }
-    };
+// /**
+//  * Generate tracks using the AI assistant (legacy)
+//  * 
+//  * @deprecated Use interactWithAssistant() instead
+//  */
+// export const generateTracks = async (
+//   prompt: string,
+//   style?: string,
+//   numTracks: number = 1,
+//   context?: Record<string, any>
+// ): Promise<GenerateResponse> => {
+//   try {
+//     // Use the new API instead
+//     const options: AssistantRequestOptions = {
+//       prompt,
+//       mode: 'generate',
+//       style,
+//       context: {
+//         ...context,
+//         num_tracks: numTracks
+//       }
+//     };
     
-    // Create a Promise that will resolve when we get the complete event
-    return new Promise((resolve, reject) => {
-      interactWithAssistant(options, {
-        onComplete: (response) => {
-          resolve(response);
-        },
-        onError: (error) => {
-          reject(error);
-        }
-      }).catch(reject);
-    });
-  } catch (error) {
-    console.error('Error generating tracks with AI:', error);
+//     // Create a Promise that will resolve when we get the complete event
+//     return new Promise((resolve, reject) => {
+//       interactWithAssistant(options, {
+//         onComplete: (response) => {
+//           resolve(response);
+//         },
+//         onError: (error) => {
+//           reject(error);
+//         }
+//       }).catch(reject);
+//     });
+//   } catch (error) {
+//     console.error('Error generating tracks with AI:', error);
     
-    // Return a fallback response
-    return {
-      response: "Sorry, I encountered an error generating tracks. Please try again later.",
-      tracks: []
-    };
-  }
-};
+//     // Return a fallback response
+//     return {
+//       response: "Sorry, I encountered an error generating tracks. Please try again later.",
+//       tracks: []
+//     };
+//   }
+// };
 
-/**
- * Edit a track using the AI assistant (legacy)
- * 
- * @deprecated Use interactWithAssistant() instead
- */
-export const editTrack = async (
-  prompt: string,
-  trackId: string,
-  editType?: string,
-  context?: Record<string, any>
-): Promise<EditResponse> => {
-    try {
-      // Use the new API instead
-      const options: AssistantRequestOptions = {
-        prompt,
-        mode: 'edit',
-        track_id: trackId,
-        context: {
-          ...context,
-          edit_type: editType
-        }
-      };
+// /**
+//  * Edit a track using the AI assistant (legacy)
+//  * 
+//  * @deprecated Use interactWithAssistant() instead
+//  */
+// export const editTrack = async (
+//   prompt: string,
+//   trackId: string,
+//   editType?: string,
+//   context?: Record<string, any>
+// ): Promise<EditResponse> => {
+//     try {
+//       // Use the new API instead
+//       const options: AssistantRequestOptions = {
+//         prompt,
+//         mode: 'edit',
+//         track_id: trackId,
+//         context: {
+//           ...context,
+//           edit_type: editType
+//         }
+//       };
       
-      // Create a Promise that will resolve when we get the complete event
-      return new Promise((resolve, reject) => {
-        interactWithAssistant(options, {
-          onComplete: (response) => {
-            resolve(response);
-          },
-          onError: (error) => {
-            reject(error);
-          }
-        }).catch(reject);
-      });
-    } catch (error) {
-        console.error('Error editing track with AI:', error);
+//       // Create a Promise that will resolve when we get the complete event
+//       return new Promise((resolve, reject) => {
+//         interactWithAssistant(options, {
+//           onComplete: (response) => {
+//             resolve(response);
+//           },
+//           onError: (error) => {
+//             reject(error);
+//           }
+//         }).catch(reject);
+//       });
+//     } catch (error) {
+//         console.error('Error editing track with AI:', error);
         
-        // Return a fallback response with an empty track
-        return {
-          response: "Sorry, I encountered an error editing the track. Please try again later.",
-          track: {
-              track_id: trackId,
-              notes: []
-          }
-        };
-    }
-};
+//         // Return a fallback response with an empty track
+//         return {
+//           response: "Sorry, I encountered an error editing the track. Please try again later.",
+//           track: {
+//               track_id: trackId,
+//               notes: []
+//           }
+//         };
+//     }
+// };

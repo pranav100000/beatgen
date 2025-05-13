@@ -13,15 +13,9 @@ import {IconX} from '@tabler/icons-react';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { 
-  generateTracks, 
-  editTrack,
-  editTrackStream,
-  streamAssistant,
   interactWithAssistant,
   cancelAssistantRequest,
-  EditStreamCallbacks,
   StreamCallbacks,
-  TrackData
 } from '../../../platform/api/assistant';
 import { historyManager } from '../../core/state/history/HistoryManager';
 import { useStudioStore } from '../../stores/studioStore';
@@ -62,7 +56,7 @@ interface ChatWindowProps {
 }
 
 // Define available AI models (placeholder)
-const AVAILABLE_MODELS = ["Claude Sonnet", "GPT-4o", "Gemini Pro"];
+const AVAILABLE_MODELS = ["deepseek-r1", "deepseek-v3", "claude-3.7-sonnet", "gpt-4o", "o3", "gemini-2.5-pro"];
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
   const theme = useTheme();
@@ -373,6 +367,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
       }
     };
   };
+
+  const handleCancel = async () => {
+    if (currentRequestId) {
+      try {
+        await cancelAssistantRequest(currentRequestId);
+        setCurrentRequestId(null);
+      } catch (err) {
+        console.error('Error cancelling request:', err);
+      }
+    }
+  }
   
   // Handle sending message to the AI
   const handleSend = async () => {
@@ -388,12 +393,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
       
       // Also cancel the request on the server if we have a request ID
       if (currentRequestId) {
-        try {
-          await cancelAssistantRequest(currentRequestId);
-          setCurrentRequestId(null);
-        } catch (err) {
-          console.error('Error cancelling request:', err);
-        }
+        handleCancel();
       }
       return;
     }
@@ -423,6 +423,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
         {
           prompt,
           mode: apiMode,
+          model: selectedModel,
           track_id: trackId,
           context: { // Pass selected model in context
             model: selectedModel 
@@ -1180,7 +1181,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
               {/* Send/Cancel Chip - Bottom Right */}
               <MenuChip 
                 label={isLoading ? "Cancel" : "Send"}
-                onClick={handleSend}
+                onClick={isLoading ? handleCancel : handleSend}
                 disabled={!prompt.trim() && !isLoading}
                 color={isLoading ? 'secondary' : 'primary'}
               />

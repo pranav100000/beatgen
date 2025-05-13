@@ -4,7 +4,7 @@ DETERMINE_MUSICAL_PARAMETERS_TOOL = {
         This tool will set the musical parameters for the composition. Every other tool will use these parameters.
         Based on the research you were provided, determine appropriate musical parameters: (MOST IMPORTANT) chord progression (e.g. C-G-Am-F),  key (e.g. C, Db, G#), tempo (in BPM), and mode (e.g. major, minor, harmonic minor, etc.) for a given music description.
         Most important is the chord progression. The key and mode should be based on the chord progression. The tempo should be based on the chord progression and the description.
-        IMPORTANT: if the description provided (not the research) provides a tempo, key, mode, or chord progression
+        <CRITICAL_INSTRUCTION> if the description provided (not the research) provides a tempo, key, mode, or chord progression, use that. </CRITICAL_INSTRUCTION>
         """,
     "input_schema": {
         "type": "object",
@@ -27,11 +27,11 @@ DETERMINE_MUSICAL_PARAMETERS_TOOL = {
             },
             "melody_instrument": {
                 "type": "string",
-                "description": "The instrument that will play the melody (e.g. 'Piano', 'Violin') IMPORTANT: The instrument you select must be out of the list of available instruments.",
+                "description": "The instrument that will play the melody (e.g. 'Piano', 'Violin') <CRITICAL_INSTRUCTION> The instrument you select must be out of the list of available instruments.</CRITICAL_INSTRUCTION>",
             },
             "chords_instrument": {
                 "type": "string",
-                "description": "The instrument that will play the chords (e.g. 'Piano', 'Violin') IMPORTANT: The instrument you select must be out of the list of available instruments.    ",
+                "description": "The instrument that will play the chords (e.g. 'Piano', 'Violin') <CRITICAL_INSTRUCTION> The instrument you select must be out of the list of available instruments.</CRITICAL_INSTRUCTION>",
             },
         },
         "required": [
