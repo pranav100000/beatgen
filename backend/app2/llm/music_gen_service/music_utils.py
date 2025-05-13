@@ -166,6 +166,18 @@ def get_scale_pitch_classes(key_name: str, mode_name: str) -> set[int]:
         
     return allowed_pitch_classes
 
+def get_key_root_midi(key_name: str, octave: int) -> int:
+    note_map = {'C': 0, 'C#': 1, 'DB': 1, 'D': 2, 'D#': 3, 'EB': 3, 'E': 4, 'F': 5, 
+                'F#': 6, 'GB': 6, 'G': 7, 'G#': 8, 'AB': 8, 'A': 9, 'A#': 10, 'BB': 10, 'B': 11}
+    base_midi_for_octave = {3: 48, 4: 60, 5: 72}
+    note_offset = note_map.get(key_name.upper(), 0)
+    return base_midi_for_octave.get(octave, 60) + note_offset
+
+def get_note_name(pitch_class: int) -> str:
+    # Helper to convert pitch class (0-11) to note name (C, C#, D, etc.)
+    note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    return note_names[pitch_class % 12]
+
 
 def validate_melody_in_key(melody_data: MelodyData, key_name: str, mode_name: str) -> bool:
     """

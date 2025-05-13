@@ -24,11 +24,11 @@ from services.music_gen_service.chord_progression_analysis import (
 )
 from services.soundfont_service.soundfont_service import soundfont_service
 from clients.anthropic_client import AnthropicClient
-from services.music_gen_service.midi import (
-    transform_bars_to_instrument_format,
-    transform_chord_progression_to_instrument_format,
-    transform_drum_beats_to_midi_format,
-)
+# from services.music_gen_service.midi import (
+#     transform_bars_to_instrument_format,
+#     transform_chord_progression_to_instrument_format,
+#     transform_drum_beats_to_midi_format,
+# )
 from services.music_gen_service.music_utils import get_mode_intervals
 from services.music_gen_service.music_gen_tools import (
     CREATE_MELODY_TOOL,

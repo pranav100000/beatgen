@@ -165,9 +165,10 @@ class ChatSession:
 
         response_content_for_history: Any
         if stream:
-            async def stream_wrapper(queue: SSEQueueManager) -> AsyncGenerator[AnyStreamEvent, None]:
+            async def stream_wrapper() -> AsyncGenerator[AnyStreamEvent, None]:
                 nonlocal response_content_for_history
                 full_response_text_chunks = []
+                last_yielded_text = "" # For calculating true deltas
                 try:
                     async_gen = await self.adapter.send_message_async(
                         user_prompt=user_prompt_content,
@@ -176,34 +177,41 @@ class ChatSession:
                         model_settings=final_model_settings,
                         usage_limits=final_usage_limits
                     )
-                    # Ensure async_gen is an async generator, not None or other type
                     if not hasattr(async_gen, '__aiter__'):
                         raise TypeError("Adapter did not return an async generator for streaming.")
                         
                     async for event in async_gen:
                         if isinstance(event, TextDeltaEvent):
-                            full_response_text_chunks.append(event.delta)
-                        # We yield the raw event for the consumer
-                        queue.add_chunk(event.delta)
-                        yield event
+                            # Adapter provides event.delta, which might be full text or true delta
+                            # We will calculate the true delta to yield for streaming to frontend
+                            current_chunk_from_adapter = event.delta
+                            full_response_text_chunks.append(current_chunk_from_adapter) # For history, always append what adapter gave
+
+                            actual_delta_to_yield = ""
+                            if current_chunk_from_adapter.startswith(last_yielded_text):
+                                actual_delta_to_yield = current_chunk_from_adapter[len(last_yielded_text):]
+                            else:
+                                # Discontinuity or first chunk, yield the whole current chunk from adapter as is
+                                actual_delta_to_yield = current_chunk_from_adapter 
+                            
+                            if actual_delta_to_yield: # Only yield if there's new text
+                                yield actual_delta_to_yield # Yielding the string delta
+                            
+                            last_yielded_text = current_chunk_from_adapter # Update tracker with the full chunk received
+                        
+                        # else: # Handle other event types if necessary, e.g., tool calls from adapter
+                        #     yield event # Yield other event types as is
+
                     response_content_for_history = "".join(full_response_text_chunks)
                 except Exception as e:
-                    # For history, record an error message. The raw error event is also yielded.
                     response_content_for_history = f"Error during streaming: {e}"
                     self.message_history.add_message(role="assistant", content=response_content_for_history)
-                    raise # Re-raise the exception to the caller of send_message_async
+                    raise
                 else:
-                    # Add the complete assistant text message to history after successful streaming
-                    # if any text was actually produced.
-                    if response_content_for_history or not full_response_text_chunks:
-                        # The condition ensures we add even if response_content_for_history is empty
-                        # (e.g. only tool calls, no final text from LLM), or if there was an error string.
-                        # If it was an error, it's already added. If successful and empty, we might not want to add.
-                        # Let's refine: only add if there was actual text output.
-                        if full_response_text_chunks: # only add if there was actual text output
-                             self.message_history.add_message(role="assistant", content=response_content_for_history)
+                    if full_response_text_chunks:
+                         self.message_history.add_message(role="assistant", content=response_content_for_history)
             
-            return stream_wrapper(self.queue)
+            return stream_wrapper()
         else:
             response_content_for_history = await self.adapter.send_message_async(
                 user_prompt=user_prompt_content,
@@ -220,9 +228,11 @@ class ChatSession:
                 try:
                     # Just test if it parses, but return the string
                     json_object = json.loads(response_content_for_history)
-                    if isinstance(json_object, list):
-                        response_content_for_history = json.dumps(json_object[0])
-                        json.loads(response_content_for_history)
+                    # The string response_content_for_history has successfully parsed.
+                    # Whether json_object is a list or dict, response_content_for_history is the
+                    # string that yielded it. This string is what we want to return.
+                    # No further modification of response_content_for_history is needed here.
+                    # The old problematic block for list handling is removed.
                     print(f"DEBUG: JSON loaded successfully: {response_content_for_history}")
                     return response_content_for_history
                 except json.JSONDecodeError:
