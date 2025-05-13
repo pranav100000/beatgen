@@ -25,23 +25,20 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
   const theme = useTheme(); // Get the MUI theme object
 
   // Determine colors based on theme.palette.mode
-  const bubbleBgColor = theme.palette.mode === 'light'
-    ? '#e5e5ea' // iMessage light grey for light mode
-    : theme.palette.grey[800]; // Darker grey for dark mode
-
-  const bubbleTextColor = theme.palette.getContrastText(bubbleBgColor);
-
+  // These are no longer bubble-specific, adjust for panel style
   const codeBgColor = theme.palette.mode === 'light'
-    ? 'rgba(0, 0, 0, 0.08)'
-    : 'rgba(255, 255, 255, 0.1)';
+    ? 'rgba(0, 0, 0, 0.05)' // Lighter code background for panel
+    : 'rgba(255, 255, 255, 0.08)'; // Slightly adjusted dark mode code bg
 
   const blockquoteBorderColor = theme.palette.mode === 'light'
-    ? 'rgba(0, 0, 0, 0.2)'
-    : 'rgba(255, 255, 255, 0.2)';
+    ? theme.palette.grey[300]
+    : theme.palette.grey[700];
 
   const blockquoteTextColor = theme.palette.mode === 'light'
-    ? 'rgba(0, 0, 0, 0.6)'
-    : 'rgba(255, 255, 255, 0.7)';
+    ? theme.palette.grey[700]
+    : theme.palette.grey[400];
+  
+  const textColor = theme.palette.text.primary; // General text color
 
   // ... (rest of the component remains the same, using the theme object correctly)
   // For action-only messages, we need a different style
@@ -67,10 +64,10 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
     return (
       <Box
         sx={{
-          alignSelf: 'flex-start',
-          maxWidth: '85%',
-          p: 0.5,
-          borderRadius: 2,
+          // alignSelf: 'flex-start', // Removed for panel style
+          maxWidth: '100%', // Allow full width within the panel
+          p: 0.5, // Keep padding for action chip
+          // borderRadius: 2, // Removed
         }}
       >
         <AssistantActionChip 
@@ -84,13 +81,13 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
   return (
     <Box
       sx={{
-        alignSelf: 'flex-start',
-        maxWidth: '85%',
-        p: 1.5, // Slightly more padding like iMessage
-        borderRadius: '16px', // More rounded corners like iMessage
-        bgcolor: bubbleBgColor, // Use theme-aware background color
-        color: bubbleTextColor, // Use theme-aware text color
-        boxShadow: theme.shadows[1],
+        // alignSelf: 'flex-start', // Removed for panel style
+        maxWidth: '100%', // Allow full width within the panel
+        p: theme.spacing(1, 0), // Padding top/bottom, no side padding
+        // borderRadius: '16px', // Removed
+        // bgcolor: bubbleBgColor, // Removed
+        color: textColor, // Use general text color
+        // boxShadow: theme.shadows[1], // Removed
         wordBreak: 'break-word',
         position: 'relative', // For positioning the cursor
         '& code': {
@@ -99,7 +96,7 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
           borderRadius: '4px',
           fontFamily: 'monospace',
           fontSize: '0.9em',
-          color: bubbleTextColor, // Ensure code text matches bubble text color
+          color: textColor, // Ensure code text matches bubble text color
         },
         '& pre': {
           backgroundColor: codeBgColor, // Theme-aware pre background
@@ -107,7 +104,7 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
           borderRadius: '4px',
           overflow: 'auto',
           '& code': {
-            backgroundColor: 'transparent',
+            backgroundColor: 'transparent', // Code within pre has no extra bg
             padding: 0,
           }
         },
@@ -152,7 +149,7 @@ const AssistantChatBubble: React.FC<AssistantChatBubbleProps> = ({ text, action,
               fontWeight: 'bold',
               fontSize: '1em', // Match text size
               lineHeight: 'inherit', // Match line height
-              color: bubbleTextColor, // Match text color
+              color: textColor, // Match text color
             }}
           >
             |

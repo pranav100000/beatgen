@@ -287,6 +287,9 @@ Provide only your reasoning and suggestions conversationally. Do NOT output JSON
             logger.error(f"Error streaming explanation for musical parameters: {e}")
             await self.chat_session.queue.error("Failed to stream parameter explanation.") # Use chat_session's queue
 
+        await self.chat_session.queue.add_chunk("\n\n")
+        await self.chat_session.queue.add_chunk("---")
+        await self.chat_session.queue.add_chunk("\n\n")
         # 2. Get JSON Data (Focused Call)
         logger.info("Requesting JSON for musical parameters...")
         schema_example_for_focused_call = json.dumps(LLMDeterminedMusicalParameters.model_json_schema())
@@ -362,6 +365,9 @@ Do NOT output JSON in this step, just your conversational reasoning."""
             await self.chat_session.queue.error("Failed to stream instrument selection explanation.")
             # Potentially return a default/empty SelectInstruments or raise error if critical
 
+        await self.chat_session.queue.add_chunk("\n\n")
+        await self.chat_session.queue.add_chunk("---")
+        await self.chat_session.queue.add_chunk("\n\n")
         # 2. Get JSON Data (Focused Call)
         logger.info("Requesting JSON for instrument selection...")
         focused_prompt = f"""
@@ -541,6 +547,9 @@ Keep it concise and conversational. Do NOT generate the actual musical notes or 
             # For now, let's return if explanation fails, as it might indicate a larger issue.
             return
 
+        await self.chat_session.queue.add_chunk("\n\n")
+        await self.chat_session.queue.add_chunk("---")
+        await self.chat_session.queue.add_chunk("\n\n")
         # 2. Generate Melody Notes (Focused Call internally within generate_melody_notes)
         logger.info(f"Proceeding to generate actual melody notes for {melody_instrument_name}...")
         try:
@@ -834,6 +843,9 @@ Do NOT output JSON in this step, just your conversational reasoning."""
             logger.error(f"Error streaming drum sound selection explanation: {e}")
             await self.chat_session.queue.error("Failed to stream drum sound explanation.")
 
+        await self.chat_session.queue.add_chunk("\n\n")
+        await self.chat_session.queue.add_chunk("---")
+        await self.chat_session.queue.add_chunk("\n\n")
         # 2. Get JSON Data (Focused Call)
         logger.info("Requesting JSON for drum sound selection...")
         focused_prompt_context = f"For a song in {determined_params.key} {determined_params.mode} at {determined_params.tempo} BPM, with style hints from the title '{determined_params.song_title}', user prompt '{determined_params.original_user_prompt}', and chord progression '{determined_params.chord_progression}'."
@@ -1132,7 +1144,7 @@ Output only the JSON object."""
         logger.info(f"Available soundfonts length: {len(self._available_soundfonts)}")
         logger.info(f"Available drum samples length: {len(self._available_drum_samples)}")
         
-        await queue.add_chunk(f"Doing research for prompt: '{request.user_prompt}'")
+        await queue.add_chunk(f"Doing research for prompt: '{request.user_prompt}'...\n\n")
         # Pass chat_session to all internal methods that need it
         # ... update all internal calls to use chat_session ...
         # For brevity, only show the start of the method here. The rest of the method and all internal calls must be updated to use chat_session as needed.

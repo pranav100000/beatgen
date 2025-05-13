@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import {IconX} from '@tabler/icons-react';
 import SendIcon from '@mui/icons-material/Send';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
+import { IconAi } from '@tabler/icons-react';
 import { 
   interactWithAssistant,
   cancelAssistantRequest,
@@ -988,10 +988,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
           bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : alpha(theme.palette.background.paper, 0.9),
           flexShrink: 0
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1 }}>
-            <SmartToyIcon sx={{ fontSize: 20 }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 0.5}}>
+            <IconAi size={28} />
             <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-              AI Assistant
+              Assistant
             </Typography>
           </Box>
           
