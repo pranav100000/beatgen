@@ -46,7 +46,7 @@ class MidiTrack(MidiTrackBase, table=True):
         sa_relationship_kwargs={
             "primaryjoin": "and_(ProjectTrack.track_id == MidiTrack.id, ProjectTrack.track_type == 'midi')",
             "foreign_keys": "[ProjectTrack.track_id]",
-            "overlaps": "project_tracks",
+            "overlaps": "midi_track",
         },
     )
 

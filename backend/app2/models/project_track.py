@@ -51,6 +51,7 @@ class ProjectTrack(ProjectTrackBase, table=True):
         sa_relationship_kwargs={
             "primaryjoin": "and_(ProjectTrack.track_id == AudioTrack.id, ProjectTrack.track_type == 'audio')",
             "foreign_keys": "[ProjectTrack.track_id]",
+            "overlaps": "midi_track, sampler_track, drum_track, project_tracks",
         },
     )
 
@@ -59,6 +60,7 @@ class ProjectTrack(ProjectTrackBase, table=True):
         sa_relationship_kwargs={
             "primaryjoin": "and_(ProjectTrack.track_id == MidiTrack.id, ProjectTrack.track_type == 'midi')",
             "foreign_keys": "[ProjectTrack.track_id]",
+            "overlaps": "audio_track, sampler_track, drum_track, project_tracks",
         },
     )
 
@@ -67,6 +69,7 @@ class ProjectTrack(ProjectTrackBase, table=True):
         sa_relationship_kwargs={
             "primaryjoin": "and_(ProjectTrack.track_id == SamplerTrack.id, ProjectTrack.track_type == 'sampler')",
             "foreign_keys": "[ProjectTrack.track_id]",
+            "overlaps": "audio_track, midi_track, drum_track, project_tracks",
         },
     )
 
