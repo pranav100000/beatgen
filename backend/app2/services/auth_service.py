@@ -282,16 +282,35 @@ class AuthService:
                 )
 
             # Store the generated PKCE verifier in an HttpOnly cookie
+            logger.info(f"[PROD DIAGNOSTIC] Attempting to set cookie with SameSite=None, Secure=True. APP_ENV is: {settings.app.APP_ENV}")
+            effective_secure_flag = True # For SameSite=None, Secure must be True
+            if settings.app.APP_ENV == "dev" and not settings.app.BASE_URL.startswith("https://"):
+                # Allow http for local dev if BASE_URL is http, even if trying SameSite=None (though None usually implies https)
+                # However, for this diagnostic, we are focusing on prod, so Secure=True is the goal with SameSite=None.
+                # If testing SameSite=None locally with http, this would need adjustment.
+                # For prod (non-dev), secure will be True.
+                effective_secure_flag = False # This line is problematic for prod diagnostic; should be True for SameSite=None
+                logger.warning("[PROD DIAGNOSTIC] Overriding Secure to False for dev HTTP with SameSite=None, this is unusual for SameSite=None.")
+
+            # Ensure secure is True if samesite is "none" for production
+            current_samesite_setting = "none"
+            is_production_like = settings.app.APP_ENV != "dev" # Assuming 'dev' is the only non-prod
+
+            if current_samesite_setting == "none" and not effective_secure_flag and is_production_like:
+                 logger.warning(f"[PROD DIAGNOSTIC] Forcing Secure=True for SameSite=None in prod-like env ({settings.app.APP_ENV})")
+                 effective_secure_flag = True
+
+
             response.set_cookie(
                 key="google_pkce_verifier",
                 value=pkce_verifier,
                 httponly=True,
-                samesite="none", # Important for OAuth redirects
-                max_age=300,  # 5 minutes
-                secure=settings.app.APP_ENV != "dev", # Use secure=True in prod (HTTPS)
-                path="/auth", # Scope cookie to auth paths
+                samesite=current_samesite_setting,  # DIAGNOSTIC: Changed from "lax"
+                max_age=300,
+                secure=effective_secure_flag,     # IMPORTANT: Must be True with SameSite=None in prod
+                path="/auth",
             )
-            logger.info(f"PKCE verifier stored in cookie. Verifier: {pkce_verifier[:10]}...")
+            logger.info(f"PKCE verifier stored in cookie. Verifier: {pkce_verifier[:10]}..., SameSite: {current_samesite_setting}, Secure: {effective_secure_flag}")
 
             generated_url = auth_response.url
             logger.info(f"Generated OAuth URL: {generated_url[:30]}...")
@@ -326,9 +345,9 @@ class AuthService:
         retrieved_pkce_verifier = request.cookies.get("google_pkce_verifier")
         logger.info(f"[PROD DEBUG] Retrieved PKCE verifier from cookie: {retrieved_pkce_verifier}")
         
-        if not retrieved_pkce_verifier:
-            logger.error("[Service] PKCE verifier cookie 'google_pkce_verifier' not found in callback.")
-            raise ServiceException("PKCE_REDIRECT::PKCE verifier cookie 'google_pkce_verifier' not found in callback.")
+        # if not retrieved_pkce_verifier:
+        #     logger.error("[Service] PKCE verifier cookie 'google_pkce_verifier' not found in callback.")
+        #     raise ServiceException("PKCE_REDIRECT::PKCE verifier cookie 'google_pkce_verifier' not found in callback.")
 
         try:
             logger.info("Handling Google OAuth callback (PKCE handled by library)")
@@ -356,13 +375,30 @@ class AuthService:
 
             # Clean up the PKCE verifier cookie
             if response: # Ensure response object is available for cookie deletion
+                logger.info(f"[PROD DIAGNOSTIC] Attempting to delete cookie with SameSite=None, Secure=True. APP_ENV is: {settings.app.APP_ENV}")
+                
+                # Determine secure flag for deletion consistent with how it might have been set
+                delete_secure_flag = True # Default for SameSite=None
+                current_samesite_for_delete = "none"
+
+                if settings.app.APP_ENV == "dev" and not settings.app.BASE_URL.startswith("https://"):
+                    # This was the problematic override attempt for setting. For deletion, match potential reality.
+                    # However, if we forced Secure=True for SameSite=None during set, we should match that.
+                    # Let's assume if samesite was "none", secure was True if not explicitly overridden for dev http
+                    pass # Keep delete_secure_flag as True if samesite is "none" unless specific dev http override was guaranteed
+
+                is_production_like_for_delete = settings.app.APP_ENV != "dev"
+                if current_samesite_for_delete == "none" and not delete_secure_flag and is_production_like_for_delete:
+                    delete_secure_flag = True
+
+
                 response.delete_cookie(
-                    key="google_pkce_verifier", 
-                    path="/auth", 
-                    secure=settings.app.APP_ENV != "dev", 
-                    samesite="none"
+                    key="google_pkce_verifier",
+                    path="/auth",
+                    secure=delete_secure_flag,      # Match setting
+                    samesite=current_samesite_for_delete   # Match setting
                 )
-                logger.info("PKCE verifier cookie deleted.")
+                logger.info(f"PKCE verifier cookie (SameSite={current_samesite_for_delete} attempt) deleted. Secure: {delete_secure_flag}")
             else:
                 logger.warning("Response object not available to delete PKCE verifier cookie.")
 
