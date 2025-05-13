@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional
 import traceback
+import urllib.parse
 
 from fastapi import Request, Response
 
@@ -8,6 +9,7 @@ from app2.core.exceptions import UnauthorizedException, ServiceException
 from app2.infrastructure.database.supabase_client import supabase
 from app2.repositories.user_repository import UserRepository
 from app2.core.config import settings
+from gotrue.helpers import generate_pkce_verifier, generate_pkce_challenge
 
 logger = get_service_logger("auth")
 
@@ -255,14 +257,20 @@ class AuthService:
                 f"[Service] Using callback URL: {backend_callback_url} (from settings.app.BASE_URL: {settings.app.BASE_URL})"
             )
 
+            # Generate PKCE verifier and challenge
+            pkce_verifier = generate_pkce_verifier()
+            pkce_challenge = generate_pkce_challenge(pkce_verifier)
+            logger.info(f"Generated PKCE verifier: {pkce_verifier[:10]}... and challenge: {pkce_challenge[:10]}...")
+
             # Use Supabase client to get the OAuth URL.
-            # With flow_type='pkce', the library should handle challenge generation.
             auth_response = supabase.client.auth.sign_in_with_oauth(
                 {
                     "provider": "google",
                     "options": {
                         "redirect_to": backend_callback_url,
                         "scopes": "openid email profile",  # Request standard scopes
+                        "code_challenge": pkce_challenge, # Pass the generated challenge
+                        "code_challenge_method": "S256"   # Specify the method
                     },
                 }
             )
@@ -273,7 +281,17 @@ class AuthService:
                     "Failed to generate Google OAuth URL from Supabase."
                 )
 
-            # NO Cookie storage needed here - relying on library
+            # Store the generated PKCE verifier in an HttpOnly cookie
+            response.set_cookie(
+                key="google_pkce_verifier",
+                value=pkce_verifier,
+                httponly=True,
+                samesite="lax", # Important for OAuth redirects
+                max_age=300,  # 5 minutes
+                secure=settings.app.APP_ENV != "dev", # Use secure=True in prod (HTTPS)
+                path="/auth", # Scope cookie to auth paths
+            )
+            logger.info(f"PKCE verifier stored in cookie. Verifier: {pkce_verifier[:10]}...")
 
             generated_url = auth_response.url
             logger.info(f"Generated OAuth URL: {generated_url[:30]}...")
@@ -305,14 +323,41 @@ class AuthService:
         try:
             logger.info("Handling Google OAuth callback (PKCE handled by library)")
 
+            # Retrieve the PKCE verifier from the cookie
+            retrieved_pkce_verifier = request.cookies.get("google_pkce_verifier")
+            if not retrieved_pkce_verifier:
+                logger.error("[Service] PKCE verifier cookie 'google_pkce_verifier' not found in callback.")
+                # Redirect to frontend with a specific error for this case
+                error_desc = urllib.parse.quote("OAuth session integrity check failed. Please try logging in again.")
+                error_redirect_url = f"{settings.app.FRONTEND_BASE_URL}?error=pkce_verifier_missing&error_description={error_desc}"
+                logger.info(f"Redirecting to frontend with PKCE error: {error_redirect_url}")
+                # This is a bit of a hack to return a redirect from within the service layer.
+                # Ideally, the API layer would handle this, but for now, to match existing patterns:
+                raise ServiceException(f"PKCE_REDIRECT::{error_redirect_url}") 
+
+            logger.info(f"PKCE verifier retrieved from cookie: {retrieved_pkce_verifier[:10]}...")
+
             # Exchange the code for a Supabase session using PKCE
-            logger.info("Exchanging code for session...")
-            auth_response = supabase.client.auth.exchange_code_for_session(
-                {"auth_code": code}
+            logger.info("Exchanging code for session with PKCE verifier...")
+            auth_response = supabase.client.auth.exchange_code_for_session( # type: ignore
+                {"auth_code": code, "pkce_verifier": retrieved_pkce_verifier}
             )
             logger.info("Code exchanged successfully.")
 
-            if not auth_response.user:
+            # Clean up the PKCE verifier cookie
+            if response: # Ensure response object is available for cookie deletion
+                response.delete_cookie(
+                    key="google_pkce_verifier", 
+                    path="/auth", 
+                    secure=settings.app.APP_ENV != "dev", 
+                    samesite="lax"
+                )
+                logger.info("PKCE verifier cookie deleted.")
+            else:
+                logger.warning("Response object not available to delete PKCE verifier cookie.")
+
+
+            if not auth_response.user: # type: ignore
                 logger.error("No user returned from Google OAuth after code exchange.")
                 raise UnauthorizedException(
                     "Google authentication failed: Could not retrieve user session."

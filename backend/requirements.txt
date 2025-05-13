@@ -20,3 +20,4 @@ supabase==2.15.1
 uvicorn==0.34.2
 email-validator
 json-repair==0.44.1
+gotrue==2.12.0

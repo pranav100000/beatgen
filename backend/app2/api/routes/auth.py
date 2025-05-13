@@ -241,6 +241,11 @@ async def callback_google(
         return RedirectResponse(redirect_url_with_token)
 
     except (UnauthorizedException, ServiceException) as e:
+        if isinstance(e, ServiceException) and str(e).startswith("PKCE_REDIRECT::"):
+            redirect_url = str(e).split("::", 1)[1]
+            logger.warning(f"[API] PKCE verifier missing, redirecting to: {redirect_url}")
+            return RedirectResponse(redirect_url)
+        
         logger.error(
             f"[API] Google OAuth callback processing failed: {str(e)}", exc_info=True
         )
