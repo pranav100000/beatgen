@@ -373,6 +373,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
       }
     };
   };
+
+  const handleCancel = async () => {
+    if (currentRequestId) {
+      try {
+        await cancelAssistantRequest(currentRequestId);
+        setCurrentRequestId(null);
+      } catch (err) {
+        console.error('Error cancelling request:', err);
+      }
+    }
+  }
   
   // Handle sending message to the AI
   const handleSend = async () => {
@@ -388,12 +399,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
       
       // Also cancel the request on the server if we have a request ID
       if (currentRequestId) {
-        try {
-          await cancelAssistantRequest(currentRequestId);
-          setCurrentRequestId(null);
-        } catch (err) {
-          console.error('Error cancelling request:', err);
-        }
+        handleCancel();
       }
       return;
     }
@@ -1180,7 +1186,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
               {/* Send/Cancel Chip - Bottom Right */}
               <MenuChip 
                 label={isLoading ? "Cancel" : "Send"}
-                onClick={handleSend}
+                onClick={isLoading ? handleCancel : handleSend}
                 disabled={!prompt.trim() && !isLoading}
                 color={isLoading ? 'secondary' : 'primary'}
               />
