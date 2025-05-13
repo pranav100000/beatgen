@@ -286,7 +286,7 @@ class AuthService:
                 key="google_pkce_verifier",
                 value=pkce_verifier,
                 httponly=True,
-                samesite="lax", # Important for OAuth redirects
+                samesite="none", # Important for OAuth redirects
                 max_age=300,  # 5 minutes
                 secure=settings.app.APP_ENV != "dev", # Use secure=True in prod (HTTPS)
                 path="/auth", # Scope cookie to auth paths
@@ -360,7 +360,7 @@ class AuthService:
                     key="google_pkce_verifier", 
                     path="/auth", 
                     secure=settings.app.APP_ENV != "dev", 
-                    samesite="lax"
+                    samesite="none"
                 )
                 logger.info("PKCE verifier cookie deleted.")
             else:
