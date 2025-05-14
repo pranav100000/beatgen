@@ -41,6 +41,7 @@ class RequestContext(BaseModel):
     context: Optional[Dict[str, Any]] = None
     task_ref: Optional[Any] = None
     sse_queue: Optional[SSEQueueManager] = None  # Changed from queue to sse_queue
+    chat_session: Optional[Any] = None # Added to hold a reference to ChatSession
 
     class Config:
         arbitrary_types_allowed = True
@@ -222,6 +223,17 @@ class RequestManager:
         request.task_ref = task_ref
         return True
 
+    def set_chat_session(self, request_id: str, chat_session: Any) -> bool:
+        """Set ChatSession reference for a request"""
+        request = self._requests.get(request_id)
+        if not request:
+            logger.warning(f"Attempted to set chat session for non-existent request: {request_id}")
+            return False
+        
+        request.chat_session = chat_session
+        logger.info(f"Chat session set for request {request_id}")
+        return True
+
     def get_queue(self, request_id: str) -> Optional[asyncio.Queue]:
         """Get the queue for a request"""
         request = self._requests.get(request_id)
@@ -259,6 +271,17 @@ class RequestManager:
         # Cancel task if it exists
         if request.task_ref and not request.task_ref.done():
             request.task_ref.cancel()
+
+        # Cancel chat session if it exists and status is CANCELLED
+        if status == RequestStatus.CANCELLED and request.chat_session:
+            if hasattr(request.chat_session, 'cancel') and callable(request.chat_session.cancel):
+                try:
+                    logger.info(f"Calling .cancel() on chat session for request {request_id}")
+                    request.chat_session.cancel()
+                except Exception as e:
+                    logger.error(f"Error calling .cancel() on chat session for {request_id}: {e}")
+            else:
+                logger.warning(f"chat_session for request {request_id} does not have a callable 'cancel' method.")
 
         # Remove from requests
         del self._requests[request_id]

@@ -1,8 +1,10 @@
+import asyncio
 from typing import Optional, Any, Dict, Type, List, Union, AsyncGenerator, Sequence
 
 from pydantic_ai.messages import ModelMessage
 
 from app2.sse.sse_queue_manager import SSEQueueManager
+from app2.core.logging import get_service_logger
 
 from .history import MessageHistory, ChatMessage
 from .adapters.base_adapter import ProviderAdapter
@@ -17,6 +19,8 @@ from .streaming import AnyStreamEvent, TextDeltaEvent
 
 import json
 from json_repair import repair_json
+
+logger = get_service_logger("chat_wrapper")
 
 
 class ChatSession:
@@ -54,6 +58,7 @@ class ChatSession:
         self.current_api_key = api_key # Store for potential re-use or if adapter needs it explicitly
         self.current_base_url = base_url
         self.current_provider_kwargs = provider_kwargs
+        self.is_cancelled = False # Initialize cancellation flag
 
         self.adapter: Optional[ProviderAdapter] = self._load_adapter(
             provider_name,
@@ -127,6 +132,11 @@ class ChatSession:
             raise RuntimeError("Adapter not loaded.")
         return self.adapter.format_pydantic_ai_messages(self.message_history.get_messages())
     
+    def cancel(self) -> None:
+        """Sets the cancellation flag to stop ongoing streaming."""
+        print(f"ChatSession received cancel signal for provider {self.current_provider_name}, model {self.current_model_name}")
+        self.is_cancelled = True
+    
     async def send_message_async(
         self,
         user_prompt_content: str,
@@ -152,100 +162,118 @@ class ChatSession:
         if not self.adapter:
             raise RuntimeError("ChatSession adapter not initialized.")
 
-        # Prepare history for Pydantic AI *before* adding the current user message to our internal history
-        # This history will be passed to the Pydantic AI agent.
-        pydantic_ai_formatted_history = self._prepare_pydantic_ai_history()
+        # Proactive cancellation check
+        if self.is_cancelled:
+            logger.info(f"ChatSession ({self.current_model_name}): send_message_async called but session is already cancelled.")
+            # For non-streaming, we should indicate failure or raise CancelledError.
+            # For streaming, the generator wrapper would normally handle this by yielding nothing or an error.
+            # Raising CancelledError is consistent with how ongoing operations are stopped.
+            raise asyncio.CancelledError("ChatSession operation cancelled because session was already flagged.")
 
-        # Add the current user's message to our internal history
-        self.message_history.add_message(role="user", content=user_prompt_content)
+        try:
+            # Prepare history for Pydantic AI *before* adding the current user message to our internal history
+            # This history will be passed to the Pydantic AI agent.
+            pydantic_ai_formatted_history = self._prepare_pydantic_ai_history()
 
-        # Get model_settings and usage_limits from session if not provided, allowing override
-        final_model_settings = model_settings # or self.current_model_settings if we store them
-        final_usage_limits = usage_limits # or self.current_usage_limits
+            # Add the current user's message to our internal history
+            self.message_history.add_message(role="user", content=user_prompt_content)
 
-        response_content_for_history: Any
-        if stream:
-            async def stream_wrapper() -> AsyncGenerator[AnyStreamEvent, None]:
-                nonlocal response_content_for_history
-                full_response_text_chunks = []
-                last_yielded_text = "" # For calculating true deltas
-                try:
-                    async_gen = await self.adapter.send_message_async(
-                        user_prompt=user_prompt_content,
-                        history=pydantic_ai_formatted_history,
-                        stream=True,
-                        model_settings=final_model_settings,
-                        usage_limits=final_usage_limits
-                    )
-                    if not hasattr(async_gen, '__aiter__'):
-                        raise TypeError("Adapter did not return an async generator for streaming.")
-                        
-                    async for event in async_gen:
-                        if isinstance(event, TextDeltaEvent):
-                            # Adapter provides event.delta, which might be full text or true delta
-                            # We will calculate the true delta to yield for streaming to frontend
-                            current_chunk_from_adapter = event.delta
-                            full_response_text_chunks.append(current_chunk_from_adapter) # For history, always append what adapter gave
+            # Get model_settings and usage_limits from session if not provided, allowing override
+            final_model_settings = model_settings # or self.current_model_settings if we store them
+            final_usage_limits = usage_limits # or self.current_usage_limits
 
-                            actual_delta_to_yield = ""
-                            if current_chunk_from_adapter.startswith(last_yielded_text):
-                                actual_delta_to_yield = current_chunk_from_adapter[len(last_yielded_text):]
-                            else:
-                                # Discontinuity or first chunk, yield the whole current chunk from adapter as is
-                                actual_delta_to_yield = current_chunk_from_adapter 
-                            
-                            if actual_delta_to_yield: # Only yield if there's new text
-                                yield actual_delta_to_yield # Yielding the string delta
-                            
-                            last_yielded_text = current_chunk_from_adapter # Update tracker with the full chunk received
-                        
-                        # else: # Handle other event types if necessary, e.g., tool calls from adapter
-                        #     yield event # Yield other event types as is
-
-                    response_content_for_history = "".join(full_response_text_chunks)
-                except Exception as e:
-                    response_content_for_history = f"Error during streaming: {e}"
-                    self.message_history.add_message(role="assistant", content=response_content_for_history)
-                    raise
-                else:
-                    if full_response_text_chunks:
-                         self.message_history.add_message(role="assistant", content=response_content_for_history)
-            
-            return stream_wrapper()
-        else:
-            response_content_for_history = await self.adapter.send_message_async(
-                user_prompt=user_prompt_content,
-                history=pydantic_ai_formatted_history,
-                stream=False,
-                model_settings=final_model_settings,
-                usage_limits=final_usage_limits
-            )
-            # Add the assistant's response to our internal history
-            self.message_history.add_message(role="assistant", content=response_content_for_history)
-            
-            print("DEBUG: response_content_for_history: ", response_content_for_history)
-            if expect_json:
-                try:
-                    # Just test if it parses, but return the string
-                    json_object = json.loads(response_content_for_history)
-                    # The string response_content_for_history has successfully parsed.
-                    # Whether json_object is a list or dict, response_content_for_history is the
-                    # string that yielded it. This string is what we want to return.
-                    # No further modification of response_content_for_history is needed here.
-                    # The old problematic block for list handling is removed.
-                    print(f"DEBUG: JSON loaded successfully: {response_content_for_history}")
-                    return response_content_for_history
-                except json.JSONDecodeError:
+            response_content_for_history: Any
+            if stream:
+                async def stream_wrapper() -> AsyncGenerator[AnyStreamEvent, None]:
+                    nonlocal response_content_for_history
+                    full_response_text_chunks = []
+                    last_yielded_text = "" # For calculating true deltas
                     try:
-                        repaired = repair_json(response_content_for_history)
-                        # Test if repaired parses, but return the repaired string
-                        json.loads(repaired)
-                        print(f"DEBUG: Repaired JSON loaded successfully: {repaired}")
-                        return repaired
-                    except Exception as repair_exc:
-                        print(f"JSON repair failed: {repair_exc}")
-                        raise
-            return response_content_for_history
+                        # Check cancellation again right before adapter call for streaming
+                        if self.is_cancelled:
+                            logger.info(f"ChatSession ({self.current_model_name}): stream_wrapper initiated but session is cancelled.")
+                            raise asyncio.CancelledError("ChatSession streaming cancelled before adapter call.")
+
+                        async_gen = await self.adapter.send_message_async(
+                            user_prompt=user_prompt_content,
+                            history=pydantic_ai_formatted_history,
+                            stream=True,
+                            model_settings=final_model_settings,
+                            usage_limits=final_usage_limits
+                        )
+                        if not hasattr(async_gen, '__aiter__'):
+                            raise TypeError("Adapter did not return an async generator for streaming.")
+                            
+                        async for event in async_gen:
+                            if self.is_cancelled: # Check before processing/yielding each event
+                                logger.info("ChatSession streaming cancelled mid-stream (event loop).")
+                                break 
+
+                            if isinstance(event, TextDeltaEvent):
+                                current_chunk_from_adapter = event.delta
+                                full_response_text_chunks.append(current_chunk_from_adapter)
+                                actual_delta_to_yield = ""
+                                actual_delta_to_yield = current_chunk_from_adapter[len(last_yielded_text):]
+                                
+                                if actual_delta_to_yield: 
+                                    yield actual_delta_to_yield 
+                                
+                                last_yielded_text = current_chunk_from_adapter 
+                            
+                        response_content_for_history = "".join(full_response_text_chunks)
+                    except Exception as e_stream_inner: # Catch other errors within the stream_wrapper
+                        logger.error(f"ChatSession ({self.current_model_name}): Error during streaming adapter call: {e_stream_inner}", exc_info=True)
+                        response_content_for_history = f"Error during streaming: {e_stream_inner}"
+                        self.message_history.add_message(role="assistant", content=response_content_for_history)
+                        raise # Re-raise to be caught by outer handler
+                    else:
+                        if full_response_text_chunks:
+                             self.message_history.add_message(role="assistant", content=response_content_for_history)
+                
+                return stream_wrapper()
+            else: # Not streaming (stream=False)
+                response_content_for_history = await self.adapter.send_message_async(
+                    user_prompt=user_prompt_content,
+                    history=pydantic_ai_formatted_history,
+                    stream=False,
+                    model_settings=final_model_settings,
+                    usage_limits=final_usage_limits
+                )
+                # Add the assistant's response to our internal history only if not cancelled during await
+                if not self.is_cancelled: # Check after the await
+                    self.message_history.add_message(role="assistant", content=response_content_for_history)
+                else:
+                    logger.info(f"ChatSession ({self.current_model_name}): Non-streaming call cancelled during/after adapter await; not adding to history.")
+                    # Potentially set response_content_for_history to a specific marker if needed by caller
+                    # but _focused_llm_call will likely fail parsing if it's not JSON as expected.
+
+                # JSON processing should only happen if not cancelled and response is valid
+                if not self.is_cancelled and expect_json:
+                    try:
+                        json_object = json.loads(response_content_for_history)
+                        return response_content_for_history
+                    except json.JSONDecodeError:
+                        try:
+                            repaired = repair_json(response_content_for_history)
+                            json.loads(repaired) 
+                            return repaired
+                        except Exception as repair_exc:
+                            logger.error(f"ChatSession ({self.current_model_name}): JSON repair failed: {repair_exc}")
+                            raise
+                return response_content_for_history
+
+        except asyncio.CancelledError:
+            logger.info(f"ChatSession ({self.current_model_name}): send_message_async task cancelled.")
+            self.is_cancelled = True # Ensure flag is set
+            # Add a generic cancelled message to history if it makes sense for your flow
+            # self.message_history.add_message(role="assistant", content="[Operation Cancelled]")
+            raise
+        except Exception as e_outer:
+            logger.error(f"ChatSession ({self.current_model_name}): Unhandled error in send_message_async: {e_outer}", exc_info=True)
+            # Add error to history if not already handled by more specific blocks
+            if not isinstance(e_outer, asyncio.CancelledError): # Avoid double-logging if already handled as CancelledError
+                 self.message_history.add_message(role="assistant", content=f"Error in ChatSession: {e_outer}")
+            raise
 
     def send_message_sync(
         self,

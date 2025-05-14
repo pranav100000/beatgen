@@ -30,52 +30,63 @@ logger = get_logger("beatgen.scripts.add_soundfonts")
 # Constants
 BUCKET_NAME = "assets"
 SOUNDFONT_PREFIX = "soundfonts_public"
-TABLE_NAME = "soundfont_public"  # Public soundfonts table
+TABLE_NAME = "instrument_files"  # Public soundfonts table
 
 
 async def create_soundfont_record(
-    name: str,
+    id: str,
     display_name: str,
     storage_key: str,
     category: str,
+    file_name: str,
+    file_format: str,
+    file_size: int,
+    is_public: bool,
     description: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Create a record in the soundfont_public table.
+    Create a record in the instrument_files table.
 
     Args:
-        name: The internal name of the soundfont
+        id: The unique identifier for the soundfont record
         display_name: The display name of the soundfont
         storage_key: The storage key where the soundfont file is stored
         category: The category of the soundfont
+        file_name: The original name of the soundfont file
+        file_format: The file format/extension (e.g., "sf2")
+        file_size: The size of the file in bytes
+        is_public: Whether the soundfont is publicly accessible
         description: An optional description of the soundfont
 
     Returns:
         The created soundfont record
     """
-    soundfont_id = str(uuid.uuid4())
     now = datetime.utcnow().replace(microsecond=0).isoformat()
 
     soundfont_data = {
-        "id": soundfont_id,
-        "name": name,
+        "id": id,
         "display_name": display_name,
+        "file_name": file_name,
+        "file_format": file_format,
+        "file_size": file_size,
         "category": category,
         "description": description or f"{display_name} soundfont",
         "storage_key": storage_key,
+        "is_public": is_public,
         "created_at": now,
+        "updated_at": now,
     }
 
-    logger.info(f"Creating soundfont record with ID: {soundfont_id}")
+    logger.info(f"Creating soundfont record with ID: {id}")
     result = supabase.execute_query(
-        TABLE_NAME, lambda table: table.insert(soundfont_data).execute()
+        TABLE_NAME, lambda table: table.insert(soundfont_data)
     )
 
-    if not result or not result.data:
-        raise Exception(f"Failed to create soundfont record: {result}")
+    if not result:
+        raise Exception(f"Failed to create soundfont record or no data returned: {result}")
 
-    logger.info(f"Created soundfont record with ID: {soundfont_id}")
-    return result.data[0]
+    logger.info(f"Created soundfont record with ID: {id}")
+    return result[0]
 
 
 async def upload_soundfont(
@@ -86,22 +97,38 @@ async def upload_soundfont(
 
     Args:
         file_path: The path to the soundfont file
-        name: The name of the soundfont
+        name: The display name of the soundfont
         category: The category of the soundfont
         description: An optional description of the soundfont
 
     Returns:
         The created soundfont record
     """
-    file_name = os.path.basename(file_path)
-    soundfont_id = str(uuid.uuid4())
-    file_name.split(".")[-1] if "." in file_name else "sf2"
+    actual_file_name = os.path.basename(file_path)
+    soundfont_id = str(uuid.uuid4()) # This ID is used for storage path, DB record ID is generated in create_soundfont_record
+    
+    file_format = actual_file_name.split(".")[-1].lower() if "." in actual_file_name else "sf2"
+    file_size = os.path.getsize(file_path)
+    is_public_flag = True
 
-    # Create internal name (lowercase, underscore format)
-    internal_name = name.lower().replace(" ", "_")
+
+    # Create storage path (in Supabase) - use the UUID from create_soundfont_record for consistency if possible,
+    # or ensure this UUID matches the one used in storage_key if create_soundfont_record generates its own.
+    # For now, using a new UUID here for path, and create_soundfont_record generates the actual record ID.
+    # The storage_key will use the ID generated in create_soundfont_record.
+    # To make storage path use the same ID as the record, we'd need to generate ID before create_soundfont_record or get it back.
+    # Let's stick to the current flow: soundfont_id for storage path is fine, record_id will be new.
+    # The storage_key in DB should use the DB record's ID.
+    # Re-evaluating: The soundfont_id here is used to create the storage_path, and this *same* id should be the record's id.
+    # So, create_soundfont_record should accept this id.
+
+    # Let's adjust: generate ID here, pass to create_soundfont_record.
+    record_id = str(uuid.uuid4())
+
 
     # Create storage path (in Supabase)
-    storage_path = f"{category.lower()}/{soundfont_id}/{file_name}"
+    storage_path = f"{category.lower()}/{record_id}/{actual_file_name}"
+
 
     # The key to store in the database (without the prefix)
     storage_key = storage_path
@@ -137,10 +164,14 @@ async def upload_soundfont(
 
         # Create database record
         soundfont = await create_soundfont_record(
-            name=internal_name,
+            id=record_id,
             display_name=name,
             storage_key=storage_key,
             category=category,
+            file_name=actual_file_name,
+            file_format=file_format,
+            file_size=file_size,
+            is_public=is_public_flag,
             description=description,
         )
 
