@@ -11,17 +11,10 @@ import {
   ButtonBase,
   useTheme
 } from '@mui/material';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
-import GraphicEqIcon from '@mui/icons-material/GraphicEq';
-import { IconTrash } from '@tabler/icons-react';
 import { IconBackspace } from '@tabler/icons-react';
-import { IconBackspaceFilled } from '@tabler/icons-react';
-import PanToolIcon from '@mui/icons-material/PanTool';
 import { CombinedTrack, AudioTrackRead, SamplerTrackRead } from '../../../platform/types/project';
 import { getTrackColor, GRID_CONSTANTS } from '../../constants/gridConstants';
 import ControlKnob from './track-sidebar-controls/ControlKnob';
-import { alpha } from '@mui/material/styles';
 
 // Interface for the component props
 interface TrackControlsSidebarProps {

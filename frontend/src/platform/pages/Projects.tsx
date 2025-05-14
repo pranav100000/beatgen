@@ -8,11 +8,6 @@ import {
   Grid, 
   Button, 
   IconButton, 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions,
-  TextField,
   CircularProgress,
   Box,
   Divider,
@@ -23,12 +18,10 @@ import {
 import './styles/Projects.css';
 import { 
   Add as AddIcon, 
-  Delete as DeleteIcon, 
   Edit as EditIcon, 
   MusicNote as MusicNoteIcon,
   ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
-import SoundUploader from '../components/SoundUploader';
 import SoundLibrary from '../components/SoundLibrary';
 import { useAuth } from '../auth/auth-context';
 import { 
@@ -36,6 +29,8 @@ import {
   deleteProject, 
 } from '../api/projects';
 import { Project } from '../types/project';
+import { IconTrashFilled } from '@tabler/icons-react';
+
 
 // Constants for pagination and display
 const INITIAL_DISPLAY_COUNT = 6;
@@ -293,7 +288,7 @@ export default function Projects() {
                     onClick={() => handleDeleteProject(project.id)} 
                     aria-label="delete"
                   >
-                    <DeleteIcon fontSize="small" />
+                    <IconTrashFilled size={18} />
                   </IconButton>
                 </Box>
               </Card>
