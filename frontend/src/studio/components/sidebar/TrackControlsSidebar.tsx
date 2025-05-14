@@ -14,7 +14,9 @@ import {
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { IconTrash } from '@tabler/icons-react';
+import { IconBackspace } from '@tabler/icons-react';
+import { IconBackspaceFilled } from '@tabler/icons-react';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import { CombinedTrack, AudioTrackRead, SamplerTrackRead } from '../../../platform/types/project';
 import { getTrackColor, GRID_CONSTANTS } from '../../constants/gridConstants';
@@ -381,15 +383,18 @@ const TrackControls: React.FC<TrackControlsProps> = ({
             size="small" 
             onClick={handleDelete}
             sx={{ 
-              color: 'text.secondary',
+              color: trackColor, 
               padding: '3px',
+              mt: -0.3,
+              mr: 0.9, 
+              borderRadius: '8px',
               '&:hover': { 
-                color: theme.palette.error.main,
-                bgcolor: alpha(theme.palette.error.main, 0.1)
+                bgcolor: theme.palette.action.hover
               }
             }}
+            disableRipple 
           >
-            <DeleteIcon sx={{ fontSize: '20px', pr: 1 }} />
+            <IconBackspace size={18}/>
           </IconButton>
         </Tooltip>
       </Box>

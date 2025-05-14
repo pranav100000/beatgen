@@ -25,7 +25,6 @@ import MenuChip from './MenuChip';
 import AddContextChip from './AddContextChip';
 import AssistantChatBubble from './AssistantChatBubble';
 import UserChatBubble from './UserChatBubble';
-import AssistantTypingBubble from './AssistantTypingBubble';
 import { GRID_CONSTANTS } from '../../constants/gridConstants';
 import { CombinedTrack } from '../../../platform/types/project';
 import ReactMarkdown from 'react-markdown'
@@ -1054,22 +1053,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                 selectedTrack={msg.selectedTrack}
               />
             ) : (
-              msg.isStreaming && !msg.text ? (
-                <Box key={index} sx={{ alignSelf: 'flex-start' }}>
-                  <AssistantTypingBubble />
-                </Box>
-              ) : (
-                <AssistantChatBubble 
-                  key={index} 
-                  text={msg.text}
-                  action={msg.action}
-                  onActionClick={msg.action && msg.actionData ? 
+              <AssistantChatBubble 
+                key={index} 
+                text={msg.text}
+                action={msg.action}
+                onActionClick={msg.action && msg.actionData ? 
                     () => handleAction(msg.action!, msg.actionData) : 
                     undefined}
                 />
               )
             )
-          ))}
+          )}
           {/* {isLoading && (
             <Box sx={{ alignSelf: 'flex-start', p: 1 }}>
               <CircularProgress size={24} color="inherit"/>

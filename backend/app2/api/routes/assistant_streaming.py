@@ -353,11 +353,12 @@ async def process_generate_request(
         selected_model_info.api_key = selected_model_info.get_api_key()
         logger.info(f"Selected model: {selected_model_info}")
         response = await music_agent.run(
-            SongRequest(user_prompt=context.prompt,
+            request_id=request_id,
+            request=SongRequest(user_prompt=context.prompt,
                         duration_bars=4),
             model_info=selected_model_info,
             queue=sse_queue,
-            session=session
+            db_session=session
         )
         
         # logger.info(

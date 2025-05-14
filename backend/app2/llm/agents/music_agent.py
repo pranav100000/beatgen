@@ -38,13 +38,13 @@ from app2.llm.music_gen_service.music_researcher import MusicResearcher
 from app2.core.logging import get_service_logger
 from app2.models.track_models.drum_track import DrumTrackRead
 from app2.models.track_models.sampler_track import SamplerTrackRead
-from services.soundfont_service.soundfont_service import soundfont_service
 from app2.api.dependencies import (
     get_drum_sample_service,
     get_drum_sample_public_repository,
+    get_file_repository,
+    get_file_service,
 )
 from app2.models.track_models.midi_track import MidiTrackRead
-from app2.models.public_models.instrument_file import InstrumentFileRead
 from app2.types.assistant_actions import AssistantAction
 
 # We\'\'\'ll need to mock or adapt soundfont_service and drum_sample_service for now
@@ -59,7 +59,6 @@ from app2.llm.music_gen_service.midi import (
     convert_interval_melody_to_absolute_melody,
     correct_notes_in_key,
     transform_chord_progression_to_instrument_format,
-    transform_bars_to_instrument_format,
     transform_drum_beats_to_midi_format,
     transform_melody_data_to_instrument_format 
     # Add other necessary midi transformations
@@ -90,6 +89,8 @@ from app2.llm.available_models import ModelInfo # Import the new dataclass
 from app2.llm.streaming import TextDeltaEvent # Import TextDeltaEvent
 
 from app2.core.config import settings
+# Import request_manager to link ChatSession for cancellation
+from app2.sse.request_manager import request_manager 
 
 # --- Input and Output Schemas for the Main Agent Tool ---
 
@@ -128,10 +129,12 @@ class MusicGenerationAgent:
         
     async def _init_real_data(self, session: Session):
         _drum_file_repository = get_drum_sample_public_repository(session)
+        _file_repository = get_file_repository(session)
         drum_sample_service = get_drum_sample_service(_drum_file_repository)
-        self._available_soundfonts = await soundfont_service.get_public_soundfonts()
+        file_service = get_file_service(_file_repository)
+        self._available_soundfonts = await file_service.get_public_instrument_files()
         self._available_drum_samples = await drum_sample_service.get_all_samples()
-        self._soundfont_map = {sf["name"]: sf for sf in self._available_soundfonts}
+        self._soundfont_map = {sf.display_name: sf for sf in self._available_soundfonts}
         self._drum_sample_map = {ds.display_name: ds for ds in self._available_drum_samples}
         self._drum_sample_id_map = {str(ds.id): ds for ds in self._available_drum_samples}
 
@@ -140,6 +143,10 @@ class MusicGenerationAgent:
         """Helper to make an isolated LLM call for structured output using ChatSession."""
         logger.info(f"DEBUG: _focused_llm_call using self.chat_session for schema: {output_type.__name__}")
         
+        if self.chat_session.is_cancelled:
+            logger.info(f"_focused_llm_call: Operation cancelled before starting for {output_type.__name__}.")
+            raise asyncio.CancelledError(f"LLM call for {output_type.__name__} cancelled pre-execution.")
+
         llm_call_model_settings: Dict[str, Any] = {}
         max_retries = 1 # Max number of retries (so 1 retry means 2 attempts total)
         if output_type is IntervalMelodyOutput: # More retries for complex melody generation
@@ -153,6 +160,10 @@ class MusicGenerationAgent:
             logger.info(f"Attempt {attempt + 1} for {output_type.__name__}...")
             raw_llm_output_data_str: Optional[str] = None
             last_error = None # Reset last_error for this attempt
+
+            if self.chat_session.is_cancelled:
+                logger.info(f"_focused_llm_call: Operation cancelled before attempt {attempt + 1} for {output_type.__name__}.")
+                raise asyncio.CancelledError(f"LLM call for {output_type.__name__} cancelled mid-retry.")
             try:
                 response_data = await self.chat_session.send_message_async(
                     user_prompt_content=current_prompt,
@@ -222,30 +233,19 @@ class MusicGenerationAgent:
                 logger.info(f"All {max_retries + 1} attempts failed for {output_type.__name__}. Last error: {last_error}")
         
         if not llm_output_obj: 
-            logger.info(f"Warning: All attempts for {output_type.__name__} failed. Constructing fallback.")
-            # Try to construct a fallback object
-            try:
-                if output_type is LLMDeterminedMusicalParameters:
-                    llm_output_obj = LLMDeterminedMusicalParameters(chord_progression="C-G-Am-F", key="C", mode="major", tempo=120, melody_instrument_suggestion="Piano", chords_instrument_suggestion="Strings", song_title="Fallback Title")
-                elif output_type is SelectInstruments: 
-                    llm_output_obj = SelectInstruments(instrument_selections=[])
-                elif output_type is MelodyData: 
-                    llm_output_obj = MelodyData(bars=[])
-                elif output_type is IntervalMelodyOutput:
-                    llm_output_obj = IntervalMelodyOutput(starting_octave=3, bars=[])
-                elif output_type is SelectDrumSounds: 
-                    llm_output_obj = SelectDrumSounds(drum_sounds=[])
-                elif output_type is CreateDrumBeat:
-                    llm_output_obj = CreateDrumBeat(drum_beats=[])
-                else:
-                    llm_output_obj = output_type() # Generic fallback construction
-                
-                logger.info(f"Successfully constructed fallback for {output_type.__name__}.")
-            except Exception as e_constr_fallback: 
-                # If even fallback construction fails, then we must raise an error.
-                logger.info(f"Fatal: Failed to construct fallback for {output_type.__name__} after ChatSession failure: {e_constr_fallback}."); 
-                raise # Re-raise the construction error for the fallback
-        
+            # If llm_output_obj is None here, it means all retries failed, or cancellation happened 
+            # and was caught by chat_session.send_message_async raising CancelledError, 
+            # or our proactive checks raised CancelledError.
+            # If it wasn't a CancelledError that got us here, it means all retries failed for other reasons.
+            if last_error and not isinstance(last_error, asyncio.CancelledError):
+                logger.error(f"All {max_retries + 1} attempts failed for {output_type.__name__}. Last error: {last_error}")
+                raise ValueError(f"Failed to obtain valid output for {output_type.__name__} after {max_retries + 1} attempts. Last error: {last_error}") from last_error
+            elif not last_error: # Loop finished, no object, no error - implies cancellation might have broken loop before send_message_async
+                logger.warning(f"LLM call for {output_type.__name__} did not produce an object, possibly due to prior cancellation signal.")
+                raise asyncio.CancelledError(f"LLM call for {output_type.__name__} aborted, no output produced.")
+            # If last_error *was* a CancelledError, it should have been re-raised by send_message_async or our checks.
+            # This path implies it was caught and we broke loop, or send_message_async returned None/unexpectedly.
+
         return llm_output_obj # Return the validated object or the successfully constructed fallback
 
     # --- Music Generation Steps (formerly tools, now regular methods) ---
@@ -253,6 +253,10 @@ class MusicGenerationAgent:
     async def determine_musical_parameters(self, user_prompt: str, duration_bars: int) -> FullMusicalParameters:
         """Determines core musical parameters via LLM call, streaming explanation first."""
         logger.info(f"Step 'determine_musical_parameters' called with user_prompt: '{user_prompt}', duration_bars: {duration_bars}")
+
+        if self.chat_session.is_cancelled:
+            logger.info("determine_musical_parameters: Cancelled at method start.")
+            raise asyncio.CancelledError("determine_musical_parameters cancelled at start.")
 
         # 1. Stream Explanation
         explanation_prompt = f"""Based on the user request: '{user_prompt}' for a song of {duration_bars} bars, please explain your reasoning for the following musical parameters:
@@ -270,22 +274,31 @@ Provide only your reasoning and suggestions conversationally. Do NOT output JSON
             async for text_chunk in await self.chat_session.send_message_async(
                 user_prompt_content=explanation_prompt,
                 stream=True
-                # Note: History might be needed here if reasoning depends on prior turns.
-                # For now, assume reasoning is based on the current user_prompt context.
-                # This stream's messages are NOT added to the main history used for JSON generation.
             ):
-                if isinstance(text_chunk, str): # Check if it's a string delta
+                # chat_session.send_message_async's streaming wrapper will check is_cancelled before yielding
+                # and will break its own loop if cancelled.
+                if isinstance(text_chunk, str): 
                     logger.debug(f"STREAMING TEXT CHUNK: '{text_chunk}'") 
                     await self.chat_session.queue.add_chunk(text_chunk)
-                # else:
-                    # If ChatSession might yield other event types (e.g., error events),
-                    # handle them here or ensure they are not strings.
-                    # logger.debug(f"STREAMING OTHER EVENT TYPE: {type(text_chunk)}")
+                # If the loop finishes early due to cancellation, chat_session.is_cancelled will be true.
+            
+            if self.chat_session.is_cancelled: # Check after stream attempt
+                logger.info("determine_musical_parameters: Streaming explanation was cancelled.")
+                raise asyncio.CancelledError("Streaming explanation for musical parameters cancelled.")
 
             logger.info("Finished streaming explanation.")
+        except asyncio.CancelledError: # Catch if send_message_async itself raises it
+            logger.info("determine_musical_parameters: Streaming explanation task explicitly cancelled.")
+            raise # Re-raise to be handled by the caller (e.g., the run method)
         except Exception as e:
             logger.error(f"Error streaming explanation for musical parameters: {e}")
-            await self.chat_session.queue.error("Failed to stream parameter explanation.") # Use chat_session's queue
+            await self.chat_session.queue.error("Failed to stream parameter explanation.") 
+            # Decide if this error is fatal for this step
+            raise # Re-raise to stop this step
+
+        if self.chat_session.is_cancelled: # Check before next major action
+            logger.info("determine_musical_parameters: Cancelled after streaming explanation.")
+            raise asyncio.CancelledError("determine_musical_parameters cancelled post-explanation stream.")
 
         await self.chat_session.queue.add_chunk("\n\n")
         await self.chat_session.queue.add_chunk("---")
@@ -301,7 +314,10 @@ Provide only your reasoning and suggestions conversationally. Do NOT output JSON
             f"Output only the JSON object."
         )
         
-        # Use the focused call helper which handles retries and uses the main history
+        if self.chat_session.is_cancelled: # Check before LLM call
+            logger.info("determine_musical_parameters: Cancelled before focused LLM call for params.")
+            raise asyncio.CancelledError("determine_musical_parameters LLM call for params cancelled.")
+
         llm_simple_params = await self._focused_llm_call(focused_prompt_for_llm, LLMDeterminedMusicalParameters)
 
         # 3. Process JSON Data
@@ -337,7 +353,7 @@ Provide only your reasoning and suggestions conversationally. Do NOT output JSON
     async def select_instruments(self, determined_params: FullMusicalParameters) -> SelectInstruments:
         """Streams explanation, then selects specific instruments via LLM call."""
         logger.info(f"Step 'select_instruments' called for song: {determined_params.song_title if determined_params.song_title else 'Untitled'}")
-        soundfont_names_list = [sf["name"] for sf in self._available_soundfonts]
+        soundfont_names_list = [sf.display_name for sf in self._available_soundfonts]
 
         # 1. Stream Explanation
         explanation_prompt_instruments = f"""Now I need to select specific instruments (soundfonts) for the composition.
@@ -351,6 +367,7 @@ Please explain your choices for the melody and chords instruments from the avail
 Do NOT output JSON in this step, just your conversational reasoning."""
 
         logger.info("Streaming explanation for instrument selection...")
+        logger.info(f"length of available soundfonts: {len(self._available_soundfonts)}")
         try:
             async for text_chunk in await self.chat_session.send_message_async(
                 user_prompt_content=explanation_prompt_instruments,
@@ -405,20 +422,20 @@ Output only the JSON object."""
         if 'melody' not in selected_roles and self._available_soundfonts:
             logger.warning("No melody instrument selected by LLM, attempting fallback.")
             # Simple fallback: pick the first available soundfont not used for chords
-            first_available_melody = next((sf for sf in self._available_soundfonts if sf["name"] not in [s.instrument_name for s in validated_selections if s.role.lower() == 'chords']), self._available_soundfonts[0])
-            validated_selections.append(InstrumentSelectionItem(instrument_name=first_available_melody["name"], role="melody", explanation="Fallback for missing melody role."))
-            logger.info(f"Fallback selected melody: {first_available_melody['name']}")
+            first_available_melody = next((sf for sf in self._available_soundfonts if sf.display_name not in [s.instrument_name for s in validated_selections if s.role.lower() == 'chords']), self._available_soundfonts[0])
+            validated_selections.append(InstrumentSelectionItem(instrument_name=first_available_melody.display_name, role="melody", explanation="Fallback for missing melody role."))
+            logger.info(f"Fallback selected melody: {first_available_melody.display_name}")
 
         if 'chords' not in selected_roles and self._available_soundfonts:
             logger.warning("No chords instrument selected by LLM, attempting fallback.")
             # Simple fallback: pick the first available soundfont not used for melody
-            first_available_chords = next((sf for sf in self._available_soundfonts if sf["name"] not in [s.instrument_name for s in validated_selections if s.role.lower() == 'melody']), self._available_soundfonts[0])
+            first_available_chords = next((sf for sf in self._available_soundfonts if sf.display_name not in [s.instrument_name for s in validated_selections if s.role.lower() == 'melody']), self._available_soundfonts[0])
             # Avoid using the same instrument as melody if possible
-            if len(self._available_soundfonts) > 1 and first_available_chords["name"] == next((s.instrument_name for s in validated_selections if s.role.lower() == 'melody'), None):
-                first_available_chords = next((sf for sf in self._available_soundfonts if sf["name"] != first_available_chords["name"]), self._available_soundfonts[1 if len(self._available_soundfonts) > 1 else 0])
+            if len(self._available_soundfonts) > 1 and first_available_chords.display_name == next((s.instrument_name for s in validated_selections if s.role.lower() == 'melody'), None):
+                first_available_chords = next((sf for sf in self._available_soundfonts if sf.display_name != first_available_chords.display_name), self._available_soundfonts[1 if len(self._available_soundfonts) > 1 else 0])
 
-            validated_selections.append(InstrumentSelectionItem(instrument_name=first_available_chords["name"], role="chords", explanation="Fallback for missing chords role."))
-            logger.info(f"Fallback selected chords: {first_available_chords['name']}")
+            validated_selections.append(InstrumentSelectionItem(instrument_name=first_available_chords.display_name, role="chords", explanation="Fallback for missing chords role."))
+            logger.info(f"Fallback selected chords: {first_available_chords.display_name}")
             
         return SelectInstruments(instrument_selections=validated_selections)
 
@@ -451,17 +468,7 @@ Output only the JSON object."""
                         # Note: transform_chord_progression_to_instrument_format expects a dict-like object for instrument
                         chord_notes_data = transform_chord_progression_to_instrument_format(
                             chord_progression=processed_chord_progression,
-                            instrument=InstrumentFileRead(
-                                id=chord_instrument_details["id"],
-                                file_name=chord_instrument_details["name"],
-                                display_name=chord_instrument_details["name"],
-                                storage_key=chord_instrument_details["storage_key"],
-                                file_format="sf2",  # TODO: Fix this later (like service)
-                                file_size=0,  # TODO: Fix this later (like service)
-                                category="chords",
-                                is_public=True,
-                                description=f"Chord progression {processed_chord_progression} in {params.key} {params.mode}",
-                            ),
+                            instrument=chord_instrument_details,
                             key=params.key,
                         )
 
@@ -472,23 +479,12 @@ Output only the JSON object."""
                         else:
                             logger.info(f"Generated {len(chord_notes_data.get('notes', []))} chord notes.")
                             track_id = uuid.uuid4()
-                            instrument_file = InstrumentFileRead(
-                                id=chord_instrument_details["id"],
-                                file_name=chord_instrument_details["name"],
-                                display_name=chord_instrument_details["name"],
-                                storage_key=chord_instrument_details["storage_key"],
-                                file_format="sf2",  # TODO: Fix this later (like service)
-                                file_size=0,  # TODO: Fix this later (like service)
-                                category="chords",
-                                is_public=True,
-                                description=f"Chord progression {processed_chord_progression} in {params.key} {params.mode}",
-                            )
                             chord_track = MidiTrackRead(
                                 id=track_id,
-                                name=chord_instrument_details["name"],
-                                instrument_id=chord_instrument_details["id"],
+                                name=chord_instrument_details.display_name,
+                                instrument_id=chord_instrument_details.id,
                                 midi_notes_json=chord_notes_data.get("notes"),
-                                instrument_file=instrument_file,
+                                instrument_file=chord_instrument_details,
                             )
                             
                             logger.info(f"Sending add_midi_track action for chords: {chord_track.name}")
@@ -568,24 +564,12 @@ Keep it concise and conversational. Do NOT generate the actual musical notes or 
             
             melody_data_json = transform_melody_data_to_instrument_format(melody_data)
             
-            # Use the already fetched melody_instrument_details for InstrumentFileRead
-            instrument_file = InstrumentFileRead(
-                id=melody_instrument_details["id"],
-                file_name=melody_instrument_details["name"],
-                display_name=melody_instrument_details["name"],
-                storage_key=melody_instrument_details["storage_key"],
-                file_format="sf2", 
-                file_size=0, 
-                category="melody",
-                is_public=True,
-                description=f"Melody for {melody_instrument_name} in {params.key} {params.mode}",
-            )
             melody_track = MidiTrackRead(
                 id=track_id,
-                name=melody_instrument_details["name"],
-                instrument_id=melody_instrument_details["id"],
+                name=melody_instrument_details.display_name,
+                instrument_id=melody_instrument_details.id,
                 midi_notes_json=melody_data_json, 
-                instrument_file=instrument_file,
+                instrument_file=melody_instrument_details,
             )
             
             logger.info(f"Sending add_midi_track action for melody: {melody_track.name}")
@@ -1128,17 +1112,36 @@ Output only the JSON object."""
         return key, mode.lower() if mode else "major"
 
     # --- Main Orchestration Method ---
-    async def run(self, request: SongRequest, model_info: ModelInfo, queue: SSEQueueManager, session: Session):
-        """Orchestrates the music generation process and returns the final composition. Requires model_info for ChatSession."""
+    async def run(self, request_id: str, request: SongRequest, model_info: ModelInfo, queue: SSEQueueManager, db_session: Session):
+        """
+        Main execution flow for the music generation agent.
+        Processes the request through various stages, using LLM calls for decisions
+        and transformations, and sends progress/results via the SSE queue.
+
+        Args:
+            request_id: The unique ID for this assistant request.
+            request: The user's song request details.
+            model_info: Information about the LLM to be used.
+            queue: The SSE queue manager for sending events to the client.
+            db_session: The database session for any database operations.
+        """
+        logger.info(f"MusicGenerationAgent run started for request_id: {request_id}, prompt: '{request.user_prompt}', duration: {request.duration_bars} bars")
+        await self._init_real_data(db_session) # Initialize soundfonts and drum samples
+
+        # Initialize ChatSession for this run
+        # The system prompt can be tailored for the music agent's overall task
+        # For now, using a generic one or None if the adapter handles it.
+        system_prompt_for_agent = get_ai_composer_agent_initial_system_prompt()
+        
         self.chat_session = ChatSession(
             provider_name=model_info.provider_name,
             model_name=model_info.model_name,
-            queue=queue,
+            queue=queue, # Pass the SSEQueueManager directly to ChatSession
+            system_prompt=system_prompt_for_agent,
             api_key=model_info.api_key,
             base_url=model_info.base_url
         )
         
-        await self._init_real_data(session)
         
         logger.info(f"MusicGenerationAgent run started for prompt: '{request.user_prompt}', duration: {request.duration_bars} bars")
         logger.info(f"Available soundfonts length: {len(self._available_soundfonts)}")

@@ -358,6 +358,9 @@ def convert_interval_melody_to_absolute_melody(interval_melody: "IntervalMelodyO
 def transform_melody_data_to_instrument_format(melody_data: MelodyData) -> Dict[str, Any]:
     notes_list = []
     current_time = 0
+    if sum(note.duration_beats for bar in melody_data.bars for note in bar.notes) <= 8:
+        melody_data.bars = melody_data.bars * 2
+        
     for bar in melody_data.bars:
         for note in bar.notes:
             notes_list.append({
@@ -488,9 +491,19 @@ def transform_chord_progression_to_instrument_format(
     print("CHORD PROGRESSION:", chord_progression)
     print("INSTRUMENT:", instrument)
     print("KEY:", key)
-    chord_progression_list = chord_progression.split("-")
+    chord_progression_list = list(filter(None, chord_progression.split("-")))
+    print("CHORD PROGRESSION LIST:", chord_progression_list)
     if len(chord_progression_list) == 0:
         return []
+    if len(chord_progression_list) == 1:
+        chord_progression_list = chord_progression_list * 4
+    if len(chord_progression_list) == 2:
+        chord_progression_list = chord_progression_list[0] * 2 + chord_progression_list[1] * 2
+    if len(chord_progression_list) == 3:
+        chord_progression_list = chord_progression_list[0] + chord_progression_list[1] + chord_progression_list[2] + chord_progression_list[1]
+    if len(chord_progression_list) > 4:
+        chord_progression_list = chord_progression_list[:4]
+        
 
     # Initialize MIDI notes array
     midi_notes = []
