@@ -19,6 +19,7 @@ export const GRID_CONSTANTS = {
   borderWidth: 1,
   borderColor: '#333',
   sidebarWidth: 200,
+  sidebarButtonWidth: 28,
   measureCount: 10,
   pixelsPerSecond: 100,
   controlsWidth: 0,

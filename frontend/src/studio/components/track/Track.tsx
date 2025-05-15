@@ -17,7 +17,7 @@ import { MidiTrack } from 'src/platform/types/track_models/midi_track'; // Keep 
 interface TrackProps {
   id: string;
   index: number;
-  gridLineStyle: { borderRight: string };
+  gridLineStyle?: { borderRight: string };
 }
 
 function Track(props: TrackProps) {

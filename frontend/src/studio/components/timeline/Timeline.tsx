@@ -1,5 +1,6 @@
 import React, { forwardRef, useRef, useImperativeHandle } from 'react';
 import { Box, useTheme } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material/styles';
 import { GRID_CONSTANTS, calculatePositionTime } from '../../constants/gridConstants';
 import Track from '../track/Track';
 import PlaybackCursor, { PlaybackCursorRef } from './PlaybackCursor';
@@ -19,6 +20,7 @@ export interface TimelineProps {
   gridLineStyle?: {
     borderRight: string;
   };
+  sx?: SxProps<Theme>;
 }
 
 // Define imperative handle interface
@@ -50,7 +52,8 @@ export const Timeline = forwardRef<TimelineRef, TimelineProps>(({
   onTimeChange = () => {},
   gridLineStyle = {
     borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`
-  }
+  },
+  sx
 }, ref) => {
   const theme = useTheme();
   // Calculate the total width needed for the entire timeline
@@ -104,7 +107,8 @@ export const Timeline = forwardRef<TimelineRef, TimelineProps>(({
         '& > *': {
           backfaceVisibility: 'hidden',
           perspective: 1000,
-        }
+        },
+        ...sx
       }}
     >
       {/* Playback Cursor with ref for imperative control */}
@@ -120,7 +124,6 @@ export const Timeline = forwardRef<TimelineRef, TimelineProps>(({
       <TimelineRuler 
         measureCount={measureCount} 
         zoomLevel={zoomLevel} 
-        gridLineStyle={currentGridLineStyle}
         bpm={bpm}
         timeSignature={timeSignature}
         onTimeChange={onTimeChange}
@@ -137,7 +140,6 @@ export const Timeline = forwardRef<TimelineRef, TimelineProps>(({
           isPlaying={isPlaying}
           bpm={bpm}
           timeSignature={timeSignature}
-          gridLineStyle={currentGridLineStyle}
           onTrackPositionChange={onTrackPositionChange}
           onTimeChange={onTimeChange}
           totalWidth={totalTimelineWidth}
@@ -155,176 +157,192 @@ interface TimelineRulerProps {
   bpm?: number;
   timeSignature?: [number, number];
   onTimeChange?: (newTime: number) => void;
-  gridLineStyle: {
-    borderRight: string;
-  };
   totalWidth?: number;
 }
 
-function TimelineRuler({ measureCount, zoomLevel, bpm = 120, timeSignature = [4, 4], onTimeChange = () => {}, gridLineStyle, totalWidth }: TimelineRulerProps) {
-  const theme = useTheme();
-  // Get beats per measure from time signature
+// SIMPLIFIED TimelineRuler for testing
+// function TimelineRuler({ totalWidth }: TimelineRulerProps) {
+//   const theme = useTheme();
+//   return (
+//     <Box
+//       sx={{
+//         display: 'flex',
+//         position: 'sticky', // Keep sticky for now
+//         top: 0,
+//         bgcolor: 'background.paper',
+//         zIndex: 2,
+//         height: GRID_CONSTANTS.headerHeight,
+//         boxSizing: 'border-box',
+//         transformOrigin: "top left",
+//         borderBottom: `1px solid ${theme.palette.divider}`,
+//         boxShadow: theme.shadows[2],
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//         fontSize: '14px',
+//         color: 'text.secondary',
+//       }}
+//       style={{
+//         width: totalWidth ? `${totalWidth}px` : '100%',
+//       }}
+//     >
+//       Simplified Ruler - Test
+//     </Box>
+//   );
+// }
+
+// --- START NEW TimelineRuler IMPLEMENTATION ---
+function TimelineRuler({
+  measureCount,
+  zoomLevel = 1, // Keep zoomLevel if it might affect rendering density later
+  bpm = 120,
+  timeSignature = [4, 4],
+  onTimeChange = () => {},
+  // gridLineStyle, // No longer needed for ruler internal lines
+  totalWidth
+}: TimelineRulerProps) {
+  const theme = useTheme(); // For theme-based colors if needed, or use fixed colors
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Colors for lines - Tailored for a dark theme as per the target image
+  const SUBDIVISION_LINE_COLOR = 'rgba(255, 255, 255, 0.20)'; // Dimmest white/grey, slightly more visible
+  const BEAT_LINE_COLOR = 'rgba(255, 255, 255, 0.40)';      // Medium white/grey, slightly clearer
+  const MEASURE_LINE_COLOR = 'rgba(255, 255, 255, 0.70)';     // Brightest white/grey, slightly more prominent
+  // Text colors will be handled by Tailwind classes e.g. text-neutral-100, text-neutral-400
+
   const beatsPerMeasure = timeSignature[0];
-  // Width of a single beat in pixels
-  const beatWidth = GRID_CONSTANTS.measureWidth / beatsPerMeasure;
-  
+  const measureWidthPixels = GRID_CONSTANTS.measureWidth; // Base measure width
+  const beatWidthPixels = measureWidthPixels / beatsPerMeasure;
+
   // Handler for ruler clicks to set playback position
   const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Get click position relative to the ruler
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
-    
-    // Adjust for zoom level
-    const adjustedX = clickX / zoomLevel;
-    
-    // Convert pixel position to time in seconds using our utility function
+    const adjustedX = clickX / zoomLevel; // Assuming zoom affects ruler scale
     const newTime = calculatePositionTime(adjustedX, bpm, timeSignature);
-    // Call the callback with the new time
     onTimeChange(newTime);
   };
-  
-  return (
-    <Box 
-      sx={{ 
-        display: 'flex',
-        position: 'sticky',
-        top: 0,
-        bgcolor: 'background.paper',
-        zIndex: 2,
-        height: GRID_CONSTANTS.headerHeight,
-        boxSizing: 'border-box',
-        willChange: "transform",
-        imageRendering: "crisp-edges",
-        transformOrigin: "top left",
-        borderBottom: `1px solid ${theme.palette.divider}`,
-        boxShadow: theme.shadows[2],
-        '& > div > div > div': {
-          '&:first-of-type': {
-            top: '8px',
-            fontSize: '14px'
-          }
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const canvasWidth = totalWidth || canvas.parentElement?.clientWidth || 0;
+    const canvasHeight = GRID_CONSTANTS.headerHeight;
+
+    canvas.width = canvasWidth * dpr;
+    canvas.height = canvasHeight * dpr;
+    canvas.style.width = `${canvasWidth}px`;
+    canvas.style.height = `${canvasHeight}px`;
+    ctx.scale(dpr, dpr);
+
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Drawing logic
+    const subdivisionsPerBeat = timeSignature[1];
+    const subdivisionWidthPixels = beatWidthPixels / subdivisionsPerBeat;
+
+    // 1. Draw subdivision lines (dimmest, shortest from bottom)
+    ctx.strokeStyle = SUBDIVISION_LINE_COLOR;
+    ctx.lineWidth = 1;
+    for (let m = 0; m < measureCount; m++) {
+      for (let b = 0; b < beatsPerMeasure; b++) {
+        for (let s = 1; s < subdivisionsPerBeat; s++) {
+          const x = m * measureWidthPixels + b * beatWidthPixels + s * subdivisionWidthPixels;
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5, canvasHeight * 0.85); // Start at 85% from top (bottom 15%)
+          ctx.lineTo(x + 0.5, canvasHeight);
+          ctx.stroke();
         }
-      }}
-      style={{
+      }
+    }
+
+    // 2. Draw beat lines (medium prominence, medium height from bottom)
+    ctx.strokeStyle = BEAT_LINE_COLOR;
+    ctx.lineWidth = 0.5; // Make beat lines thinner
+    for (let m = 0; m < measureCount; m++) {
+      for (let b = 1; b < beatsPerMeasure; b++) { // Start from beat 1
+        const x = m * measureWidthPixels + b * beatWidthPixels;
+        ctx.beginPath();
+        ctx.moveTo(x + 0.5, canvasHeight * 0); // Start at 70% from top (bottom 30%)
+        ctx.lineTo(x + 0.5, canvasHeight);
+        ctx.stroke();
+      }
+    }
+
+    // 3. Draw measure lines (most prominent, full height)
+    ctx.strokeStyle = MEASURE_LINE_COLOR;
+    ctx.lineWidth = 1; // Target image lines look sharp, not overly thick
+    for (let i = 0; i <= measureCount; i++) {
+      const x = i * measureWidthPixels;
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0); // Full height
+      ctx.lineTo(x + 0.5, canvasHeight);
+      ctx.stroke();
+    }
+
+  }, [
+    totalWidth,
+    measureCount,
+    beatsPerMeasure,
+    timeSignature,
+    zoomLevel, // Add if it affects calculations like beatWidthPixels or subdivisionWidthPixels
+    SUBDIVISION_LINE_COLOR, BEAT_LINE_COLOR, MEASURE_LINE_COLOR // Redraw if colors change
+  ]);
+
+  return (
+    // Main sticky container - Apply Tailwind classes
+    <div
+      className="sticky top-0 z-[2] box-border overflow-hidden bg-[#121212] border-b border-neutral-700 shadow-sm"
+      style={{ // Height and dynamic width still via style prop
+        height: `${GRID_CONSTANTS.headerHeight}px`,
         width: totalWidth ? `${totalWidth}px` : '100%',
       }}
+      onClick={handleRulerClick}
     >
-      <Box 
-        sx={{ 
-          display: 'flex',
-          position: 'relative',
-          width: '100%',
-          cursor: 'pointer',
-        }}
-        onClick={handleRulerClick}
-      >
-        {/* Measure divisions */}
-        {Array.from({ length: measureCount }).map((_, measureIndex) => (
-          <Box 
-            key={`measure-${measureIndex}`}
-            sx={{ 
-              position: 'relative',
-              width: GRID_CONSTANTS.measureWidth,
-              height: '100%',
-              display: 'flex',
-            }}
-          >
-            {/* Measure number */}
-            <Box sx={{
-              position: 'absolute',
-              top: '8px',
-              left: '6px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: 'text.secondary',
-              userSelect: 'none',
-            }}>
-              {measureIndex + 1}
-            </Box>
-            
-            {/* Beat divisions */}
-            {Array.from({ length: beatsPerMeasure }).map((_, beatIndex) => (
-              <Box 
-                key={`beat-${measureIndex}-${beatIndex}`}
-                sx={{ 
-                  position: 'relative',
-                  width: beatWidth,
-                  height: '100%',
-                  borderLeft: `1px solid ${beatIndex === 0 ? theme.palette.text.secondary : theme.palette.divider}`,
-                  '&:first-of-type': {
-                    borderLeft: `1px solid ${theme.palette.text.secondary}`,
-                  }
-                }}
-              >
-                {/* Beat number under measure number */}
-                {beatIndex !== 0 && (
-                  <Box sx={{
-                    position: 'absolute',
-                    bottom: '6px',
-                    left: '4px',
-                    width: '100%',
-                    textAlign: 'left',
-                  fontSize: '8px',
-                  color: 'text.disabled',
-                  userSelect: 'none',
-                }}>
-                    {beatIndex + 1}
-                  </Box>
-                )}
-
-                {/* Sub-beat markings based on time signature */}
-                {beatIndex !== beatsPerMeasure && (() => {
-                  const denominator = timeSignature[1];
-                  const numSubdivisions = denominator - 1;
-                  
-                  // Return early if no subdivisions are needed
-                  if (numSubdivisions <= 0) return null;
-                  
-                  // Create an array of subdivisions
-                  return Array.from({ length: numSubdivisions }).map((_, subBeatIndex) => {
-                    // Calculate the position of each subdivision
-                    const subBeatPosition = (subBeatIndex + 1) * (beatWidth / denominator);
-                    
-                    // Determine visibility - highlight middle subdivisions for better readability
-                    const isMiddle = subBeatIndex === Math.floor(numSubdivisions / 2) - 1;
-                    const subBeatColor = theme.palette.divider;
-                    
-                    return (
-                      <Box 
-                        key={`sub-${measureIndex}-${beatIndex}-${subBeatIndex}`}
-                        sx={{
-                          position: 'absolute',
-                          top: '95%',
-                          left: `${subBeatPosition}px`,
-                          height: '4px',
-                          width: '1px',
-                          bgcolor: subBeatColor,
-                          transform: 'translateY(-2px)',
-                        }}
-                      />
-                    );
-                  });
-                })()}
-              </Box>
-            ))}
-          </Box>
-        ))}
-
-        {/* Final measure line */}
-        <Box
-          sx={{
-            position: 'absolute',
-            right: 0,
-            top: 0,
-            bottom: 0,
-            width: '1px',
-            bgcolor: theme.palette.text.secondary,
+      {/* Canvas for drawing lines */}
+      <canvas
+        ref={canvasRef}
+        className="absolute top-0 left-0 w-full h-full pointer-events-none"
+      />
+      {/* Measure Numbers */}
+      {Array.from({ length: measureCount }).map((_, measureIndex) => (
+        <div
+          key={`measure-num-${measureIndex}`}
+          className="absolute top-1/2 -translate-y-1/2 text-sm text-neutral-100 select-none z-[1]"
+          style={{ // Dynamic left positioning
+            left: `${measureIndex * measureWidthPixels + 5}px`,
+            bottom: '0px'
           }}
-        />
-      </Box>
-    </Box>
+        >
+          {measureIndex + 1}
+        </div>
+      ))}
+      {/* Beat Numbers */}
+      {Array.from({ length: measureCount }).map((_, measureIndex) => (
+        Array.from({ length: beatsPerMeasure -1 }).map((_, beatIndexInMeasure) => {
+          const actualBeatNumber = beatIndexInMeasure + 2;
+          const beatXPosition = measureIndex * measureWidthPixels + (actualBeatNumber -1) * beatWidthPixels;
+          return (
+            <div
+              key={`beat-num-${measureIndex}-${actualBeatNumber}`}
+              className="absolute top-1/2 -translate-y-1/2 text-[8px] text-neutral-400 select-none z-[1]"
+              style={{ // Dynamic left positioning, similar to measure numbers but offset from beat line
+                left: `${beatXPosition + 4}px`, // Position 4px to the right of the beat line start
+              }}
+            >
+              {actualBeatNumber}
+            </div>
+          );
+        })
+      ))}
+    </div>
   );
 }
+// --- END NEW TimelineRuler IMPLEMENTATION ---
 
 interface TimelineContentProps extends TimelineRulerProps {
   tracks: CombinedTrack[];
@@ -345,7 +363,6 @@ function TimelineContent({
   isPlaying,
   bpm,
   timeSignature,
-  gridLineStyle,
   onTrackPositionChange,
   onTimeChange,
   totalWidth
@@ -419,7 +436,7 @@ function TimelineContent({
           key={track.id}
           id={track.id}
           index={index}
-          gridLineStyle={gridLineStyle} 
+          // gridLineStyle={gridLineStyle} // Removed, GridOverlay handles this
         />
       ))}
     </Box>

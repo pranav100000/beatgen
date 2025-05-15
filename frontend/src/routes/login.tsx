@@ -2,21 +2,25 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import React, { useState } from 'react'
 import { publicRoute } from '../platform/auth/auth-utils.tsx'
 import { useAuth } from '../platform/auth/auth-context'
-import Navbar from '../platform/components/Navbar'
-import { 
-  Box, 
-  Typography, 
-  TextField, 
-  Button, 
-  Card, 
-  CardContent,
-  Container,
-  Snackbar,
-  Alert,
-  CircularProgress,
-  Divider
-} from '@mui/material'
-import GoogleIcon from '@mui/icons-material/Google'
+
+// Shadcn/ui and lucide-react imports
+import { Button } from "../components/ui/button"
+import { Input } from "../components/ui/input"
+import { Label } from "../components/ui/label"
+import { Alert as ShadcnAlert, AlertDescription, AlertTitle } from "../components/ui/alert" // Renamed to avoid conflict
+import { Separator } from "../components/ui/separator"
+import { Loader2, AlertCircle } from "lucide-react"
+
+// Placeholder for GoogleIcon, replace with actual SVG or a better Lucide icon if available
+const GoogleIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+    <path d="M12 5.38c1.63 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+    <path d="M1 1h22v22H1z" fill="none"/>
+  </svg>
+);
 
 // Login route - this will render at the path '/login'
 export const Route = createFileRoute('/login')({
@@ -39,32 +43,19 @@ function LoginPage() {
     setIsLoading(true);
     setError(null);
     
-    // Clear any existing token to avoid issues
     localStorage.removeItem('access_token');
     
     try {
-      console.log('Login attempt with email:', email);
-      
-      // Use the auth context to sign in
       const result = await signIn(email, password);
-      console.log('Login result:', result);
       
       if (result.success) {
-        console.log('Login successful, redirecting to home page');
-        
-        // Ensure we have time to set the token before navigating
         setTimeout(() => {
-          // Force reload to ensure auth state is updated
           window.location.href = '/home';
         }, 100);
       } else {
-        console.warn('Login failed:', result);
-        
-        // Handle specific login error cases
         if (result.message) {
           setError(result.message);
         } else if (result.error) {
-          // Handle known error types
           if (result.error.message.includes('Network Error')) {
             setError('Cannot connect to the authentication server. Please check your internet connection or try again later.');
           } else {
@@ -75,9 +66,6 @@ function LoginPage() {
         }
       }
     } catch (err) {
-      console.error('Login error:', err);
-      
-      // Display user-friendly error message
       if (err instanceof Error) {
         if (err.message.includes('Network Error')) {
           setError('Cannot connect to the server. Please check your internet connection.');
@@ -97,12 +85,8 @@ function LoginPage() {
     setError(null);
     
     try {
-      // Save current location for redirect after Google auth
       localStorage.setItem('auth_redirect', '/home');
-      
-      // Redirect to Google OAuth
       await signInWithGoogle();
-      // This will redirect the user to Google's login page
     } catch (err) {
       console.error('Google login error:', err);
       setError('Failed to connect to Google authentication service.');
@@ -111,130 +95,115 @@ function LoginPage() {
   };
   
   return (
-    <Container maxWidth="sm" sx={{ 
-      minHeight: 'calc(100vh - 64px)',
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      py: 4
-    }}>
-      <Card sx={{ 
-        width: '100%', 
-        p: { xs: 2, sm: 3 },
-      }}>
-        <CardContent>
-          <Typography variant="h4" component="h1" gutterBottom textAlign="center">
+    <div className="min-h-screen flex items-center justify-center bg-background py-8 px-4 sm:px-6 lg:px-8">
+      <div className="w-[512px] mx-auto space-y-8 bg-card p-6 sm:p-8 rounded-xl shadow-xl">
+        <div>
+          <h1 className="mt-6 text-center text-3xl font-extrabold text-foreground">
             Log In to BeatGen
-          </Typography>
-          
-          <Box component="form" onSubmit={handleLogin} sx={{ mt: 3 }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            
+          </h1>
+        </div>
+        
+        {error && (
+          <ShadcnAlert variant="destructive" className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </ShadcnAlert>
+        )}
+
+        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+          <div className="rounded-md shadow-sm -space-y-px">
+            <div className="space-y-2">
+              <Label htmlFor="email-address">Email address</Label>
+              <Input
+                id="email-address"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="w-full"
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading || isGoogleLoading}
+              />
+            </div>
+            <div className="space-y-2 pt-4">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="w-full"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading || isGoogleLoading}
+              />
+            </div>
+          </div>
+
+          <div>
             <Button
               type="submit"
-              fullWidth
-              variant="contained"
+              className="w-full group"
               disabled={isLoading || isGoogleLoading}
-              sx={{ mt: 3, mb: 2, position: 'relative' }}
             >
               {isLoading ? (
                 <>
-                  <CircularProgress
-                    size={24}
-                    sx={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      marginTop: '-12px',
-                      marginLeft: '-12px',
-                    }}
-                  />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing In...
                 </>
               ) : (
                 'Sign In'
               )}
             </Button>
+          </div>
+          
+          <div className="relative my-6">
+            <Separator />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+              OR
+            </span>
+          </div>
             
-            <Divider sx={{ my: 2 }}>or</Divider>
-            
+          <div>
             <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<GoogleIcon />}
+              variant="outline"
+              className="w-full group"
               onClick={handleGoogleLogin}
               disabled={isLoading || isGoogleLoading}
-              data-oauth-provider="google"
-              sx={{ 
-                mb: 2, 
-                position: 'relative',
-              }}
             >
               {isGoogleLoading ? (
                 <>
-                  <CircularProgress
-                    size={24}
-                    sx={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      marginTop: '-12px',
-                      marginLeft: '-12px',
-                    }}
-                  />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Connecting...
                 </>
               ) : (
-                'Continue with Google'
+                <>
+                  <GoogleIcon />
+                  <span className="ml-2">Continue with Google</span>
+                </>
               )}
             </Button>
+          </div>
             
-            <Box sx={{ mt: 2, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
-                Don't have an account?{' '}
-                <Button
-                  variant="text"
-                  color="primary"
-                  size="small"
-                  onClick={() => navigate({ to: '/register' })}
-                  sx={{ textTransform: 'none', p: 0, minWidth: 'auto', verticalAlign: 'baseline' }}
-                >
-                  Sign up
-                </Button>
-              </Typography>
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
-      
-      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
-        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
-          {error}
-        </Alert>
-      </Snackbar>
-    </Container>
+          <div className="mt-6 text-center text-sm">
+            <p className="text-muted-foreground">
+              Don't have an account?{' '}
+              <Button
+                variant="link"
+                className="font-medium text-primary hover:text-primary/90 p-0 h-auto"
+                onClick={() => navigate({ to: '/register' })}
+              >
+                Sign up
+              </Button>
+            </p>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

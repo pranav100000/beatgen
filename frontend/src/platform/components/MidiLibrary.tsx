@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Typography, 
@@ -9,16 +9,16 @@ import {
 import { 
   MusicNote as MusicNoteIcon
 } from '@mui/icons-material';
-import { getSounds, deleteSound } from '../api/sounds';
-import { AudioTrackRead } from '../../platform/types/track_models/audio_track';
-import AudioTrackCard from './DisplayCards/AudioTrackCard';
+import { getMidiTracks, deleteMidiTrack } from '../api/sounds';
+import { MidiTrackRead } from '../types/track_models/midi_track';
+import MidiTrackCard from './DisplayCards/MidiTrackCard';
 
-interface SoundLibraryProps {
+interface MidiLibraryProps {
   onReload?: () => void;
 }
 
-export default function SoundLibrary({ onReload }: SoundLibraryProps) {
-  const [sounds, setSounds] = useState<AudioTrackRead[]>([]);
+export default function MidiLibrary({ onReload }: MidiLibraryProps) {
+  const [midiTracks, setMidiTracks] = useState<MidiTrackRead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -26,9 +26,9 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   
-  // Load sounds on mount
+  // Load MIDI tracks on mount
   useEffect(() => {
-    loadSounds();
+    loadMidiTracks();
   }, []);
   
   // Set up timeupdate listener for tracking playback progress
@@ -62,88 +62,55 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
     };
   }, [audioElement]);
   
-  const loadSounds = async () => {
+  const loadMidiTracks = async () => {
     try {
       setLoading(true);
       setError(null);
-      const loadedSounds = await getSounds();
-      setSounds(loadedSounds);
+      const loadedTracks = await getMidiTracks();
+      setMidiTracks(loadedTracks);
     } catch (err) {
-      setError(`Failed to load sounds: ${(err as Error).message}`);
+      setError(`Failed to load MIDI tracks: ${(err as Error).message}`);
     } finally {
       setLoading(false);
     }
   };
   
-  const handlePlaySound = (sound: AudioTrackRead) => {
-    // If we're already playing this sound, pause it
-    if (playingId === sound.id && audioElement) {
+  const handlePlayTrack = (track: MidiTrackRead) => {
+    // If we're already playing this track, pause it
+    if (playingId === track.id && audioElement) {
       audioElement.pause();
       setPlayingId(null);
       return;
     }
     
-    // If we have another sound playing, stop it
-    if (audioElement) {
-      audioElement.pause();
-      setCurrentTime(0);
-    }
+    // Mock playback for now - in reality we would use a MIDI player library
+    // For now, just set the playingId to simulate being able to play MIDI
+    setPlayingId(track.id);
     
-    // Create a new audio element
-    const audio = new Audio();
+    // This is where you would initialize a MIDI player
+    console.log('Playing MIDI track:', track.name);
     
-    // Construct URL from storage key
-    const baseUrl = process.env.REACT_APP_SUPABASE_URL || '';
-    const url = `${baseUrl}/storage/v1/object/public/tracks/${sound.audio_file_storage_key}`;
-    console.log('Audio URL:', url);
-    
-    // Add CORS headers
-    audio.crossOrigin = "anonymous";
-    audio.src = url;
-    
-    // Preload metadata to get duration faster
-    audio.preload = "metadata";
-    
-    // Add error event listener for debugging
-    audio.addEventListener('error', (e) => {
-      console.error('Audio error details:', audio.error);
-      setError(`Failed to play sound: ${audio.error?.message || 'Unknown error'}`);
-    });
-    
-    audio.play().catch(err => {
-      console.error('Failed to play sound:', err);
-      setError(`Failed to play sound: ${err.message}`);
-    });
-    
-    setAudioElement(audio);
-    setPlayingId(sound.id);
-    setCurrentTime(0);
+    // For debugging - after 5 seconds auto-stop
+    setTimeout(() => {
+      setPlayingId(null);
+    }, 5000);
   };
   
-  // Handle seeking when user clicks on waveform
-  const handleSeek = (soundId: string, position: number) => {
-    if (!audioElement || playingId !== soundId) return;
-    
-    // Set the current time of the audio
-    audioElement.currentTime = position;
-    setCurrentTime(position);
-  };
-  
-  const handleDeleteSound = async (id: string) => {
-    // Stop playback if this is the sound being played
+  const handleDeleteTrack = async (id: string) => {
+    // Stop playback if this is the track being played
     if (playingId === id && audioElement) {
       audioElement.pause();
       setPlayingId(null);
     }
     
     try {
-      await deleteSound(id);
-      setSounds(sounds.filter(sound => sound.id !== id));
+      await deleteMidiTrack(id);
+      setMidiTracks(midiTracks.filter(track => track.id !== id));
       if (onReload) {
         onReload();
       }
     } catch (err) {
-      setError(`Failed to delete sound: ${(err as Error).message}`);
+      setError(`Failed to delete MIDI track: ${(err as Error).message}`);
     }
   };
   
@@ -163,7 +130,7 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
     );
   }
   
-  if (sounds.length === 0) {
+  if (midiTracks.length === 0) {
     return (
       <Box sx={{ 
         display: 'flex', 
@@ -175,10 +142,10 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
       }}>
         <MusicNoteIcon sx={{ fontSize: 60, color: '#666', mb: 2 }} />
         <Typography variant="h6" gutterBottom sx={{ color: '#ccc' }}>
-          No sounds in your library
+          No MIDI tracks in your library
         </Typography>
         <Typography variant="body2" color="text.secondary" align="center">
-          Upload some sounds to get started
+          Create MIDI tracks in the studio to see them here
         </Typography>
       </Box>
     );
@@ -187,16 +154,15 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
   return (
     <Box sx={{ mt: 2 }}>
       <Grid container spacing={2}>
-        {sounds.map((sound) => (
-          <Grid item xs={12} sm={6} md={4} key={sound.id}>
-            <AudioTrackCard
-              sound={sound}
+        {midiTracks.map((track) => (
+          <Grid item xs={12} sm={6} md={4} key={track.id}>
+            <MidiTrackCard
+              track={track}
               playingId={playingId}
               currentTime={currentTime}
               duration={duration}
-              handlePlaySound={handlePlaySound}
-              handleDeleteSound={handleDeleteSound}
-              handleSeek={handleSeek}
+              handlePlayTrack={handlePlayTrack}
+              handleDeleteTrack={handleDeleteTrack}
             />
           </Grid>
         ))}

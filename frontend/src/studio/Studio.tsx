@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo, useLayoutEffect } from 'react';
-import { Box, Button, FormControlLabel, Switch } from '@mui/material';
+import { Box, Button, FormControlLabel, Switch, useTheme } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 
 // Import components
@@ -27,11 +28,15 @@ import DrumMachineWindows from './components/drum-machine/DrumMachineWindows';
 import { StudioSettingsModal } from './components/modals/StudioSettingsModal';
 import { useAppTheme } from '../platform/theme/ThemeContext';
 import { studioLightTheme, studioDarkTheme } from '../platform/theme/ThemeContext';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { IconChevronLeftPipe, IconChevronRightPipe } from '@tabler/icons-react';
 
 // Studio Component Props
 interface StudioProps {
   projectId?: string;
 }
+
+const COLLAPSED_SIDEBAR_WIDTH = '40px'; // Width of the sidebar when collapsed
 
 // Main Studio Component
 function Studio({ projectId }: StudioProps) {
@@ -107,6 +112,7 @@ function Studio({ projectId }: StudioProps) {
   const scrollRef = useRef<TimelineRef>(null);
   const animationFrameRef = useRef<number | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Default to open
   const [existingProjectId, setExistingProjectId] = useState<string | null>(projectId || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [trackIdForFileUpload, setTrackIdForFileUpload] = useState<string | null>(null);
@@ -316,76 +322,156 @@ function Studio({ projectId }: StudioProps) {
         <Box sx={{ 
           display: 'flex', 
           flex: 1, 
-          overflow: 'hidden',
+          overflow: 'visible',
           position: 'relative',
           paddingTop: `${controlBarHeight}px`
         }}>
-          {/* Left Sidebar */}
+          {/* Left Sidebar - Fixed position */}
           <Box sx={{ 
-            width: GRID_CONSTANTS.sidebarWidth,
+            width: isSidebarOpen ? GRID_CONSTANTS.sidebarWidth : COLLAPSED_SIDEBAR_WIDTH,
+            transition: 'width 0.3s ease-in-out',
             borderRight: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`,
             bgcolor: 'background.paper',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            position: 'fixed',
+            left: 0,
+            top: `${controlBarHeight}px`,
+            height: `calc(100vh - ${controlBarHeight}px)`,
+            overflowX: 'hidden', // Prevent horizontal overflow during transition
+            zIndex: 10
           }}>
             {/* Header section with Add Track button */}
             <Box sx={{
               height: GRID_CONSTANTS.headerHeight,
+              minHeight: GRID_CONSTANTS.headerHeight, // Ensure header height is maintained
               borderBottom: `${GRID_CONSTANTS.borderWidth} solid ${GRID_CONSTANTS.borderColor}`,
               display: 'flex',
               alignItems: 'center',
-              p: 0.3,
-              boxSizing: 'border-box'
+              p: 0, // User's update
+              boxSizing: 'border-box',
+              overflow: 'hidden', // Prevent content spill during transition
             }}>
               <Box sx={{ 
                 position: 'relative', 
                 display: 'flex',
-                width: '100%'
+                alignItems: 'center',
+                width: '100%',
+                padding: '0 4px', // Add some padding for content within header
               }}>
-                <Button
-                  startIcon={<AddIcon />}
-                  variant="contained"
-                  onClick={(e) => setAddMenuAnchor(e.currentTarget)}
-                  sx={{
-                    height: 24,
-                    textTransform: 'none',
-                    width: '100%',
-                    mx: 'auto',
-                    display: 'flex',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  Add Track
-                </Button>
-                <AddTrackMenu
-                  isOpen={Boolean(addMenuAnchor)}
-                  anchorEl={addMenuAnchor}
-                  onClose={() => setAddMenuAnchor(null)}
-                  onAddTrack={handleAddTrack}
-                  onFileUpload={uploadAudioFile}
-                />
+                {isSidebarOpen && (
+                  <Button
+                      size="small"
+                      color="inherit"
+                      onClick={() => {
+                         setIsSidebarOpen(false);
+                      }}
+                      sx={{
+                          borderRadius: '8px',
+                          minWidth: 'auto',
+                          width: '28px',
+                          padding: '4px',
+                          marginRight: '8px', // Space between close button and Add Track
+                          '&:hover': {
+                              backgroundColor: currentStudioTheme.palette.action.hover,
+                          },
+                      }}
+                  >
+                      <IconChevronLeftPipe size={20} />
+                  </Button>
+                )}
+                {isSidebarOpen && (
+                  <Button
+                    startIcon={<AddIcon />}
+                    variant="contained"
+                    onClick={(e) => setAddMenuAnchor(e.currentTarget)}
+                    sx={{
+                      height: 24,
+                      textTransform: 'none',
+                      flexGrow: 1, 
+                      display: 'flex',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      minWidth: 0, // Allow shrinking
+                      overflow: 'hidden', // Prevent text overflow
+                      textOverflow: 'ellipsis', // Add ellipsis for overflow
+                      whiteSpace: 'nowrap', // Prevent wrapping
+                    }}
+                  >
+                    Add Track
+                  </Button>
+                )}
+                {/* Placeholder for right side balance when sidebar is open */}
+                {isSidebarOpen && (
+                  <Box
+                    sx={{
+                      width: '28px',
+                      minWidth: '28px',
+                      marginLeft: '8px', // Match marginRight of the left chevron
+                    }}
+                  />
+                )}
+                {!isSidebarOpen && (
+                  <Button
+                      size="small"
+                      color="inherit"
+                      onClick={() => {
+                           setIsSidebarOpen(true);
+                      }}
+                      sx={{
+                          borderRadius: '8px',
+                          minWidth: 'auto',
+                          width: '28px',
+                          padding: '4px',
+                          margin: 'auto', // Center the button when sidebar is collapsed
+                          '&:hover': {
+                              backgroundColor: currentStudioTheme.palette.action.hover,
+                          },
+                      }}
+                  >
+                      <IconChevronRightPipe size={20} />
+                  </Button>
+                )}
+                {isSidebarOpen && (
+                  <AddTrackMenu
+                    isOpen={Boolean(addMenuAnchor)}
+                    anchorEl={addMenuAnchor}
+                    onClose={() => setAddMenuAnchor(null)}
+                    onAddTrack={handleAddTrack}
+                    onFileUpload={uploadAudioFile}
+                  />
+                )}
               </Box>
             </Box>
 
             {/* Track controls section */}
-            <Box sx={{ 
-              flex: 1, 
-              overflow: 'auto'
-            }}>
-              <TrackControlsSidebar 
-                tracks={tracks}
-                onVolumeChange={handleTrackVolumeChange}
-                onPanChange={handleTrackPanChange}
-                onMuteToggle={handleTrackMuteToggle}
-                onSoloToggle={handleTrackSoloToggle}
-                onTrackDelete={handleTrackDelete}
-                onTrackNameChange={handleTrackNameChange}
-                onInstrumentChange={handleInstrumentChange}
-                onLoadAudioFile={handleLoadAudioFile}
-              />
-            </Box>
+            {isSidebarOpen && (
+              <Box sx={{ 
+                flex: 1, 
+                overflowY: 'auto', // Allow scrolling for track controls only when open
+                overflowX: 'hidden',
+              }}>
+                <TrackControlsSidebar 
+                  tracks={tracks}
+                  onVolumeChange={handleTrackVolumeChange}
+                  onPanChange={handleTrackPanChange}
+                  onMuteToggle={handleTrackMuteToggle}
+                  onSoloToggle={handleTrackSoloToggle}
+                  onTrackDelete={handleTrackDelete}
+                  onTrackNameChange={handleTrackNameChange}
+                  onInstrumentChange={handleInstrumentChange}
+                  onLoadAudioFile={handleLoadAudioFile}
+                />
+              </Box>
+            )}
           </Box>
+          
+          {/* Spacer to maintain layout with fixed sidebar */}
+          <Box sx={{ 
+            width: isSidebarOpen ? GRID_CONSTANTS.sidebarWidth : COLLAPSED_SIDEBAR_WIDTH,
+            flexShrink: 0,
+            transition: 'width 0.3s ease-in-out', // Match transition for smoothness
+          }} />
 
           {/* Timeline Area */}
           <Timeline

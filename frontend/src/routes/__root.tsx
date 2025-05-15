@@ -6,6 +6,7 @@ import { handleOAuthCallback } from '../platform/api/auth'
 import { useAppTheme } from '../platform/theme/ThemeContext'
 import Sidebar from '../platform/components/Sidebar'
 import { SidebarProvider, SidebarInset } from '../components/ui/sidebar'
+import { cn } from '../lib/utils'
 
 // Root Layout Component - this wraps all routes
 export const Route = createRootRoute({
@@ -134,12 +135,18 @@ function RootLayout() {
           background: currentThemePalette.background, 
           color: currentThemePalette.text, 
           minHeight: '100vh',
-          display: 'flex' // Added display flex
+          display: 'flex', // Added display flex
+          width: '100%' // Ensure full width within its parent flex container
         }}
       >
         {shouldShowSidebar && <Sidebar />} 
-        <SidebarInset> {/* Wrap Outlet with SidebarInset */} 
-          <main style={{ flexGrow: 1, overflowY: 'auto' }}> {/* Ensure main content can grow and scroll */} 
+        <SidebarInset> {/* Wrap Outlet with SidebarInset */}
+          <main
+            className={cn(
+              "flex-grow overflow-y-auto w-full" // Ensure it's always full width
+            )}
+            // style={{ flexGrow: 1, overflowY: 'auto' }} // Replaced by className
+          >
             <Outlet />
           </main>
         </SidebarInset>
