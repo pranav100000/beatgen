@@ -35,7 +35,7 @@ class DrumTrack(DrumTrackBase, table=True):
     id: uuid.UUID = Field(primary_key=True)
 
     # User relationship
-    user_id: uuid.UUID = Field(foreign_key="users.id")
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     user: Optional["User"] = Relationship(back_populates="drum_tracks")
 
     # Drum grid data can be added here if needed

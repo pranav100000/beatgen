@@ -42,11 +42,11 @@ class SamplerTrack(SamplerTrackBase, table=True):
     id: uuid.UUID = Field(primary_key=True, foreign_key="project_tracks.track_id")
 
     # User relationship
-    user_id: uuid.UUID = Field(foreign_key="users.id")
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     user: Optional["User"] = Relationship(back_populates="sampler_tracks")
 
     drum_track_id: Optional[uuid.UUID] = Field(
-        foreign_key="drum_tracks.id", default=None
+        default=None, foreign_key="drum_tracks.id", index=True
     )
     drum_track: Optional["DrumTrack"] = Relationship(back_populates="sampler_tracks")
 

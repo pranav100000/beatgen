@@ -14,6 +14,7 @@ from app2.models.track_models.audio_track import AudioTrackRead, AudioTrackCreat
 from app2.models.track_models.midi_track import MidiTrackRead, MidiTrackCreate
 from app2.models.track_models.sampler_track import SamplerTrackRead, SamplerTrackCreate
 from app2.models.track_models.drum_track import DrumTrackCreate, DrumTrackRead
+from app2.dto.projects_dto import Page, PageParams
 
 router = APIRouter()
 logger = get_api_logger("sounds")
@@ -170,6 +171,7 @@ async def create_drum_track(
     """
     Create a new drum track
     """
+    logger.info(f"DEbug: Drum Track data: {track_data}")
     user_id = uuid.UUID(current_user["id"])
     logger.info(f"Creating drum track '{track_data.name}' for user: {user_id}")
     try:
@@ -185,6 +187,32 @@ async def create_drum_track(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create drum track: {str(e)}",
+        )
+
+
+@router.get("/drum", response_model=Page[DrumTrackRead])
+async def get_drum_tracks(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service),
+    page_params: PageParams = Depends(),
+) -> Page[DrumTrackRead]:
+    """
+    Get all drum tracks for the current user, with pagination.
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(
+        f"Getting drum tracks for user: {user_id} "
+        f"with params: page={page_params.page}, size={page_params.size}"
+    )
+    try:
+        return await track_service.get_user_drum_tracks_paginated(
+            user_id, page_params
+        )
+    except Exception as e:
+        logger.error(f"Error getting drum tracks: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get drum tracks: {str(e)}",
         )
 
 
@@ -211,23 +239,21 @@ async def get_audio_tracks(
             detail=f"Failed to get audio tracks: {str(e)}",
         )
 
-
-@router.get("/midi", response_model=List[MidiTrackRead])
-async def get_midi_tracks(
+@router.get("/midi", response_model=Page[MidiTrackRead])
+async def get_user_midi_tracks(
     current_user: Dict[str, Any] = Depends(get_current_user),
     track_service: TrackService = Depends(get_track_service),
-) -> List[MidiTrackRead]:
-    """
-    Get all MIDI tracks for the current user
-    """
-    user_id = uuid.UUID(current_user["id"])
-    logger.info(f"Getting MIDI tracks for user: {user_id}")
+    page_params: PageParams = Depends(),
+) -> Page[MidiTrackRead]:
+    """Get all MIDI tracks for the current user, with pagination."""
+    logger.info(
+        f"Getting MIDI tracks for user ID: {current_user['id']} "
+        f"with params: page={page_params.page}, size={page_params.size}"
+    )
     try:
-        # Get all tracks for the user
-        all_tracks = await track_service.get_user_tracks(user_id, TrackType.MIDI)
-
-        # Return just the MIDI tracks
-        return all_tracks[TrackType.MIDI.value]
+        return await track_service.get_user_midi_tracks_paginated(
+            uuid.UUID(current_user["id"]), page_params
+        )
     except Exception as e:
         logger.error(f"Error getting MIDI tracks: {str(e)}")
         raise HTTPException(
@@ -235,23 +261,48 @@ async def get_midi_tracks(
             detail=f"Failed to get MIDI tracks: {str(e)}",
         )
 
+# @router.get("/midi", response_model=List[MidiTrackRead])
+# async def get_midi_tracks(
+#     current_user: Dict[str, Any] = Depends(get_current_user),
+#     track_service: TrackService = Depends(get_track_service),
+# ) -> List[MidiTrackRead]:
+#     """
+#     Get all MIDI tracks for the current user
+#     """
+#     user_id = uuid.UUID(current_user["id"])
+#     logger.info(f"Getting MIDI tracks for user: {user_id}")
+#     try:
+#         # Get all tracks for the user
+#         all_tracks = await track_service.get_user_tracks(user_id, TrackType.MIDI)
 
-@router.get("/sampler", response_model=List[SamplerTrackRead])
+#         # Return just the MIDI tracks
+#         return all_tracks[TrackType.MIDI.value]
+#     except Exception as e:
+#         logger.error(f"Error getting MIDI tracks: {str(e)}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"Failed to get MIDI tracks: {str(e)}",
+#         )
+
+
+@router.get("/sampler", response_model=Page[SamplerTrackRead])
 async def get_sampler_tracks(
     current_user: Dict[str, Any] = Depends(get_current_user),
     track_service: TrackService = Depends(get_track_service),
-) -> List[SamplerTrackRead]:
+    page_params: PageParams = Depends(),
+) -> Page[SamplerTrackRead]:
     """
-    Get all sampler tracks for the current user
+    Get all sampler tracks for the current user, with pagination.
     """
     user_id = uuid.UUID(current_user["id"])
-    logger.info(f"Getting sampler tracks for user: {user_id}")
+    logger.info(
+        f"Getting sampler tracks for user: {user_id} "
+        f"with params: page={page_params.page}, size={page_params.size}"
+    )
     try:
-        # Get all tracks for the user
-        all_tracks = await track_service.get_user_tracks(user_id, TrackType.SAMPLER)
-
-        # Return just the sampler tracks
-        return all_tracks[TrackType.SAMPLER.value]
+        return await track_service.get_user_sampler_tracks_paginated(
+            user_id, page_params
+        )
     except Exception as e:
         logger.error(f"Error getting sampler tracks: {str(e)}")
         raise HTTPException(
@@ -353,6 +404,38 @@ async def get_sampler_track(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get sampler track: {str(e)}",
+        )
+
+
+@router.get("/drum/{track_id}", response_model=DrumTrackRead)
+async def get_drum_track(
+    track_id: uuid.UUID,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service),
+) -> DrumTrackRead:
+    """
+    Get a specific drum track by ID
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Getting drum track with ID: {track_id} for user: {user_id}")
+    try:
+        return await track_service.get_track(track_id, TrackType.DRUM, user_id)
+    except NotFoundException as e:
+        logger.error(f"Drum track not found: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Drum track not found"
+        )
+    except ForbiddenException as e:
+        logger.error(f"Forbidden: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this drum track",
+        )
+    except Exception as e:
+        logger.error(f"Error getting drum track: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get drum track: {str(e)}",
         )
 
 
@@ -458,4 +541,39 @@ async def delete_sampler_track(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete sampler track: {str(e)}",
+        )
+
+
+@router.delete("/drum/{track_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_drum_track(
+    track_id: uuid.UUID,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    track_service: TrackService = Depends(get_track_service),
+) -> None:
+    """
+    Delete a drum track
+    """
+    user_id = uuid.UUID(current_user["id"])
+    logger.info(f"Deleting drum track with ID: {track_id} for user: {user_id}")
+    try:
+        result = await track_service.delete_track(track_id, TrackType.DRUM, user_id)
+        if result:
+            logger.info(f"Deleted drum track with ID: {track_id}")
+        return None
+    except NotFoundException as e:
+        logger.error(f"Drum track not found: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Drum track not found"
+        )
+    except ForbiddenException as e:
+        logger.error(f"Forbidden: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete this drum track",
+        )
+    except Exception as e:
+        logger.error(f"Error deleting drum track: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete drum track: {str(e)}",
         )

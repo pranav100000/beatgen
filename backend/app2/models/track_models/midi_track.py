@@ -32,10 +32,10 @@ class MidiTrack(MidiTrackBase, table=True):
     __tablename__ = "midi_tracks"
 
     # User relationship
-    user_id: uuid.UUID = Field(foreign_key="users.id")
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     user: Optional["User"] = Relationship(back_populates="midi_tracks")
 
-    instrument_id: uuid.UUID = Field(foreign_key="instrument_files.id")
+    instrument_id: uuid.UUID = Field(foreign_key="instrument_files.id", index=True)
     instrument_file: Optional["InstrumentFile"] = Relationship(
         back_populates="midi_tracks"
     )
