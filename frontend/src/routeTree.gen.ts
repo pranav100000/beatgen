@@ -13,10 +13,15 @@
 import { Route as rootRoute } from './routes/__root'
 import { Route as StudioImport } from './routes/studio'
 import { Route as SettingsImport } from './routes/settings'
+import { Route as SamplerTracksImport } from './routes/sampler-tracks'
 import { Route as RegisterImport } from './routes/register'
+import { Route as ProjectsImport } from './routes/projects'
 import { Route as OauthCallbackImport } from './routes/oauth-callback'
+import { Route as MidiTracksImport } from './routes/midi-tracks'
 import { Route as LoginImport } from './routes/login'
 import { Route as HomeImport } from './routes/home'
+import { Route as DrumTracksImport } from './routes/drum-tracks'
+import { Route as AudioTracksImport } from './routes/audio-tracks'
 import { Route as IndexImport } from './routes/index'
 
 // Create/Update Routes
@@ -33,15 +38,33 @@ const SettingsRoute = SettingsImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const SamplerTracksRoute = SamplerTracksImport.update({
+  id: '/sampler-tracks',
+  path: '/sampler-tracks',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const RegisterRoute = RegisterImport.update({
   id: '/register',
   path: '/register',
   getParentRoute: () => rootRoute,
 } as any)
 
+const ProjectsRoute = ProjectsImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const OauthCallbackRoute = OauthCallbackImport.update({
   id: '/oauth-callback',
   path: '/oauth-callback',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const MidiTracksRoute = MidiTracksImport.update({
+  id: '/midi-tracks',
+  path: '/midi-tracks',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -54,6 +77,18 @@ const LoginRoute = LoginImport.update({
 const HomeRoute = HomeImport.update({
   id: '/home',
   path: '/home',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const DrumTracksRoute = DrumTracksImport.update({
+  id: '/drum-tracks',
+  path: '/drum-tracks',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const AudioTracksRoute = AudioTracksImport.update({
+  id: '/audio-tracks',
+  path: '/audio-tracks',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -74,6 +109,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/audio-tracks': {
+      id: '/audio-tracks'
+      path: '/audio-tracks'
+      fullPath: '/audio-tracks'
+      preLoaderRoute: typeof AudioTracksImport
+      parentRoute: typeof rootRoute
+    }
+    '/drum-tracks': {
+      id: '/drum-tracks'
+      path: '/drum-tracks'
+      fullPath: '/drum-tracks'
+      preLoaderRoute: typeof DrumTracksImport
+      parentRoute: typeof rootRoute
+    }
     '/home': {
       id: '/home'
       path: '/home'
@@ -88,6 +137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginImport
       parentRoute: typeof rootRoute
     }
+    '/midi-tracks': {
+      id: '/midi-tracks'
+      path: '/midi-tracks'
+      fullPath: '/midi-tracks'
+      preLoaderRoute: typeof MidiTracksImport
+      parentRoute: typeof rootRoute
+    }
     '/oauth-callback': {
       id: '/oauth-callback'
       path: '/oauth-callback'
@@ -95,11 +151,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OauthCallbackImport
       parentRoute: typeof rootRoute
     }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsImport
+      parentRoute: typeof rootRoute
+    }
     '/register': {
       id: '/register'
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterImport
+      parentRoute: typeof rootRoute
+    }
+    '/sampler-tracks': {
+      id: '/sampler-tracks'
+      path: '/sampler-tracks'
+      fullPath: '/sampler-tracks'
+      preLoaderRoute: typeof SamplerTracksImport
       parentRoute: typeof rootRoute
     }
     '/settings': {
@@ -123,20 +193,30 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/audio-tracks': typeof AudioTracksRoute
+  '/drum-tracks': typeof DrumTracksRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/midi-tracks': typeof MidiTracksRoute
   '/oauth-callback': typeof OauthCallbackRoute
+  '/projects': typeof ProjectsRoute
   '/register': typeof RegisterRoute
+  '/sampler-tracks': typeof SamplerTracksRoute
   '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/audio-tracks': typeof AudioTracksRoute
+  '/drum-tracks': typeof DrumTracksRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/midi-tracks': typeof MidiTracksRoute
   '/oauth-callback': typeof OauthCallbackRoute
+  '/projects': typeof ProjectsRoute
   '/register': typeof RegisterRoute
+  '/sampler-tracks': typeof SamplerTracksRoute
   '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
 }
@@ -144,10 +224,15 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/audio-tracks': typeof AudioTracksRoute
+  '/drum-tracks': typeof DrumTracksRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/midi-tracks': typeof MidiTracksRoute
   '/oauth-callback': typeof OauthCallbackRoute
+  '/projects': typeof ProjectsRoute
   '/register': typeof RegisterRoute
+  '/sampler-tracks': typeof SamplerTracksRoute
   '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
 }
@@ -156,28 +241,43 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/audio-tracks'
+    | '/drum-tracks'
     | '/home'
     | '/login'
+    | '/midi-tracks'
     | '/oauth-callback'
+    | '/projects'
     | '/register'
+    | '/sampler-tracks'
     | '/settings'
     | '/studio'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/audio-tracks'
+    | '/drum-tracks'
     | '/home'
     | '/login'
+    | '/midi-tracks'
     | '/oauth-callback'
+    | '/projects'
     | '/register'
+    | '/sampler-tracks'
     | '/settings'
     | '/studio'
   id:
     | '__root__'
     | '/'
+    | '/audio-tracks'
+    | '/drum-tracks'
     | '/home'
     | '/login'
+    | '/midi-tracks'
     | '/oauth-callback'
+    | '/projects'
     | '/register'
+    | '/sampler-tracks'
     | '/settings'
     | '/studio'
   fileRoutesById: FileRoutesById
@@ -185,20 +285,30 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AudioTracksRoute: typeof AudioTracksRoute
+  DrumTracksRoute: typeof DrumTracksRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
+  MidiTracksRoute: typeof MidiTracksRoute
   OauthCallbackRoute: typeof OauthCallbackRoute
+  ProjectsRoute: typeof ProjectsRoute
   RegisterRoute: typeof RegisterRoute
+  SamplerTracksRoute: typeof SamplerTracksRoute
   SettingsRoute: typeof SettingsRoute
   StudioRoute: typeof StudioRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AudioTracksRoute: AudioTracksRoute,
+  DrumTracksRoute: DrumTracksRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
+  MidiTracksRoute: MidiTracksRoute,
   OauthCallbackRoute: OauthCallbackRoute,
+  ProjectsRoute: ProjectsRoute,
   RegisterRoute: RegisterRoute,
+  SamplerTracksRoute: SamplerTracksRoute,
   SettingsRoute: SettingsRoute,
   StudioRoute: StudioRoute,
 }
@@ -214,10 +324,15 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
+        "/audio-tracks",
+        "/drum-tracks",
         "/home",
         "/login",
+        "/midi-tracks",
         "/oauth-callback",
+        "/projects",
         "/register",
+        "/sampler-tracks",
         "/settings",
         "/studio"
       ]
@@ -225,17 +340,32 @@ export const routeTree = rootRoute
     "/": {
       "filePath": "index.tsx"
     },
+    "/audio-tracks": {
+      "filePath": "audio-tracks.tsx"
+    },
+    "/drum-tracks": {
+      "filePath": "drum-tracks.tsx"
+    },
     "/home": {
       "filePath": "home.tsx"
     },
     "/login": {
       "filePath": "login.tsx"
     },
+    "/midi-tracks": {
+      "filePath": "midi-tracks.tsx"
+    },
     "/oauth-callback": {
       "filePath": "oauth-callback.tsx"
     },
+    "/projects": {
+      "filePath": "projects.tsx"
+    },
     "/register": {
       "filePath": "register.tsx"
+    },
+    "/sampler-tracks": {
+      "filePath": "sampler-tracks.tsx"
     },
     "/settings": {
       "filePath": "settings.tsx"

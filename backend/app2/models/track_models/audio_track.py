@@ -40,7 +40,7 @@ class AudioTrack(AudioTrackBase, table=True):
     id: uuid.UUID = Field(primary_key=True)
 
     # User relationship
-    user_id: uuid.UUID = Field(foreign_key="users.id")
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     user: Optional["User"] = Relationship(back_populates="audio_tracks")
 
     # Relationships to project tracks

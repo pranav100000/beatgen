@@ -26,7 +26,7 @@ class Project(ProjectBase, table=True):
 
     __tablename__ = "projects"
     # Relationships
-    user_id: uuid.UUID = Field(foreign_key="users.id")
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     user: Optional["User"] = Relationship(back_populates="projects")
     # Direct relationship to ProjectTrack entries
     project_tracks: List["ProjectTrack"] = Relationship(back_populates="project")

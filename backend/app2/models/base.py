@@ -32,13 +32,17 @@ def all_optional(base_model: Type[BaseModel], name: str) -> Type[BaseModel]:
 
 
 class TimestampMixin(SQLModel):
-    """Mixin that adds created_at and updated_at fields to models"""
+    """Mixin for created_at and updated_at timestamps"""
 
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, sa_column=TIMESTAMP(timezone=True)
+        default_factory=datetime.utcnow,
+        index=True,
+        sa_type=TIMESTAMP(timezone=True)
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow, sa_column=TIMESTAMP(timezone=True)
+        default_factory=datetime.utcnow,
+        index=True,
+        sa_type=TIMESTAMP(timezone=True)
     )
 
     # Configure JSON serialization for datetime fields

@@ -31,10 +31,13 @@ from app2.models.track_models.midi_track import (
 )
 from app2.models.track_models.sampler_track import (
     SamplerTrackRead,
+    SamplerTrackCreate,
 )
 from app2.models.track_models.drum_track import (
     DrumTrackRead,
+    DrumTrackCreate,
 )
+from app2.dto.projects_dto import Page, PageParams
 
 logger = get_service_logger("track")
 
@@ -132,6 +135,102 @@ class TrackService:
             logger.error(f"Error getting user tracks: {str(e)}")
             logger.error(traceback.format_exc())
             raise ServiceException(f"Failed to get user tracks: {str(e)}")
+
+    async def get_user_midi_tracks_paginated(
+        self, user_id: uuid.UUID, page_params: PageParams
+    ) -> Page[MidiTrackRead]:
+        """Get paginated MIDI tracks for a specific user."""
+        logger.info(
+            f"Getting paginated MIDI tracks for user ID: {user_id} "
+            f"with params: page={page_params.page}, size={page_params.size}"
+        )
+        try:
+            skip = (page_params.page - 1) * page_params.size
+            limit = page_params.size
+
+            midi_tracks_orm, total_items_count = (
+                await self.midi_repository.get_by_user_id_paginated(
+                    user_id, skip=skip, limit=limit
+                )
+            )
+
+            midi_tracks_read = [
+                MidiTrackRead.model_validate(track) for track in midi_tracks_orm
+            ]
+
+            return Page.create(
+                items=midi_tracks_read,
+                total_items=total_items_count,
+                params=page_params,
+            )
+        except Exception as e:
+            logger.error(f"Error getting paginated MIDI tracks: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise ServiceException(f"Failed to get paginated MIDI tracks: {str(e)}")
+
+    async def get_user_sampler_tracks_paginated(
+        self, user_id: uuid.UUID, page_params: PageParams
+    ) -> Page[SamplerTrackRead]:
+        """Get paginated Sampler tracks for a specific user."""
+        logger.info(
+            f"Getting paginated Sampler tracks for user ID: {user_id} "
+            f"with params: page={page_params.page}, size={page_params.size}"
+        )
+        try:
+            skip = (page_params.page - 1) * page_params.size
+            limit = page_params.size
+
+            sampler_tracks_orm, total_items_count = (
+                await self.sampler_repository.get_by_user_id_paginated(
+                    user_id, skip=skip, limit=limit
+                )
+            )
+
+            sampler_tracks_read = [
+                SamplerTrackRead.model_validate(track) for track in sampler_tracks_orm
+            ]
+
+            return Page.create(
+                items=sampler_tracks_read,
+                total_items=total_items_count,
+                params=page_params,
+            )
+        except Exception as e:
+            logger.error(f"Error getting paginated Sampler tracks: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise ServiceException(f"Failed to get paginated Sampler tracks: {str(e)}")
+
+    async def get_user_drum_tracks_paginated(
+        self, user_id: uuid.UUID, page_params: PageParams
+    ) -> Page[DrumTrackRead]:
+        """Get paginated Drum tracks for a specific user."""
+        logger.info(
+            f"Getting paginated Drum tracks for user ID: {user_id} "
+            f"with params: page={page_params.page}, size={page_params.size}"
+        )
+        try:
+            skip = (page_params.page - 1) * page_params.size
+            limit = page_params.size
+
+            drum_tracks_orm, total_items_count = (
+                await self.drum_repository.get_by_user_id_paginated(
+                    user_id, skip=skip, limit=limit
+                )
+            )
+
+            drum_tracks_read = [
+                DrumTrackRead.model_validate(track) for track in drum_tracks_orm
+            ]
+
+            return Page.create(
+                items=drum_tracks_read,
+                total_items=total_items_count,
+                params=page_params,
+            )
+        except Exception as e:
+            logger.error(f"Error getting paginated Drum tracks: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise ServiceException(f"Failed to get paginated Drum tracks: {str(e)}")
 
     async def get_track(
         self, track_id: uuid.UUID, track_type: TrackType, user_id: uuid.UUID

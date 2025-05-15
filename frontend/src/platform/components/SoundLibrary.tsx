@@ -3,146 +3,15 @@ import {
   Box, 
   Typography, 
   Grid, 
-  Card, 
-  CardContent, 
-  IconButton,
   CircularProgress,
   Alert,
-  Divider
 } from '@mui/material';
 import { 
-  PlayArrow as PlayIcon, 
-  Pause as PauseIcon, 
-  Delete as DeleteIcon,
   MusicNote as MusicNoteIcon
 } from '@mui/icons-material';
 import { getSounds, deleteSound } from '../api/sounds';
 import { AudioTrackRead } from '../../platform/types/track_models/audio_track';
-
-// Enhanced waveform component with progress and click handling
-const Waveform = ({ 
-  data, 
-  playing = false, 
-  progress = 0, 
-  duration = 0,
-  onSeek
-}: { 
-  data: number[], 
-  playing?: boolean, 
-  progress?: number, 
-  duration?: number,
-  onSeek?: (position: number) => void 
-}) => {
-  const [hoverPosition, setHoverPosition] = useState<number | null>(null);
-  const waveformRef = useRef<HTMLDivElement>(null);
-  
-  // Calculate current position as percentage
-  const progressPercent = duration > 0 ? (progress / duration) : 0;
-  
-  // Handle mouse move to show time indicator
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!waveformRef.current || !onSeek) return;
-    
-    const rect = waveformRef.current.getBoundingClientRect();
-    const position = (e.clientX - rect.left) / rect.width;
-    setHoverPosition(position);
-  };
-  
-  // Handle click to seek
-  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!waveformRef.current || !onSeek || !duration) return;
-    
-    const rect = waveformRef.current.getBoundingClientRect();
-    const position = (e.clientX - rect.left) / rect.width;
-    onSeek(position * duration);
-  };
-  
-  // Format time for hover display
-  const formatHoverTime = (position: number): string => {
-    if (!duration) return "0:00";
-    const seconds = Math.floor(position * duration);
-    return formatTime(seconds);
-  };
-  
-  return (
-    <Box 
-      ref={waveformRef}
-      onClick={handleClick}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={() => setHoverPosition(null)}
-      sx={{ 
-        height: 40, 
-        width: '100%', 
-        display: 'flex', 
-        alignItems: 'flex-end',
-        position: 'relative',
-        marginTop: 1,
-        marginBottom: 1,
-        cursor: onSeek ? 'pointer' : 'default',
-      }}
-    >
-      {/* Waveform bars */}
-      {data.map((value, index) => (
-        <Box 
-          key={index}
-          sx={{
-            height: `${Math.max(3, value * 40)}px`,
-            width: '100%',
-            flex: 1,
-            backgroundColor: index < (data.length * progressPercent) ? '#6a3de8' : '#555',
-            mx: '1px',
-            transition: 'background-color 0.1s ease'
-          }}
-        />
-      ))}
-      
-      {/* Time indicator on hover */}
-      {hoverPosition !== null && (
-        <Box sx={{
-          position: 'absolute',
-          bottom: '100%',
-          left: `${hoverPosition * 100}%`,
-          transform: 'translateX(-50%)',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          color: 'white',
-          padding: '2px 6px',
-          borderRadius: '4px',
-          fontSize: '0.7rem',
-          marginBottom: '4px'
-        }}>
-          {formatHoverTime(hoverPosition)}
-        </Box>
-      )}
-      
-      {/* Playback position indicator */}
-      {playing && progress > 0 && (
-        <Box sx={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: `${progressPercent * 100}%`,
-          width: '2px',
-          backgroundColor: '#fff',
-          zIndex: 2
-        }} />
-      )}
-    </Box>
-  );
-};
-
-// Format time in mm:ss
-const formatTime = (seconds: number): string => {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-};
-
-// Format file size
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
+import AudioTrackCard from './DisplayCards/AudioTrackCard';
 
 interface SoundLibraryProps {
   onReload?: () => void;
@@ -320,73 +189,15 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
       <Grid container spacing={2}>
         {sounds.map((sound) => (
           <Grid item xs={12} sm={6} md={4} key={sound.id}>
-            <Card sx={{ 
-              bgcolor: '#1a1a1a', 
-              borderRadius: 2,
-              '&:hover': {
-                boxShadow: '0 5px 15px rgba(0,0,0,0.2)'
-              }
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="h6" sx={{ color: 'white', fontSize: '1rem' }}>
-                    {sound.name}
-                  </Typography>
-                  <Box>
-                    <IconButton 
-                      size="small" 
-                      onClick={() => handlePlaySound(sound)}
-                      sx={{ color: playingId === sound.id ? '#6a3de8' : 'white' }}
-                    >
-                      {playingId === sound.id ? <PauseIcon /> : <PlayIcon />}
-                    </IconButton>
-                    <IconButton 
-                      size="small" 
-                      onClick={() => handleDeleteSound(sound.id)}
-                      sx={{ color: 'white' }}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                </Box>
-                
-                <Waveform 
-                  data={sound.waveform_data || []} 
-                  playing={playingId === sound.id}
-                  progress={playingId === sound.id ? currentTime : 0}
-                  duration={playingId === sound.id ? (duration || sound.audio_file_duration) : sound.audio_file_duration}
-                  onSeek={(position) => handleSeek(sound.id, position)}
-                />
-                
-                {/* Current playback time display */}
-                {playingId === sound.id && (
-                  <Typography variant="body2" sx={{ 
-                    textAlign: 'center', 
-                    color: '#6a3de8',
-                    fontSize: '0.75rem',
-                    mt: 0.5
-                  }}>
-                    {formatTime(currentTime)} / {formatTime(duration || sound.audio_file_duration)}
-                  </Typography>
-                )}
-                
-                <Divider sx={{ my: 1, bgcolor: '#444' }} />
-                
-                <Box sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  color: '#aaa',
-                  fontSize: '0.8rem'
-                }}>
-                  <Typography variant="body2" sx={{ color: '#aaa' }}>
-                    {formatTime(sound.audio_file_duration)}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#aaa' }}>
-                    {sound.audio_file_format} · {formatFileSize(sound.audio_file_size)}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
+            <AudioTrackCard
+              sound={sound}
+              playingId={playingId}
+              currentTime={currentTime}
+              duration={duration}
+              handlePlaySound={handlePlaySound}
+              handleDeleteSound={handleDeleteSound}
+              handleSeek={handleSeek}
+            />
           </Grid>
         ))}
       </Grid>

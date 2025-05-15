@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import React, { useEffect } from 'react'
 import Projects from '../platform/pages/Projects'
-import Navbar from '../platform/components/Navbar'
+import HomePage from '../platform/pages/HomePage'
 import { requireAuth, AuthErrorComponent } from '../platform/auth/auth-utils.tsx'
 
 // Home/Projects route - this will render at the path '/home'
@@ -16,7 +16,7 @@ export const Route = createFileRoute('/home')({
   errorComponent: AuthErrorComponent,
 })
 
-function HomePage() {
+function HomePageDemo() {
   // For demonstration, log that we've accessed this protected route
   useEffect(() => {
     console.log('Accessing protected home/projects page')
@@ -25,8 +25,7 @@ function HomePage() {
   // Render the Navbar and Projects component
   return (
     <>
-      <Navbar />
-      <Projects />
+      <HomePage />
     </>
   )
 }

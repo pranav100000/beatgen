@@ -1,9 +1,12 @@
 import { createRootRoute, Outlet, useRouter } from '@tanstack/react-router'
-import React, { useEffect } from 'react'
-import Navbar from '../platform/components/Navbar'
+import React, { useEffect, useState } from 'react'
+// import Navbar from '../platform/components/Navbar'
 import { useAuth } from '../platform/auth/auth-context'
 import { handleOAuthCallback } from '../platform/api/auth'
 import { useAppTheme } from '../platform/theme/ThemeContext'
+import Sidebar from '../platform/components/Sidebar'
+import { SidebarProvider, SidebarInset } from '../components/ui/sidebar'
+import { cn } from '../lib/utils'
 
 // Root Layout Component - this wraps all routes
 export const Route = createRootRoute({
@@ -50,6 +53,7 @@ function RootLayout() {
   const { loading } = useAuth();
   const router = useRouter();
   const { mode } = useAppTheme();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   // Simple studio route detection using string matching on location.href
   // This is more reliable than router state during transitions
@@ -112,12 +116,41 @@ function RootLayout() {
     );
   }
   
+  // Determine if the sidebar should be shown based on the route
+  // For example, hide sidebar on /studio, /login, /register, /etc.
+  const noSidebarRoutes = ['/studio', '/login', '/register', '/']; // Added landing page '/'
+  const shouldShowSidebar = !noSidebarRoutes.some(route => currentUrl.endsWith(route) || currentUrl.includes(route + '/') || currentUrl.includes(route + '?'));
+
   // No navbar in the root layout - each route will add its own navbar if needed
+  // The main div now becomes a flex container to hold Sidebar and SidebarInset
   return (
-    <div id="root-layout" style={{ background: currentThemePalette.background, color: currentThemePalette.text, minHeight: '100vh' }}>
-      <main>
-        <Outlet />
-      </main>
-    </div>
+    <SidebarProvider 
+      open={isSidebarOpen}
+      onOpenChange={setIsSidebarOpen} 
+      defaultOpen={true} // Default open state
+    >
+      <div 
+        id="root-layout" 
+        style={{ 
+          background: currentThemePalette.background, 
+          color: currentThemePalette.text, 
+          minHeight: '100vh',
+          display: 'flex', // Added display flex
+          width: '100%' // Ensure full width within its parent flex container
+        }}
+      >
+        {shouldShowSidebar && <Sidebar />} 
+        <SidebarInset> {/* Wrap Outlet with SidebarInset */}
+          <main
+            className={cn(
+              "flex-grow overflow-y-auto w-full" // Ensure it's always full width
+            )}
+            // style={{ flexGrow: 1, overflowY: 'auto' }} // Replaced by className
+          >
+            <Outlet />
+          </main>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 }

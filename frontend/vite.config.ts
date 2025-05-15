@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { TanStackRouterVite } from '@tanstack/router-vite-plugin'
-import path from 'path'
 import fs from 'fs'
 import https from 'https'
+import path from "path"
+import tailwindcss from "@tailwindcss/vite"
 
 // Removed srcPath check as it was causing issues in Vercel build environment
 // const srcPath = path.resolve(__dirname, '../src')
@@ -16,6 +17,7 @@ export default defineConfig(({ command }) => {
   return {
     plugins: [
       react(),
+      tailwindcss(),
       TanStackRouterVite(),
     ],
     define: {
@@ -26,6 +28,7 @@ export default defineConfig(({ command }) => {
     },
     resolve: {
       alias: [
+        { find: '@', replacement: path.resolve(__dirname, './src') },
         { find: '@src', replacement: path.resolve(__dirname, 'src') },
         { find: '@core', replacement: path.resolve(__dirname, 'src/core') },
         { find: '@components', replacement: path.resolve(__dirname, 'src/components') },

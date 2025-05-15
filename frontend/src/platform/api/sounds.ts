@@ -5,6 +5,7 @@ import { AudioTrackCreate } from '../types/track_models/audio_track';
 import { MidiTrackCreate } from '../types/track_models/midi_track';
 import { SamplerTrackCreate } from '../types/track_models/sampler_track';
 import { DrumTrackCreate } from '../types/track_models/drum_track';
+import { Page } from '../types/pagination';
 
 // Keep using the Sound interface from studio for now until we can fully migrate
 
@@ -143,11 +144,44 @@ export const createDrumTrackRecord = async (drumData: DrumTrackCreate): Promise<
 };
 
 /**
- * Get all sounds for the current user
- * @returns Array of sounds
+ * Get all audio tracks for the current user
+ * @returns Array of audio tracks
  */
 export const getSounds = async (): Promise<AudioTrackRead[]> => {
   const response = await apiClient.get('/sounds/audio');
+  return response.data;
+};
+
+/**
+ * Get all MIDI tracks for the current user
+ * @returns Array of MIDI tracks
+ */
+export const getMidiTracks = async (page: number = 1, size: number = 10): Promise<Page<MidiTrackRead>> => {
+  const response = await apiClient.get<Page<MidiTrackRead>>('/sounds/midi', {
+    params: { page, size }
+  });
+  return response.data;
+};
+
+/**
+ * Get all sampler tracks for the current user
+ * @returns Array of sampler tracks
+ */
+export const getSamplerTracks = async (page: number = 1, size: number = 10): Promise<Page<SamplerTrackRead>> => {
+  const response = await apiClient.get<Page<SamplerTrackRead>>('/sounds/sampler', {
+    params: { page, size }
+  });
+  return response.data;
+};
+
+/**
+ * Get all drum tracks for the current user
+ * @returns Array of drum tracks
+ */
+export const getDrumTracks = async (page: number = 1, size: number = 10): Promise<Page<DrumTrackRead>> => {
+  const response = await apiClient.get<Page<DrumTrackRead>>('/sounds/drum', {
+    params: { page, size }
+  });
   return response.data;
 };
 
@@ -157,16 +191,70 @@ export const getSounds = async (): Promise<AudioTrackRead[]> => {
  * @returns The sound object
  */
 export const getSound = async (id: string): Promise<AudioTrackRead> => {
-  const response = await apiClient.get(`/sounds/${id}`);
+  const response = await apiClient.get(`/sounds/audio/${id}`);
   return response.data;
 };
 
 /**
- * Delete a sound
- * @param id The sound ID
+ * Get a specific MIDI track by ID
+ * @param id The MIDI track ID
+ * @returns The MIDI track object
+ */
+export const getMidiTrack = async (id: string): Promise<MidiTrackRead> => {
+  const response = await apiClient.get(`/sounds/midi/${id}`);
+  return response.data;
+};
+
+/**
+ * Get a specific sampler track by ID
+ * @param id The sampler track ID
+ * @returns The sampler track object
+ */
+export const getSamplerTrack = async (id: string): Promise<SamplerTrackRead> => {
+  const response = await apiClient.get(`/sounds/sampler/${id}`);
+  return response.data;
+};
+
+/**
+ * Get a specific drum track by ID
+ * @param id The drum track ID
+ * @returns The drum track object
+ */
+export const getDrumTrack = async (id: string): Promise<DrumTrackRead> => {
+  const response = await apiClient.get(`/sounds/drum/${id}`);
+  return response.data;
+};
+
+/**
+ * Delete an audio track
+ * @param id The audio track ID
  */
 export const deleteSound = async (id: string): Promise<void> => {
-  await apiClient.delete(`/sounds/${id}`);
+  await apiClient.delete(`/sounds/audio/${id}`);
+};
+
+/**
+ * Delete a MIDI track
+ * @param id The MIDI track ID
+ */
+export const deleteMidiTrack = async (id: string): Promise<void> => {
+  await apiClient.delete(`/sounds/midi/${id}`);
+};
+
+/**
+ * Delete a sampler track
+ * @param id The sampler track ID
+ */
+export const deleteSamplerTrack = async (id: string): Promise<void> => {
+  await apiClient.delete(`/sounds/sampler/${id}`);
+};
+
+/**
+ * Delete a drum track
+ * @param id The drum track ID
+ */
+export const deleteDrumTrack = async (id: string): Promise<void> => {
+  await apiClient.delete(`/sounds/drum/${id}`);
 };
 
 /**

@@ -1,0 +1,44 @@
+* {
+  font-family: 'Sen', sans-serif !important;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* background-color: #ffffff; */ /* Removed - Let MUI theme handle */
+  /* color: #000000; */ /* Removed - Let MUI theme handle */
+}
+
+code {
+  font-family: 'Sen', sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  /* background-color: #ffffff; */ /* Removed - Let MUI theme handle */
+}
+
+/* Fix for MUI components */
+.MuiPopover-root {
+  z-index: 9999 !important;
+}
+
+/* Hide App.css elements */
+.logo, .card, .read-the-docs {
+  display: none;
+}
+
+/* Hide all scrollbars */
+* {
+  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
+}
