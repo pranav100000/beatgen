@@ -66,8 +66,9 @@ export default function MidiLibrary({ onReload }: MidiLibraryProps) {
     try {
       setLoading(true);
       setError(null);
-      const loadedTracks = await getMidiTracks();
-      setMidiTracks(loadedTracks);
+      // Fetch the first page with 25 items
+      const loadedTracksPage = await getMidiTracks(1, 25); 
+      setMidiTracks(loadedTracksPage.items); // Extract items from the Page object
     } catch (err) {
       setError(`Failed to load MIDI tracks: ${(err as Error).message}`);
     } finally {

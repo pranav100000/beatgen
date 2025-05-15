@@ -5,6 +5,7 @@ import { AudioTrackCreate } from '../types/track_models/audio_track';
 import { MidiTrackCreate } from '../types/track_models/midi_track';
 import { SamplerTrackCreate } from '../types/track_models/sampler_track';
 import { DrumTrackCreate } from '../types/track_models/drum_track';
+import { Page } from '../types/pagination';
 
 // Keep using the Sound interface from studio for now until we can fully migrate
 
@@ -155,8 +156,10 @@ export const getSounds = async (): Promise<AudioTrackRead[]> => {
  * Get all MIDI tracks for the current user
  * @returns Array of MIDI tracks
  */
-export const getMidiTracks = async (): Promise<MidiTrackRead[]> => {
-  const response = await apiClient.get('/sounds/midi');
+export const getMidiTracks = async (page: number = 1, size: number = 10): Promise<Page<MidiTrackRead>> => {
+  const response = await apiClient.get<Page<MidiTrackRead>>('/sounds/midi', {
+    params: { page, size }
+  });
   return response.data;
 };
 
@@ -164,8 +167,10 @@ export const getMidiTracks = async (): Promise<MidiTrackRead[]> => {
  * Get all sampler tracks for the current user
  * @returns Array of sampler tracks
  */
-export const getSamplerTracks = async (): Promise<SamplerTrackRead[]> => {
-  const response = await apiClient.get('/sounds/sampler');
+export const getSamplerTracks = async (page: number = 1, size: number = 10): Promise<Page<SamplerTrackRead>> => {
+  const response = await apiClient.get<Page<SamplerTrackRead>>('/sounds/sampler', {
+    params: { page, size }
+  });
   return response.data;
 };
 
@@ -173,8 +178,10 @@ export const getSamplerTracks = async (): Promise<SamplerTrackRead[]> => {
  * Get all drum tracks for the current user
  * @returns Array of drum tracks
  */
-export const getDrumTracks = async (): Promise<DrumTrackRead[]> => {
-  const response = await apiClient.get('/sounds/drum');
+export const getDrumTracks = async (page: number = 1, size: number = 10): Promise<Page<DrumTrackRead>> => {
+  const response = await apiClient.get<Page<DrumTrackRead>>('/sounds/drum', {
+    params: { page, size }
+  });
   return response.data;
 };
 
