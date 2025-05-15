@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import React, { useEffect } from 'react'
 import Projects from '../platform/pages/Projects'
-import Navbar from '../platform/components/Navbar'
 import { requireAuth, AuthErrorComponent } from '../platform/auth/auth-utils.tsx'
 
 // Home/Projects route - this will render at the path '/home'
@@ -25,7 +24,6 @@ function HomePage() {
   // Render the Navbar and Projects component
   return (
     <>
-      <Navbar />
       <Projects />
     </>
   )

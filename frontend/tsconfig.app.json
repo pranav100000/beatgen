@@ -25,6 +25,9 @@
     /* Path aliases */
     "baseUrl": ".",
     "paths": {
+      "@/*": [
+        "./src/*"
+      ],
       "@src/*": ["../old_code/*"],
       "@core/*": ["../old_code/core/*"],
       "@components/*": ["../old_code/components/*"],
@@ -41,5 +44,6 @@
     "../old_code/utils/**/*",
     "../old_code/api/**/*",
     "../old_code/pages/NewProject.tsx"
-, "src/vite-env.d.ts", "src/platform/pages"  ]
+, "src/vite-env.d.ts", "src/platform/pages"  ],
+
 }

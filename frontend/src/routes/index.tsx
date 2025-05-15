@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import React from 'react'
 import { Box, Typography, Button, Container } from '@mui/material'
-import Navbar from '../platform/components/Navbar'
 import { publicRoute } from '../platform/auth/auth-utils.tsx'
 
 // Landing Page component - this will render at the root path '/'
@@ -14,7 +13,6 @@ export const Route = createFileRoute('/')({
 function LandingPage() {
   return (
     <>
-      <Navbar />
       <Container maxWidth="xl" sx={{ 
         minHeight: 'calc(100vh - 64px)', // Account for navbar height
         display: 'flex', 

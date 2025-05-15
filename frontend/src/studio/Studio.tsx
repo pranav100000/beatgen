@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useLayoutEffect } from 'react';
 import { Box, Button, FormControlLabel, Switch } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
@@ -43,6 +43,10 @@ function Studio({ projectId }: StudioProps) {
   
   // Setup history state sync
   useHistorySync();
+  
+  // Ref and state for Control Bar height
+  const controlBarRef = useRef<HTMLDivElement>(null);
+  const [controlBarHeight, setControlBarHeight] = useState(0);
   
   // Get studioMode from theme context
   const { studioMode } = useAppTheme();
@@ -115,6 +119,15 @@ function Studio({ projectId }: StudioProps) {
   const handleSettingsToggle = () => {
     setIsSettingsModalOpen(prev => !prev);
   };
+
+  // Effect to measure control bar height
+  useLayoutEffect(() => {
+    if (controlBarRef.current) {
+      const height = controlBarRef.current.offsetHeight;
+      setControlBarHeight(height);
+      console.log('Control Bar Height:', height);
+    }
+  }, []); // Empty dependency array to run once on mount
 
   // Initialize audio engine
   useEffect(() => {
@@ -272,6 +285,7 @@ function Studio({ projectId }: StudioProps) {
         flexDirection: 'column',
       }}>
         <StudioControlBar
+          ref={controlBarRef}
           canUndo={canUndo}
           canRedo={canRedo}
           bpm={bpm}
@@ -303,7 +317,8 @@ function Studio({ projectId }: StudioProps) {
           display: 'flex', 
           flex: 1, 
           overflow: 'hidden',
-          position: 'relative'
+          position: 'relative',
+          paddingTop: `${controlBarHeight}px`
         }}>
           {/* Left Sidebar */}
           <Box sx={{ 

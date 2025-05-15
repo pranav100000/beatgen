@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef, memo } from 'react';
 import { Box, IconButton, Typography, TextField, Tooltip, useTheme } from '@mui/material';
 // Import components
 import BPMControl from './BPMControl';
@@ -39,8 +39,9 @@ interface StudioControlBarProps {
     onSettingsToggle: () => void;
 }
 
-
-const StudioControlBar: React.FC<StudioControlBarProps> = ({
+// Wrap with forwardRef and memo
+const StudioControlBar = memo(forwardRef<HTMLDivElement, StudioControlBarProps>((
+{
     canUndo,
     canRedo,
     bpm,
@@ -65,11 +66,13 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
     onZoomOut,
     onChatToggle,
     onSettingsToggle,
-}) => {
+}, ref) => {
     const theme = useTheme();
 
     return (
-        <Box sx={{
+        <Box 
+            ref={ref} // Attach the forwarded ref here
+            sx={{
             display: 'grid',
             gridTemplateColumns: '1fr auto 1fr',
             alignItems: 'center',
@@ -77,7 +80,9 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
             gap: 2,
             p: 1,
             borderBottom: `1px solid ${theme.palette.divider}`,
-            position: 'relative',
+            position: 'fixed',
+            top: 0,
+            left: 0,
             zIndex: 1300,
             bgcolor: 'background.paper',
             color: 'text.primary'
@@ -311,6 +316,6 @@ const StudioControlBar: React.FC<StudioControlBarProps> = ({
             </Box>
         </Box>
     );
-};
+}));
 
 export default StudioControlBar;

@@ -6,7 +6,6 @@ import {
   Card, 
   CardContent, 
   Grid, 
-  Button, 
   IconButton, 
   Dialog, 
   DialogTitle, 
@@ -26,7 +25,8 @@ import {
   Delete as DeleteIcon, 
   Edit as EditIcon, 
   MusicNote as MusicNoteIcon,
-  ArrowBack as ArrowBackIcon
+  ArrowBack as ArrowBackIcon,
+  Menu as MenuIcon
 } from '@mui/icons-material';
 import SoundUploader from '../components/SoundUploader';
 import SoundLibrary from '../components/SoundLibrary';
@@ -36,12 +36,19 @@ import {
   deleteProject, 
 } from '../api/projects';
 import { Project } from '../types/project';
+import { IconTrashFilled } from '@tabler/icons-react';
+import Sidebar from '../components/Sidebar';
+import { Button } from "../../components/ui/button"
+
 
 // Constants for pagination and display
 const INITIAL_DISPLAY_COUNT = 6;
 const DISPLAY_INCREMENT = 6; // How many more to show on each click (relevant later)
 const FETCH_THRESHOLD = 10; // When to fetch more from API (relevant later)
 const PROJECTS_PER_PAGE_API = 20; // How many to fetch from API at a time
+
+// const drawerWidth = 240; // No longer needed
+// const collapsedDrawerWidth = 60; // No longer needed
 
 export default function Projects() {
   const navigate = useNavigate();
@@ -50,6 +57,7 @@ export default function Projects() {
   const [displayedProjectsCount, setDisplayedProjectsCount] = useState<number>(INITIAL_DISPLAY_COUNT);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalProjectsOnServer, setTotalProjectsOnServer] = useState<number>(0);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -187,183 +195,184 @@ export default function Projects() {
     });
   };
 
+  const handleToggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
   // We'll keep the page loaded and only show a spinner in the projects area
 
   return (
-    <Container maxWidth="lg" className="projects-container">
-      <Button
-        variant="text"
-        startIcon={<ArrowBackIcon />}
-        onClick={() => navigate({ to: '/' })}
-        sx={{ mb: 2 }}
+    <Box sx={{ display: 'flex' }}>
+      <Sidebar />
+      <main 
+        className={`flex-grow p-8 transition-all duration-300 ease-in-out ${
+          'ml-0'
+        }`}
       >
-        Back to Home
-      </Button>
-      <Box className="project-header">
-        <Typography variant="h3" component="h1" sx={{ color: 'text.primary' }}>
-          Projects
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => navigate({ to: '/studio' })}
-        >
-          New Project
-        </Button>
-      </Box>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 4 }}>
-          {error}
-        </Alert>
-      )}
-
-      {loading ? (
-        <Paper className="project-empty-state" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
-          <CircularProgress sx={{ mb: 2 }} />
-          <Typography variant="body1" color="text.secondary">
-            Loading your projects...
-          </Typography>
-        </Paper>
-      ) : allFetchedProjects.length === 0 ? (
-        <Paper className="project-empty-state">
-          <MusicNoteIcon className="project-empty-icon" />
-          <Typography variant="h6" gutterBottom>
-            No projects yet
-          </Typography>
-          <Typography variant="body1" color="text.secondary" paragraph>
-            Create your first music project to get started!
-          </Typography>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            startIcon={<AddIcon />}
-            onClick={() => navigate({ to: '/studio' })}
-          >
-            Create Project
-          </Button>
-        </Paper>
-      ) : (
-        <Grid container spacing={3}>
-          {allFetchedProjects.slice(0, displayedProjectsCount).map((project) => (
-            <Grid item xs={12} sm={6} md={4} key={project.id}>
-              <Card className="project-card">
-                <CardContent className="project-card-content">
-                  <Typography variant="h6" component="h2" gutterBottom>
-                    {project.name}
-                  </Typography>
-                  
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    {`BPM: ${project.bpm}, Key: ${project.key_signature}`}
-                  </Typography>
-                  
-                  <Divider className="project-divider" />
-                  
-                  <Box className="project-metadata">
-                    <Typography variant="body2">
-                      BPM: {project.bpm}
-                    </Typography>
-                    <Typography variant="body2">
-                      Key: {project.key_signature}
-                    </Typography>
-                  </Box>
-                </CardContent>
-                
-                <Box className="project-card-actions">
-                  <Button 
-                    size="small" 
-                    onClick={() => openProject(project.id)}
-                    sx={{ flexGrow: 1, mr: 1 }}
-                  >
-                    Open
-                  </Button>
-                  <IconButton 
-                    size="small" 
-                    onClick={() => navigate({ 
-                      to: '/studio',
-                      search: { projectId: project.id } as any
-                    })} 
-                    aria-label="edit"
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton 
-                    size="small" 
-                    onClick={() => handleDeleteProject(project.id)} 
-                    aria-label="delete"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      )}
-
-      {/* Show More Button */} 
-      {!loading && displayedProjectsCount < totalProjectsOnServer && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4, mb: 2 }}>
-          <Button 
-            variant="outlined"
-            onClick={handleShowMore} 
-            disabled={loadingMore}
-          >
-            Show More
-          </Button>
-        </Box>
-      )}
-
-      {/* Project Dialog removed - users go directly to studio page */}
-
-      {/* My Sounds Section */}
-      <Box sx={{ mt: 6, mb: 3 }}>
-        <Box className="project-header">
-          <Typography variant="h3" component="h1" sx={{ color: 'text.primary' }}>
-            Audio Tracks
-          </Typography>
-          {/* <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={() => setShowSoundUploader(true)}
-          >
-            Upload Sound
-          </Button> */}
-        </Box>
-
-        {/* {showSoundUploader && (
-          <Box sx={{ mt: 2, mb: 3 }}>
-            <SoundUploader
-              onSoundUploaded={(soundId) => {
-                setShowSoundUploader(false);
-                fetchSounds();
-                showSnackbar('Sound uploaded successfully', 'success');
-              }}
-              onCancel={() => setShowSoundUploader(false)}
-            />
+        <Container maxWidth="lg" className="projects-container" sx={{ pt: 0, mt:0 }}>
+          <Box className="project-header" sx={{ mb: 5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h3" component="h1" sx={{ color: 'text.primary' }}>
+              Projects
+            </Typography>
+            <Button
+              variant="default"
+              className="flex items-center gap-2"
+              onClick={() => navigate({ to: '/studio' })}
+            >
+              <AddIcon fontSize="small" />
+              New Project
+            </Button>
           </Box>
-        )} */}
 
-        <SoundLibrary onReload={fetchSounds} />
-      </Box>
+          {error && (
+            <Alert severity="error" sx={{ mb: 4 }}>
+              {error}
+            </Alert>
+          )}
 
-      {/* Snackbar for notifications */}
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={6000} 
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
-          variant="filled"
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Container>
+          {loading ? (
+            <Paper className="project-empty-state" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
+              <CircularProgress sx={{ mb: 2 }} />
+              <Typography variant="body1" color="text.secondary">
+                Loading your projects...
+              </Typography>
+            </Paper>
+          ) : allFetchedProjects.length === 0 ? (
+            <Paper className="project-empty-state">
+              <MusicNoteIcon className="project-empty-icon" />
+              <Typography variant="h6" gutterBottom>
+                No projects yet
+              </Typography>
+              <Typography variant="body1" color="text.secondary" paragraph>
+                Create your first music project to get started!
+              </Typography>
+              <Button 
+                variant="default"
+                className="flex items-center gap-2"
+                onClick={() => navigate({ to: '/studio' })}
+              >
+                <AddIcon fontSize="small" />
+                Create Project
+              </Button>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {allFetchedProjects.slice(0, displayedProjectsCount).map((project) => (
+                <Grid item xs={12} sm={6} md={4} key={project.id}>
+                  <Card className="project-card">
+                    <CardContent className="project-card-content" sx={{ p: 3 }}>
+                      <Typography variant="h6" component="h2" gutterBottom>
+                        {project.name}
+                      </Typography>
+                      
+                      <Divider className="project-divider" sx={{ my: 2 }} />
+                      
+                      <Box className="project-metadata" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2">
+                          BPM: {project.bpm}
+                        </Typography>
+                        <Typography variant="body2">
+                          Key: {project.key_signature}
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                    
+                    <Box className="project-card-actions" sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Button
+                        size="sm"
+                        onClick={() => openProject(project.id)}
+                        className="flex-grow mr-1"
+                      >
+                        Open
+                      </Button>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => navigate({ 
+                          to: '/studio',
+                          search: { projectId: project.id } as any
+                        })} 
+                        aria-label="edit"
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDeleteProject(project.id)} 
+                        aria-label="delete"
+                      >
+                        <IconTrashFilled size={18} />
+                      </IconButton>
+                    </Box>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+
+          {/* Show More Button */} 
+          {!loading && displayedProjectsCount < totalProjectsOnServer && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4, mb: 2 }}>
+              <Button 
+                variant="outline"
+                onClick={handleShowMore} 
+                disabled={loadingMore}
+              >
+                Show More
+              </Button>
+            </Box>
+          )}
+
+          {/* Project Dialog removed - users go directly to studio page */}
+
+          {/* My Sounds Section */}
+          <Box sx={{ mt: 6, mb: 3 }}>
+            <Box className="project-header" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+              <Typography variant="h3" component="h1" sx={{ color: 'text.primary' }}>
+                Audio Tracks
+              </Typography>
+              {/* <Button
+                variant="contained"
+                color="primary"
+                startIcon={<AddIcon />}
+                onClick={() => setShowSoundUploader(true)}
+              >
+                Upload Sound
+              </Button> */}
+            </Box>
+
+            {/* {showSoundUploader && (
+              <Box sx={{ mt: 2, mb: 3 }}>
+                <SoundUploader
+                  onSoundUploaded={(soundId) => {
+                    setShowSoundUploader(false);
+                    fetchSounds();
+                    showSnackbar('Sound uploaded successfully', 'success');
+                  }}
+                  onCancel={() => setShowSoundUploader(false)}
+                />
+              </Box>
+            )} */}
+
+            <SoundLibrary onReload={fetchSounds} />
+          </Box>
+
+          {/* Snackbar for notifications */}
+          <Snackbar 
+            open={snackbar.open} 
+            autoHideDuration={6000} 
+            onClose={handleCloseSnackbar}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          >
+            <Alert 
+              onClose={handleCloseSnackbar} 
+              severity={snackbar.severity} 
+              variant="filled"
+            >
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
+        </Container>
+      </main>
+    </Box>
   );
 }
