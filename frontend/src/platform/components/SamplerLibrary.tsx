@@ -67,7 +67,7 @@ export default function SamplerLibrary({ onReload }: SamplerLibraryProps) {
       setLoading(true);
       setError(null);
       const loadedTracks = await getSamplerTracks();
-      setSamplerTracks(loadedTracks.items);
+      setSamplerTracks(loadedTracks.items ?? []);
     } catch (err) {
       setError(`Failed to load sampler tracks: ${(err as Error).message}`);
     } finally {
