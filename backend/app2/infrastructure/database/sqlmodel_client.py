@@ -37,8 +37,8 @@ else:
         # Pool settings to maintain connections
         pool_pre_ping=True,
         pool_recycle=300,  # Recycle connections after 5 minutes
-        pool_size=5,  # Default connection pool size
-        max_overflow=10,  # Allow up to 10 additional connections
+        pool_size=20,  # Default connection pool size
+        max_overflow=20,  # Allow up to 10 additional connections
     )
 
 
