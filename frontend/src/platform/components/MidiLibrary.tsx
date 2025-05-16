@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Box, 
   Typography, 
@@ -25,10 +25,14 @@ export default function MidiLibrary({ onReload }: MidiLibraryProps) {
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Load MIDI tracks on mount
   useEffect(() => {
     loadMidiTracks();
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, []);
   
   // Set up timeupdate listener for tracking playback progress
@@ -63,15 +67,28 @@ export default function MidiLibrary({ onReload }: MidiLibraryProps) {
   }, [audioElement]);
   
   const loadMidiTracks = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       setLoading(true);
       setError(null);
       // Fetch the first page with 25 items
-      const loadedTracksPage = await getMidiTracks(1, 25); 
+      const loadedTracksPage = await getMidiTracks(1, 25, controller.signal); 
       setMidiTracks(loadedTracksPage.items ?? []); // Extract items from the Page object
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('MIDI tracks fetch aborted');
+        return;
+      }
       setError(`Failed to load MIDI tracks: ${(err as Error).message}`);
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setLoading(false);
     }
   };

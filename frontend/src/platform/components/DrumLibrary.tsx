@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Box, 
   Typography, 
@@ -20,21 +20,38 @@ export default function DrumLibrary({ onReload }: DrumLibraryProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Load drum tracks on mount
   useEffect(() => {
     loadDrumTracks();
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, []);
   
   const loadDrumTracks = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       setLoading(true);
       setError(null);
-      const loadedTracks = await getDrumTracks();
+      const loadedTracks = await getDrumTracks(1, 25, controller.signal);
       setDrumTracks(loadedTracks.items ?? []);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Drum tracks fetch aborted');
+        return;
+      }
       setError(`Failed to load drum tracks: ${(err as Error).message}`);
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setLoading(false);
     }
   };

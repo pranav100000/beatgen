@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { 
   Container, 
@@ -60,6 +60,8 @@ export default function HomePage() {
   const { user } = useAuth();
   const { open: sidebarActualOpen } = useSidebar();
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const [allFetchedProjects, setAllFetchedProjects] = useState<Project[]>([]);
   const [displayedProjectsCount, setDisplayedProjectsCount] = useState<number>(INITIAL_DISPLAY_COUNT);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -81,6 +83,9 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchAndSetInitialProjects();
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, []);
   
   // Function to fetch sounds (will be passed to SoundLibrary for reloading)
@@ -91,10 +96,16 @@ export default function HomePage() {
   };
 
   const fetchAndSetInitialProjects = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       setLoading(true);
       setError(null);
-      const response = await getProjects(1, PROJECTS_PER_PAGE_API); // Fetch page 1, 20 items
+      const response = await getProjects(1, PROJECTS_PER_PAGE_API, controller.signal);
       setAllFetchedProjects(response.items ?? []);
       setTotalProjectsOnServer(response.total_items ?? 0);
       const initialDisplay = Math.min(INITIAL_DISPLAY_COUNT, response.items?.length ?? 0);
@@ -107,10 +118,17 @@ export default function HomePage() {
       console.log("totalProjectsOnServer:", response.total_items ?? 0);
       console.log("allFetchedProjects.length:", response.items?.length ?? 0);
 
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Initial projects fetch aborted');
+        return;
+      }
       console.error('Error fetching projects:', err);
       setError('Failed to load projects. Please try again later.');
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setLoading(false);
       // Add log here too to see when loading is actually set to false
       console.log("Initial loading state (in finally block):", false);
@@ -120,19 +138,35 @@ export default function HomePage() {
   const fetchMoreProjects = async () => {
     if (loadingMore || allFetchedProjects.length >= totalProjectsOnServer) return;
 
+    if (abortControllerRef.current) {
+      // Abort previous ongoing "fetchMore" or "initialFetch" if any
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoadingMore(true);
     setError(null);
     try {
       const nextPage = currentPage + 1;
-      const response = await getProjects(nextPage, PROJECTS_PER_PAGE_API);
+      const response = await getProjects(nextPage, PROJECTS_PER_PAGE_API, controller.signal);
       
       setAllFetchedProjects(prevProjects => [...prevProjects, ...response.items]);
       setTotalProjectsOnServer(response.total_items ?? 0); // Update total, though it might not change often
       setCurrentPage(nextPage);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Fetch more projects aborted');
+        // Potentially reset loadingMore if it was set due to this aborted request
+        // However, setLoadingMore(false) is in finally, so it will be handled.
+        return;
+      }
       console.error('Error fetching more projects:', err);
       setError('Failed to load more projects.'); // You might want a less intrusive error display here
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setLoadingMore(false);
     }
   };

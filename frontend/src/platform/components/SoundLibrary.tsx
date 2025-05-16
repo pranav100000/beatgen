@@ -25,10 +25,14 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Load sounds on mount
   useEffect(() => {
     loadSounds();
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, []);
   
   // Set up timeupdate listener for tracking playback progress
@@ -63,14 +67,27 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
   }, [audioElement]);
   
   const loadSounds = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       setLoading(true);
       setError(null);
-      const loadedSounds = await getSounds();
+      const loadedSounds = await getSounds(controller.signal);
       setSounds(loadedSounds);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Sounds fetch aborted');
+        return;
+      }
       setError(`Failed to load sounds: ${(err as Error).message}`);
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setLoading(false);
     }
   };
