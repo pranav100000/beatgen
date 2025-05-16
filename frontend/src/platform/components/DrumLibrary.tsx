@@ -31,7 +31,7 @@ export default function DrumLibrary({ onReload }: DrumLibraryProps) {
       setLoading(true);
       setError(null);
       const loadedTracks = await getDrumTracks();
-      setDrumTracks(loadedTracks.items ?? []);
+      setDrumTracks(loadedTracks.items);
     } catch (err) {
       setError(`Failed to load drum tracks: ${(err as Error).message}`);
     } finally {

@@ -95,17 +95,17 @@ export default function HomePage() {
       setLoading(true);
       setError(null);
       const response = await getProjects(1, PROJECTS_PER_PAGE_API); // Fetch page 1, 20 items
-      setAllFetchedProjects(response.items ?? []);
-      setTotalProjectsOnServer(response.total_items ?? 0);
-      const initialDisplay = Math.min(INITIAL_DISPLAY_COUNT, response.items?.length ?? 0);
+      setAllFetchedProjects(response.items);
+      setTotalProjectsOnServer(response.total_items);
+      const initialDisplay = Math.min(INITIAL_DISPLAY_COUNT, response.items.length);
       setDisplayedProjectsCount(initialDisplay);
       setCurrentPage(1);
 
       // Add these logs for debugging:
       console.log("Initial fetch complete. States after initial set:");
       console.log("displayedProjectsCount:", initialDisplay);
-      console.log("totalProjectsOnServer:", response.total_items ?? 0);
-      console.log("allFetchedProjects.length:", response.items?.length ?? 0);
+      console.log("totalProjectsOnServer:", response.total_items);
+      console.log("allFetchedProjects.length:", response.items.length);
 
     } catch (err) {
       console.error('Error fetching projects:', err);
@@ -127,7 +127,7 @@ export default function HomePage() {
       const response = await getProjects(nextPage, PROJECTS_PER_PAGE_API);
       
       setAllFetchedProjects(prevProjects => [...prevProjects, ...response.items]);
-      setTotalProjectsOnServer(response.total_items ?? 0); // Update total, though it might not change often
+      setTotalProjectsOnServer(response.total_items); // Update total, though it might not change often
       setCurrentPage(nextPage);
     } catch (err) {
       console.error('Error fetching more projects:', err);
