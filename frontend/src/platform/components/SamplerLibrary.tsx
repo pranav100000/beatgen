@@ -9,29 +9,39 @@ import {
 import { 
   GraphicEq as GraphicEqIcon
 } from '@mui/icons-material';
-import { getSamplerTracks, deleteSamplerTrack, downloadAudioTrackFile } from '../api/sounds';
+import { getSamplerTracks, deleteSamplerTrack } from '../api/sounds';
 import { SamplerTrackRead } from '../types/track_models/sampler_track';
 import SamplerTrackCard from './DisplayCards/SamplerTrackCard';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Page } from '../types/pagination';
 
 interface SamplerLibraryProps {
   onReload?: () => void;
 }
 
+const ITEMS_PER_PAGE = 10;
+
 export default function SamplerLibrary({ onReload }: SamplerLibraryProps) {
-  const [samplerTracks, setSamplerTracks] = useState<SamplerTrackRead[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [currentPageApi, setCurrentPageApi] = useState<number>(1);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   
-  // Load sampler tracks on mount
-  useEffect(() => {
-    loadSamplerTracks();
-  }, []);
+  const { 
+    data: samplerTracksPage,
+    isLoading,
+    error: fetchError,
+    isFetching
+  } = useQuery<Page<SamplerTrackRead>, Error, Page<SamplerTrackRead>, [string, number, number]>({
+    queryKey: ['samplerTracks', currentPageApi, ITEMS_PER_PAGE],
+    queryFn: () => getSamplerTracks(currentPageApi, ITEMS_PER_PAGE),
+    placeholderData: (previousData) => previousData,
+  });
+
+  const samplerTracks = samplerTracksPage?.items ?? [];
   
-  // Set up timeupdate listener for tracking playback progress
   useEffect(() => {
     if (!audioElement) return;
     
@@ -48,12 +58,10 @@ export default function SamplerLibrary({ onReload }: SamplerLibraryProps) {
       setCurrentTime(0);
     };
     
-    // Add event listeners
     audioElement.addEventListener('timeupdate', handleTimeUpdate);
     audioElement.addEventListener('durationchange', handleDurationChange);
     audioElement.addEventListener('ended', handleEnded);
     
-    // Clean up listeners
     return () => {
       audioElement.removeEventListener('timeupdate', handleTimeUpdate);
       audioElement.removeEventListener('durationchange', handleDurationChange);
@@ -62,60 +70,37 @@ export default function SamplerLibrary({ onReload }: SamplerLibraryProps) {
     };
   }, [audioElement]);
   
-  const loadSamplerTracks = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const loadedTracks = await getSamplerTracks();
-      setSamplerTracks(loadedTracks.items ?? []);
-    } catch (err) {
-      setError(`Failed to load sampler tracks: ${(err as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
   const handlePlayTrack = async (track: SamplerTrackRead) => {
-    // If we're already playing this track, pause it
     if (playingId === track.id && audioElement) {
       audioElement.pause();
       setPlayingId(null);
       return;
     }
     
-    // If we have another track playing, stop it
     if (audioElement) {
       audioElement.pause();
       setCurrentTime(0);
     }
     
     try {
-      // Create a new audio element
       const audio = new Audio();
       
-      // To play the audio, we need to get the audio file from storage
-      // For now, we'll use a direct URL construction
       const baseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://fmpafpwdkegazcerrnso.supabase.co';
       const url = `${baseUrl}/storage/v1/object/public/tracks/${track.audio_storage_key}`;
       
       console.log('Audio URL:', url);
       
-      // Add CORS headers
       audio.crossOrigin = "anonymous";
       audio.src = url;
       
-      // Preload metadata to get duration faster
       audio.preload = "metadata";
       
-      // Add error event listener for debugging
       audio.addEventListener('error', (e) => {
         console.error('Audio error details:', audio.error);
-        setError(`Failed to play sampler track: ${audio.error?.message || 'Unknown error'}`);
       });
       
       audio.play().catch(err => {
         console.error('Failed to play sampler track:', err);
-        setError(`Failed to play sampler track: ${err.message}`);
       });
       
       setAudioElement(audio);
@@ -123,38 +108,38 @@ export default function SamplerLibrary({ onReload }: SamplerLibraryProps) {
       setCurrentTime(0);
     } catch (err) {
       console.error('Error playing sampler track:', err);
-      setError(`Failed to play sampler track: ${(err as Error).message}`);
     }
   };
   
+  const { mutate: performDeleteSamplerTrack, isPending: isDeletingTrack } = useMutation<void, Error, string>({
+    mutationFn: deleteSamplerTrack,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['samplerTracks', currentPageApi, ITEMS_PER_PAGE] });
+      if (onReload) {
+        onReload();
+      }
+    },
+    onError: (err: Error) => {
+      console.error(`Failed to delete sampler track: ${err.message}`);
+    },
+  });
+
   const handleDeleteTrack = async (id: string) => {
-    // Stop playback if this is the track being played
     if (playingId === id && audioElement) {
       audioElement.pause();
       setPlayingId(null);
     }
-    
-    try {
-      await deleteSamplerTrack(id);
-      setSamplerTracks(samplerTracks.filter(track => track.id !== id));
-      if (onReload) {
-        onReload();
-      }
-    } catch (err) {
-      setError(`Failed to delete sampler track: ${(err as Error).message}`);
-    }
+    performDeleteSamplerTrack(id);
   };
   
-  // Handle seeking when user clicks on waveform
   const handleSeek = (trackId: string, position: number) => {
     if (!audioElement || playingId !== trackId) return;
     
-    // Set the current time of the audio
     audioElement.currentTime = position;
     setCurrentTime(position);
   };
   
-  if (loading) {
+  if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
         <CircularProgress />
@@ -162,15 +147,15 @@ export default function SamplerLibrary({ onReload }: SamplerLibraryProps) {
     );
   }
   
-  if (error) {
+  if (fetchError) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
-        {error}
+        {fetchError.message}
       </Alert>
     );
   }
   
-  if (samplerTracks.length === 0) {
+  if (samplerTracks.length === 0 && !isFetching) {
     return (
       <Box sx={{ 
         display: 'flex', 

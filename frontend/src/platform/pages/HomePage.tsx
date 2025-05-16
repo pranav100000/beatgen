@@ -45,6 +45,8 @@ import AudioTracksDisplay from '../components/AudioTracksDisplay';
 import MidiLibrary from '../components/MidiLibrary';
 import SamplerLibrary from '../components/SamplerLibrary';
 import DrumLibrary from '../components/DrumLibrary';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Page } from '../types/pagination';
 
 // Constants for pagination and display
 const INITIAL_DISPLAY_COUNT = 6;
@@ -59,15 +61,11 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { open: sidebarActualOpen } = useSidebar();
+  const queryClient = useQueryClient();
 
-  const [allFetchedProjects, setAllFetchedProjects] = useState<Project[]>([]);
   const [displayedProjectsCount, setDisplayedProjectsCount] = useState<number>(INITIAL_DISPLAY_COUNT);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalProjectsOnServer, setTotalProjectsOnServer] = useState<number>(0);
+  const [currentPageApi, setCurrentPageApi] = useState<number>(1);
 
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showSoundUploader, setShowSoundUploader] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -79,62 +77,29 @@ export default function HomePage() {
     severity: 'success'
   });
 
-  useEffect(() => {
-    fetchAndSetInitialProjects();
-  }, []);
+  const { 
+    data: projectsData, 
+    isLoading: loadingProjects, 
+    error: projectsError,
+    isFetching: isFetchingProjects,
+  } = useQuery<Page<Project>, Error, Page<Project>, [string, number, number]>({
+    queryKey: ['projects', currentPageApi, PROJECTS_PER_PAGE_API],
+    queryFn: () => getProjects(currentPageApi, PROJECTS_PER_PAGE_API),
+    placeholderData: (previousData) => previousData,
+  });
   
-  // Function to fetch sounds (will be passed to SoundLibrary for reloading)
-  const fetchSounds = () => {
-    // SoundLibrary component has its own fetch logic
-    // This is just a placeholder to refresh the component when needed
-    console.log('Refreshing sounds library');
-  };
+  const allFetchedProjects = projectsData?.items ?? [];
+  const totalProjectsOnServer = projectsData?.total_items ?? 0;
 
-  const fetchAndSetInitialProjects = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await getProjects(1, PROJECTS_PER_PAGE_API); // Fetch page 1, 20 items
-      setAllFetchedProjects(response.items ?? []);
-      setTotalProjectsOnServer(response.total_items ?? 0);
-      const initialDisplay = Math.min(INITIAL_DISPLAY_COUNT, response.items?.length ?? 0);
+  useEffect(() => {
+    if (projectsData?.items) {
+      const initialDisplay = Math.min(INITIAL_DISPLAY_COUNT, projectsData.items.length);
       setDisplayedProjectsCount(initialDisplay);
-      setCurrentPage(1);
-
-      // Add these logs for debugging:
-      console.log("Initial fetch complete. States after initial set:");
-      console.log("displayedProjectsCount:", initialDisplay);
-      console.log("totalProjectsOnServer:", response.total_items ?? 0);
-      console.log("allFetchedProjects.length:", response.items?.length ?? 0);
-
-    } catch (err) {
-      console.error('Error fetching projects:', err);
-      setError('Failed to load projects. Please try again later.');
-    } finally {
-      setLoading(false);
-      // Add log here too to see when loading is actually set to false
-      console.log("Initial loading state (in finally block):", false);
     }
-  };
+  }, [projectsData?.items]);
 
-  const fetchMoreProjects = async () => {
-    if (loadingMore || allFetchedProjects.length >= totalProjectsOnServer) return;
-
-    setLoadingMore(true);
-    setError(null);
-    try {
-      const nextPage = currentPage + 1;
-      const response = await getProjects(nextPage, PROJECTS_PER_PAGE_API);
-      
-      setAllFetchedProjects(prevProjects => [...prevProjects, ...response.items]);
-      setTotalProjectsOnServer(response.total_items ?? 0); // Update total, though it might not change often
-      setCurrentPage(nextPage);
-    } catch (err) {
-      console.error('Error fetching more projects:', err);
-      setError('Failed to load more projects.'); // You might want a less intrusive error display here
-    } finally {
-      setLoadingMore(false);
-    }
+  const fetchSounds = () => {
+    console.log('Refreshing sounds library');
   };
 
   const handleShowMoreProjects = () => {
@@ -144,12 +109,11 @@ export default function HomePage() {
     );
     setDisplayedProjectsCount(newDisplayedCount);
 
-    // Check if we need to fetch more from the API
-    const remainingInBatch = allFetchedProjects.length - newDisplayedCount;
     const hasMoreOnServer = allFetchedProjects.length < totalProjectsOnServer;
-
-    if (remainingInBatch < FETCH_THRESHOLD && hasMoreOnServer && !loadingMore) {
-      fetchMoreProjects();
+    if (newDisplayedCount >= allFetchedProjects.length && hasMoreOnServer && !isFetchingProjects) {
+      if (projectsData && currentPageApi < projectsData.total_pages ) {
+         setCurrentPageApi(prev => prev + 1);
+      }
     }
   };
 
@@ -164,20 +128,23 @@ export default function HomePage() {
     });
   };
 
+  const { mutate: performDeleteProject } = useMutation({
+    mutationFn: deleteProject,
+    onSuccess: () => {
+      showSnackbar('Project deleted successfully', 'success');
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (err) => {
+      console.error('Error deleting project:', err);
+      showSnackbar('Failed to delete project', 'error');
+    },
+  });
+
   const handleDeleteListedProject = async (projectId: string) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
-      try {
-        await deleteProject(projectId);
-        await fetchAndSetInitialProjects(); // Re-fetch initial set after delete
-        showSnackbar('Project deleted successfully', 'success');
-      } catch (err) {
-        console.error('Error deleting project:', err);
-        showSnackbar('Failed to delete project', 'error');
-      }
+      performDeleteProject(projectId);
     }
   };
-
-  // Removed dialog-related handlers
 
   const showSnackbar = (message: string, severity: 'success' | 'error') => {
     setSnackbar({
@@ -201,8 +168,6 @@ export default function HomePage() {
     });
   };
 
-  // We'll keep the page loaded and only show a spinner in the projects area
-
   return (
     <Box sx={{ display: 'flex' }}>
       <Sidebar />
@@ -216,13 +181,13 @@ export default function HomePage() {
       >
         <Container maxWidth="lg" className="projects-container" sx={{ pt: 0, mt:0 }}>
 
-          {error && (
+          {projectsError && (
             <Alert severity="error" sx={{ mb: 4 }}>
-              {error}
+              {projectsError.message || 'Failed to load projects. Please try again later.'}
             </Alert>
           )}
 
-          <Paper elevation={2} sx={{ p: 3, mt: 0, borderRadius: 2, mb: 4 }}>
+          <Paper elevation={2} sx={{ p: 3, mt: 0, borderRadius: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h5" component="h2" sx={{ fontWeight: 'medium' }}>
                 Projects
@@ -240,9 +205,9 @@ export default function HomePage() {
               allFetchedProjects={allFetchedProjects}
               displayedProjectsCount={displayedProjectsCount}
               totalProjectsOnServer={totalProjectsOnServer}
-              loading={loading}
-              loadingMore={loadingMore}
-              error={null}
+              loading={loadingProjects}
+              loadingMore={isFetchingProjects && currentPageApi > 1}
+              error={projectsError ? projectsError.message : null}
               onCreateNewProject={handleCreateProject}
               onOpenProject={openListedProject}
               onEditProject={handleEditListedProject}
@@ -256,7 +221,7 @@ export default function HomePage() {
           </Paper>
 
           {/* My Sounds Section is now replaced by AudioTracksDisplay */}
-          <Paper elevation={2} sx={{ p: 3, mt: 4, borderRadius: 2, mb: 4 }}>
+          <Paper elevation={2} sx={{ p: 3, mt: 4, borderRadius: 2 }}>
             <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 'medium' }}>
               Audio Tracks
             </Typography>
@@ -264,7 +229,7 @@ export default function HomePage() {
           </Paper>
 
           {/* Midi Tracks Section */}
-          <Paper elevation={2} sx={{ p: 3, mt: 4, borderRadius: 2, mb: 4 }}>
+          <Paper elevation={2} sx={{ p: 3, mt: 4, borderRadius: 2 }}>
             <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 'medium' }}>
               MIDI Tracks
             </Typography>
@@ -272,7 +237,7 @@ export default function HomePage() {
           </Paper>
 
           {/* Sampler Tracks Section */}
-          <Paper elevation={2} sx={{ p: 3, mt: 4, borderRadius: 2, mb: 4 }}>
+          <Paper elevation={2} sx={{ p: 3, mt: 4, borderRadius: 2 }}>
             <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 'medium' }}>
               Sampler Tracks
             </Typography>
@@ -289,7 +254,7 @@ export default function HomePage() {
 
           {/* Snackbar for notifications */}
           <Snackbar 
-            open={snackbar.open && !loading}
+            open={snackbar.open && !loadingProjects}
             autoHideDuration={6000} 
             onClose={handleCloseSnackbar}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}

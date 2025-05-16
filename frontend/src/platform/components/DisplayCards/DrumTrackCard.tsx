@@ -36,10 +36,10 @@ const DrumTrackCard: React.FC<DrumTrackCardProps> = ({
   const samplerCount = track.sampler_tracks?.length || 0;
 
   return (
-    <Card className="drum-track-card w-full bg-neutral-900 border-neutral-800 text-white rounded-lg">
+    <Card className="drum-track-card w-full rounded-lg">
       <CardHeader className="flex flex-row items-center justify-between p-3">
         <div className="flex items-center">
-          <Drum className="text-orange-400 mr-2" size={18} />
+          <Drum className="text-primary mr-2" size={18} />
           <CardTitle className="text-sm font-medium truncate mr-2">{track.name}</CardTitle>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -47,7 +47,7 @@ const DrumTrackCard: React.FC<DrumTrackCardProps> = ({
             variant="ghost"
             size="icon"
             onClick={() => handlePlayTrack(track)}
-            className="text-neutral-300 hover:bg-neutral-700 hover:text-orange-400 h-7 w-7"
+            className="text-muted-foreground hover:bg-accent hover:text-primary h-7 w-7"
           >
             {isPlaying ? <PauseIcon fontSize="small" /> : <PlayIcon fontSize="small" />}
           </Button>
@@ -56,7 +56,7 @@ const DrumTrackCard: React.FC<DrumTrackCardProps> = ({
               variant="ghost" 
               size="icon"
               onClick={() => handleEditTrack(track.id)}
-              className="text-neutral-300 hover:bg-neutral-700 hover:text-amber-400 h-7 w-7"
+              className="text-muted-foreground hover:bg-accent hover:text-yellow-500 dark:hover:text-yellow-400 h-7 w-7"
             >
               <EditIcon fontSize="small" />
             </Button>
@@ -65,7 +65,7 @@ const DrumTrackCard: React.FC<DrumTrackCardProps> = ({
             variant="ghost" 
             size="icon"
             onClick={() => handleDeleteTrack(track.id)}
-            className="text-neutral-300 hover:bg-neutral-700 hover:text-red-500 h-7 w-7"
+            className="text-muted-foreground hover:bg-accent hover:text-destructive h-7 w-7"
           >
             <DeleteIcon fontSize="small" />
           </Button>
@@ -79,7 +79,7 @@ const DrumTrackCard: React.FC<DrumTrackCardProps> = ({
               <Badge 
                 key={sampler.id} 
                 variant="outline" 
-                className="text-xs bg-neutral-800 text-neutral-300 border-neutral-700"
+                className="text-xs"
               >
                 {sampler.name}
               </Badge>
@@ -89,7 +89,7 @@ const DrumTrackCard: React.FC<DrumTrackCardProps> = ({
       )}
       
       <CardFooter className="p-3 pt-1 flex justify-end items-center">
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-muted-foreground">
           {samplerCount} {samplerCount === 1 ? 'sample' : 'samples'}
         </p>
       </CardFooter>

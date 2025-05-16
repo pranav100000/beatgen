@@ -33,12 +33,28 @@ else:
     logger.info(f"DATABASE_URL: {DATABASE_URL}")
     engine = create_engine(
         DATABASE_URL,
-        echo=settings.app.DEBUG,
-        # Pool settings to maintain connections
+        echo=False,
+        
+        # More aggressive connection management
         pool_pre_ping=True,
-        pool_recycle=300,  # Recycle connections after 5 minutes
-        pool_size=20,  # Default connection pool size
-        max_overflow=20,  # Allow up to 10 additional connections
+        pool_recycle=300,
+        pool_size=35,  # Increased further but still under your 50 connection limit
+        max_overflow=10,
+        pool_timeout=60,
+        
+        # Enhanced keepalive and reliability settings
+        connect_args={
+            # More aggressive keepalives
+            "keepalives": 1,
+            "keepalives_idle": 10,  # Check after just 10s of inactivity
+            "keepalives_interval": 3,  # Try every 3s
+            "keepalives_count": 10,  # Try 10 times
+            
+            # SSL and timeout settings
+            "connect_timeout": 15,
+            "sslmode": "require",  # Explicitly require SSL
+            "application_name": "beatgen"
+        }
     )
 
 

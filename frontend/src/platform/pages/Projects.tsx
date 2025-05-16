@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { 
+  Container,
   Typography, 
   Box,
   Alert,
@@ -167,23 +168,25 @@ export default function Projects() {
           padding: '2rem',
         }}
       >
-        <ProjectsDisplay
-          allFetchedProjects={allFetchedProjects}
-          displayedProjectsCount={displayedProjectsCount}
-          totalProjectsOnServer={totalProjectsOnServer}
-          loading={loading}
-          loadingMore={loadingMore}
-          error={error}
-          onCreateNewProject={handleCreateProject}
-          onOpenProject={openProject}
-          onEditProject={navigateToEditProject} 
-          onDeleteProject={handleDeleteProject}
-          onShowMore={handleShowMore}
-          snackbarOpen={snackbar.open}
-          snackbarMessage={snackbar.message}
-          snackbarSeverity={snackbar.severity}
-          onCloseSnackbar={handleCloseSnackbar}
-        />
+        <Container maxWidth="lg" sx={{ pt: 0, mt: 0 }}>
+          <ProjectsDisplay
+            allFetchedProjects={allFetchedProjects}
+            displayedProjectsCount={displayedProjectsCount}
+            totalProjectsOnServer={totalProjectsOnServer}
+            loading={loading}
+            loadingMore={loadingMore}
+            error={error}
+            onCreateNewProject={handleCreateProject}
+            onOpenProject={openProject}
+            onEditProject={navigateToEditProject} 
+            onDeleteProject={handleDeleteProject}
+            onShowMore={handleShowMore}
+            snackbarOpen={snackbar.open}
+            snackbarMessage={snackbar.message}
+            snackbarSeverity={snackbar.severity}
+            onCloseSnackbar={handleCloseSnackbar}
+          />
+        </Container>
       </main>
     </Box>
   );

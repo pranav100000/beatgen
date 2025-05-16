@@ -12,24 +12,36 @@ import {
 import { getMidiTracks, deleteMidiTrack } from '../api/sounds';
 import { MidiTrackRead } from '../types/track_models/midi_track';
 import MidiTrackCard from './DisplayCards/MidiTrackCard';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Page } from '../types/pagination'; // Import Page type
 
 interface MidiLibraryProps {
   onReload?: () => void;
 }
 
+const ITEMS_PER_PAGE = 25; // Define items per page, as used before
+
 export default function MidiLibrary({ onReload }: MidiLibraryProps) {
-  const [midiTracks, setMidiTracks] = useState<MidiTrackRead[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [currentPageApi, setCurrentPageApi] = useState<number>(1); // For pagination
+
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   
-  // Load MIDI tracks on mount
-  useEffect(() => {
-    loadMidiTracks();
-  }, []);
+  const { 
+    data: midiTracksPage,
+    isLoading,
+    error: fetchError,
+    isFetching // To indicate background fetching for pagination
+  } = useQuery<Page<MidiTrackRead>, Error, Page<MidiTrackRead>, [string, number, number]>({
+    queryKey: ['midiTracks', currentPageApi, ITEMS_PER_PAGE],
+    queryFn: () => getMidiTracks(currentPageApi, ITEMS_PER_PAGE),
+    placeholderData: (previousData) => previousData,
+  });
+
+  const midiTracks = midiTracksPage?.items ?? [];
   
   // Set up timeupdate listener for tracking playback progress
   useEffect(() => {
@@ -62,20 +74,6 @@ export default function MidiLibrary({ onReload }: MidiLibraryProps) {
     };
   }, [audioElement]);
   
-  const loadMidiTracks = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      // Fetch the first page with 25 items
-      const loadedTracksPage = await getMidiTracks(1, 25); 
-      setMidiTracks(loadedTracksPage.items ?? []); // Extract items from the Page object
-    } catch (err) {
-      setError(`Failed to load MIDI tracks: ${(err as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
   const handlePlayTrack = (track: MidiTrackRead) => {
     // If we're already playing this track, pause it
     if (playingId === track.id && audioElement) {
@@ -97,25 +95,31 @@ export default function MidiLibrary({ onReload }: MidiLibraryProps) {
     }, 5000);
   };
   
+  const { mutate: performDeleteMidiTrack, isPending: isDeletingTrack } = useMutation<void, Error, string>({
+    mutationFn: deleteMidiTrack,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['midiTracks', currentPageApi, ITEMS_PER_PAGE] });
+      // Or broader: queryClient.invalidateQueries({ queryKey: ['midiTracks'] });
+      if (onReload) {
+        onReload();
+      }
+    },
+    onError: (err: Error) => {
+      console.error(`Failed to delete MIDI track: ${err.message}`);
+      // Update an error state or show snackbar
+    },
+  });
+
   const handleDeleteTrack = async (id: string) => {
     // Stop playback if this is the track being played
     if (playingId === id && audioElement) {
       audioElement.pause();
       setPlayingId(null);
     }
-    
-    try {
-      await deleteMidiTrack(id);
-      setMidiTracks(midiTracks.filter(track => track.id !== id));
-      if (onReload) {
-        onReload();
-      }
-    } catch (err) {
-      setError(`Failed to delete MIDI track: ${(err as Error).message}`);
-    }
+    performDeleteMidiTrack(id);
   };
   
-  if (loading) {
+  if (isLoading) { // Initial page load
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
         <CircularProgress />
@@ -123,15 +127,15 @@ export default function MidiLibrary({ onReload }: MidiLibraryProps) {
     );
   }
   
-  if (error) {
+  if (fetchError) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
-        {error}
+        {fetchError.message}
       </Alert>
     );
   }
   
-  if (midiTracks.length === 0) {
+  if (midiTracks.length === 0 && !isFetching) { // Show no tracks only if not fetching more
     return (
       <Box sx={{ 
         display: 'flex', 
