@@ -3,7 +3,8 @@ User repository for database operations using SQLModel
 """
 
 from typing import Dict, Any, Optional
-from sqlmodel import Session, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 import traceback
 import uuid
 
@@ -15,12 +16,12 @@ from .base_repository import BaseRepository
 class UserRepository(BaseRepository[User]):
     """Repository for user operations"""
 
-    def __init__(self, session: Session):
+    def __init__(self, session: AsyncSession):
         """
         Initialize the repository with User model class and session
 
         Args:
-            session: The SQLModel session for database operations
+            session: The AsyncSQLModel session for database operations
         """
         super().__init__(User, session)
 
@@ -173,7 +174,8 @@ class UserRepository(BaseRepository[User]):
         self.logger.info(f"Finding user with email {email}")
         try:
             statement = select(self.model_class).where(self.model_class.email == email)
-            result = self.session.exec(statement).first()
+            result_proxy = await self.session.execute(statement)
+            result = result_proxy.scalars().first()
 
             if result:
                 self.logger.info(f"Found user with email {email}")

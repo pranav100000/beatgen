@@ -4,10 +4,11 @@ Handles operations on the project-track join table with the new track model stru
 """
 
 from typing import Dict, Any, List, Optional
-from sqlmodel import Session, select
+from sqlmodel import select
 import traceback
 from datetime import datetime
 import uuid
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app2.core.exceptions import DatabaseException, NotFoundException
 from app2.core.logging import get_repository_logger
@@ -18,12 +19,12 @@ from app2.types.track_types import TrackType
 class ProjectTrackRepository:
     """Repository for project-track relationship operations"""
 
-    def __init__(self, session: Session):
+    def __init__(self, session: AsyncSession):
         """
         Initialize the repository with database session
 
         Args:
-            session: The SQLModel session for database operations
+            session: The AsyncSQLModel session for database operations
         """
         self.session = session
         self.logger = get_repository_logger("project_track")
@@ -46,12 +47,13 @@ class ProjectTrackRepository:
             statement = select(ProjectTrack).where(
                 ProjectTrack.project_id == project_id
             )
-            results = self.session.exec(statement).all()
+            result_proxy = await self.session.execute(statement)
+            all_results = result_proxy.scalars().all()
 
             self.logger.info(
-                f"Found {len(results)} project-tracks for project {project_id}"
+                f"Found {len(all_results)} project-tracks for project {project_id}"
             )
-            return results
+            return all_results
         except Exception as e:
             self.logger.error(f"Error getting project-tracks: {str(e)}")
             self.logger.error(traceback.format_exc())
@@ -80,12 +82,13 @@ class ProjectTrackRepository:
                 ProjectTrack.track_type == track_type, ProjectTrack.track_id == track_id
             )
 
-            results = self.session.exec(statement).all()
+            result_proxy = await self.session.execute(statement)
+            all_results = result_proxy.scalars().all()
 
             self.logger.info(
-                f"Found {len(results)} project-tracks for {track_type} track {track_id}"
+                f"Found {len(all_results)} project-tracks for {track_type} track {track_id}"
             )
-            return results
+            return all_results
         except Exception as e:
             self.logger.error(f"Error getting project-tracks: {str(e)}")
             self.logger.error(traceback.format_exc())
@@ -119,7 +122,8 @@ class ProjectTrackRepository:
                 ProjectTrack.track_id == track_id,
             )
 
-            result = self.session.exec(statement).first()
+            result_proxy = await self.session.execute(statement)
+            result = result_proxy.scalars().first()
 
             if result:
                 self.logger.info(
@@ -165,15 +169,15 @@ class ProjectTrackRepository:
 
             # Add to session and commit
             self.session.add(project_track)
-            self.session.commit()
-            self.session.refresh(project_track)
+            await self.session.commit()
+            await self.session.refresh(project_track)
 
             self.logger.info(
                 f"Created project-track for project {project_track.project_id}"
             )
             return project_track
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             self.logger.error(f"Error creating project-track: {str(e)}")
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to create project-track: {str(e)}")
@@ -236,15 +240,15 @@ class ProjectTrackRepository:
 
             # Commit changes
             self.session.add(project_track)
-            self.session.commit()
-            self.session.refresh(project_track)
+            await self.session.commit()
+            await self.session.refresh(project_track)
 
             self.logger.info(
                 f"Updated project-track for project {project_id} and {track_type} track {track_id}"
             )
             return project_track
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
             self.logger.error(f"Error updating project-track: {str(e)}")
@@ -284,15 +288,15 @@ class ProjectTrackRepository:
                 return False
 
             # Delete from database
-            self.session.delete(project_track)
-            self.session.commit()
+            await self.session.delete(project_track)
+            await self.session.commit()
 
             self.logger.info(
                 f"Deleted project-track for project {project_id} and {track_type} track {track_id}"
             )
             return True
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             self.logger.error(f"Error deleting project-track: {str(e)}")
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to delete project-track: {str(e)}")
@@ -317,17 +321,17 @@ class ProjectTrackRepository:
 
             # Delete all associations
             for pt in project_tracks:
-                self.session.delete(pt)
+                await self.session.delete(pt)
 
             # Commit changes
-            self.session.commit()
+            await self.session.commit()
 
             self.logger.info(
                 f"Deleted {len(project_tracks)} project-tracks for project {project_id}"
             )
             return len(project_tracks)
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             self.logger.error(f"Error deleting project-tracks: {str(e)}")
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to delete project-tracks: {str(e)}")
@@ -355,17 +359,17 @@ class ProjectTrackRepository:
 
             # Delete all associations
             for pt in project_tracks:
-                self.session.delete(pt)
+                await self.session.delete(pt)
 
             # Commit changes
-            self.session.commit()
+            await self.session.commit()
 
             self.logger.info(
                 f"Deleted {len(project_tracks)} project-tracks for {track_type} track {track_id}"
             )
             return len(project_tracks)
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             self.logger.error(f"Error deleting project-tracks: {str(e)}")
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to delete project-tracks: {str(e)}")

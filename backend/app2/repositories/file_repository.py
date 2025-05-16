@@ -4,7 +4,8 @@ Handles all file types (audio, MIDI, instrument) consistently
 """
 
 from typing import Dict, Any, List, Optional, Type
-from sqlmodel import Session, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 import traceback
 import uuid
 
@@ -21,12 +22,12 @@ FileModel = InstrumentFile
 class FileRepository:
     """Repository for operations on all file types (audio, MIDI, instrument)"""
 
-    def __init__(self, session: Session):
+    def __init__(self, session: AsyncSession):
         """
         Initialize the repository with database session
 
         Args:
-            session: The SQLModel session for database operations
+            session: The AsyncSQLModel session for database operations
         """
         self.session = session
         self.logger = get_repository_logger("file")
@@ -74,7 +75,8 @@ class FileRepository:
             model_class = self._get_model_class(file_type)
 
             statement = select(model_class).where(model_class.id == file_id)
-            result = self.session.exec(statement).first()
+            result_proxy = await self.session.execute(statement)
+            result = result_proxy.scalars().first()
 
             if result is None:
                 self.logger.error(
@@ -119,10 +121,11 @@ class FileRepository:
                     query = query.where(getattr(model_class, key) == value)
 
             # Execute query
-            results = self.session.exec(query).all()
+            result_proxy = await self.session.execute(query)
+            all_results = result_proxy.scalars().all()
 
-            self.logger.info(f"Found {len(results)} {file_type.value} files")
-            return results
+            self.logger.info(f"Found {len(all_results)} {file_type.value} files")
+            return all_results
         except Exception as e:
             self.logger.error(f"Error getting {file_type.value} files: {str(e)}")
             self.logger.error(traceback.format_exc())
@@ -188,15 +191,15 @@ class FileRepository:
 
             # Add to session
             self.session.add(file_instance)
-            self.session.commit()
-            self.session.refresh(file_instance)
+            await self.session.commit()
+            await self.session.refresh(file_instance)
 
             self.logger.info(
                 f"Created {file_type.value} file with ID {file_instance.id}"
             )
             return file_instance
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             self.logger.error(f"Error creating {file_type.value} file: {str(e)}")
             self.logger.error(traceback.format_exc())
             raise DatabaseException(
@@ -233,13 +236,13 @@ class FileRepository:
 
             # Commit changes
             self.session.add(file_instance)
-            self.session.commit()
-            self.session.refresh(file_instance)
+            await self.session.commit()
+            await self.session.refresh(file_instance)
 
             self.logger.info(f"Updated {file_type.value} file with ID {file_id}")
             return file_instance
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
             self.logger.error(f"Error updating {file_type.value} file: {str(e)}")
@@ -269,13 +272,13 @@ class FileRepository:
             file_instance = await self.get_by_id(file_id, file_type)
 
             # Delete from database
-            self.session.delete(file_instance)
-            self.session.commit()
+            await self.session.delete(file_instance)
+            await self.session.commit()
 
             self.logger.info(f"Deleted {file_type.value} file with ID {file_id}")
             return True
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
             self.logger.error(f"Error deleting {file_type.value} file: {str(e)}")
