@@ -5,8 +5,10 @@ import { useAuth } from '../platform/auth/auth-context'
 import { handleOAuthCallback } from '../platform/api/auth'
 import { useAppTheme } from '../platform/theme/ThemeContext'
 import Sidebar from '../platform/components/Sidebar'
-import { SidebarProvider, SidebarInset } from '../components/ui/sidebar'
+import { SidebarProvider, SidebarInset, useSidebar, SidebarTrigger } from '../components/ui/sidebar'
 import { cn } from '../lib/utils'
+import { Button } from '../components/ui/button'
+import { PanelLeftIcon } from 'lucide-react'
 
 // Root Layout Component - this wraps all routes
 export const Route = createRootRoute({
@@ -118,7 +120,7 @@ function RootLayout() {
   
   // Determine if the sidebar should be shown based on the route
   // For example, hide sidebar on /studio, /login, /register, /etc.
-  const noSidebarRoutes = ['/studio', '/login', '/register', '/']; // Added landing page '/'
+  const noSidebarRoutes = ['/studio', '/login', '/register']; // Removed landing page '/'
   const shouldShowSidebar = !noSidebarRoutes.some(route => currentUrl.endsWith(route) || currentUrl.includes(route + '/') || currentUrl.includes(route + '?'));
 
   // No navbar in the root layout - each route will add its own navbar if needed
@@ -129,28 +131,48 @@ function RootLayout() {
       onOpenChange={setIsSidebarOpen} 
       defaultOpen={true} // Default open state
     >
-      <div 
-        id="root-layout" 
-        style={{ 
-          background: currentThemePalette.background, 
-          color: currentThemePalette.text, 
-          minHeight: '100vh',
-          display: 'flex', // Added display flex
-          width: '100%' // Ensure full width within its parent flex container
-        }}
-      >
+      <RootLayoutContent 
+        shouldShowSidebar={shouldShowSidebar} 
+        currentThemePalette={currentThemePalette}
+      />
+    </SidebarProvider>
+  );
+}
+
+// New component to access useSidebar hook
+function RootLayoutContent({ shouldShowSidebar, currentThemePalette }: { shouldShowSidebar: boolean, currentThemePalette: any }) {
+  const { isMobile, toggleSidebar } = useSidebar();
+  console.log('[RootLayoutContent] isMobile:', isMobile, 'shouldShowSidebar:', shouldShowSidebar);
+
+  return (
+    <div 
+      id="root-layout" 
+      style={{ 
+        background: currentThemePalette.background, 
+        color: currentThemePalette.text, 
+        minHeight: '100vh',
+        width: '100%' 
+      }}
+    >
+      {isMobile && shouldShowSidebar && (
+        <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden p-2 border-b">
+          <Button variant="ghost" size="icon" onClick={toggleSidebar} aria-label="Toggle Sidebar">
+            <PanelLeftIcon className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
+      <div className="flex flex-1"> {/* This div will handle the flex layout for sidebar and content */}
         {shouldShowSidebar && <Sidebar />} 
-        <SidebarInset> {/* Wrap Outlet with SidebarInset */}
+        <SidebarInset> 
           <main
             className={cn(
-              "flex-grow overflow-y-auto w-full" // Ensure it's always full width
+              "flex-grow overflow-y-auto w-full"
             )}
-            // style={{ flexGrow: 1, overflowY: 'auto' }} // Replaced by className
           >
             <Outlet />
           </main>
         </SidebarInset>
       </div>
-    </SidebarProvider>
+    </div>
   );
 }

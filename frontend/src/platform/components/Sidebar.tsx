@@ -36,7 +36,7 @@ import { useAuth } from '../auth/auth-context';
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
-  const { open } = useSidebar();
+  const { open, isMobile } = useSidebar();
   const { signOut } = useAuth();
 
   const menuItems = [
@@ -52,16 +52,16 @@ const Sidebar: React.FC = () => {
     <ShadcnSidebar collapsible="icon">
       <SidebarHeader 
         className={`flex flex-row items-center h-16 px-4 ${
-          open ? 'justify-between' : 'justify-end'
+          open && !isMobile ? 'justify-between' : 'justify-end'
         }`}
       >
-        {open && (
+        {open && !isMobile && (
           <div className="flex items-center">
             <img src="/beatgen-favicon.png" alt="BeatGen Favicon" className="mr-2 h-6 w-6" />
             <span className="text-xl font-semibold">BeatGen</span>
           </div>
         )}
-        <SidebarTrigger className="translate-x-1.5" />
+        {!isMobile && <SidebarTrigger className="translate-x-1.5" />}
       </SidebarHeader>
       
       <SidebarContent>
@@ -75,10 +75,11 @@ const Sidebar: React.FC = () => {
                 className="w-full justify-start translate-x-1.5"
               >
                 <IconUserCircle />
-                {open && <span>My Profile</span>}
+                {open && !isMobile && <span>My Profile</span>}
+                {isMobile && <span>My Profile</span>}
               </SidebarMenuButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" side="right" align="start" sideOffset={open ? 5 : 10}>
+            <DropdownMenuContent className="w-56" side="right" align="start" sideOffset={open && !isMobile ? 5 : 10}>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">pranav100000@gmail.com</p>
@@ -123,7 +124,7 @@ const Sidebar: React.FC = () => {
                 tooltip={item.text}
               >
                 {React.cloneElement(item.icon, { className: "shrink-0" })}
-                <span>{item.text}</span>
+                {(open && !isMobile) || isMobile ? <span>{item.text}</span> : null}
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
