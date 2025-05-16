@@ -18,7 +18,7 @@ import {
 } from '../api/projects';
 import { Project } from '../types/project';
 import Sidebar from '../components/Sidebar';
-import { useSidebar } from "@/components/ui/sidebar";
+import { useSidebar } from "../../components/ui/sidebar";
 import ProjectsDisplay from '../components/ProjectsDisplay';
 
 
