@@ -30,7 +30,7 @@ import {
   SidebarMenuButton,
   SidebarSeparator,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from "../../components/ui/sidebar";
 
 import { useAuth } from '../auth/auth-context';
 
