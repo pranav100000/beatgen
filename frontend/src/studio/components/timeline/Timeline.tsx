@@ -6,6 +6,8 @@ import Track from '../track/Track';
 import PlaybackCursor, { PlaybackCursorRef } from './PlaybackCursor';
 import { CombinedTrack } from 'src/platform/types/project';
 import { Position } from '../track/types';
+import { useAppTheme } from '../../../platform/theme/ThemeContext';
+import { cn } from '@/lib/utils';
 
 export interface TimelineProps {
   tracks: CombinedTrack[];
@@ -200,17 +202,20 @@ function TimelineRuler({
   // gridLineStyle, // No longer needed for ruler internal lines
   totalWidth
 }: TimelineRulerProps) {
-  const theme = useTheme(); // For theme-based colors if needed, or use fixed colors
+  // const theme = useTheme(); // MUI theme, not directly needed for these specific changes
+  const { studioMode } = useAppTheme(); // Get studioMode
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Colors for lines - Tailored for a dark theme as per the target image
-  const SUBDIVISION_LINE_COLOR = 'rgba(255, 255, 255, 0.20)'; // Dimmest white/grey, slightly more visible
-  const BEAT_LINE_COLOR = 'rgba(255, 255, 255, 0.40)';      // Medium white/grey, slightly clearer
-  const MEASURE_LINE_COLOR = 'rgba(255, 255, 255, 0.70)';     // Brightest white/grey, slightly more prominent
-  // Text colors will be handled by Tailwind classes e.g. text-neutral-100, text-neutral-400
+  // Define colors based on studioMode
+  const isDark = studioMode === 'dark';
+
+  // Adjusted light mode colors to be lighter shades of gray (via black with low alpha)
+  const SUBDIVISION_LINE_COLOR = isDark ? 'rgba(255, 255, 255, 0.20)' : 'rgba(0, 0, 0, 0.10)';
+  const BEAT_LINE_COLOR = isDark ? 'rgba(255, 255, 255, 0.40)' : 'rgba(0, 0, 0, 0.20)';
+  const MEASURE_LINE_COLOR = isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(0, 0, 0, 0.40)';
 
   const beatsPerMeasure = timeSignature[0];
-  const measureWidthPixels = GRID_CONSTANTS.measureWidth; // Base measure width
+  const measureWidthPixels = GRID_CONSTANTS.measureWidth;
   const beatWidthPixels = measureWidthPixels / beatsPerMeasure;
 
   // Handler for ruler clicks to set playback position
@@ -289,14 +294,18 @@ function TimelineRuler({
     measureCount,
     beatsPerMeasure,
     timeSignature,
-    zoomLevel, // Add if it affects calculations like beatWidthPixels or subdivisionWidthPixels
+    zoomLevel, 
     SUBDIVISION_LINE_COLOR, BEAT_LINE_COLOR, MEASURE_LINE_COLOR // Redraw if colors change
   ]);
 
   return (
     // Main sticky container - Apply Tailwind classes
     <div
-      className="sticky top-0 z-[2] box-border overflow-hidden bg-[#121212] border-b border-neutral-700 shadow-sm"
+      className={cn(
+        "sticky top-0 z-[2] box-border overflow-hidden shadow-sm",
+        isDark ? "bg-card" : "bg-slate-100", // Conditional background
+        "border-b border-border" // Uses --border CSS variable (theme-aware)
+        )}
       style={{ // Height and dynamic width still via style prop
         height: `${GRID_CONSTANTS.headerHeight}px`,
         width: totalWidth ? `${totalWidth}px` : '100%',
@@ -312,10 +321,12 @@ function TimelineRuler({
       {Array.from({ length: measureCount }).map((_, measureIndex) => (
         <div
           key={`measure-num-${measureIndex}`}
-          className="absolute top-1/2 -translate-y-1/2 text-sm text-neutral-100 select-none z-[1]"
+          className={cn(
+            "absolute top-1/2 -translate-y-1/2 text-sm select-none z-[1]",
+            "text-foreground" // Uses --foreground CSS variable (theme-aware)
+            )}
           style={{ // Dynamic left positioning
             left: `${measureIndex * measureWidthPixels + 5}px`,
-            bottom: '0px'
           }}
         >
           {measureIndex + 1}
@@ -329,9 +340,12 @@ function TimelineRuler({
           return (
             <div
               key={`beat-num-${measureIndex}-${actualBeatNumber}`}
-              className="absolute top-1/2 -translate-y-1/2 text-[8px] text-neutral-400 select-none z-[1]"
+              className={cn(
+                "absolute top-1/2 -translate-y-1/2 text-[8px] select-none z-[1]",
+                "text-muted-foreground" // Uses --muted-foreground CSS variable (theme-aware)
+                )}
               style={{ // Dynamic left positioning, similar to measure numbers but offset from beat line
-                left: `${beatXPosition + 4}px`, // Position 4px to the right of the beat line start
+                left: `${beatXPosition + 4}px`, 
               }}
             >
               {actualBeatNumber}
