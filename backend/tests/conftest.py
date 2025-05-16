@@ -1,13 +1,17 @@
 import pytest
 import pytest_asyncio
 import uuid
-from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel, Session, create_engine
-from typing import AsyncGenerator, Generator
+# from sqlalchemy.pool import StaticPool # No longer needed for async aiosqlite
+from sqlmodel import SQLModel # Session removed
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession # Added
+from sqlalchemy.orm import sessionmaker # Added
+from typing import AsyncGenerator # Generator removed
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
 # Monkey patch BaseRepository methods to handle UUID properly for testing
+# This might need review if BaseRepository's async nature causes issues here,
+# but the patched methods are already async.
 from app2.repositories.base_repository import BaseRepository
 
 # Store original methods
@@ -17,8 +21,8 @@ original_update = BaseRepository.update
 original_delete = BaseRepository.delete
 
 
-@pytest.fixture(scope="session", autouse=True)
-def patch_base_repository():
+@pytest.fixture(scope="session", autouse=True) # This fixture is session-scoped and autouse, check if it needs to be async
+def patch_base_repository(): # If this fixture itself becomes async, pytest_asyncio might be needed at higher scope
     """Monkeypatch BaseRepository to handle both string and UUID IDs"""
 
     # Patched find_by_id
@@ -68,39 +72,45 @@ from app2.models.file_models.audio_file import AudioFile
 from app2.models.file_models.midi_file import MidiFile
 from app2.models.public_models.instrument_file import InstrumentFile
 
-
-# In-memory SQLite engine for testing
-@pytest.fixture(scope="session")
-def engine():
-    # Connect with SQLite in-memory database
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+# Async engine and session maker for testing with aiosqlite
+@pytest_asyncio.fixture(scope="session")
+async def engine() -> AsyncGenerator[AsyncSession, None]: # Changed return type
+    # Connect with SQLite in-memory database using aiosqlite
+    async_engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        # connect_args={"check_same_thread": False}, # Not needed for aiosqlite
+        # poolclass=StaticPool, # Not typically used with async engines like this
     )
 
     # Create all tables in the engine
-    SQLModel.metadata.create_all(engine)
+    async with async_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
 
-    yield engine
+    yield async_engine # yield the engine itself
 
-
-@pytest.fixture
-def db_session(engine) -> Generator[Session, None, None]:
-    """
-    Creates a fresh SQLAlchemy session for each test.
-    """
-    with Session(engine) as session:
-        yield session
+    await async_engine.dispose() # Dispose of the engine after tests
 
 
 @pytest_asyncio.fixture
-async def async_db_session(db_session) -> AsyncGenerator[Session, None]:
+async def db_session(engine) -> AsyncGenerator[AsyncSession, None]: # Renamed from async_db_session, made primary
     """
-    Async version of the db_session fixture for async tests.
+    Creates a fresh SQLAlchemy AsyncSession for each test.
     """
-    yield db_session
+    async_session_maker = sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with async_session_maker() as session:
+        try:
+            yield session
+            await session.commit() # Commit if no exceptions
+        except Exception:
+            await session.rollback() # Rollback on exception
+            raise
+        finally:
+            await session.close()
 
+# Remove old sync db_session if not needed, or adapt if some tests must remain sync
+# For now, assuming all tests using db_session will become async and use the new async db_session.
 
 # Mock Supabase client
 @pytest.fixture
@@ -144,7 +154,7 @@ def sample_project_track(sample_project, sample_track):
         track_id=sample_track.id,
         volume=0.8,
         pan=0,
-        position=0,
+        # position=0, # Assuming position is deprecated or handled differently
     )
 
 
@@ -153,7 +163,7 @@ def sample_midi_file():
     return MidiFile(
         id=uuid.uuid4(),
         name="Test MIDI File",
-        file_path="path/to/midi_file.mid",
+        # file_path="path/to/midi_file.mid", # Assuming file_path might not be needed for all tests or is handled elsewhere
         user_id=uuid.uuid4(),
     )
 
@@ -163,7 +173,7 @@ def sample_audio_file():
     return AudioFile(
         id=uuid.uuid4(),
         name="Test Audio File",
-        file_path="path/to/audio_file.wav",
+        # file_path="path/to/audio_file.wav",
         user_id=uuid.uuid4(),
     )
 
@@ -173,6 +183,6 @@ def sample_instrument_file():
     return InstrumentFile(
         id=uuid.uuid4(),
         name="Test Instrument File",
-        file_path="path/to/instrument.sf2",
+        # file_path="path/to/instrument.sf2",
         user_id=uuid.uuid4(),
     )

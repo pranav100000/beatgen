@@ -3,8 +3,9 @@ Base repository with common database operations using SQLModel
 """
 
 from typing import Generic, TypeVar, Type, List, Dict, Any
-from sqlmodel import SQLModel, Session, select
+from sqlmodel import SQLModel, select
 import traceback
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app2.core.logging import get_repository_logger
 from app2.core.exceptions import DatabaseException, NotFoundException
@@ -16,13 +17,13 @@ T = TypeVar("T", bound=SQLModel)
 class BaseRepository(Generic[T]):
     """Base repository with common database operations"""
 
-    def __init__(self, model_class: Type[T], session: Session):
+    def __init__(self, model_class: Type[T], session: AsyncSession):
         """
         Initialize the repository with a model class and database session
 
         Args:
             model_class: The SQLModel class this repository works with
-            session: The SQLModel session for database operations
+            session: The AsyncSQLModel session for database operations
         """
         self.model_class = model_class
         self.session = session
@@ -41,11 +42,12 @@ class BaseRepository(Generic[T]):
         self.logger.info(f"Finding all {self.model_class.__name__} records")
         try:
             statement = select(self.model_class)
-            results = self.session.exec(statement).all()
+            result_proxy = await self.session.execute(statement)
+            all_results = result_proxy.scalars().all()
             self.logger.info(
-                f"Found {len(results)} {self.model_class.__name__} records"
+                f"Found {len(all_results)} {self.model_class.__name__} records"
             )
-            return results
+            return all_results
         except Exception as e:
             self.logger.error(f"Error finding all records: {str(e)}")
             self.logger.error(traceback.format_exc())
@@ -67,8 +69,9 @@ class BaseRepository(Generic[T]):
         """
         self.logger.info(f"Finding {self.model_class.__name__} with ID {id}")
         try:
-            statement = select(self.model_class).where(self.model_class.id == id)
-            result = self.session.exec(statement).first()
+            statement = select(self.model_class).where(getattr(self.model_class, 'id') == id)
+            result_proxy = await self.session.execute(statement)
+            result = result_proxy.scalars().first()
 
             if result is None:
                 self.logger.error(f"{self.model_class.__name__} with ID {id} not found")
@@ -100,14 +103,13 @@ class BaseRepository(Generic[T]):
             f"Finding {self.model_class.__name__} records for user {user_id}"
         )
         try:
-            statement = select(self.model_class).where(
-                self.model_class.user_id == user_id
-            )
-            results = self.session.exec(statement).all()
+            statement = select(self.model_class).where(getattr(self.model_class, 'user_id') == user_id)
+            result_proxy = await self.session.execute(statement)
+            all_results = result_proxy.scalars().all()
             self.logger.info(
-                f"Found {len(results)} {self.model_class.__name__} records for user {user_id}"
+                f"Found {len(all_results)} {self.model_class.__name__} records for user {user_id}"
             )
-            return results
+            return all_results
         except Exception as e:
             self.logger.error(f"Error finding records by user: {str(e)}")
             self.logger.error(traceback.format_exc())
@@ -133,15 +135,15 @@ class BaseRepository(Generic[T]):
 
             # Add to session
             self.session.add(model_instance)
-            self.session.commit()
-            self.session.refresh(model_instance)
+            await self.session.commit()
+            await self.session.refresh(model_instance)
 
             self.logger.info(
-                f"Created {self.model_class.__name__} with ID {model_instance.id}"
+                f"Created {self.model_class.__name__} with ID {getattr(model_instance, 'id', 'Unknown')}"
             )
             return model_instance
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             self.logger.error(f"Error creating record: {str(e)}")
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to create record: {str(e)}")
@@ -173,13 +175,13 @@ class BaseRepository(Generic[T]):
 
             # Commit changes
             self.session.add(model_instance)
-            self.session.commit()
-            self.session.refresh(model_instance)
+            await self.session.commit()
+            await self.session.refresh(model_instance)
 
             self.logger.info(f"Updated {self.model_class.__name__} with ID {id}")
             return model_instance
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
             self.logger.error(f"Error updating record: {str(e)}")
@@ -206,13 +208,13 @@ class BaseRepository(Generic[T]):
             model_instance = await self.find_by_id(id)
 
             # Delete the record
-            self.session.delete(model_instance)
-            self.session.commit()
+            await self.session.delete(model_instance)
+            await self.session.commit()
 
             self.logger.info(f"Deleted {self.model_class.__name__} with ID {id}")
             return True
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
             self.logger.error(f"Error deleting record: {str(e)}")

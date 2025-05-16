@@ -36,11 +36,11 @@ app.add_middleware(
 
 # Initialize SQLModel tables on startup
 @app.on_event("startup")
-def init_db():
+async def init_db():
     """Initialize the database and create tables"""
     logger.info("Initializing database and creating tables...")
     try:
-        create_db_and_tables()
+        await create_db_and_tables()
         logger.info("Database initialization complete")
     except Exception as e:
         logger.error(f"Database initialization failed: {str(e)}")

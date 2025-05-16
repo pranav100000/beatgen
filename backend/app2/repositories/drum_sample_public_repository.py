@@ -4,7 +4,8 @@ Handles all file types (audio, MIDI, instrument) consistently
 """
 
 from typing import Dict, Any, List, Optional, Type
-from sqlmodel import Session, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 import traceback
 import uuid
 
@@ -17,12 +18,12 @@ from app2.models.public_models.drum_samples import DrumSamplePublic
 class DrumSamplePublicRepository:
     """Repository for operations on DrumSamplePublic model"""
 
-    def __init__(self, session: Session):
+    def __init__(self, session: AsyncSession):
         """
         Initialize the repository with database session
 
         Args:
-            session: The SQLModel session for database operations
+            session: The AsyncSQLModel session for database operations
         """
         self.session = session
         self.logger = get_repository_logger("drum_sample_public")
@@ -56,7 +57,8 @@ class DrumSamplePublicRepository:
         try:
             # Use the hardcoded model class directly
             statement = select(self._file_model).where(self._file_model.id == file_id)
-            result = self.session.exec(statement).first()
+            result_proxy = await self.session.execute(statement)
+            result = result_proxy.scalars().first()
 
             if result is None:
                 self.logger.error(f"Drum Sample with ID {file_id} not found")
@@ -97,10 +99,11 @@ class DrumSamplePublicRepository:
                     query = query.where(getattr(model_class, key) == value)
 
             # Execute query
-            results = self.session.exec(query).all()
+            result_proxy = await self.session.execute(query)
+            all_results = result_proxy.scalars().all()
 
-            self.logger.info(f"Found {len(results)} Drum Samples")
-            return results
+            self.logger.info(f"Found {len(all_results)} Drum Samples")
+            return all_results
         except Exception as e:
             self.logger.error(f"Error getting Drum Samples: {str(e)}")
             self.logger.error(traceback.format_exc())
@@ -129,13 +132,13 @@ class DrumSamplePublicRepository:
 
             # Add to session
             self.session.add(file_instance)
-            self.session.commit()
-            self.session.refresh(file_instance)
+            await self.session.commit()
+            await self.session.refresh(file_instance)
 
             self.logger.info(f"Created Drum Sample with ID {file_instance.id}")
             return file_instance
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             self.logger.error(f"Error creating Drum Sample: {str(e)}")
             self.logger.error(traceback.format_exc())
             raise DatabaseException(f"Failed to create Drum Sample: {str(e)}")
@@ -169,13 +172,13 @@ class DrumSamplePublicRepository:
 
             # Commit changes
             self.session.add(file_instance)
-            self.session.commit()
-            self.session.refresh(file_instance)
+            await self.session.commit()
+            await self.session.refresh(file_instance)
 
             self.logger.info(f"Updated Drum Sample with ID {file_id}")
             return file_instance
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
             self.logger.error(f"Error updating Drum Sample: {str(e)}")
@@ -202,13 +205,13 @@ class DrumSamplePublicRepository:
             file_instance = await self.get_by_id(file_id)
 
             # Delete from database
-            self.session.delete(file_instance)
-            self.session.commit()
+            await self.session.delete(file_instance)
+            await self.session.commit()
 
             self.logger.info(f"Deleted Drum Sample with ID {file_id}")
             return True
         except Exception as e:
-            self.session.rollback()
+            await self.session.rollback()
             if isinstance(e, NotFoundException):
                 raise
             self.logger.error(f"Error deleting Drum Sample: {str(e)}")
