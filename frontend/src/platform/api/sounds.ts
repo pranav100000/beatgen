@@ -147,8 +147,8 @@ export const createDrumTrackRecord = async (drumData: DrumTrackCreate): Promise<
  * Get all audio tracks for the current user
  * @returns Array of audio tracks
  */
-export const getSounds = async (): Promise<AudioTrackRead[]> => {
-  const response = await apiClient.get('/sounds/audio');
+export const getSounds = async (signal?: AbortSignal): Promise<AudioTrackRead[]> => {
+  const response = await apiClient.get('/sounds/audio', { signal });
   return response.data;
 };
 
@@ -156,9 +156,10 @@ export const getSounds = async (): Promise<AudioTrackRead[]> => {
  * Get all MIDI tracks for the current user
  * @returns Array of MIDI tracks
  */
-export const getMidiTracks = async (page: number = 1, size: number = 10): Promise<Page<MidiTrackRead>> => {
+export const getMidiTracks = async (page: number = 1, size: number = 10, signal?: AbortSignal): Promise<Page<MidiTrackRead>> => {
   const response = await apiClient.get<Page<MidiTrackRead>>('/sounds/midi', {
-    params: { page, size }
+    params: { page, size },
+    signal
   });
   return response.data;
 };
@@ -167,9 +168,10 @@ export const getMidiTracks = async (page: number = 1, size: number = 10): Promis
  * Get all sampler tracks for the current user
  * @returns Array of sampler tracks
  */
-export const getSamplerTracks = async (page: number = 1, size: number = 10): Promise<Page<SamplerTrackRead>> => {
+export const getSamplerTracks = async (page: number = 1, size: number = 10, signal?: AbortSignal): Promise<Page<SamplerTrackRead>> => {
   const response = await apiClient.get<Page<SamplerTrackRead>>('/sounds/sampler', {
-    params: { page, size }
+    params: { page, size },
+    signal
   });
   return response.data;
 };
@@ -178,9 +180,10 @@ export const getSamplerTracks = async (page: number = 1, size: number = 10): Pro
  * Get all drum tracks for the current user
  * @returns Array of drum tracks
  */
-export const getDrumTracks = async (page: number = 1, size: number = 10): Promise<Page<DrumTrackRead>> => {
+export const getDrumTracks = async (page: number = 1, size: number = 10, signal?: AbortSignal): Promise<Page<DrumTrackRead>> => {
   const response = await apiClient.get<Page<DrumTrackRead>>('/sounds/drum', {
-    params: { page, size }
+    params: { page, size },
+    signal
   });
   return response.data;
 };

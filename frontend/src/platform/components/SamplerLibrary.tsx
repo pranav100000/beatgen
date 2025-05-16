@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Box, 
   Typography, 
@@ -25,10 +25,14 @@ export default function SamplerLibrary({ onReload }: SamplerLibraryProps) {
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Load sampler tracks on mount
   useEffect(() => {
     loadSamplerTracks();
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, []);
   
   // Set up timeupdate listener for tracking playback progress
@@ -63,14 +67,27 @@ export default function SamplerLibrary({ onReload }: SamplerLibraryProps) {
   }, [audioElement]);
   
   const loadSamplerTracks = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       setLoading(true);
       setError(null);
-      const loadedTracks = await getSamplerTracks();
+      const loadedTracks = await getSamplerTracks(1, 25, controller.signal);
       setSamplerTracks(loadedTracks.items ?? []);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Sampler tracks fetch aborted');
+        return;
+      }
       setError(`Failed to load sampler tracks: ${(err as Error).message}`);
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setLoading(false);
     }
   };
