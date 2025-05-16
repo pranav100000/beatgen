@@ -29,7 +29,7 @@ const AudioTrackCard: React.FC<AudioTrackCardProps> = ({
   const isPlaying = playingId === sound.id;
 
   return (
-    <Card className="audio-track-card w-full bg-neutral-900 border-neutral-800 text-white rounded-lg">
+    <Card className="audio-track-card w-full rounded-lg">
       <CardHeader className="flex flex-row items-center justify-between p-3">
         <CardTitle className="text-sm font-medium truncate mr-2">{sound.name}</CardTitle>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -37,7 +37,7 @@ const AudioTrackCard: React.FC<AudioTrackCardProps> = ({
             variant="ghost"
             size="icon"
             onClick={() => handlePlaySound(sound)}
-            className="text-neutral-300 hover:bg-neutral-700 hover:text-purple-400 h-7 w-7"
+            className="text-muted-foreground hover:bg-accent hover:text-accent-foreground h-7 w-7"
           >
             {isPlaying ? <PauseIcon fontSize="small" /> : <PlayIcon fontSize="small" />}
           </Button>
@@ -45,7 +45,7 @@ const AudioTrackCard: React.FC<AudioTrackCardProps> = ({
             variant="ghost" 
             size="icon"
             onClick={() => handleDeleteSound(sound.id)}
-            className="text-neutral-300 hover:bg-neutral-700 hover:text-red-500 h-7 w-7"
+            className="text-muted-foreground hover:bg-accent hover:text-destructive h-7 w-7"
           >
             <DeleteIcon fontSize="small" />
           </Button>
@@ -53,7 +53,7 @@ const AudioTrackCard: React.FC<AudioTrackCardProps> = ({
       </CardHeader>
       
       <CardFooter className="p-3 pt-1 flex justify-end items-center">
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-muted-foreground">
           {formatTime(sound.audio_file_duration, false)}
         </p>
       </CardFooter>

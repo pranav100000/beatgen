@@ -48,7 +48,7 @@
   justify-content: space-between;
   margin-top: 1rem;
   font-size: 0.875rem;
-  color: rgba(0, 0, 0, 0.6);
+  /* color: rgba(0, 0, 0, 0.6); */ /* Removed to allow Tailwind class to take effect */
 }
 
 .project-divider {
