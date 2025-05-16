@@ -38,7 +38,7 @@ import {
 import { Project } from '../types/project';
 import { IconTrashFilled } from '@tabler/icons-react';
 import Sidebar from '../components/Sidebar';
-import { useSidebar } from "@/components/ui/sidebar";
+import { useSidebar } from "../../components/ui/sidebar";
 import { Button } from "../../components/ui/button"
 import ProjectsDisplay from '../components/ProjectsDisplay';
 import AudioTracksDisplay from '../components/AudioTracksDisplay';
