@@ -1,4 +1,4 @@
-import React, { createContext, useState, useMemo, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useMemo, useContext, ReactNode, useEffect } from 'react';
 import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
@@ -63,6 +63,15 @@ export const AppThemeProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Default to dark mode, or read from localStorage/preference
   const [uiMode, setUIMode] = useState<'light' | 'dark'>('light'); 
   const [studioMode, setStudioMode] = useState<'light' | 'dark'>('dark'); 
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (uiMode === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [uiMode]);
 
   const toggleUITheme = () => {
     setUIMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));

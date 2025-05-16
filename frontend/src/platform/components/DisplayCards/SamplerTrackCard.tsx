@@ -53,10 +53,10 @@ const SamplerTrackCard: React.FC<SamplerTrackCardProps> = ({
   };
 
   return (
-    <Card className="sampler-track-card w-full bg-neutral-900 border-neutral-800 text-white rounded-lg">
+    <Card className="sampler-track-card w-full rounded-lg">
       <CardHeader className="flex flex-row items-center justify-between p-3">
         <div className="flex items-center">
-          <IconWaveSine className="text-green-400 mr-2" size={18} />
+          <IconWaveSine className="text-green-600 dark:text-green-400 mr-2" size={18} />
           <CardTitle className="text-sm font-medium truncate mr-2">{track.name}</CardTitle>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -64,7 +64,7 @@ const SamplerTrackCard: React.FC<SamplerTrackCardProps> = ({
             variant="ghost"
             size="icon"
             onClick={() => handlePlayTrack(track)}
-            className="text-neutral-300 hover:bg-neutral-700 hover:text-green-400 h-7 w-7"
+            className="text-muted-foreground hover:bg-accent hover:text-green-600 dark:hover:text-green-400 h-7 w-7"
           >
             {isPlaying ? <PauseIcon fontSize="small" /> : <PlayIcon fontSize="small" />}
           </Button>
@@ -73,7 +73,7 @@ const SamplerTrackCard: React.FC<SamplerTrackCardProps> = ({
               variant="ghost" 
               size="icon"
               onClick={() => handleEditTrack(track.id)}
-              className="text-neutral-300 hover:bg-neutral-700 hover:text-amber-400 h-7 w-7"
+              className="text-muted-foreground hover:bg-accent hover:text-yellow-500 dark:hover:text-yellow-400 h-7 w-7"
             >
               <SettingsIcon fontSize="small" />
             </Button>
@@ -82,7 +82,7 @@ const SamplerTrackCard: React.FC<SamplerTrackCardProps> = ({
             variant="ghost" 
             size="icon"
             onClick={() => handleDeleteTrack(track.id)}
-            className="text-neutral-300 hover:bg-neutral-700 hover:text-red-500 h-7 w-7"
+            className="text-muted-foreground hover:bg-accent hover:text-destructive h-7 w-7"
           >
             <DeleteIcon fontSize="small" />
           </Button>
@@ -91,15 +91,15 @@ const SamplerTrackCard: React.FC<SamplerTrackCardProps> = ({
       
       <CardFooter className="p-3 pt-1 flex justify-between items-center">
         <div className="flex flex-col">
-          <p className="text-xs text-neutral-400 mb-1">
+          <p className="text-xs text-muted-foreground mb-1">
             Base Note: {formatMidiNote(track.base_midi_note)}
           </p>
-          <p className="text-xs text-neutral-400">
-            {formatTime(track.audio_file_duration, false)} � {formatFileSize(track.audio_file_size)}
+          <p className="text-xs text-muted-foreground">
+            {formatTime(track.audio_file_duration, false)} {formatFileSize(track.audio_file_size)}
           </p>
         </div>
         {isPlaying && (
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-muted-foreground">
             {formatTime(currentTime, false)} / {formatTime(duration, false)}
           </p>
         )}

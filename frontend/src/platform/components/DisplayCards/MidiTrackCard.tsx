@@ -37,10 +37,10 @@ const MidiTrackCard: React.FC<MidiTrackCardProps> = ({
     0;
 
   return (
-    <Card className="midi-track-card w-full bg-neutral-900 border-neutral-800 text-white rounded-lg">
+    <Card className="midi-track-card w-full rounded-lg">
       <CardHeader className="flex flex-row items-center justify-between p-3">
         <div className="flex items-center">
-          <MusicNoteIcon className="text-blue-400 mr-2" fontSize="small" />
+          <MusicNoteIcon className="text-primary mr-2" fontSize="small" />
           <CardTitle className="text-sm font-medium truncate mr-2">{track.name}</CardTitle>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -48,7 +48,7 @@ const MidiTrackCard: React.FC<MidiTrackCardProps> = ({
             variant="ghost"
             size="icon"
             onClick={() => handlePlayTrack(track)}
-            className="text-neutral-300 hover:bg-neutral-700 hover:text-blue-400 h-7 w-7"
+            className="text-muted-foreground hover:bg-accent hover:text-primary h-7 w-7"
           >
             {isPlaying ? <PauseIcon fontSize="small" /> : <PlayIcon fontSize="small" />}
           </Button>
@@ -57,7 +57,7 @@ const MidiTrackCard: React.FC<MidiTrackCardProps> = ({
               variant="ghost" 
               size="icon"
               onClick={() => handleEditTrack(track.id)}
-              className="text-neutral-300 hover:bg-neutral-700 hover:text-amber-400 h-7 w-7"
+              className="text-muted-foreground hover:bg-accent hover:text-yellow-500 dark:hover:text-yellow-400 h-7 w-7"
             >
               <MusicNoteIcon fontSize="small" />
             </Button>
@@ -66,7 +66,7 @@ const MidiTrackCard: React.FC<MidiTrackCardProps> = ({
             variant="ghost" 
             size="icon"
             onClick={() => handleDeleteTrack(track.id)}
-            className="text-neutral-300 hover:bg-neutral-700 hover:text-red-500 h-7 w-7"
+            className="text-muted-foreground hover:bg-accent hover:text-destructive h-7 w-7"
           >
             <DeleteIcon fontSize="small" />
           </Button>
@@ -74,11 +74,11 @@ const MidiTrackCard: React.FC<MidiTrackCardProps> = ({
       </CardHeader>
       
       <CardFooter className="p-3 pt-1 flex justify-between items-center">
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-muted-foreground">
           Instrument: {track.instrument_file?.display_name || 'Unknown'}
         </p>
-        <p className="text-xs text-neutral-400">
-          {noteCount} notes {isPlaying && `� ${formatTime(currentTime, false)} / ${formatTime(duration, false)}`}
+        <p className="text-xs text-muted-foreground">
+          {noteCount} notes {isPlaying && ` ${formatTime(currentTime, false)} / ${formatTime(duration, false)}`}
         </p>
       </CardFooter>
     </Card>
