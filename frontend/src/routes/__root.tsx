@@ -120,7 +120,7 @@ function RootLayout() {
   
   // Determine if the sidebar should be shown based on the route
   // For example, hide sidebar on /studio, /login, /register, /etc.
-  const noSidebarRoutes = ['/studio', '/login', '/register']; // Removed landing page '/'
+  const noSidebarRoutes = ['/studio', '/login', '/register', '/']; // Added landing page '/'
   const shouldShowSidebar = !noSidebarRoutes.some(route => currentUrl.endsWith(route) || currentUrl.includes(route + '/') || currentUrl.includes(route + '?'));
 
   // No navbar in the root layout - each route will add its own navbar if needed
