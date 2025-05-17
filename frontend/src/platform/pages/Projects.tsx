@@ -12,7 +12,6 @@ import {
   ArrowBack as ArrowBackIcon,
   Menu as MenuIcon
 } from '@mui/icons-material';
-import { useAuth } from '../auth/auth-context';
 import { 
   getProjects, 
   deleteProject, 
@@ -21,26 +20,22 @@ import { Project } from '../types/project';
 import Sidebar from '../components/Sidebar';
 import { useSidebar } from "@/components/ui/sidebar";
 import ProjectsDisplay from '../components/ProjectsDisplay';
-
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Page } from '../types/pagination';
 
 // Constants for pagination and display
 const INITIAL_DISPLAY_COUNT = 12;
-const DISPLAY_INCREMENT = 6; // How many more to show on each click (relevant later)
-const FETCH_THRESHOLD = 10; // When to fetch more from API (relevant later)
-const PROJECTS_PER_PAGE_API = 20; // How many to fetch from API at a time
+const DISPLAY_INCREMENT = 6;
+const PROJECTS_PER_PAGE_API = 20;
 
 export default function Projects() {
   const navigate = useNavigate();
   const { open: sidebarActualOpen } = useSidebar();
+  const queryClient = useQueryClient();
 
-  const [allFetchedProjects, setAllFetchedProjects] = useState<Project[]>([]);
   const [displayedProjectsCount, setDisplayedProjectsCount] = useState<number>(INITIAL_DISPLAY_COUNT);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalProjectsOnServer, setTotalProjectsOnServer] = useState<number>(0);
+  const [currentPageApi, setCurrentPageApi] = useState<number>(1);
 
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -51,54 +46,30 @@ export default function Projects() {
     severity: 'success'
   });
 
+  const {
+    data: projectsData,
+    isLoading: loadingProjects,
+    error: projectsError,
+    isFetching: isFetchingProjects,
+  } = useQuery<Page<Project>, Error, Page<Project>, [string, number, number]>({
+    queryKey: ['projects', currentPageApi, PROJECTS_PER_PAGE_API],
+    queryFn: () => getProjects(currentPageApi, PROJECTS_PER_PAGE_API),
+    placeholderData: (previousData) => previousData,
+  });
+
+  const allFetchedProjects = projectsData?.items ?? [];
+  const totalProjectsOnServer = projectsData?.total_items ?? 0;
+  const totalPagesApi = projectsData?.total_pages ?? 0;
+
   useEffect(() => {
-    fetchAndSetInitialProjects();
-  }, []);
-  
-  const fetchSounds = () => {
-    console.log('Refreshing sounds library');
-  };
-
-  const fetchAndSetInitialProjects = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await getProjects(1, PROJECTS_PER_PAGE_API);
-      setAllFetchedProjects(response.items);
-      setTotalProjectsOnServer(response.total_items);
-      const initialDisplay = Math.min(INITIAL_DISPLAY_COUNT, response.items.length);
-      setDisplayedProjectsCount(initialDisplay);
-      setCurrentPage(1);
-      console.log("Initial fetch complete. States after initial set:");
-      console.log("displayedProjectsCount:", initialDisplay);
-      console.log("totalProjectsOnServer:", response.total_items);
-      console.log("allFetchedProjects.length:", response.items.length);
-    } catch (err) {
-      console.error('Error fetching projects:', err);
-      setError('Failed to load projects. Please try again later.');
-    } finally {
-      setLoading(false);
-      console.log("Initial loading state (in finally block):", false);
+    if (projectsData?.items) {
+      if (currentPageApi === 1) {
+        setDisplayedProjectsCount(Math.min(INITIAL_DISPLAY_COUNT, projectsData.items.length));
+      } else {
+        setDisplayedProjectsCount(prevCount => Math.min(prevCount, allFetchedProjects.length));
+      }
     }
-  };
-
-  const fetchMoreProjects = async () => {
-    if (loadingMore || allFetchedProjects.length >= totalProjectsOnServer) return;
-    setLoadingMore(true);
-    setError(null);
-    try {
-      const nextPage = currentPage + 1;
-      const response = await getProjects(nextPage, PROJECTS_PER_PAGE_API);
-      setAllFetchedProjects(prevProjects => [...prevProjects, ...response.items]);
-      setTotalProjectsOnServer(response.total_items); 
-      setCurrentPage(nextPage);
-    } catch (err) {
-      console.error('Error fetching more projects:', err);
-      setError('Failed to load more projects.');
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  }, [projectsData?.items, currentPageApi, allFetchedProjects.length]);
 
   const handleShowMore = () => {
     const newDisplayedCount = Math.min(
@@ -106,10 +77,11 @@ export default function Projects() {
       allFetchedProjects.length
     );
     setDisplayedProjectsCount(newDisplayedCount);
-    const remainingInBatch = allFetchedProjects.length - newDisplayedCount;
-    const hasMoreOnServer = allFetchedProjects.length < totalProjectsOnServer;
-    if (remainingInBatch < FETCH_THRESHOLD && hasMoreOnServer && !loadingMore) {
-      fetchMoreProjects();
+
+    if (newDisplayedCount >= allFetchedProjects.length && allFetchedProjects.length < totalProjectsOnServer && !isFetchingProjects) {
+      if (currentPageApi < totalPagesApi) {
+        setCurrentPageApi(prev => prev + 1);
+      }
     }
   };
 
@@ -124,16 +96,21 @@ export default function Projects() {
     });
   };
 
+  const { mutate: performDeleteProject, isPending: isDeletingProject } = useMutation({
+    mutationFn: deleteProject,
+    onSuccess: () => {
+      showSnackbar('Project deleted successfully', 'success');
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (err: Error) => {
+      console.error('Error deleting project:', err);
+      showSnackbar(`Failed to delete project: ${err.message}`, 'error');
+    },
+  });
+
   const handleDeleteProject = async (projectId: string) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
-      try {
-        await deleteProject(projectId);
-        await fetchAndSetInitialProjects();
-        showSnackbar('Project deleted successfully', 'success');
-      } catch (err) {
-        console.error('Error deleting project:', err);
-        showSnackbar('Failed to delete project', 'error');
-      }
+      performDeleteProject(projectId);
     }
   };
 
@@ -169,13 +146,18 @@ export default function Projects() {
         }}
       >
         <Container maxWidth="lg" sx={{ pt: 0, mt: 0 }}>
+          {projectsError && !projectsData && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {projectsError.message || 'Failed to load projects. Please try again later.'}
+            </Alert>
+          )}
           <ProjectsDisplay
             allFetchedProjects={allFetchedProjects}
             displayedProjectsCount={displayedProjectsCount}
             totalProjectsOnServer={totalProjectsOnServer}
-            loading={loading}
-            loadingMore={loadingMore}
-            error={error}
+            loading={loadingProjects && currentPageApi === 1}
+            loadingMore={isFetchingProjects && currentPageApi > 1}
+            error={projectsError ? projectsError.message : null}
             onCreateNewProject={handleCreateProject}
             onOpenProject={openProject}
             onEditProject={navigateToEditProject}

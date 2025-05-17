@@ -355,21 +355,46 @@ def convert_interval_melody_to_absolute_melody(interval_melody: "IntervalMelodyO
     
     return MelodyData(bars=absolute_melody_bars)
 
-def transform_melody_data_to_instrument_format(melody_data: MelodyData) -> Dict[str, Any]:
+def transform_melody_data_to_instrument_format(melody_data: MelodyData, beats_per_bar: int = 4) -> Dict[str, Any]:
     notes_list = []
-    current_time = 0
-    if sum(note.duration_beats for bar in melody_data.bars for note in bar.notes) <= 8:
-        melody_data.bars = melody_data.bars * 2
+    
+    processed_bars = list(melody_data.bars) # Start with a mutable copy
+
+    # Calculate total duration of actual notes for the duplication logic
+    # This calculation of total_duration_beats might not be what's intended for the "8 beats" rule,
+    # as it sums durations rather than checking the span of the melody.
+    # However, retaining the original condition's spirit with a sum of durations:
+    total_note_duration_beats = sum(note.duration_beats for bar in melody_data.bars for note in bar.notes)
+
+    # if melody_data.bars and total_note_duration_beats > 0 and total_note_duration_beats <= 8: # Ensure there are bars and notes
+    #     logger.info(f"Melody total note duration {total_note_duration_beats} <= 8 beats, duplicating bars.")
+    #     original_bars_to_duplicate = list(melody_data.bars) # Make a copy to iterate over
+    #     num_original_bars = len(original_bars_to_duplicate)
         
-    for bar in melody_data.bars:
-        for note in bar.notes:
+    #     if num_original_bars > 0:
+    #         duplicated_part = []
+    #         for bar_to_copy in original_bars_to_duplicate:
+    #             # Create new Bar objects with adjusted bar numbers for the duplicated part
+    #             new_bar_number = bar_to_copy.bar + num_original_bars
+    #             # Deep copy notes to avoid modifying original data if Note objects are mutable in ways not shown
+    #             copied_notes = [note.model_copy() for note in bar_to_copy.notes]
+    #             duplicated_part.append(Bar(bar=new_bar_number, notes=copied_notes))
+    #         processed_bars.extend(duplicated_part)
+    #     else:
+    #         logger.info("No bars to duplicate.")
+    
+    for bar_item in processed_bars:
+        bar_start_offset_beats = (bar_item.bar - 1) * beats_per_bar
+        for note in bar_item.notes:
+            absolute_note_start_beat = bar_start_offset_beats + note.start_beat
             notes_list.append({
                 "pitch": note.pitch,
-                "start": current_time * settings.audio.PPQ,
+                "start": absolute_note_start_beat * settings.audio.PPQ,
                 "duration": note.duration_beats * settings.audio.PPQ,
                 "velocity": note.velocity,
             })
-            current_time += note.duration_beats
+            # No longer using a cumulative current_time here, as absolute_note_start_beat provides the correct timing.
+
     return {
         "notes": notes_list,
     }
