@@ -30,6 +30,7 @@ import {
   SidebarMenuButton,
   SidebarSeparator,
   useSidebar,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
 
 import { useAuth } from '../auth/auth-context';
@@ -144,6 +145,23 @@ const Sidebar: React.FC = () => {
           ))}
         </SidebarMenu>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              className="translate-x-1.5"
+              tooltip="Logout"
+              onClick={async () => {
+                await signOut();
+                navigate({ to: '/login', replace: true });
+              }}
+            >
+              <IconLogout className="shrink-0" />
+              {open && <span>Logout</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </ShadcnSidebar>
   );
 };
