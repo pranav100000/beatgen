@@ -131,7 +131,6 @@ const Sidebar: React.FC = () => {
           {menuItems.map((item, index) => (
             <SidebarMenuItem key={item.text}>
               <SidebarMenuButton
-                className="translate-x-1.5"
                 onClick={() => navigate({ to: item.path })}
                 tooltip={item.text}
               >
@@ -149,7 +148,6 @@ const Sidebar: React.FC = () => {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              className="translate-x-1.5"
               tooltip="Logout"
               onClick={async () => {
                 await signOut();
