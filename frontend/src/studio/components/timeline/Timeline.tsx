@@ -302,9 +302,9 @@ function TimelineRuler({
     // Main sticky container - Apply Tailwind classes
     <div
       className={cn(
-        "sticky top-0 z-[2] box-border overflow-hidden shadow-sm",
-        isDark ? "bg-card" : "bg-slate-100", // Conditional background
-        "border-b border-border" // Uses --border CSS variable (theme-aware)
+        "sticky top-0 z-[2] box-border overflow-hidden shadow-sm border-b",
+        isDark ? "bg-neutral-900 border-b-neutral-700" // Darker neutral gray for dark mode
+               : "bg-neutral-100 border-b-neutral-300" // Neutral light gray for light mode
         )}
       style={{ // Height and dynamic width still via style prop
         height: `${GRID_CONSTANTS.headerHeight}px`,
@@ -323,7 +323,7 @@ function TimelineRuler({
           key={`measure-num-${measureIndex}`}
           className={cn(
             "absolute top-1/2 -translate-y-1/2 text-sm select-none z-[1]",
-            "text-foreground" // Uses --foreground CSS variable (theme-aware)
+            isDark ? "text-neutral-200" : "text-neutral-700" // Text colors adjusted for contrast
             )}
           style={{ // Dynamic left positioning
             left: `${measureIndex * measureWidthPixels + 5}px`,
@@ -342,7 +342,7 @@ function TimelineRuler({
               key={`beat-num-${measureIndex}-${actualBeatNumber}`}
               className={cn(
                 "absolute top-1/2 -translate-y-1/2 text-[8px] select-none z-[1]",
-                "text-muted-foreground" // Uses --muted-foreground CSS variable (theme-aware)
+                isDark ? "text-neutral-400" : "text-neutral-500" // Muted text colors adjusted for contrast
                 )}
               style={{ // Dynamic left positioning, similar to measure numbers but offset from beat line
                 left: `${beatXPosition + 4}px`, 
