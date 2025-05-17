@@ -86,8 +86,8 @@ const Sidebar: React.FC = () => {
                 tooltip="My Profile"
                 className="w-full justify-start translate-x-1.5"
               >
-                <IconUserCircle style={{ color: myProfileColor }} />
-                {open && <span style={{ color: myProfileColor }}>My Profile</span>}
+                <IconUserCircle />
+                {open && <span>My Profile</span>}
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" side="right" align="start" sideOffset={open ? 5 : 10}>
