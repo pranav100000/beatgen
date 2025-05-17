@@ -22,7 +22,7 @@ export const Route = createFileRoute('/studio')({
   },
   
   // Use requireAuth utility to protect this route
-  //...requireAuth('/login'),
+  ...requireAuth('/login'),
   
   // Custom loader behavior when authentication is successful
   loader: async ({ /* context, params, */ location }) => { // Access location instead of search

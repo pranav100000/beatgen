@@ -4,6 +4,7 @@ import SoundLibrary from './SoundLibrary'; // Assuming SoundLibrary is in the sa
 
 interface AudioTracksDisplayProps {
   onReloadSounds: () => void;
+  sectionColor: string;
   // If SoundUploader becomes active, we'll need more props:
   // showSoundUploader: boolean;
   // onToggleSoundUploader: () => void; // Or separate setShow for true/false
@@ -14,6 +15,7 @@ interface AudioTracksDisplayProps {
 
 const AudioTracksDisplay: React.FC<AudioTracksDisplayProps> = ({
   onReloadSounds,
+  sectionColor,
   // showSoundUploader,
   // onToggleSoundUploader,
   // onSoundUploaded,
@@ -21,7 +23,7 @@ const AudioTracksDisplay: React.FC<AudioTracksDisplayProps> = ({
   // showSnackbar,
 }) => {
   return (
-    <SoundLibrary onReload={onReloadSounds} />
+    <SoundLibrary onReload={onReloadSounds} sectionColor={sectionColor} />
   );
 };
 

@@ -15,11 +15,12 @@ import { Page } from '../types/pagination'; // Import Page type
 
 interface DrumLibraryProps {
   onReload?: () => void;
+  sectionColor: string;
 }
 
 const ITEMS_PER_PAGE = 10; // Default for drum tracks API
 
-export default function DrumLibrary({ onReload }: DrumLibraryProps) {
+export default function DrumLibrary({ onReload, sectionColor }: DrumLibraryProps) {
   const queryClient = useQueryClient();
   const [currentPageApi, setCurrentPageApi] = useState<number>(1); // For pagination
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -134,6 +135,7 @@ export default function DrumLibrary({ onReload }: DrumLibraryProps) {
               handlePlayTrack={handlePlayTrack}
               handleDeleteTrack={handleDeleteTrack}
               handleEditTrack={handleEditTrack}
+              sectionColor={sectionColor}
             />
           </Grid>
         ))}

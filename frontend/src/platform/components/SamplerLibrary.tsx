@@ -17,11 +17,12 @@ import { Page } from '../types/pagination';
 
 interface SamplerLibraryProps {
   onReload?: () => void;
+  sectionColor: string;
 }
 
 const ITEMS_PER_PAGE = 10;
 
-export default function SamplerLibrary({ onReload }: SamplerLibraryProps) {
+export default function SamplerLibrary({ onReload, sectionColor }: SamplerLibraryProps) {
   const queryClient = useQueryClient();
   const [currentPageApi, setCurrentPageApi] = useState<number>(1);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -189,6 +190,7 @@ export default function SamplerLibrary({ onReload }: SamplerLibraryProps) {
               handlePlayTrack={handlePlayTrack}
               handleDeleteTrack={handleDeleteTrack}
               handleSeek={handleSeek}
+              sectionColor={sectionColor}
             />
           </Grid>
         ))}

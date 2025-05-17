@@ -18,6 +18,7 @@ interface MidiTrackCardProps {
   handlePlayTrack: (track: MidiTrackRead) => void;
   handleDeleteTrack: (trackId: string) => void;
   handleEditTrack?: (trackId: string) => void;
+  sectionColor: string;
 }
 
 const MidiTrackCard: React.FC<MidiTrackCardProps> = ({
@@ -28,6 +29,7 @@ const MidiTrackCard: React.FC<MidiTrackCardProps> = ({
   handlePlayTrack,
   handleDeleteTrack,
   handleEditTrack,
+  sectionColor,
 }) => {
   const isPlaying = playingId === track.id;
   
@@ -37,7 +39,10 @@ const MidiTrackCard: React.FC<MidiTrackCardProps> = ({
     0;
 
   return (
-    <Card className="midi-track-card w-full rounded-lg">
+    <Card 
+      className="midi-track-card w-full rounded-lg hover-shadow-card"
+      style={{ '--hover-shadow-color': sectionColor } as React.CSSProperties}
+    >
       <CardHeader className="flex flex-row items-center justify-between p-3">
         <div className="flex items-center">
           <MusicNoteIcon className="text-primary mr-2" fontSize="small" />

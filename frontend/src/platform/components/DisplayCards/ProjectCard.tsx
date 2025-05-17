@@ -17,6 +17,7 @@ interface ProjectCardProps {
   onOpenProject: (projectId: string) => void;
   onEditProject: (projectId: string) => void;
   onDeleteProject: (projectId: string) => void;
+  sectionColor: string;
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({
@@ -24,9 +25,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
   onOpenProject,
   onEditProject,
   onDeleteProject,
+  sectionColor,
 }) => {
   return (
-    <Card className="project-card w-full min-h-[220px] flex flex-col justify-between">
+    <Card 
+      className="project-card w-full min-h-[220px] flex flex-col justify-between hover-shadow-card"
+      style={{ '--hover-shadow-color': sectionColor } as React.CSSProperties}
+    >
       <CardHeader>
         <CardTitle className="truncate">{project.name}</CardTitle>
       </CardHeader>

@@ -2,6 +2,7 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
+import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from "@tabler/icons-react";
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -25,7 +26,7 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "14rem"
+const SIDEBAR_WIDTH = "12rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
@@ -256,24 +257,31 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, open } = useSidebar()
 
   return (
-    <Button
-      data-sidebar="trigger"
-      data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("size-7", className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
-    >
-      <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          data-sidebar="trigger"
+          data-slot="sidebar-trigger"
+          variant="ghost"
+          size="icon"
+          className={cn("size-7", className)}
+          onClick={(event) => {
+            onClick?.(event)
+            toggleSidebar()
+          }}
+          {...props}
+        >
+          {open ? <IconLayoutSidebarLeftCollapse /> : <IconLayoutSidebarLeftExpand />}
+          <span className="sr-only">Toggle Sidebar</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="right" align="center">
+        {open ? "Collapse Sidebar" : "Expand Sidebar"}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -346,7 +354,12 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-footer"
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn(
+        "flex flex-col gap-2", 
+        "group-data-[state=expanded]:p-2", 
+        "group-data-[state=collapsed]:py-2 group-data-[state=collapsed]:px-1", 
+        className
+      )}
       {...props}
     />
   )

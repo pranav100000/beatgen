@@ -4,6 +4,7 @@ import Sidebar from '../platform/components/Sidebar'
 import MidiLibrary from '../platform/components/MidiLibrary'
 import { requireAuth } from '../platform/auth/auth-utils'
 import { Container } from '@mui/material'
+import { logoColors } from '../platform/components/Sidebar'
 
 export const Route = createFileRoute('/midi-tracks')({
   component: MidiTracksPage,
@@ -12,6 +13,8 @@ export const Route = createFileRoute('/midi-tracks')({
 })
 
 function MidiTracksPage() {
+  const midiTracksColor = logoColors[3]
+
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
@@ -20,14 +23,21 @@ function MidiTracksPage() {
       {/* Main content */}
       <div className="flex-1 overflow-auto p-8">
         <Container maxWidth="lg" sx={{ pt: 0, mt: 0 }}>
-          <h1 className="text-3xl font-bold mb-6">MIDI Tracks</h1>
+          <h1 
+            className="text-3xl font-bold mb-6"
+            style={{ 
+              color: midiTracksColor, 
+            }}
+          >
+            MIDI Tracks
+          </h1>
           <p className="text-muted-foreground mb-6">
             Manage your MIDI tracks. Upload new MIDI files or use existing tracks in your projects.
           </p>
           
           {/* MIDI Library Component */}
           <div className="bg-card rounded-lg p-4 shadow-md">
-            <MidiLibrary />
+            <MidiLibrary sectionColor={midiTracksColor} />
           </div>
         </Container>
       </div>

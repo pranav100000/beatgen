@@ -3,14 +3,22 @@
   padding-bottom: 4rem;
 }
 
-.project-card {
+.project-card,
+.audio-track-card,
+.midi-track-card,
+.sampler-track-card,
+.drum-track-card {
   height: 100%;
   display: flex;
   flex-direction: column;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.project-card:hover {
+.project-card:hover,
+.audio-track-card:hover,
+.midi-track-card:hover,
+.sampler-track-card:hover,
+.drum-track-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
@@ -53,4 +61,12 @@
 
 .project-divider {
   margin: 1rem 0;
+}
+
+.hover-shadow-card {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.hover-shadow-card:hover {
+  box-shadow: 0 0 12px var(--hover-shadow-color);
 }
