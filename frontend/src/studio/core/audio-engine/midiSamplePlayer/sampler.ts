@@ -188,7 +188,7 @@ class MidiSampler {
         const gridUnitTime = secPerBeat / 4; // Assuming 16th note grid
         
         // Add a small lookahead to compensate for transport timing delays
-        const lookAheadTime = 0.025; // 25ms lookahead
+        const lookAheadTime = 0.1; // 25ms lookahead
         // Schedule all notes
         for (const note of this.notes) {
             // Calculate note time based on grid position
