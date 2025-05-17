@@ -178,14 +178,14 @@ export default function Projects() {
             error={error}
             onCreateNewProject={handleCreateProject}
             onOpenProject={openProject}
-            onEditProject={navigateToEditProject} 
+            onEditProject={navigateToEditProject}
             onDeleteProject={handleDeleteProject}
             onShowMore={handleShowMore}
             snackbarOpen={snackbar.open}
             snackbarMessage={snackbar.message}
             snackbarSeverity={snackbar.severity}
-            onCloseSnackbar={handleCloseSnackbar}
-          />
+            onCloseSnackbar={handleCloseSnackbar} 
+            sectionColor={''}          />
         </Container>
       </main>
     </Box>

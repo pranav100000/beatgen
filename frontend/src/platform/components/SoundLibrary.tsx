@@ -16,9 +16,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface SoundLibraryProps {
   onReload?: () => void;
+  sectionColor: string;
 }
 
-export default function SoundLibrary({ onReload }: SoundLibraryProps) {
+export default function SoundLibrary({ onReload, sectionColor }: SoundLibraryProps) {
   const queryClient = useQueryClient();
 
   const [sounds, setSounds] = useState<AudioTrackRead[]>([]);
@@ -182,6 +183,7 @@ export default function SoundLibrary({ onReload }: SoundLibraryProps) {
               handlePlaySound={handlePlaySound}
               handleDeleteSound={handleDeleteSound}
               handleSeek={handleSeek}
+              sectionColor={sectionColor}
             />
           </Grid>
         ))}

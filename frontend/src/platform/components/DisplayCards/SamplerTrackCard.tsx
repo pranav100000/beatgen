@@ -25,6 +25,7 @@ interface SamplerTrackCardProps {
   handleDeleteTrack: (trackId: string) => void;
   handleEditTrack?: (trackId: string) => void;
   handleSeek?: (trackId: string, position: number) => void;
+  sectionColor: string;
 }
 
 const SamplerTrackCard: React.FC<SamplerTrackCardProps> = ({
@@ -36,6 +37,7 @@ const SamplerTrackCard: React.FC<SamplerTrackCardProps> = ({
   handleDeleteTrack,
   handleEditTrack,
   handleSeek,
+  sectionColor,
 }) => {
   const isPlaying = playingId === track.id;
   
@@ -53,7 +55,10 @@ const SamplerTrackCard: React.FC<SamplerTrackCardProps> = ({
   };
 
   return (
-    <Card className="sampler-track-card w-full rounded-lg">
+    <Card 
+      className="sampler-track-card w-full rounded-lg hover-shadow-card"
+      style={{ '--hover-shadow-color': sectionColor } as React.CSSProperties}
+    >
       <CardHeader className="flex flex-row items-center justify-between p-3">
         <div className="flex items-center">
           <IconWaveSine className="text-green-600 dark:text-green-400 mr-2" size={18} />

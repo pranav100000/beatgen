@@ -23,6 +23,7 @@ interface DrumTrackCardProps {
   handlePlayTrack: (track: DrumTrackRead) => void;
   handleDeleteTrack: (trackId: string) => void;
   handleEditTrack?: (trackId: string) => void;
+  sectionColor: string; // <<< ADD THIS LINE
 }
 
 const DrumTrackCard: React.FC<DrumTrackCardProps> = ({
@@ -31,12 +32,16 @@ const DrumTrackCard: React.FC<DrumTrackCardProps> = ({
   handlePlayTrack,
   handleDeleteTrack,
   handleEditTrack,
+  sectionColor
 }) => {
   const isPlaying = playingId === track.id;
   const samplerCount = track.sampler_tracks?.length || 0;
 
   return (
-    <Card className="drum-track-card w-full rounded-lg">
+    <Card
+    className="drum-track-card w-full rounded-lg hover-shadow-card" // <<< ADD hover-shadow-card
+    style={{ '--hover-shadow-color': sectionColor } as React.CSSProperties} // <<< ADD THIS LINE
+    >
       <CardHeader className="flex flex-row items-center justify-between p-3">
         <div className="flex items-center">
           <Drum className="text-primary mr-2" size={18} />

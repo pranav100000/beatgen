@@ -62,3 +62,11 @@
 .project-divider {
   margin: 1rem 0;
 }
+
+.hover-shadow-card {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.hover-shadow-card:hover {
+  box-shadow: 0 0 12px var(--hover-shadow-color);
+}

@@ -47,6 +47,7 @@ import SamplerLibrary from '../components/SamplerLibrary';
 import DrumLibrary from '../components/DrumLibrary';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Page } from '../types/pagination';
+import { logoColors } from '../components/Sidebar';
 
 // Constants for pagination and display
 const INITIAL_DISPLAY_COUNT = 6;
@@ -189,7 +190,14 @@ export default function HomePage() {
 
           <Paper elevation={2} sx={{ p: 3, mt: 0, borderRadius: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h5" component="h2" sx={{ fontWeight: 'medium' }}>
+              <Typography 
+                variant="h5" 
+                component="h2" 
+                sx={{ fontWeight: 'medium' }}
+                style={{ 
+                  color: logoColors[1], // Projects
+                }}
+              >
                 Projects
               </Typography>
               <Button
@@ -217,39 +225,68 @@ export default function HomePage() {
               snackbarMessage={snackbar.message}
               snackbarSeverity={snackbar.severity}
               onCloseSnackbar={handleCloseSnackbar}
+              sectionColor={logoColors[1]}
             />
           </Paper>
 
           {/* My Sounds Section is now replaced by AudioTracksDisplay */}
           <Paper elevation={2} sx={{ p: 3, mt: 4, borderRadius: 2 }}>
-            <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 'medium' }}>
+            <Typography 
+              variant="h5" 
+              component="h2" 
+              sx={{ mb: 2, fontWeight: 'medium' }}
+              style={{
+                color: logoColors[2], // Audio Tracks
+              }}
+            >
               Audio Tracks
             </Typography>
-            <AudioTracksDisplay onReloadSounds={fetchSounds} />
+            <AudioTracksDisplay onReloadSounds={fetchSounds} sectionColor={logoColors[2]} />
           </Paper>
 
           {/* Midi Tracks Section */}
           <Paper elevation={2} sx={{ p: 3, mt: 4, borderRadius: 2 }}>
-            <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 'medium' }}>
+            <Typography 
+              variant="h5" 
+              component="h2" 
+              sx={{ mb: 2, fontWeight: 'medium' }}
+              style={{
+                color: logoColors[3], // MIDI Tracks
+              }}
+            >
               MIDI Tracks
             </Typography>
-            <MidiLibrary />
+            <MidiLibrary sectionColor={logoColors[3]} />
           </Paper>
 
           {/* Sampler Tracks Section */}
           <Paper elevation={2} sx={{ p: 3, mt: 4, borderRadius: 2 }}>
-            <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 'medium' }}>
+            <Typography 
+              variant="h5" 
+              component="h2" 
+              sx={{ mb: 2, fontWeight: 'medium' }}
+              style={{
+                color: logoColors[4], // Sampler Tracks
+              }}
+            >
               Sampler Tracks
             </Typography>
-            <SamplerLibrary />
+            <SamplerLibrary sectionColor={logoColors[4]} />
           </Paper>
 
           {/* Drum Tracks Section */}
           <Paper elevation={2} sx={{ p: 3, mt: 4, borderRadius: 2, mb: 4 }}>
-            <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 'medium' }}>
+            <Typography 
+              variant="h5" 
+              component="h2" 
+              sx={{ mb: 2, fontWeight: 'medium' }}
+              style={{
+                color: logoColors[5], // Drum Tracks
+              }}
+            >
               Drum Tracks
             </Typography>
-            <DrumLibrary />
+            <DrumLibrary sectionColor={logoColors[5]} />
           </Paper>
 
           {/* Snackbar for notifications */}

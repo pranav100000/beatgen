@@ -34,6 +34,18 @@ import {
 
 import { useAuth } from '../auth/auth-context';
 
+export const logoColors = [
+  '#e539a9', // Bright Pink
+  '#c63ba6', // Magenta
+  '#a93fbf', // Dark Violet
+  '#8247d8', // Purple
+  '#6050e0', // Indigo
+  '#4160e2', // Blue
+];
+
+const myProfileColor = '#c63ba6';
+const beatGenTitleColor = logoColors[3]; // Purple for BeatGen title
+
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const { open } = useSidebar();
@@ -58,7 +70,7 @@ const Sidebar: React.FC = () => {
         {open && (
           <div className="flex items-center">
             <img src="/beatgen-favicon.png" alt="BeatGen Favicon" className="mr-2 h-6 w-6" />
-            <span className="text-xl font-semibold">BeatGen</span>
+            <span className="text-xl font-semibold" style={{ color: beatGenTitleColor }}>BeatGen</span>
           </div>
         )}
         <SidebarTrigger className="translate-x-1.5" />
@@ -74,8 +86,8 @@ const Sidebar: React.FC = () => {
                 tooltip="My Profile"
                 className="w-full justify-start translate-x-1.5"
               >
-                <IconUserCircle />
-                {open && <span>My Profile</span>}
+                <IconUserCircle style={{ color: myProfileColor }} />
+                {open && <span style={{ color: myProfileColor }}>My Profile</span>}
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" side="right" align="start" sideOffset={open ? 5 : 10}>
@@ -115,15 +127,18 @@ const Sidebar: React.FC = () => {
         
         {/* Navigation Links */}
         <SidebarMenu>
-          {menuItems.map((item) => (
+          {menuItems.map((item, index) => (
             <SidebarMenuItem key={item.text}>
               <SidebarMenuButton
                 className="translate-x-1.5"
                 onClick={() => navigate({ to: item.path })}
                 tooltip={item.text}
               >
-                {React.cloneElement(item.icon, { className: "shrink-0" })}
-                <span>{item.text}</span>
+                {React.cloneElement(item.icon, { 
+                  className: "shrink-0", 
+                  style: { color: logoColors[index % logoColors.length] } 
+                })}
+                <span style={{ color: logoColors[index % logoColors.length] }}>{item.text}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

@@ -18,6 +18,7 @@ interface AudioTrackCardProps {
   handlePlaySound: (sound: Sound) => void;
   handleDeleteSound: (soundId: string) => void;
   handleSeek: (soundId: string, position: number) => void;
+  sectionColor: string;
 }
 
 const AudioTrackCard: React.FC<AudioTrackCardProps> = ({
@@ -25,11 +26,15 @@ const AudioTrackCard: React.FC<AudioTrackCardProps> = ({
   playingId,
   handlePlaySound,
   handleDeleteSound,
+  sectionColor,
 }) => {
   const isPlaying = playingId === sound.id;
 
   return (
-    <Card className="audio-track-card w-full rounded-lg">
+    <Card 
+      className="audio-track-card w-full rounded-lg hover-shadow-card"
+      style={{ '--hover-shadow-color': sectionColor } as React.CSSProperties}
+    >
       <CardHeader className="flex flex-row items-center justify-between p-3">
         <CardTitle className="text-sm font-medium truncate mr-2">{sound.name}</CardTitle>
         <div className="flex items-center gap-1 flex-shrink-0">

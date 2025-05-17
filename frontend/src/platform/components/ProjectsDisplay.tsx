@@ -15,6 +15,7 @@ import {
 import { Project } from '../types/project';
 import { Button } from "../../components/ui/button";
 import ProjectCard from './DisplayCards/ProjectCard';
+import { logoColors } from './Sidebar';
 
 interface ProjectsDisplayProps {
   allFetchedProjects: Project[];
@@ -32,6 +33,7 @@ interface ProjectsDisplayProps {
   snackbarMessage: string;
   snackbarSeverity: 'success' | 'error';
   onCloseSnackbar: () => void;
+  sectionColor: string;
 }
 
 const ProjectsDisplay: React.FC<ProjectsDisplayProps> = ({
@@ -50,6 +52,7 @@ const ProjectsDisplay: React.FC<ProjectsDisplayProps> = ({
   snackbarMessage,
   snackbarSeverity,
   onCloseSnackbar,
+  sectionColor,
 }) => {
   return (
     <React.Fragment>
@@ -69,7 +72,14 @@ const ProjectsDisplay: React.FC<ProjectsDisplayProps> = ({
       ) : allFetchedProjects.length === 0 ? (
         <Paper className="project-empty-state" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8, mt: 2, textAlign: 'center' }}>
           <MusicNoteIcon className="project-empty-icon" sx={{ fontSize: 60, mb: 2 }} />
-          <Typography variant="h6" gutterBottom>
+          <Typography 
+            variant="h6" 
+            gutterBottom
+            style={{ 
+              color: logoColors[1],
+              textShadow: `0 0 5px ${logoColors[1]}`
+            }}
+          >
             No projects yet
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph>
@@ -93,6 +103,7 @@ const ProjectsDisplay: React.FC<ProjectsDisplayProps> = ({
                 onOpenProject={onOpenProject}
                 onEditProject={onEditProject}
                 onDeleteProject={onDeleteProject}
+                sectionColor={sectionColor}
               />
             </Grid>
           ))}

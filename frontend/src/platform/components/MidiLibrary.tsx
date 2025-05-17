@@ -17,11 +17,12 @@ import { Page } from '../types/pagination'; // Import Page type
 
 interface MidiLibraryProps {
   onReload?: () => void;
+  sectionColor: string;
 }
 
 const ITEMS_PER_PAGE = 25; // Define items per page, as used before
 
-export default function MidiLibrary({ onReload }: MidiLibraryProps) {
+export default function MidiLibrary({ onReload, sectionColor }: MidiLibraryProps) {
   const queryClient = useQueryClient();
   const [currentPageApi, setCurrentPageApi] = useState<number>(1); // For pagination
 
@@ -168,6 +169,7 @@ export default function MidiLibrary({ onReload }: MidiLibraryProps) {
               duration={duration}
               handlePlayTrack={handlePlayTrack}
               handleDeleteTrack={handleDeleteTrack}
+              sectionColor={sectionColor}
             />
           </Grid>
         ))}
