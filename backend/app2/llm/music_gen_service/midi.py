@@ -513,21 +513,49 @@ def transform_chord_progression_to_instrument_format(
     Returns:
         Dictionary with formatted instrument data including MIDI notes
     """
-    print("CHORD PROGRESSION:", chord_progression)
     print("INSTRUMENT:", instrument)
     print("KEY:", key)
-    chord_progression_list = list(filter(None, chord_progression.split("-")))
-    print("CHORD PROGRESSION LIST:", chord_progression_list)
-    if len(chord_progression_list) == 0:
-        return []
+
+    # Define common arrow or separator strings that are not chords
+    NON_CHORD_TOKENS = ["→", "->", "->>", "-->", "=>", "==>", "&", "|"]
+
+    raw_items_from_split = chord_progression.split('-')
+    
+    parsed_chord_list = []
+    for item in raw_items_from_split:
+        stripped_item = item.strip()
+        if stripped_item and stripped_item not in NON_CHORD_TOKENS:
+            parsed_chord_list.append(stripped_item)
+    
+    chord_progression_list = parsed_chord_list # Assign to the variable name used below
+
+    print("CHORD PROGRESSION (raw input):", chord_progression)
+    print("CHORD PROGRESSION LIST (cleaned and before length adjustment):", chord_progression_list)
+
+    if not chord_progression_list:
+        logger.warning(f"No valid chords found in progression string: '{chord_progression}' after filtering. Returning empty instrument notes.")
+        return {
+            "instrument_id": instrument.id,
+            "storage_key": instrument.storage_key,
+            "name": instrument.display_name,
+            "notes": {"notes": []},  # Consistent return type
+        }
+
+    # Adjust list length if necessary (e.g., for 1, 2, 3 chords)
+    # This logic now operates on the cleaned chord_progression_list
     if len(chord_progression_list) == 1:
-        chord_progression_list = chord_progression_list * 4
-    if len(chord_progression_list) == 2:
-        chord_progression_list = chord_progression_list[0] * 2 + chord_progression_list[1] * 2
-    if len(chord_progression_list) == 3:
-        chord_progression_list = chord_progression_list[0] + chord_progression_list[1] + chord_progression_list[2] + chord_progression_list[1]
-    if len(chord_progression_list) > 4:
+        # Repeat the single chord 4 times
+        chord_progression_list = [chord_progression_list[0]] * 4
+    elif len(chord_progression_list) == 2:
+        # Form a list: [c1, c1, c2, c2]
+        chord_progression_list = [chord_progression_list[0]] * 2 + [chord_progression_list[1]] * 2
+    elif len(chord_progression_list) == 3:
+        # Form a list: [c1, c2, c3, c2]
+        chord_progression_list = [chord_progression_list[0]] + [chord_progression_list[1]] + [chord_progression_list[2]] + [chord_progression_list[1]]
+    elif len(chord_progression_list) > 4:
         chord_progression_list = chord_progression_list[:4]
+    
+    print("CHORD PROGRESSION LIST (after length adjustment):", chord_progression_list)
         
 
     # Initialize MIDI notes array
@@ -538,11 +566,12 @@ def transform_chord_progression_to_instrument_format(
     chord_duration = 4.0
 
     # Process each chord
-    filtered_chord_progression_list = [chord for chord in chord_progression_list if chord]
-    for chord_name in filtered_chord_progression_list:
+    # No longer need: filtered_chord_progression_list = [chord for chord in chord_progression_list if chord]
+    for chord_name in chord_progression_list: # Iterate directly over the cleaned and length-adjusted list
         # Parse the chord name into MIDI notes
         try:
-            chord_notes = _parse_chord_name(chord_name.strip(), key, octave=3)
+            # chord_name is already stripped from the cleaning process
+            chord_notes = _parse_chord_name(chord_name, key, octave=3)
 
             # Add each note in the chord
             for pitch in chord_notes:
@@ -589,6 +618,7 @@ def _parse_chord_name(chord_name: str, key: str, octave: int = 4) -> List[int]:
     logger.info(f"Parsing chord name: {chord_name}")
     # Convert 'b' flats to '-' for music21
     chord_name = chord_name.replace("b", "-")
+    chord_name = chord_name.replace("♭", "-")
     chord = harmony.ChordSymbol(chord_name)
     return [note.midi for note in chord.pitches]
 
